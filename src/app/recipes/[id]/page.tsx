@@ -9,6 +9,8 @@ import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
 import { AddToCookbookButton } from "@/components/AddToCookbookModal";
 import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
 import { listShoppingLists } from "@/lib/shopping";
+import { ShareButton } from "@/components/ShareButton";
+import { getActiveToken } from "@/lib/share";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +23,12 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const [recipe, available, cookbooks, shoppingLists] = await Promise.all([
+  const [recipe, available, cookbooks, shoppingLists, shareToken] = await Promise.all([
     getRecipeDetail(recipeId),
     listRecipesMinimal(recipeId),
     listCookbooks(),
     listShoppingLists(),
+    getActiveToken("recipe", recipeId),
   ]);
   if (!recipe) notFound();
 
@@ -69,6 +72,11 @@ export default async function RecipePage({
           <AddToShoppingListButton
             recipeId={recipe.id}
             lists={shoppingLists.map((l) => ({ id: l.id, name: l.name }))}
+          />
+          <ShareButton
+            entityType="recipe"
+            entityId={recipe.id}
+            existingToken={shareToken?.token ?? null}
           />
           <AddToCookbookButton
             recipeId={recipe.id}
