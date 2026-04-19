@@ -41,7 +41,7 @@ Le stack applicatif (backend, frontend, ORM, PDF) est laissé au libre choix du 
 - [x] Cahier des charges V1.1 validé
 - [x] Phase 1 — Cadrage & setup
 - [x] Phase 2 — Socle & recettes V1
-- [ ] Phase 3 — Multiplication & sous-recettes
+- [x] Phase 3 — Multiplication & sous-recettes
 - [ ] Phase 4 — Cahiers & PDF
 - [ ] Phase 5 — Liste de courses
 - [ ] Phase 6 — Partage public & paramètres

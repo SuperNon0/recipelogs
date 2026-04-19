@@ -1,23 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getRecipeDetail } from "@/lib/recipes";
+import { getRecipeDetail, listRecipesMinimal } from "@/lib/recipes";
+import { listCookbooks } from "@/lib/cookbooks";
 import { RecipeActions } from "@/components/RecipeActions";
 import { CommentsSection } from "@/components/CommentsSection";
+import { RecipeBody, type SubRecipeRow } from "@/components/RecipeBody";
+import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
+import { AddToCookbookButton } from "@/components/AddToCookbookModal";
 
 export const dynamic = "force-dynamic";
-
-function formatG(value: number): string {
-  if (value >= 1000) {
-    return (
-      (value / 1000).toLocaleString("fr-FR", {
-        maximumFractionDigits: 2,
-      }) + " kg"
-    );
-  }
-  return (
-    value.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " g"
-  );
-}
 
 export default async function RecipePage({
   params,
@@ -28,13 +19,35 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const recipe = await getRecipeDetail(recipeId);
+  const [recipe, available, cookbooks] = await Promise.all([
+    getRecipeDetail(recipeId),
+    listRecipesMinimal(recipeId),
+    listCookbooks(),
+  ]);
   if (!recipe) notFound();
 
-  const totalG = recipe.ingredients.reduce(
-    (s, i) => s + Number(i.quantityG),
-    0,
-  );
+  const ingredients = recipe.ingredients.map((i) => ({
+    id: i.id,
+    name: i.name ?? i.ingredientBase?.name ?? "—",
+    quantityG: Number(i.quantityG),
+  }));
+
+  const subRecipes: SubRecipeRow[] = recipe.parentLinks.map((link) => ({
+    id: link.id,
+    childId: link.childId,
+    childName: link.child.name,
+    label: link.label,
+    calcMode: link.calcMode,
+    calcValue: Number(link.calcValue),
+    pivotIngredientId: link.pivotIngredientId,
+    isLocked: link.isLocked,
+    childIngredients: link.child.ingredients.map((i) => ({
+      id: i.id,
+      name: i.name ?? i.ingredientBase?.name ?? "—",
+      quantityG: Number(i.quantityG),
+    })),
+    childSteps: link.child.stepsBlock?.content ?? null,
+  }));
 
   return (
     <article className="flex flex-col gap-5 max-w-3xl mx-auto">
@@ -42,7 +55,20 @@ export default async function RecipePage({
         <Link href="/" className="fl-label hover:text-[color:var(--text)]">
           ← Recettes
         </Link>
-        <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
+        <div className="flex items-center gap-2">
+          <a
+            href={`/recipes/${recipe.id}/pdf`}
+            className="fl-btn fl-btn-secondary"
+            style={{ fontSize: "0.8rem" }}
+          >
+            ⬇ PDF
+          </a>
+          <AddToCookbookButton
+            recipeId={recipe.id}
+            cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
+          />
+          <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
+        </div>
       </div>
 
       <header className="flex flex-col gap-3">
@@ -97,68 +123,18 @@ export default async function RecipePage({
         )}
       </header>
 
-      <section className="fl-card flex items-end justify-between">
-        <div>
-          <div className="fl-label">Masse totale</div>
-          <div className="fl-value-serif" style={{ fontSize: "2.25rem" }}>
-            {formatG(totalG)}
-          </div>
-        </div>
-        <div className="flex flex-col items-end">
-          <div className="fl-label">Ingrédients</div>
-          <div className="fl-value-serif" style={{ fontSize: "1.5rem" }}>
-            {recipe.ingredients.length}
-          </div>
-        </div>
-      </section>
+      <RecipeBody
+        recipeId={recipe.id}
+        ingredients={ingredients}
+        subRecipes={subRecipes}
+      />
 
-      <section className="fl-card">
-        <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
-          Ingrédients
-        </h2>
-        <table className="w-full">
-          <tbody>
-            {recipe.ingredients.map((ing, idx) => (
-              <tr
-                key={ing.id}
-                style={{
-                  background:
-                    idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
-                }}
-              >
-                <td
-                  className="py-1.5 pr-3 text-right"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.9rem",
-                    color: "var(--text)",
-                    width: "110px",
-                  }}
-                >
-                  {Number(ing.quantityG).toLocaleString("fr-FR", {
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  <span style={{ color: "var(--muted)" }}>g</span>
-                </td>
-                <td className="py-1.5" style={{ color: "var(--text)" }}>
-                  {ing.name ?? ing.ingredientBase?.name ?? "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td
-                className="pt-3 text-right fl-value-serif"
-                style={{ fontSize: "1.1rem" }}
-              >
-                {formatG(totalG)}
-              </td>
-              <td className="pt-3 fl-label">Total</td>
-            </tr>
-          </tfoot>
-        </table>
-      </section>
+      <div className="flex">
+        <AddSubRecipeButton
+          parentId={recipe.id}
+          availableRecipes={available}
+        />
+      </div>
 
       {recipe.stepsBlock?.content && (
         <section className="fl-card">
