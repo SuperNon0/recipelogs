@@ -8,97 +8,88 @@
 
 | Élément | Détail |
 |---|---|
-| Hôte Proxmox | Version ≥ 7.x, accès SSH root |
-| Template LXC | `debian-12-standard_12.7-1_amd64.tar.zst` (ou équivalent Debian 12) |
+| Hôte Proxmox | Version ≥ 7.x, accès shell root (SSH ou console web) |
 | DNS | Sous-domaine pointant vers le tunnel Cloudflare (ex. `recipe.super-nono.cc`) |
 | Compte Cloudflare | Zero Trust activé + tunnel configuré |
-| Accès dépôt | Git (SSH ou HTTPS) vers `github.com/supernon0/recipelogs` |
 
 ---
 
-## Étape 1 — Préparer le template Proxmox
+## Étape 1 — Créer le container LXC (community-scripts)
 
-Sur l'hôte Proxmox (via SSH ou shell Proxmox) :
+> Les [Proxmox VE Helper Scripts](https://community-scripts.github.io/ProxmoxVE/) gèrent automatiquement le téléchargement du template, la création et la configuration du container.
+
+Dans le **shell de l'hôte Proxmox** (SSH ou console Proxmox) :
 
 ```bash
-# Télécharger le template Debian 12 si absent
-pveam update
-pveam download local debian-12-standard_12.7-1_amd64.tar.zst
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/debian.sh)"
+```
 
-# Vérifier la présence du template
-pveam list local | grep debian-12
+Le script pose des questions interactives. Choisir :
+
+| Question | Valeur recommandée |
+|---|---|
+| Type de container | Unprivileged |
+| Distribution | Debian 12 |
+| RAM | **2048** Mo |
+| Swap | 512 Mo |
+| Disque | **20** Go |
+| CPU | **2** cores |
+| Hostname | `recipelog` |
+| Réseau | DHCP ou IP fixe de ton choix |
+
+### Activer Nesting (obligatoire pour Chromium/PDF)
+
+Après la création, **dans l'interface Proxmox** :
+
+1. Sélectionner le container → **Options → Features**
+2. Cocher **Nesting** → OK
+3. Redémarrer le container si déjà démarré
+
+Ou en ligne de commande sur l'hôte (remplacer `120` par le VMID attribué) :
+
+```bash
+pct set 120 --features nesting=1
+pct reboot 120
 ```
 
 ---
 
-## Étape 2 — Créer le container LXC
+## Étape 2 — Installer l'application
+
+Entrer dans le container :
 
 ```bash
-# Copier les scripts de déploiement sur l'hôte
-scp -r deploy/proxmox/ root@<ip-proxmox>:/root/recipelog/
-
-# Sur l'hôte Proxmox
-cd /root/recipelog
-
-# Usage : bash create-lxc.sh <VMID> <hostname>
-bash create-lxc.sh 120 recipelog
-```
-
-Le script `create-lxc.sh` :
-- Crée un container Debian 12 avec 2 CPU, 2 Go RAM, 20 Go disque
-- Configure le réseau (DHCP par défaut, modifiable dans le script)
-- Démarre le container
-
-### Personnalisation réseau (optionnel)
-
-Éditer `create-lxc.sh` avant l'exécution pour fixer l'IP :
-
-```bash
-# Remplacer la ligne ip=dhcp par :
-ip=192.168.1.XXX/24,gw=192.168.1.1
-```
-
----
-
-## Étape 3 — Installer l'application
-
-Entrer dans le container et lancer le script d'installation :
-
-```bash
-# Accéder au container (depuis l'hôte Proxmox)
+# Depuis l'hôte Proxmox (remplacer 120 par le VMID)
 pct enter 120
-
-# Dans le container — copier setup.sh puis lancer
-# (ou pipe directement si SSH configuré)
-bash /root/setup.sh
 ```
 
-Le script `setup.sh` (~5-10 min) :
-1. Met à jour Debian 12
-2. Installe Node.js 22, pnpm, PostgreSQL 16, Chromium, nginx
-3. Clone le dépôt dans `/opt/recipelog`
-4. Crée l'utilisateur PostgreSQL + la base de données
-5. Génère le fichier `.env` avec `DATABASE_URL` et `NEXTAUTH_SECRET`
-6. Lance `pnpm install` + `pnpm build` (mode standalone)
-7. Installe le service systemd `recipelog`
-8. Configure nginx en reverse proxy sur le port 3000
-9. Configure UFW (ports 22, 80, 443)
+Puis dans le container, lancer le script d'installation en une seule commande :
 
-### Variables à configurer dans `.env`
+```bash
+apt-get install -y curl git && \
+curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/deploy/proxmox/setup.sh | bash
+```
 
-Après `setup.sh`, éditer `/opt/recipelog/.env` :
+Le script `setup.sh` (~5-10 min) installe et configure automatiquement :
+1. Node.js 22, pnpm, PostgreSQL 16, Chromium, nginx
+2. Clone du dépôt dans `/opt/recipelog`
+3. Utilisateur PostgreSQL + base de données + extension `pg_trgm`
+4. Fichier `.env` avec `DATABASE_URL` et `NEXTAUTH_SECRET` générés aléatoirement
+5. `pnpm install` + migrations Prisma + `pnpm build`
+6. Service systemd `recipelog` + nginx reverse proxy + UFW
+
+À la fin, le script affiche l'IP du container et les commandes utiles.
+
+### Configurer le domaine dans `.env`
 
 ```bash
 nano /opt/recipelog/.env
 ```
 
-| Variable | Valeur à renseigner |
-|---|---|
-| `DATABASE_URL` | Déjà configurée par setup.sh |
-| `NEXTAUTH_SECRET` | Déjà généré (32 bytes aléatoires) |
-| `NEXT_PUBLIC_APP_URL` | `https://recipe.super-nono.cc` (votre domaine) |
-
-Après modification :
+Modifier la ligne :
+```
+NEXTAUTH_URL="https://recipe.super-nono.cc"   # ← ton vrai domaine
+```
 
 ```bash
 systemctl restart recipelog
@@ -106,7 +97,7 @@ systemctl restart recipelog
 
 ---
 
-## Étape 4 — Vérifier l'installation
+## Étape 3 — Vérifier l'installation
 
 ```bash
 # Statut du service
@@ -137,9 +128,9 @@ Sortie attendue pour `systemctl status recipelog` :
 
 ---
 
-## Étape 5 — Configurer Cloudflare Zero Trust
+## Étape 4 — Configurer Cloudflare Zero Trust
 
-### 5.1 Créer un tunnel Cloudflare
+### 4.1 Créer un tunnel Cloudflare
 
 Dans le dashboard Cloudflare Zero Trust :
 
@@ -151,7 +142,7 @@ Dans le dashboard Cloudflare Zero Trust :
    cloudflared service install <TOKEN>
    ```
 
-### 5.2 Installer cloudflared dans le container
+### 4.2 Installer cloudflared dans le container
 
 ```bash
 # Dans le container LXC
@@ -165,7 +156,7 @@ systemctl enable cloudflared
 systemctl start cloudflared
 ```
 
-### 5.3 Configurer la route publique
+### 4.3 Configurer la route publique
 
 Dans le dashboard Cloudflare Zero Trust :
 
@@ -177,7 +168,7 @@ Dans le dashboard Cloudflare Zero Trust :
    - URL : `localhost:80`
 3. Sauvegarder
 
-### 5.4 Configurer Access (accès privé)
+### 4.4 Configurer Access (accès privé)
 
 1. **Access → Applications → Add an application → Self-hosted**
 2. Application name : `RecipeLog`
@@ -186,7 +177,7 @@ Dans le dashboard Cloudflare Zero Trust :
 
 ---
 
-## Étape 6 — Premier accès
+## Étape 5 — Premier accès
 
 1. Ouvrir `https://recipe.super-nono.cc` dans le navigateur
 2. L'authentification Cloudflare ZT s'affiche (OTP / email)
@@ -206,7 +197,7 @@ Dans le dashboard Cloudflare Zero Trust :
 ### Mettre à jour l'application
 
 ```bash
-# Depuis l'hôte Proxmox ou directement dans le container
+# Depuis l'hôte Proxmox (remplacer 120 par le VMID)
 pct exec 120 -- bash /opt/recipelog/deploy/proxmox/deploy.sh
 ```
 
@@ -262,36 +253,26 @@ Transmettre ce fichier pour analyse.
 ### Le service ne démarre pas
 
 ```bash
-# Voir les erreurs détaillées
 journalctl -u recipelog -n 100 --no-pager
 
 # Causes fréquentes :
 # 1. DATABASE_URL incorrect → vérifier /opt/recipelog/.env
 # 2. Port 3000 déjà utilisé → lsof -i :3000
-# 3. Erreur de build → relancer pnpm build
+# 3. Erreur de build → cd /opt/recipelog && pnpm build
 ```
 
 ### nginx retourne 502 Bad Gateway
 
 ```bash
-# Vérifier que recipelog tourne sur le bon port
-curl http://localhost:3000
-
-# Vérifier la config nginx
-cat /etc/nginx/sites-available/recipelog
-nginx -t
-
-# Redémarrer les deux services
+curl http://localhost:3000          # recipelog répond ?
+nginx -t                            # config valide ?
 systemctl restart recipelog nginx
 ```
 
 ### Erreur de connexion PostgreSQL
 
 ```bash
-# Tester la connexion
 psql -U recipelog -d recipelog -c "SELECT version();"
-
-# Vérifier que PostgreSQL tourne
 systemctl status postgresql
 
 # Réinitialiser le mot de passe si nécessaire
@@ -301,32 +282,23 @@ sudo -u postgres psql -c "ALTER USER recipelog WITH PASSWORD 'recipelog';"
 ### PDF ne se génère pas (erreur Puppeteer)
 
 ```bash
-# Vérifier que Chromium est installé
-which chromium || which chromium-browser
+which chromium                          # doit retourner /usr/bin/chromium
+grep PUPPETEER /opt/recipelog/.env      # doit contenir PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Tester Chromium en mode headless
-chromium --headless --dump-dom https://example.com 2>&1 | head -5
-
-# Variable d'environnement dans .env
-grep PUPPETEER /opt/recipelog/.env
-# Doit contenir : PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Si Nesting n'était pas activé → l'activer et redémarrer le container
 ```
 
 ### Rollback vers la version précédente
 
 ```bash
 cd /opt/recipelog
-
-# Voir les commits disponibles
 git log --oneline -10
-
-# Revenir au commit précédent
 git checkout <COMMIT_HASH>
 pnpm install --frozen-lockfile
 pnpm build
 systemctl restart recipelog
 
-# Pour revenir à main plus tard
+# Revenir à main plus tard
 git checkout main
 ```
 
@@ -336,7 +308,7 @@ git checkout main
 
 | Service | Port | Accès |
 |---|---|---|
-| recipelog (Next.js) | 3000 | interne uniquement |
+| recipelog (Next.js) | 3000 | localhost uniquement |
 | nginx | 80 | LAN (→ cloudflared) |
 | PostgreSQL | 5432 | localhost uniquement |
 | cloudflared tunnel | — | sortant vers Cloudflare |
@@ -348,7 +320,6 @@ git checkout main
 ```
 deploy/
 ├── proxmox/
-│   ├── create-lxc.sh     # Crée le container LXC
 │   ├── setup.sh          # Installation complète dans le container
 │   ├── deploy.sh         # Mise à jour de l'application
 │   ├── backup.sh         # Sauvegarde PostgreSQL (rétention 30j)
