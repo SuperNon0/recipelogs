@@ -56,6 +56,13 @@ export default async function RecipePage({
           ← Recettes
         </Link>
         <div className="flex items-center gap-2">
+          <a
+            href={`/recipes/${recipe.id}/pdf`}
+            className="fl-btn fl-btn-secondary"
+            style={{ fontSize: "0.8rem" }}
+          >
+            ⬇ PDF
+          </a>
           <AddToCookbookButton
             recipeId={recipe.id}
             cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
