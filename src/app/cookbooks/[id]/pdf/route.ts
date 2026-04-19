@@ -4,6 +4,8 @@ import { buildCookbookHtml } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
+type SnapEntry = NonNullable<RecipeSnapshot>;
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -38,23 +40,16 @@ export async function GET(
     const entryData: (typeof entries)[number] = { snap, subrecipeMode };
 
     if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
-      entryData.separateSnaps = await Promise.all(
-        snap.subRecipes.map(async (sr) => {
-          const childSnap = await buildRecipeSnapshot(
-            snap!.subRecipes.find((s) => s.childName === sr.childName)
-              ? entry.recipeId
-              : entry.recipeId,
-          );
-          return {
-            recipeId: entry.recipeId,
-            name: sr.label ?? sr.childName,
-            source: null,
-            notesTips: null,
-            ingredients: sr.ingredients,
-            steps: sr.steps,
-            totalMassG: sr.totalMassG,
-            subRecipes: [],
-          } satisfies NonNullable<RecipeSnapshot>;
+      entryData.separateSnaps = snap.subRecipes.map(
+        (sr): SnapEntry => ({
+          recipeId: entry.recipeId,
+          name: sr.label ?? sr.childName,
+          source: null,
+          notesTips: null,
+          ingredients: sr.ingredients,
+          steps: sr.steps,
+          totalMassG: sr.totalMassG,
+          subRecipes: [],
         }),
       );
     }
