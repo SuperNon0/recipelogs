@@ -113,7 +113,7 @@ Le CDC suggère un split `backend/` + `frontend/`. Ce projet utilise un **monoli
 - **Phase 2 — Socle & recettes V1** ✓ (CRUD, tags, catégories, favoris, recherche, commentaires)
 - **Phase 3 — Multiplication & sous-recettes** ✓ (3 modes, cascade, verrouillage 🔒, détection de cycle)
 - **Phase 4 — Cahiers & PDF** ✓ (CRUD cahiers, mode liée/figée, modal ajout recette, PDF Puppeteer, `/cookbooks/[id]/pdf` + `/recipes/[id]/pdf`)
-- **Phase 5 — Listes de courses** — À venir
+- **Phase 5 — Listes de courses** ✓ (CRUD listes, ajout recettes avec coefficient, agrégation auto des ingrédients, items manuels, cases à cocher avec useOptimistic, bouton 🛒 depuis fiche recette)
 - **Phase 6 — Partage public & paramètres** — À venir
 - **Phase 7 — Scripts Proxmox** — À venir
 - **Phase 8 — Tests & import initial** — À venir
