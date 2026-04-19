@@ -39,9 +39,8 @@ Le stack applicatif (backend, frontend, ORM, PDF) est laissé au libre choix du 
 
 - [x] Cadrage fonctionnel
 - [x] Cahier des charges V1.1 validé
-- [ ] Choix du développeur
-- [ ] Phase 1 — Cadrage & setup
-- [ ] Phase 2 — Socle & recettes V1
+- [x] Phase 1 — Cadrage & setup
+- [x] Phase 2 — Socle & recettes V1
 - [ ] Phase 3 — Multiplication & sous-recettes
 - [ ] Phase 4 — Cahiers & PDF
 - [ ] Phase 5 — Liste de courses
@@ -51,6 +50,32 @@ Le stack applicatif (backend, frontend, ORM, PDF) est laissé au libre choix du 
 - [ ] Phase 9 — Mise en production
 
 **Durée estimée** : 9 à 11 semaines en dev solo.
+
+## 🛠️ Stack retenu
+
+| Couche | Choix |
+|---|---|
+| Framework | **Next.js 15** (App Router, Server Actions) |
+| Langage | TypeScript (strict) |
+| ORM | Prisma 6 |
+| Base | PostgreSQL 15+ (ext. `pg_trgm`) |
+| Style | Tailwind CSS v4 + tokens design FuelLog |
+| Validation | Zod |
+
+Monolithe Next.js plutôt que split backend/frontend — voir `docs/INSTALL.md` §7.
+
+## 🚀 Démarrage rapide
+
+```bash
+pnpm install
+cp .env.example .env
+docker compose up -d      # ou postgres local
+pnpm db:migrate
+pnpm db:seed
+pnpm dev                  # http://localhost:3000
+```
+
+Voir [`docs/INSTALL.md`](./docs/INSTALL.md) pour le détail.
 
 ## 🌐 Écosystème super-nono.cc
 

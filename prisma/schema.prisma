@@ -1,0 +1,331 @@
+// RecipeLog — Schéma Prisma V1
+// Source de vérité : CDC.md § 7
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Recettes
+// ─────────────────────────────────────────────────────────────
+
+model Recipe {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(200)
+  photoPath  String?  @map("photo_path")
+  source     String?  @db.Text
+  notesTips  String?  @map("notes_tips") @db.Text
+  favorite   Boolean  @default(false)
+  rating     Int?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  stepsBlock  StepsBlock?
+  ingredients Ingredient[]
+  tags        Tag[]
+  categories  RecipeCategory[]
+  comments    Comment[]
+
+  parentLinks SubRecipe[] @relation("SubRecipeParent")
+  childLinks  SubRecipe[] @relation("SubRecipeChild")
+
+  variantSources Variant[] @relation("VariantSource")
+  variantTargets Variant[] @relation("VariantTarget")
+
+  cookbookEntries    CookbookRecipe[]
+  shoppingListRecipes ShoppingListRecipe[]
+  shoppingListItems   ShoppingListItem[]
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([favorite])
+  @@map("recipes")
+}
+
+model StepsBlock {
+  id       Int    @id @default(autoincrement())
+  recipeId Int    @unique @map("recipe_id")
+  content  String @db.Text
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("steps_block")
+}
+
+model IngredientBase {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  defaultUnit String   @default("g") @map("default_unit")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  usages Ingredient[]
+
+  @@map("ingredients_base")
+}
+
+model Ingredient {
+  id               Int      @id @default(autoincrement())
+  recipeId         Int      @map("recipe_id")
+  name             String?
+  ingredientBaseId Int?     @map("ingredient_base_id")
+  quantityG        Decimal  @map("quantity_g") @db.Decimal(10, 3)
+  position         Int      @default(0)
+
+  recipe         Recipe          @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientBase IngredientBase? @relation(fields: [ingredientBaseId], references: [id], onDelete: SetNull)
+
+  @@index([recipeId])
+  @@map("ingredients")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sous-recettes & variantes
+// ─────────────────────────────────────────────────────────────
+
+enum CalcMode {
+  coefficient
+  mass_target
+  pivot_ingredient
+}
+
+model SubRecipe {
+  id         Int      @id @default(autoincrement())
+  parentId   Int      @map("parent_id")
+  childId    Int      @map("child_id")
+  label      String
+  calcMode   CalcMode @default(coefficient) @map("calc_mode")
+  calcValue  Decimal  @default(1) @map("calc_value") @db.Decimal(12, 4)
+  pivotIngredientId Int? @map("pivot_ingredient_id")
+  isLocked   Boolean  @default(false) @map("is_locked")
+  position   Int      @default(0)
+
+  parent Recipe @relation("SubRecipeParent", fields: [parentId], references: [id], onDelete: Cascade)
+  child  Recipe @relation("SubRecipeChild", fields: [childId], references: [id], onDelete: Restrict)
+
+  @@index([parentId])
+  @@index([childId])
+  @@map("sub_recipes")
+}
+
+model Variant {
+  id              Int     @id @default(autoincrement())
+  sourceRecipeId  Int     @map("source_recipe_id")
+  variantRecipeId Int     @map("variant_recipe_id")
+  note            String? @db.Text
+
+  source  Recipe @relation("VariantSource", fields: [sourceRecipeId], references: [id], onDelete: Cascade)
+  variant Recipe @relation("VariantTarget", fields: [variantRecipeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceRecipeId, variantRecipeId])
+  @@map("variants")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catégories, tags, commentaires
+// ─────────────────────────────────────────────────────────────
+
+model Category {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  color String  @default("#e8c547")
+  icon  String?
+
+  recipes RecipeCategory[]
+
+  @@map("categories")
+}
+
+model RecipeCategory {
+  recipeId   Int @map("recipe_id")
+  categoryId Int @map("category_id")
+
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, categoryId])
+  @@map("recipes_categories")
+}
+
+model Tag {
+  id       Int    @id @default(autoincrement())
+  recipeId Int    @map("recipe_id")
+  name     String
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([name])
+  @@index([recipeId])
+  @@map("tags")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  recipeId  Int      @map("recipe_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@map("comments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cahiers & templates PDF
+// ─────────────────────────────────────────────────────────────
+
+enum PaperFormat {
+  A4
+  A5
+}
+
+enum LinkMode {
+  linked
+  snapshot
+}
+
+enum SubRecipeRenderMode {
+  single
+  separate
+}
+
+model PdfTemplate {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String? @db.Text
+  slug        String  @unique
+  previewPath String? @map("preview_path")
+  isCustom    Boolean @default(false) @map("is_custom")
+
+  cookbooks Cookbook[]
+
+  @@map("pdf_templates")
+}
+
+model Cookbook {
+  id                  Int         @id @default(autoincrement())
+  name                String
+  description         String?     @db.Text
+  format              PaperFormat @default(A4)
+  templateId          Int?        @map("template_id")
+  hasToc              Boolean     @default(true) @map("has_toc")
+  hasCover            Boolean     @default(true) @map("has_cover")
+  coverConfig         Json        @default("{}") @map("cover_config")
+  hasLogo             Boolean     @default(true) @map("has_logo")
+  pageNumberingConfig Json        @default("{}") @map("page_numbering_config")
+  footer              String?     @db.Text
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  template PdfTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  entries  CookbookRecipe[]
+
+  @@index([updatedAt(sort: Desc)])
+  @@map("cookbooks")
+}
+
+model CookbookRecipe {
+  id             Int                 @id @default(autoincrement())
+  cookbookId     Int                 @map("cookbook_id")
+  recipeId       Int                 @map("recipe_id")
+  position       Int                 @default(0)
+  linkMode       LinkMode            @default(linked) @map("link_mode")
+  snapshotData   Json?               @map("snapshot_data")
+  snapshotDate   DateTime?           @map("snapshot_date")
+  subrecipeMode  SubRecipeRenderMode @default(single) @map("subrecipe_mode")
+
+  cookbook Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([cookbookId, position])
+  @@index([recipeId])
+  @@map("cookbooks_recipes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Listes de courses
+// ─────────────────────────────────────────────────────────────
+
+enum ShoppingListType {
+  recipes
+  free
+  mixed
+}
+
+model ShoppingList {
+  id        Int              @id @default(autoincrement())
+  name      String
+  type      ShoppingListType @default(mixed)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  items   ShoppingListItem[]
+  recipes ShoppingListRecipe[]
+
+  @@index([updatedAt(sort: Desc)])
+  @@map("shopping_lists")
+}
+
+model ShoppingListItem {
+  id             Int      @id @default(autoincrement())
+  shoppingListId Int      @map("shopping_list_id")
+  name           String
+  quantityG      Decimal? @map("quantity_g") @db.Decimal(10, 3)
+  recipeId       Int?     @map("recipe_id")
+  checked        Boolean  @default(false)
+  position       Int      @default(0)
+
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  recipe       Recipe?      @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([shoppingListId])
+  @@map("shopping_list_items")
+}
+
+model ShoppingListRecipe {
+  id             Int     @id @default(autoincrement())
+  shoppingListId Int     @map("shopping_list_id")
+  recipeId       Int     @map("recipe_id")
+  coefficient    Decimal @default(1) @db.Decimal(12, 4)
+
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  recipe       Recipe       @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([shoppingListId, recipeId])
+  @@map("shopping_list_recipes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Partage public & paramètres
+// ─────────────────────────────────────────────────────────────
+
+enum ShareEntityType {
+  recipe
+  cookbook
+}
+
+model ShareToken {
+  id         Int              @id @default(autoincrement())
+  token      String           @unique
+  entityType ShareEntityType  @map("entity_type")
+  entityId   Int              @map("entity_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  revokedAt  DateTime?        @map("revoked_at")
+
+  @@index([entityType, entityId])
+  @@map("share_tokens")
+}
+
+model Setting {
+  key   String @id
+  value Json
+
+  @@map("settings")
+}
