@@ -44,7 +44,7 @@ Le stack applicatif (backend, frontend, ORM, PDF) est laissé au libre choix du 
 - [x] Phase 3 — Multiplication & sous-recettes
 - [x] Phase 4 — Cahiers & PDF
 - [x] Phase 5 — Liste de courses
-- [ ] Phase 6 — Partage public & paramètres
+- [x] Phase 6 — Partage public & paramètres
 - [ ] Phase 7 — Scripts Proxmox
 - [ ] Phase 8 — Tests & import initial
 - [ ] Phase 9 — Mise en production

@@ -4,6 +4,8 @@ import { getCookbookDetail, listPdfTemplates } from "@/lib/cookbooks";
 import { CookbookEntryRow } from "@/components/CookbookEntryRow";
 import { CookbookConfigForm } from "@/components/CookbookConfigForm";
 import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
+import { ShareButton } from "@/components/ShareButton";
+import { getActiveToken } from "@/lib/share";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,10 @@ export default async function CookbookDetailPage({
   const cookbookId = Number(id);
   if (isNaN(cookbookId)) notFound();
 
-  const [cookbook, templates] = await Promise.all([
+  const [cookbook, templates, shareToken] = await Promise.all([
     getCookbookDetail(cookbookId),
     listPdfTemplates(),
+    getActiveToken("cookbook", cookbookId),
   ]);
 
   if (!cookbook) notFound();
@@ -57,6 +60,11 @@ export default async function CookbookDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <ShareButton
+            entityType="cookbook"
+            entityId={cookbookId}
+            existingToken={shareToken?.token ?? null}
+          />
           <a
             href={`/cookbooks/${cookbookId}/pdf`}
             className="fl-btn fl-btn-primary"
