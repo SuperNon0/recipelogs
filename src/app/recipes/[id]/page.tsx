@@ -7,6 +7,8 @@ import { CommentsSection } from "@/components/CommentsSection";
 import { RecipeBody, type SubRecipeRow } from "@/components/RecipeBody";
 import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
 import { AddToCookbookButton } from "@/components/AddToCookbookModal";
+import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
+import { listShoppingLists } from "@/lib/shopping";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +21,11 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const [recipe, available, cookbooks] = await Promise.all([
+  const [recipe, available, cookbooks, shoppingLists] = await Promise.all([
     getRecipeDetail(recipeId),
     listRecipesMinimal(recipeId),
     listCookbooks(),
+    listShoppingLists(),
   ]);
   if (!recipe) notFound();
 
@@ -63,6 +66,10 @@ export default async function RecipePage({
           >
             ⬇ PDF
           </a>
+          <AddToShoppingListButton
+            recipeId={recipe.id}
+            lists={shoppingLists.map((l) => ({ id: l.id, name: l.name }))}
+          />
           <AddToCookbookButton
             recipeId={recipe.id}
             cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
