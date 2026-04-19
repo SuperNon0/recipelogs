@@ -76,11 +76,29 @@ export async function getRecipeDetail(id: number) {
       parentLinks: {
         orderBy: { position: "asc" },
         include: {
-          child: { include: { ingredients: true } },
+          child: {
+            include: {
+              ingredients: {
+                orderBy: { position: "asc" },
+                include: { ingredientBase: true },
+              },
+              stepsBlock: true,
+            },
+          },
         },
       },
     },
   });
+}
+
+export async function listRecipesMinimal(excludeId?: number) {
+  const where = excludeId ? { id: { not: excludeId } } : undefined;
+  const recipes = await prisma.recipe.findMany({
+    where,
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return recipes;
 }
 
 export async function listAllTags(): Promise<string[]> {
