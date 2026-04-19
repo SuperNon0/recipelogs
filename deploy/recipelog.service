@@ -1,0 +1,36 @@
+[Unit]
+Description=RecipeLog — Gestionnaire de recettes pâtisserie
+Documentation=https://github.com/SuperNon0/recipelogs
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=recipelog
+Group=recipelog
+WorkingDirectory=/opt/recipelog
+EnvironmentFile=/opt/recipelog/.env
+
+# Next.js standalone mode
+ExecStart=/usr/bin/node /opt/recipelog/.next/standalone/server.js
+
+# Variables pour Next.js standalone
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+
+# Puppeteer sans sandbox (LXC)
+Environment=PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+Environment=PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=recipelog
+
+# Limites de ressources
+LimitNOFILE=65536
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target
