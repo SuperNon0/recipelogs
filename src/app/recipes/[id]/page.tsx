@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getRecipeDetail, listRecipesMinimal } from "@/lib/recipes";
+import { listCookbooks } from "@/lib/cookbooks";
 import { RecipeActions } from "@/components/RecipeActions";
 import { CommentsSection } from "@/components/CommentsSection";
 import { RecipeBody, type SubRecipeRow } from "@/components/RecipeBody";
 import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
+import { AddToCookbookButton } from "@/components/AddToCookbookModal";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +19,10 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const [recipe, available] = await Promise.all([
+  const [recipe, available, cookbooks] = await Promise.all([
     getRecipeDetail(recipeId),
     listRecipesMinimal(recipeId),
+    listCookbooks(),
   ]);
   if (!recipe) notFound();
 
@@ -52,7 +55,13 @@ export default async function RecipePage({
         <Link href="/" className="fl-label hover:text-[color:var(--text)]">
           ← Recettes
         </Link>
-        <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
+        <div className="flex items-center gap-2">
+          <AddToCookbookButton
+            recipeId={recipe.id}
+            cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
+          />
+          <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
+        </div>
       </div>
 
       <header className="flex flex-col gap-3">
