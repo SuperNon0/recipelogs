@@ -115,6 +115,6 @@ Le CDC suggère un split `backend/` + `frontend/`. Ce projet utilise un **monoli
 - **Phase 4 — Cahiers & PDF** ✓ (CRUD cahiers, mode liée/figée, modal ajout recette, PDF Puppeteer, `/cookbooks/[id]/pdf` + `/recipes/[id]/pdf`)
 - **Phase 5 — Listes de courses** ✓ (CRUD listes, ajout recettes avec coefficient, agrégation auto des ingrédients, items manuels, cases à cocher avec useOptimistic, bouton 🛒 depuis fiche recette)
 - **Phase 6 — Partage public & paramètres** ✓ (ShareToken, page /share/[token] publique, ShareButton avec révocation, CRUD catégories dans /settings)
-- **Phase 7 — Scripts Proxmox** — À venir
-- **Phase 8 — Tests & import initial** — À venir
-- **Phase 9 — Mise en production** — À venir
+- **Phase 7 — Scripts Proxmox** ✓ (create-lxc.sh, setup.sh, deploy.sh, backup.sh, recipelog.service, nginx.conf, standalone mode)
+- **Phase 8 — Tests & import initial** ✓ (vitest, 30 tests, 4 suites, import CSV Recipe Keeper dans /settings)
+- **Phase 9 — Mise en production** — À planifier
