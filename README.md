@@ -45,8 +45,8 @@ Le stack applicatif (backend, frontend, ORM, PDF) est laissé au libre choix du 
 - [x] Phase 4 — Cahiers & PDF
 - [x] Phase 5 — Liste de courses
 - [x] Phase 6 — Partage public & paramètres
-- [ ] Phase 7 — Scripts Proxmox
-- [ ] Phase 8 — Tests & import initial
+- [x] Phase 7 — Scripts Proxmox
+- [x] Phase 8 — Tests & import initial
 - [ ] Phase 9 — Mise en production
 
 **Durée estimée** : 9 à 11 semaines en dev solo.
