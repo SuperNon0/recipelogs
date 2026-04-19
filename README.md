@@ -9,6 +9,8 @@ Outil personnel de gestion de recettes conçu pour un usage en pâtisserie profe
 ## 📋 Documentation
 
 - **[Cahier des charges V1.1](./CDC.md)** — Spécifications complètes du projet
+- **[Guide d'installation dev](./docs/INSTALL.md)** — Environnement local (Node, Docker, pnpm)
+- **[Guide de déploiement prod](./docs/DEPLOYMENT.md)** — Proxmox LXC + Cloudflare Zero Trust
 
 ## 🎯 En bref
 
@@ -66,6 +68,8 @@ Monolithe Next.js plutôt que split backend/frontend — voir `docs/INSTALL.md` 
 
 ## 🚀 Démarrage rapide
 
+### Développement local
+
 ```bash
 pnpm install
 cp .env.example .env
@@ -75,7 +79,21 @@ pnpm db:seed
 pnpm dev                  # http://localhost:3000
 ```
 
-Voir [`docs/INSTALL.md`](./docs/INSTALL.md) pour le détail.
+Voir [`docs/INSTALL.md`](./docs/INSTALL.md) pour le détail complet.
+
+### Production (Proxmox LXC)
+
+1. Créer un container LXC Debian 12 (2 CPU / 2 Go RAM / 20 Go disque, Nesting activé)
+2. Dans le container :
+
+```bash
+apt-get install -y curl git
+curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/deploy/proxmox/setup.sh | bash
+```
+
+3. Éditer `/opt/recipelog/.env` (domaine), puis configurer le tunnel Cloudflare Zero Trust.
+
+Voir [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) pour le guide complet étape par étape.
 
 ## 🌐 Écosystème super-nono.cc
 
