@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: recipelog_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: recipelog
+      POSTGRES_PASSWORD: recipelog
+      POSTGRES_DB: recipelog
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recipelog -d recipelog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
