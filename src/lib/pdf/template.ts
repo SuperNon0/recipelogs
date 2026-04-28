@@ -1,88 +1,13 @@
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
+export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
 type SubrecipeMode = "single" | "separate";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatG(g: number): string {
   if (g >= 1000) return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
   return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
-
-function ingredientsTable(
-  items: { name: string; quantityG: number }[],
-  totalG: number,
-): string {
-  const rows = items
-    .map(
-      (i) => `
-      <tr>
-        <td class="ing-name">${esc(i.name)}</td>
-        <td class="ing-qty">${formatG(i.quantityG)}</td>
-        <td class="ing-pct">${totalG > 0 ? ((i.quantityG / totalG) * 100).toFixed(1) + " %" : "—"}</td>
-      </tr>`,
-    )
-    .join("");
-
-  return `
-    <table class="ing-table">
-      <thead>
-        <tr>
-          <th>Ingrédient</th>
-          <th>Quantité</th>
-          <th>%</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr>
-          <td>Total</td>
-          <td>${formatG(totalG)}</td>
-          <td>100 %</td>
-        </tr>
-      </tfoot>
-    </table>`;
-}
-
-function recipeCard(snap: NonNullable<RecipeSnapshot>, subrecipeMode: SubrecipeMode): string {
-  const mainIngHtml =
-    snap.ingredients.length > 0
-      ? ingredientsTable(snap.ingredients, snap.totalMassG)
-      : "<p class='muted'>Aucun ingrédient.</p>";
-
-  const stepsHtml = snap.steps
-    ? `<h3 class="section-title">Étapes</h3><pre class="steps">${esc(snap.steps)}</pre>`
-    : "";
-
-  const notesTipsHtml = snap.notesTips
-    ? `<h3 class="section-title">Notes & astuces</h3><p class="notes">${esc(snap.notesTips)}</p>`
-    : "";
-
-  const sourceHtml = snap.source
-    ? `<p class="source">Source : ${esc(snap.source)}</p>`
-    : "";
-
-  let subrecipesHtml = "";
-  if (subrecipeMode === "single" && snap.subRecipes.length > 0) {
-    subrecipesHtml = snap.subRecipes
-      .map(
-        (sr) => `
-        <div class="subrecipe-block">
-          <h3 class="subrecipe-title">${esc(sr.label ?? sr.childName)}</h3>
-          ${ingredientsTable(sr.ingredients, sr.totalMassG)}
-          ${sr.steps ? `<pre class="steps">${esc(sr.steps)}</pre>` : ""}
-        </div>`,
-      )
-      .join("");
-  }
-
-  return `
-    <section class="recipe-card">
-      <h2 class="recipe-title">${esc(snap.name)}</h2>
-      ${sourceHtml}
-      ${mainIngHtml}
-      ${subrecipesHtml}
-      ${stepsHtml}
-      ${notesTipsHtml}
-    </section>`;
 }
 
 function esc(s: string | null | undefined): string {
@@ -94,150 +19,280 @@ function esc(s: string | null | undefined): string {
     .replace(/"/g, "&quot;");
 }
 
-const BASE_CSS = `
+/** Numérote les étapes "1. ... 2. ..." si le texte n'est pas déjà numéroté. */
+function numberSteps(raw: string): string {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const alreadyNumbered = lines.every((l) => /^\d+[.)]\s/.test(l));
+  if (alreadyNumbered) return lines.join("\n");
+
+  return lines.map((l, i) => `${i + 1}. ${l}`).join("\n");
+}
+
+// ─── Template "classique" (style BTM examen blanc) ────────────────────────────
+//   - Sans-serif (Helvetica/Arial system stack)
+//   - Couleur dominante : rouge profond #A52A2A
+//   - 2 colonnes : Ingrédients | Préparation
+//   - Ingrédients format "Nom\n- 200g"
+//   - Étapes numérotées 1. 2. 3.
+
+const CLASSIQUE_CSS = `
+  @page { margin: 12mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 10.5pt;
-    color: #1a1a1a;
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    color: #111;
     background: #fff;
-    line-height: 1.55;
+    line-height: 1.5;
   }
-  .cookbook-cover {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    text-align: center;
+  /* Couverture */
+  .cover {
+    display: flex; align-items: center; justify-content: center;
+    height: 100vh; width: 100%;
     page-break-after: always;
+    background: linear-gradient(135deg, #d35a4a 0%, #f0c95a 33%, #84c46a 66%, #6ea8d8 100%);
+    position: relative;
+  }
+  .cover-circle {
+    width: 220px; height: 220px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 18px;
   }
   .cover-title {
-    font-size: 32pt;
-    font-weight: bold;
-    margin-bottom: 12px;
-    color: #111;
+    font-size: 28pt; font-weight: 700;
+    color: #111; line-height: 1.05;
   }
-  .cover-desc {
-    font-size: 13pt;
-    color: #555;
-    max-width: 400px;
+  .cover-subtitle {
+    font-size: 12pt; color: #666; margin-top: 6px;
   }
-  .cover-date {
-    margin-top: 24px;
-    font-size: 10pt;
-    color: #888;
+  /* Sommaire */
+  .toc { page-break-after: always; padding-top: 6mm; }
+  .toc-section-title {
+    font-size: 22pt; font-weight: 700; color: #A52A2A;
+    text-align: center; margin-bottom: 12mm;
   }
-  .toc {
-    page-break-after: always;
-    padding: 20px 0;
-  }
-  .toc-title {
-    font-size: 18pt;
-    margin-bottom: 16px;
-    border-bottom: 2px solid #1a1a1a;
-    padding-bottom: 6px;
+  .toc-group-title {
+    font-size: 14pt; font-weight: 700; color: #A52A2A;
+    margin: 6mm 0 2mm 0;
+    display: flex; justify-content: space-between;
   }
   .toc-entry {
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-    border-bottom: 1px dotted #ccc;
-  }
-  .recipe-card {
-    page-break-before: always;
-    padding: 0;
-  }
-  .recipe-title {
-    font-size: 20pt;
-    margin-bottom: 8px;
-    border-bottom: 2px solid #1a1a1a;
-    padding-bottom: 6px;
+    display: flex; justify-content: space-between;
+    font-size: 10.5pt; padding: 1.2mm 0;
     color: #111;
   }
+  .toc-entry .toc-num { color: #111; }
+  /* Recette */
+  .recipe {
+    page-break-before: always;
+    position: relative;
+    min-height: 95vh;
+  }
+  .recipe-title {
+    font-size: 22pt; font-weight: 700; color: #A52A2A;
+    text-align: center; margin: 4mm 0 3mm;
+    line-height: 1.15;
+  }
+  .recipe-tags {
+    font-size: 10pt; color: #444;
+    text-align: center; margin-bottom: 3mm;
+  }
+  .portion {
+    font-size: 10pt; color: #A52A2A; font-weight: 700;
+    text-align: center; margin-bottom: 6mm;
+  }
+  .portion-value { color: #111; font-weight: 400; }
+  .columns {
+    display: flex; gap: 6mm; margin-top: 3mm;
+  }
+  .col {
+    flex: 1; min-width: 0;
+  }
+  .col-ing { flex: 0 0 38%; }
+  .col-prep { flex: 1; }
+  .col-title {
+    font-size: 13pt; font-weight: 700; color: #A52A2A;
+    margin-bottom: 3mm;
+  }
+  .ing-item {
+    margin-bottom: 2mm;
+    line-height: 1.35;
+  }
+  .ing-item .ing-name { display: block; }
+  .ing-item .ing-qty { display: block; color: #333; }
+  .total-line {
+    margin-top: 4mm;
+    padding-top: 1.5mm;
+    border-top: 1px solid #A52A2A;
+    font-weight: 700; color: #A52A2A;
+  }
+  .step {
+    margin-bottom: 3mm;
+    line-height: 1.5;
+  }
+  .step-num { font-weight: 700; }
   .source {
-    font-size: 8.5pt;
-    color: #888;
-    margin-bottom: 14px;
-    font-style: italic;
-  }
-  .section-title {
-    font-size: 11pt;
-    font-weight: bold;
-    margin: 16px 0 6px;
-    color: #333;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .ing-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 14px;
-    font-size: 9.5pt;
-  }
-  .ing-table th {
-    text-align: left;
-    background: #f0f0f0;
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    font-size: 8.5pt;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .ing-table td {
-    padding: 3px 8px;
-    border: 1px solid #e8e8e8;
-  }
-  .ing-table tfoot td {
-    font-weight: bold;
-    background: #f8f8f8;
-  }
-  .ing-qty, .ing-pct {
-    text-align: right;
-    white-space: nowrap;
-  }
-  .steps {
-    font-family: 'Courier New', monospace;
-    font-size: 9pt;
-    white-space: pre-wrap;
-    line-height: 1.6;
-    background: #fafafa;
-    border-left: 3px solid #ccc;
-    padding: 10px 14px;
-    margin-top: 6px;
-    color: #222;
+    font-size: 8.5pt; color: #888;
+    font-style: italic; text-align: center;
+    margin-top: 2mm;
   }
   .notes {
-    font-size: 9.5pt;
-    color: #444;
-    margin-top: 6px;
+    font-size: 9pt; color: #444;
+    margin-top: 6mm;
+    padding-top: 3mm;
+    border-top: 1px dashed #ccc;
     white-space: pre-wrap;
   }
+  .notes-title {
+    font-weight: 700; color: #A52A2A; margin-bottom: 1mm;
+  }
   .subrecipe-block {
-    margin-top: 16px;
-    padding: 12px;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    background: #fdfdfb;
+    margin-top: 6mm;
+    padding-top: 3mm;
+    border-top: 2px solid #A52A2A33;
   }
   .subrecipe-title {
-    font-size: 12pt;
-    margin-bottom: 8px;
-    color: #333;
+    font-size: 13pt; font-weight: 700; color: #A52A2A;
+    margin-bottom: 2mm;
   }
-  .footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 8pt;
-    color: #aaa;
-    padding: 4px 0;
-    border-top: 1px solid #eee;
+  .page-num {
+    position: absolute;
+    bottom: 0; right: 0;
+    font-size: 9.5pt; color: #111;
   }
-  .muted { color: #999; font-style: italic; font-size: 9pt; }
+  .footer-note {
+    position: fixed; bottom: 5mm; left: 0; right: 0;
+    text-align: center; font-size: 7.5pt; color: #aaa;
+  }
+  .muted { color: #999; font-style: italic; }
 `;
+
+// ─── Helpers de rendu (style classique) ──────────────────────────────────────
+
+function classiqueIngredients(items: { name: string; quantityG: number }[], totalG: number): string {
+  const list = items
+    .map(
+      (i) => `
+      <div class="ing-item">
+        <span class="ing-name">${esc(i.name)}</span>
+        <span class="ing-qty">- ${formatG(i.quantityG)}</span>
+      </div>`,
+    )
+    .join("");
+
+  const totalLine = totalG > 0
+    ? `<div class="total-line">Total · ${formatG(totalG)}</div>`
+    : "";
+
+  return list + totalLine;
+}
+
+function classiqueSteps(raw: string): string {
+  const numbered = numberSteps(raw);
+  return numbered
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^(\d+[.)])\s+(.+)$/);
+      if (m) {
+        return `<div class="step"><span class="step-num">${esc(m[1])}</span> ${esc(m[2])}</div>`;
+      }
+      return `<div class="step">${esc(line)}</div>`;
+    })
+    .join("");
+}
+
+function classiqueRecipeCard(
+  snap: NonNullable<RecipeSnapshot>,
+  subrecipeMode: SubrecipeMode,
+  pageNum: number | null,
+  tags: string,
+  portion: string,
+): string {
+  const ingHtml = snap.ingredients.length > 0
+    ? classiqueIngredients(snap.ingredients, snap.totalMassG)
+    : "<p class='muted'>Aucun ingrédient.</p>";
+
+  const stepsHtml = snap.steps
+    ? classiqueSteps(snap.steps)
+    : "<p class='muted'>—</p>";
+
+  let subrecipesHtml = "";
+  if (subrecipeMode === "single" && snap.subRecipes.length > 0) {
+    subrecipesHtml = snap.subRecipes
+      .map((sr) => `
+        <div class="subrecipe-block">
+          <div class="subrecipe-title">${esc(sr.label ?? sr.childName)}</div>
+          <div class="columns">
+            <div class="col col-ing">
+              <div class="col-title">Ingrédients</div>
+              ${classiqueIngredients(sr.ingredients, sr.totalMassG)}
+            </div>
+            <div class="col col-prep">
+              <div class="col-title">Préparation</div>
+              ${sr.steps ? classiqueSteps(sr.steps) : "<p class='muted'>—</p>"}
+            </div>
+          </div>
+        </div>`)
+      .join("");
+  }
+
+  const portionHtml = portion
+    ? `<div class="portion">Taille de portion: <span class="portion-value">${esc(portion)}</span></div>`
+    : "";
+
+  const tagsHtml = tags
+    ? `<div class="recipe-tags">${esc(tags)}</div>`
+    : "";
+
+  const sourceHtml = snap.source
+    ? `<div class="source">Source : ${esc(snap.source)}</div>`
+    : "";
+
+  const notesHtml = snap.notesTips
+    ? `<div class="notes"><div class="notes-title">Notes & astuces</div>${esc(snap.notesTips)}</div>`
+    : "";
+
+  const pageNumHtml = pageNum !== null
+    ? `<div class="page-num">${pageNum}</div>`
+    : "";
+
+  return `
+    <section class="recipe">
+      <h2 class="recipe-title">${esc(snap.name)}</h2>
+      ${tagsHtml}
+      ${portionHtml}
+      <div class="columns">
+        <div class="col col-ing">
+          <div class="col-title">Ingrédients</div>
+          ${ingHtml}
+        </div>
+        <div class="col col-prep">
+          <div class="col-title">Préparation</div>
+          ${stepsHtml}
+        </div>
+      </div>
+      ${subrecipesHtml}
+      ${sourceHtml}
+      ${notesHtml}
+      ${pageNumHtml}
+    </section>`;
+}
+
+// ─── API publique ──────────────────────────────────────────────────────────
+
+function getCss(template: TemplateSlug): string {
+  // Pour l'instant, classique uniquement (les autres viendront)
+  // moderne/fiche-technique/magazine fallback sur classique
+  return CLASSIQUE_CSS;
+}
 
 export function buildCookbookHtml(opts: {
   cookbookName: string;
@@ -246,59 +301,67 @@ export function buildCookbookHtml(opts: {
   hasCover: boolean;
   hasToc: boolean;
   format: "A4" | "A5";
+  template?: TemplateSlug;
   entries: {
     snap: NonNullable<RecipeSnapshot>;
     subrecipeMode: SubrecipeMode;
     separateSnaps?: NonNullable<RecipeSnapshot>[];
+    portion?: string;
+    tags?: string;
   }[];
 }): string {
   const { cookbookName, description, footer, hasCover, hasToc, entries } = opts;
+  const template: TemplateSlug = opts.template ?? "classique";
+  const css = getCss(template);
 
   let body = "";
 
+  // Couverture
   if (hasCover) {
     body += `
-      <div class="cookbook-cover">
-        <div class="cover-title">${esc(cookbookName)}</div>
-        ${description ? `<div class="cover-desc">${esc(description)}</div>` : ""}
-        <div class="cover-date">${new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}</div>
+      <div class="cover">
+        <div class="cover-circle">
+          <div class="cover-title">${esc(cookbookName)}</div>
+          ${description ? `<div class="cover-subtitle">${esc(description)}</div>` : ""}
+        </div>
       </div>`;
   }
 
+  // Sommaire
   if (hasToc && entries.length > 0) {
     const tocEntries = entries
       .map(
         (e, i) =>
-          `<div class="toc-entry"><span>${esc(e.snap.name)}</span><span>${i + 1}</span></div>`,
+          `<div class="toc-entry"><span>${esc(e.snap.name)}</span><span class="toc-num">${i + 1}</span></div>`,
       )
       .join("");
     body += `
       <div class="toc">
-        <h2 class="toc-title">Table des matières</h2>
+        <div class="toc-section-title">Contenu</div>
         ${tocEntries}
       </div>`;
   }
 
+  // Recettes (numérotage continu)
+  let pageNum = 1;
   for (const entry of entries) {
     if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-      body += recipeCard(entry.snap, "single");
+      body += classiqueRecipeCard(entry.snap, "single", pageNum++, entry.tags ?? "", entry.portion ?? "");
       for (const sub of entry.separateSnaps) {
-        body += recipeCard(sub, "single");
+        body += classiqueRecipeCard(sub, "single", pageNum++, "", "");
       }
     } else {
-      body += recipeCard(entry.snap, entry.subrecipeMode);
+      body += classiqueRecipeCard(entry.snap, entry.subrecipeMode, pageNum++, entry.tags ?? "", entry.portion ?? "");
     }
   }
 
-  const footerHtml = footer
-    ? `<div class="footer">${esc(footer)}</div>`
-    : "";
+  const footerHtml = footer ? `<div class="footer-note">${esc(footer)}</div>` : "";
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <style>${BASE_CSS}</style>
+  <style>${css}</style>
 </head>
 <body>
   ${body}
@@ -310,9 +373,10 @@ export function buildCookbookHtml(opts: {
 export function buildSingleRecipeHtml(
   snap: NonNullable<RecipeSnapshot>,
   format: "A4" | "A5" = "A4",
+  template: TemplateSlug = "classique",
 ): string {
-  const card = recipeCard(snap, "single");
-  const css = BASE_CSS.replace("page-break-before: always;", "");
+  const css = getCss(template).replace("page-break-before: always;", "page-break-before: auto;");
+  const card = classiqueRecipeCard(snap, "single", null, "", "");
 
   return `<!DOCTYPE html>
 <html lang="fr">
