@@ -89,6 +89,7 @@ echo "==> Installation des dépendances et build..."
 sudo -u "${APP_USER}" bash -c "
   cd ${APP_DIR}
   pnpm install --frozen-lockfile
+  pnpm exec prisma generate
   pnpm exec prisma migrate deploy
   pnpm exec prisma db seed
   pnpm build
