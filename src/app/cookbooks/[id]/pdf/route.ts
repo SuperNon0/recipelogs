@@ -50,6 +50,7 @@ export async function GET(
           steps: sr.steps,
           totalMassG: sr.totalMassG,
           subRecipes: [],
+          multiplier: 1,
         }),
       );
     }
