@@ -93,7 +93,14 @@ sudo -u "${APP_USER}" bash -c "
   pnpm exec prisma migrate deploy
   pnpm exec prisma db seed
   pnpm build
+  # Mode standalone : copier static/ et public/ dans .next/standalone/
+  cp -r .next/static .next/standalone/.next/static
+  [ -d public ] && cp -r public .next/standalone/public || true
 "
+
+# Permissions pour que nginx (www-data) puisse servir les statiques
+chmod 755 "${APP_DIR}"
+chmod -R o+rX "${APP_DIR}/.next"
 
 # ── 9. Puppeteer Chromium ────────────────────────────────
 echo "==> Configuration Puppeteer pour Chromium système..."

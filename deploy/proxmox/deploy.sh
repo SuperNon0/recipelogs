@@ -27,7 +27,15 @@ sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && pnpm exec prisma migrate deploy"
 
 # ── Build ────────────────────────────────────────────────
 echo "==> Build Next.js..."
-sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && pnpm build"
+sudo -u "${APP_USER}" bash -c "
+  cd ${APP_DIR}
+  pnpm exec prisma generate
+  pnpm build
+  # Mode standalone : copier static/ et public/ dans .next/standalone/
+  rm -rf .next/standalone/.next/static .next/standalone/public
+  cp -r .next/static .next/standalone/.next/static
+  [ -d public ] && cp -r public .next/standalone/public || true
+"
 
 # ── Restart ─────────────────────────────────────────────
 echo "==> Redémarrage du service..."
