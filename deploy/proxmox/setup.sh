@@ -55,7 +55,8 @@ systemctl enable postgresql
 # ── 5. Utilisateur applicatif ────────────────────────────
 echo "==> Création de l'utilisateur ${APP_USER}..."
 if ! id "${APP_USER}" &>/dev/null; then
-  useradd --system --shell /bin/bash --home "${APP_DIR}" --create-home "${APP_USER}"
+  # Pas de --create-home : on veut que git clone crée le dossier
+  useradd --system --shell /bin/bash --home-dir "${APP_DIR}" "${APP_USER}"
 fi
 
 # ── 6. Clone du dépôt ────────────────────────────────────
@@ -63,6 +64,10 @@ echo "==> Clone du dépôt..."
 if [ -d "${APP_DIR}/.git" ]; then
   echo "    Dépôt déjà présent, skip."
 else
+  # Si le dossier existe mais n'est pas un repo git, on le vide
+  if [ -d "${APP_DIR}" ]; then
+    rm -rf "${APP_DIR}"
+  fi
   git clone https://github.com/SuperNon0/recipelogs.git "${APP_DIR}"
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
