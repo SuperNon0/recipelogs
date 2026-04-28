@@ -93,6 +93,9 @@ sudo -u "${APP_USER}" bash -c "
   pnpm exec prisma migrate deploy
   pnpm exec prisma db seed
   pnpm build
+  # Mode standalone : copier static/ et public/ dans .next/standalone/
+  cp -r .next/static .next/standalone/.next/static
+  [ -d public ] && cp -r public .next/standalone/public || true
 "
 
 # ── 9. Puppeteer Chromium ────────────────────────────────
