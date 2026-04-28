@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildCookbookHtml } from "@/lib/pdf/template";
+import { buildCookbookHtml, type TemplateSlug } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
@@ -50,12 +50,15 @@ export async function GET(
           steps: sr.steps,
           totalMassG: sr.totalMassG,
           subRecipes: [],
+          multiplier: 1,
         }),
       );
     }
 
     entries.push(entryData);
   }
+
+  const templateSlug = (cookbook.template?.slug ?? "classique") as TemplateSlug;
 
   const html = buildCookbookHtml({
     cookbookName: cookbook.name,
@@ -64,6 +67,7 @@ export async function GET(
     hasCover: cookbook.hasCover,
     hasToc: cookbook.hasToc,
     format: cookbook.format as "A4" | "A5",
+    template: templateSlug,
     entries,
   });
 

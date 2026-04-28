@@ -82,6 +82,7 @@ export async function addRecipeToCookbook(
   recipeId: number,
   linkMode: "linked" | "snapshot",
   subrecipeMode: "single" | "separate",
+  multiplier = 1,
 ): Promise<ActionResult> {
   const cookbook = await prisma.cookbook.findUnique({
     where: { id: cookbookId },
@@ -97,7 +98,7 @@ export async function addRecipeToCookbook(
   let snapshotData = null;
   let snapshotDate: Date | null = null;
   if (linkMode === "snapshot") {
-    const snap = await buildRecipeSnapshot(recipeId);
+    const snap = await buildRecipeSnapshot(recipeId, multiplier);
     if (!snap) return { ok: false, error: "Recette introuvable." };
     snapshotData = snap;
     snapshotDate = new Date();

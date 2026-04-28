@@ -38,8 +38,11 @@ export async function listPdfTemplates() {
 /**
  * Snapshot complet d'une recette (une passe, sans récursion profonde),
  * utilisé pour les entrées 📌 figées dans les cahiers.
+ *
+ * @param multiplier coefficient appliqué à toutes les quantités (1 = inchangé).
+ *                   Permet de figer une version multipliée de la recette.
  */
-export async function buildRecipeSnapshot(recipeId: number) {
+export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   const r = await prisma.recipe.findUnique({
     where: { id: recipeId },
     include: {
@@ -66,16 +69,18 @@ export async function buildRecipeSnapshot(recipeId: number) {
   });
   if (!r) return null;
 
+  const k = multiplier > 0 ? multiplier : 1;
+
   const ingredients = r.ingredients.map((i) => ({
     name: i.name ?? i.ingredientBase?.name ?? "—",
-    quantityG: Number(i.quantityG),
+    quantityG: Number(i.quantityG) * k,
   }));
   const totalMassG = ingredients.reduce((s, i) => s + i.quantityG, 0);
 
   const subRecipes = r.parentLinks.map((link) => {
     const childIngredients = link.child.ingredients.map((i) => ({
       name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Number(i.quantityG),
+      quantityG: Number(i.quantityG) * k,
     }));
     const childTotalG = childIngredients.reduce(
       (s, i) => s + i.quantityG,
@@ -102,6 +107,7 @@ export async function buildRecipeSnapshot(recipeId: number) {
     steps: r.stepsBlock?.content ?? null,
     totalMassG,
     subRecipes,
+    multiplier: k,
   };
 }
 

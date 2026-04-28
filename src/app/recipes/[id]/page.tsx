@@ -81,6 +81,8 @@ export default async function RecipePage({
           <AddToCookbookButton
             recipeId={recipe.id}
             cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
+            totalMassG={ingredients.reduce((s, i) => s + i.quantityG, 0)}
+            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG }))}
           />
           <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
         </div>
