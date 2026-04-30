@@ -51,6 +51,8 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
         include: { ingredientBase: true },
       },
       stepsBlock: true,
+      tags: { orderBy: { name: "asc" } },
+      categories: { include: { category: true } },
       parentLinks: {
         orderBy: { position: "asc" },
         include: {
@@ -103,6 +105,10 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     name: r.name,
     source: r.source,
     notesTips: r.notesTips,
+    rating: r.rating,
+    photoPath: r.photoPath,
+    tags: r.tags.map((t) => t.name),
+    categories: r.categories.map((rc) => rc.category.name),
     ingredients,
     steps: r.stepsBlock?.content ?? null,
     totalMassG,
