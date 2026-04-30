@@ -46,8 +46,29 @@ const hex = z
   .string()
   .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Couleur hex invalide");
 
+export const COVER_LAYOUTS = [
+  "circle",
+  "framed",
+  "half-top",
+  "half-bottom",
+  "full-bleed",
+  "banner-top",
+  "minimal",
+] as const;
+export type CoverLayout = (typeof COVER_LAYOUTS)[number];
+
+export const COVER_LAYOUT_LABELS: Record<CoverLayout, string> = {
+  circle: "Cercle centré",
+  framed: "Cadre centré",
+  "half-top": "Bandeau haut",
+  "half-bottom": "Bandeau bas",
+  "full-bleed": "Plein bleed",
+  "banner-top": "Bannière fine",
+  minimal: "Minimaliste",
+};
+
 export const cookbookThemeSchema = z.object({
-  // Couleurs
+  // Couleurs (recette)
   accentColor: hex.default("#A52A2A"),
   textColor: hex.default("#111111"),
   bgColor: hex.default("#ffffff"),
@@ -75,6 +96,14 @@ export const cookbookThemeSchema = z.object({
   tocDots: z.boolean().default(false),
   tocPageNumbers: z.boolean().default(true),
   tocTitle: z.string().max(80).default("Contenu"),
+
+  // Couverture
+  coverLayout: z.enum(COVER_LAYOUTS).default("circle"),
+  coverBgColor: hex.default("#d35a4a"),
+  coverBgColor2: hex.default("#6ea8d8"),
+  coverGradient: z.boolean().default(true),
+  coverTextColor: hex.default("#111111"),
+  coverSubtitle: z.string().max(200).default(""),
 
   // Cahier
   marginSize: z.enum(["small", "medium", "large"]).default("medium"),

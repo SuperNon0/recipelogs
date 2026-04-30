@@ -1,6 +1,6 @@
-import type { RecipeSnapshot } from "@/lib/cookbooks";
 import {
   type CookbookTheme,
+  type CoverLayout,
   DEFAULT_THEME,
   FONT_FAMILIES,
   TEXT_SIZE_PT,
@@ -14,6 +14,32 @@ import {
  */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
 type SubrecipeMode = "single" | "separate";
+
+/**
+ * Forme minimale d'un snapshot de recette, suffisante pour le rendu.
+ * Définie localement pour garder ce module portable côté client (aperçu live).
+ */
+export type RecipeSnap = {
+  recipeId?: number;
+  name: string;
+  source?: string | null;
+  notesTips?: string | null;
+  rating?: number | null;
+  photoPath?: string | null;
+  tags?: string[];
+  categories?: string[];
+  ingredients: { name: string; quantityG: number }[];
+  steps: string | null;
+  totalMassG: number;
+  subRecipes: {
+    label: string | null;
+    childName: string;
+    ingredients: { name: string; quantityG: number }[];
+    totalMassG: number;
+    steps: string | null;
+  }[];
+  multiplier?: number;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,9 +69,40 @@ function numberSteps(raw: string): string {
   return lines.map((l, i) => `${i + 1}. ${l}`).join("\n");
 }
 
+/** Couleur "atténuée" : mélange vers gris à ~50%. */
+function mute(hex: string, amount = 0.5): string {
+  const c = hexToRgb(hex);
+  if (!c) return "#888";
+  const r = Math.round(c.r + (136 - c.r) * amount);
+  const g = Math.round(c.g + (136 - c.g) * amount);
+  const b = Math.round(c.b + (136 - c.b) * amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+function shade(hex: string, amount: number): string {
+  const c = hexToRgb(hex);
+  if (!c) return hex;
+  const r = Math.round(c.r + (51 - c.r) * amount);
+  const g = Math.round(c.g + (51 - c.g) * amount);
+  const b = Math.round(c.b + (51 - c.b) * amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
 // ─── CSS dépendant du thème ───────────────────────────────────────────────────
 
-function buildCss(theme: CookbookTheme): string {
+export function buildCss(theme: CookbookTheme): string {
   const titleFont = FONT_FAMILIES[theme.titleFont];
   const bodyFont = FONT_FAMILIES[theme.bodyFont];
   const baseSize = TEXT_SIZE_PT[theme.textSize];
@@ -59,10 +116,13 @@ function buildCss(theme: CookbookTheme): string {
         ? "0 0 50%"
         : "0 0 60%";
 
-  // Direction de la rangée 2 colonnes selon position des ingrédients
   const colsDirection =
     theme.ingredientsPosition === "right" ? "row-reverse" : "row";
   const stackedColumns = theme.ingredientsPosition === "top";
+
+  const coverBg = theme.coverGradient
+    ? `linear-gradient(135deg, ${theme.coverBgColor} 0%, ${theme.coverBgColor2} 100%)`
+    : theme.coverBgColor;
 
   return `
     @page { margin: ${margin}mm ${margin + 2}mm; size: A4; }
@@ -74,30 +134,113 @@ function buildCss(theme: CookbookTheme): string {
       background: ${theme.bgColor};
       line-height: 1.5;
     }
-    /* Couverture */
+
+    /* Couverture — base */
     .cover {
-      display: flex; align-items: center; justify-content: center;
-      height: 100vh; width: 100%;
-      page-break-after: always;
-      background: linear-gradient(135deg, #d35a4a 0%, #f0c95a 33%, #84c46a 66%, #6ea8d8 100%);
       position: relative;
-    }
-    .cover-circle {
-      width: 220px; height: 220px;
-      background: ${theme.bgColor};
-      border-radius: 50%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; padding: 18px;
+      width: 100%;
+      height: 100vh;
+      page-break-after: always;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      color: ${theme.coverTextColor};
     }
     .cover-title {
       font-family: ${titleFont};
-      font-size: ${titleSize + 6}pt; font-weight: 700;
-      color: ${theme.textColor}; line-height: 1.05;
+      font-size: ${titleSize + 8}pt;
+      font-weight: 700;
+      line-height: 1.05;
+      text-align: center;
     }
     .cover-subtitle {
-      font-size: ${baseSize + 2}pt; color: ${mute(theme.textColor)}; margin-top: 6px;
+      font-family: ${bodyFont};
+      font-size: ${baseSize + 2}pt;
+      margin-top: 6mm;
+      opacity: 0.85;
+      text-align: center;
     }
+
+    /* Layout : cercle centré */
+    .cover-circle { background: ${coverBg}; }
+    .cover-circle .cover-inner {
+      width: 78mm; height: 78mm;
+      background: #fff;
+      color: ${theme.textColor};
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 8mm;
+    }
+
+    /* Layout : cadre centré */
+    .cover-framed { background: ${coverBg}; }
+    .cover-framed .cover-inner {
+      border: 2px solid ${theme.coverTextColor};
+      padding: 14mm 18mm;
+      text-align: center;
+    }
+
+    /* Layout : bandeau haut */
+    .cover-half-top { background: ${theme.bgColor}; }
+    .cover-half-top::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 50%;
+      background: ${coverBg};
+    }
+    .cover-half-top .cover-inner {
+      position: relative;
+      text-align: center;
+      width: 80%;
+      transform: translateY(-10mm);
+    }
+
+    /* Layout : bandeau bas */
+    .cover-half-bottom { background: ${theme.bgColor}; }
+    .cover-half-bottom::after {
+      content: "";
+      position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+      background: ${coverBg};
+    }
+    .cover-half-bottom .cover-inner {
+      position: relative;
+      text-align: center;
+      width: 80%;
+      transform: translateY(10mm);
+    }
+
+    /* Layout : plein bleed */
+    .cover-full-bleed { background: ${coverBg}; }
+    .cover-full-bleed .cover-inner {
+      text-align: center; padding: 20mm;
+    }
+
+    /* Layout : bannière fine */
+    .cover-banner-top { background: ${theme.bgColor}; color: ${theme.textColor}; }
+    .cover-banner-top::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 30mm;
+      background: ${coverBg};
+    }
+    .cover-banner-top .cover-inner {
+      position: relative;
+      text-align: center;
+      padding-top: 18mm;
+    }
+
+    /* Layout : minimaliste */
+    .cover-minimal {
+      background: ${theme.bgColor};
+      color: ${theme.textColor};
+    }
+    .cover-minimal .cover-inner {
+      text-align: center;
+      border-top: 2px solid ${theme.accentColor};
+      border-bottom: 2px solid ${theme.accentColor};
+      padding: 8mm 14mm;
+    }
+
     /* Sommaire */
     .toc { page-break-after: always; padding-top: 6mm; }
     .toc-section-title {
@@ -121,6 +264,7 @@ function buildCss(theme: CookbookTheme): string {
     .toc-entry .toc-leader { flex: 1 1 auto; border-bottom: 1px dotted ${mute(theme.textColor)}; transform: translateY(-3px); margin: 0 4px; min-width: 8mm; }
     .toc-entry .toc-leader-empty { flex: 1 1 auto; }
     .toc-entry .toc-num { color: ${theme.textColor}; flex: 0 0 auto; }
+
     /* Recette */
     .recipe {
       page-break-before: always;
@@ -132,10 +276,6 @@ function buildCss(theme: CookbookTheme): string {
       font-size: ${titleSize}pt; font-weight: 700; color: ${theme.accentColor};
       text-align: center; margin: 4mm 0 3mm;
       line-height: 1.15;
-    }
-    .recipe-meta {
-      font-size: ${baseSize}pt; color: ${mute(theme.textColor)};
-      text-align: center; margin-bottom: 1.5mm;
     }
     .recipe-categories {
       font-size: ${baseSize - 0.5}pt; color: ${mute(theme.textColor)};
@@ -164,12 +304,26 @@ function buildCss(theme: CookbookTheme): string {
       font-size: ${baseSize + 3}pt; font-weight: 700; color: ${theme.accentColor};
       margin-bottom: 3mm;
     }
+
+    /* Ingrédients : "200g · Glaçage mix" sur une seule ligne */
     .ing-item {
-      margin-bottom: 2mm;
-      line-height: 1.35;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 1.8mm;
+      line-height: 1.4;
     }
-    .ing-item .ing-name { display: block; }
-    .ing-item .ing-qty { display: block; color: ${shade(theme.textColor, 0.3)}; }
+    .ing-item .ing-qty {
+      flex: 0 0 auto;
+      font-weight: 600;
+      color: ${theme.accentColor};
+      font-variant-numeric: tabular-nums;
+      min-width: 18mm;
+    }
+    .ing-item .ing-name {
+      flex: 1 1 auto;
+      color: ${theme.textColor};
+    }
     .total-line {
       margin-top: 4mm;
       padding-top: 1.5mm;
@@ -232,38 +386,6 @@ function buildCss(theme: CookbookTheme): string {
   `;
 }
 
-/** Couleur "atténuée" : mélange vers gris à ~50%. */
-function mute(hex: string, amount = 0.5): string {
-  const c = hexToRgb(hex);
-  if (!c) return "#888";
-  const r = Math.round(c.r + (136 - c.r) * amount);
-  const g = Math.round(c.g + (136 - c.g) * amount);
-  const b = Math.round(c.b + (136 - c.b) * amount);
-  return `rgb(${r},${g},${b})`;
-}
-
-/** Mélange vers gris léger pour les variations subtiles. */
-function shade(hex: string, amount: number): string {
-  const c = hexToRgb(hex);
-  if (!c) return hex;
-  const r = Math.round(c.r + (51 - c.r) * amount);
-  const g = Math.round(c.g + (51 - c.g) * amount);
-  const b = Math.round(c.b + (51 - c.b) * amount);
-  return `rgb(${r},${g},${b})`;
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex);
-  if (!m) return null;
-  let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
-  return {
-    r: parseInt(h.slice(0, 2), 16),
-    g: parseInt(h.slice(2, 4), 16),
-    b: parseInt(h.slice(4, 6), 16),
-  };
-}
-
 // ─── Helpers de rendu ─────────────────────────────────────────────────────────
 
 function renderIngredients(items: { name: string; quantityG: number }[], totalG: number, showTotal: boolean): string {
@@ -271,8 +393,8 @@ function renderIngredients(items: { name: string; quantityG: number }[], totalG:
     .map(
       (i) => `
       <div class="ing-item">
+        <span class="ing-qty">${formatG(i.quantityG)}</span>
         <span class="ing-name">${esc(i.name)}</span>
-        <span class="ing-qty">- ${formatG(i.quantityG)}</span>
       </div>`,
     )
     .join("");
@@ -305,8 +427,8 @@ function renderRating(rating: number | null | undefined): string {
   return `<div class="recipe-rating">${stars}</div>`;
 }
 
-function renderRecipeCard(
-  snap: NonNullable<RecipeSnapshot>,
+export function renderRecipeCard(
+  snap: RecipeSnap,
   subrecipeMode: SubrecipeMode,
   pageNum: number | null,
   portion: string,
@@ -392,6 +514,26 @@ function renderRecipeCard(
     </section>`;
 }
 
+// ─── Couverture ───────────────────────────────────────────────────────────────
+
+export function renderCover(opts: {
+  cookbookName: string;
+  description?: string | null;
+  theme: CookbookTheme;
+}): string {
+  const { cookbookName, description, theme } = opts;
+  const layoutClass = `cover-${theme.coverLayout satisfies CoverLayout}`;
+  const subtitle = theme.coverSubtitle?.trim() || description?.trim() || "";
+
+  return `
+    <div class="cover ${layoutClass}">
+      <div class="cover-inner">
+        <div class="cover-title">${esc(cookbookName)}</div>
+        ${subtitle ? `<div class="cover-subtitle">${esc(subtitle)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
 // ─── Sommaire ─────────────────────────────────────────────────────────────────
 
 function renderToc(
@@ -412,7 +554,6 @@ function renderToc(
 
   let body = "";
   if (theme.tocMode === "by-section") {
-    // Groupe par première catégorie (ou "Autres")
     const groups = new Map<string, typeof entries>();
     for (const e of entries) {
       const key = (e.categories && e.categories[0]) || "Autres";
@@ -447,9 +588,9 @@ export function buildCookbookHtml(opts: {
   template?: TemplateSlug;
   theme?: CookbookTheme;
   entries: {
-    snap: NonNullable<RecipeSnapshot>;
+    snap: RecipeSnap;
     subrecipeMode: SubrecipeMode;
-    separateSnaps?: NonNullable<RecipeSnapshot>[];
+    separateSnaps?: RecipeSnap[];
     portion?: string;
   }[];
 }): string {
@@ -459,18 +600,10 @@ export function buildCookbookHtml(opts: {
 
   let body = "";
 
-  // Couverture
   if (hasCover) {
-    body += `
-      <div class="cover">
-        <div class="cover-circle">
-          <div class="cover-title">${esc(cookbookName)}</div>
-          ${description ? `<div class="cover-subtitle">${esc(description)}</div>` : ""}
-        </div>
-      </div>`;
+    body += renderCover({ cookbookName, description, theme });
   }
 
-  // Sommaire (avant les pages de recettes)
   if (hasToc) {
     let pageNumPreview = 1;
     const tocEntries: { name: string; pageNum: number; categories?: string[] }[] = [];
@@ -489,7 +622,6 @@ export function buildCookbookHtml(opts: {
     body += renderToc(tocEntries, theme);
   }
 
-  // Recettes (numérotage continu)
   let pageNum = 1;
   for (const entry of entries) {
     if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
@@ -518,11 +650,10 @@ export function buildCookbookHtml(opts: {
 }
 
 export function buildSingleRecipeHtml(
-  snap: NonNullable<RecipeSnapshot>,
+  snap: RecipeSnap,
   format: "A4" | "A5" = "A4",
   theme: CookbookTheme = DEFAULT_THEME,
 ): string {
-  // Pas de saut de page forcé pour une recette seule
   const css = buildCss(theme).replace("page-break-before: always;", "page-break-before: auto;");
   const card = renderRecipeCard(snap, "single", null, "", theme);
 

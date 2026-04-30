@@ -57,11 +57,11 @@ export default async function RecipePage({
 
   return (
     <article className="flex flex-col gap-5 max-w-3xl mx-auto">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <Link href="/" className="fl-label hover:text-[color:var(--text)]">
           ← Recettes
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <a
             href={`/recipes/${recipe.id}/pdf`}
             className="fl-btn fl-btn-secondary"
