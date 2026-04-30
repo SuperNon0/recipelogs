@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildCookbookHtml, type TemplateSlug } from "@/lib/pdf/template";
+import { buildCookbookHtml } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
+import { parseTheme } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
 type SnapEntry = NonNullable<RecipeSnapshot>;
@@ -46,6 +47,10 @@ export async function GET(
           name: sr.label ?? sr.childName,
           source: null,
           notesTips: null,
+          rating: null,
+          photoPath: null,
+          tags: [],
+          categories: [],
           ingredients: sr.ingredients,
           steps: sr.steps,
           totalMassG: sr.totalMassG,
@@ -58,7 +63,7 @@ export async function GET(
     entries.push(entryData);
   }
 
-  const templateSlug = (cookbook.template?.slug ?? "classique") as TemplateSlug;
+  const theme = parseTheme(cookbook.coverConfig);
 
   const html = buildCookbookHtml({
     cookbookName: cookbook.name,
@@ -67,7 +72,7 @@ export async function GET(
     hasCover: cookbook.hasCover,
     hasToc: cookbook.hasToc,
     format: cookbook.format as "A4" | "A5",
-    template: templateSlug,
+    theme,
     entries,
   });
 

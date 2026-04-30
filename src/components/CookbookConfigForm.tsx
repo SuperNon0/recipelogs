@@ -1,35 +1,57 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useMemo } from "react";
 import { updateCookbookConfig } from "@/app/actions/cookbooks";
+import {
+  type CookbookTheme,
+  THEME_COLORS,
+  DEFAULT_THEME,
+} from "@/lib/pdf/theme";
 
-type Template = { id: number; name: string };
+type FontKey = CookbookTheme["titleFont"];
+
+const FONT_OPTIONS: { value: FontKey; label: string }[] = [
+  { value: "sans", label: "Sans-serif" },
+  { value: "serif", label: "Serif moderne" },
+  { value: "classic", label: "Serif classique" },
+  { value: "rounded", label: "Sans arrondi" },
+  { value: "mono", label: "Monospace" },
+];
 
 export function CookbookConfigForm({
   cookbookId,
   defaultValues,
-  templates,
+  defaultTheme,
 }: {
   cookbookId: number;
   defaultValues: {
     name: string;
     description: string;
     format: string;
-    templateId: number | null;
     hasToc: boolean;
     hasCover: boolean;
     hasLogo: boolean;
     footer: string;
   };
-  templates: Template[];
+  defaultTheme: CookbookTheme;
 }) {
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CookbookTheme>(defaultTheme);
+
+  const setT = <K extends keyof CookbookTheme>(key: K, value: CookbookTheme[K]) =>
+    setTheme((t) => ({ ...t, [key]: value }));
+
+  const isDirty = useMemo(
+    () => JSON.stringify(theme) !== JSON.stringify(defaultTheme),
+    [theme, defaultTheme],
+  );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    fd.set("theme", JSON.stringify(theme));
     setError(null);
     setSaved(false);
     startTransition(async () => {
@@ -43,108 +65,292 @@ export function CookbookConfigForm({
     });
   }
 
+  function resetTheme() {
+    setTheme(DEFAULT_THEME);
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="fl-card flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5">
-        <span className="fl-label">Nom *</span>
-        <input
-          name="name"
-          required
-          maxLength={200}
-          defaultValue={defaultValues.name}
-          className="fl-input"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="fl-label">Description</span>
-        <textarea
-          name="description"
-          rows={3}
-          maxLength={2000}
-          defaultValue={defaultValues.description}
-          className="fl-input"
-        />
-      </label>
-
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {/* ── Identité ─────────────────────────────────────── */}
+      <Section title="Identité du cahier">
         <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Format</span>
-          <select
-            name="format"
-            defaultValue={defaultValues.format}
-            className="fl-input"
-          >
-            <option value="A4">A4</option>
-            <option value="A5">A5</option>
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Template</span>
-          <select
-            name="templateId"
-            defaultValue={defaultValues.templateId ?? ""}
-            className="fl-input"
-          >
-            <option value="">— Aucun —</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-4">
-        <label className="flex items-center gap-2 cursor-pointer">
+          <span className="fl-label">Nom *</span>
           <input
-            type="checkbox"
-            name="hasToc"
-            defaultChecked={defaultValues.hasToc}
-            className="accent-[color:var(--accent)]"
+            name="name"
+            required
+            maxLength={200}
+            defaultValue={defaultValues.name}
+            className="fl-input"
           />
-          <span className="fl-label">Table des matières</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Description</span>
+          <textarea
+            name="description"
+            rows={2}
+            maxLength={2000}
+            defaultValue={defaultValues.description}
+            className="fl-input"
+          />
+        </label>
+
+        <div className="grid grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Format</span>
+            <select
+              name="format"
+              defaultValue={defaultValues.format}
+              className="fl-input"
+            >
+              <option value="A4">A4</option>
+              <option value="A5">A5</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Marges</span>
+            <select
+              value={theme.marginSize}
+              onChange={(e) => setT("marginSize", e.target.value as CookbookTheme["marginSize"])}
+              className="fl-input"
+            >
+              <option value="small">Petites</option>
+              <option value="medium">Moyennes</option>
+              <option value="large">Grandes</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Pied de page</span>
           <input
-            type="checkbox"
+            name="footer"
+            maxLength={500}
+            defaultValue={defaultValues.footer}
+            className="fl-input"
+            placeholder="Ex : © Ma Pâtisserie 2025"
+          />
+        </label>
+      </Section>
+
+      {/* ── Couleurs ─────────────────────────────────────── */}
+      <Section title="Couleurs">
+        <ColorRow
+          label="Couleur d'accent (titres, traits)"
+          value={theme.accentColor}
+          onChange={(v) => setT("accentColor", v)}
+        />
+        <ColorRow
+          label="Couleur du texte"
+          value={theme.textColor}
+          onChange={(v) => setT("textColor", v)}
+        />
+        <ColorRow
+          label="Couleur de fond"
+          value={theme.bgColor}
+          onChange={(v) => setT("bgColor", v)}
+        />
+      </Section>
+
+      {/* ── Typographie ──────────────────────────────────── */}
+      <Section title="Typographie">
+        <div className="grid grid-cols-2 gap-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Police des titres</span>
+            <select
+              value={theme.titleFont}
+              onChange={(e) => setT("titleFont", e.target.value as FontKey)}
+              className="fl-input"
+            >
+              {FONT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Police du corps</span>
+            <select
+              value={theme.bodyFont}
+              onChange={(e) => setT("bodyFont", e.target.value as FontKey)}
+              className="fl-input"
+            >
+              {FONT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Taille du texte</span>
+          <SegmentedControl
+            value={theme.textSize}
+            onChange={(v) => setT("textSize", v)}
+            options={[
+              { value: "small", label: "Petite" },
+              { value: "medium", label: "Moyenne" },
+              { value: "large", label: "Grande" },
+            ]}
+          />
+        </label>
+      </Section>
+
+      {/* ── Mise en page recette ─────────────────────────── */}
+      <Section title="Mise en page de la recette">
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Position des ingrédients</span>
+          <SegmentedControl
+            value={theme.ingredientsPosition}
+            onChange={(v) => setT("ingredientsPosition", v)}
+            options={[
+              { value: "left", label: "Gauche" },
+              { value: "right", label: "Droite" },
+              { value: "top", label: "En haut" },
+            ]}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Largeur de la colonne ingrédients</span>
+          <SegmentedControl
+            value={theme.ingredientsRatio}
+            onChange={(v) => setT("ingredientsRatio", v)}
+            options={[
+              { value: "narrow", label: "Étroite" },
+              { value: "balanced", label: "Équilibrée" },
+              { value: "wide", label: "Large" },
+            ]}
+          />
+        </label>
+      </Section>
+
+      {/* ── Sections affichées ───────────────────────────── */}
+      <Section title="Sections affichées sur la fiche">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <Toggle
+            label="Catégories"
+            checked={theme.showTags || theme.showSource /* always rendered if cats exist */}
+            onChange={() => {}}
+            disabled
+            help="Toujours affichées si renseignées"
+          />
+          <Toggle
+            label="Tags"
+            checked={theme.showTags}
+            onChange={(v) => setT("showTags", v)}
+          />
+          <Toggle
+            label="Source"
+            checked={theme.showSource}
+            onChange={(v) => setT("showSource", v)}
+          />
+          <Toggle
+            label="Note ★"
+            checked={theme.showRating}
+            onChange={(v) => setT("showRating", v)}
+          />
+          <Toggle
+            label="Notes & astuces"
+            checked={theme.showNotes}
+            onChange={(v) => setT("showNotes", v)}
+          />
+          <Toggle
+            label="Masse totale"
+            checked={theme.showTotalMass}
+            onChange={(v) => setT("showTotalMass", v)}
+          />
+          <Toggle
+            label="Taille de portion"
+            checked={theme.showPortion}
+            onChange={(v) => setT("showPortion", v)}
+          />
+          <Toggle
+            label="Numéros de page"
+            checked={theme.showPageNumbers}
+            onChange={(v) => setT("showPageNumbers", v)}
+          />
+        </div>
+      </Section>
+
+      {/* ── Sommaire ─────────────────────────────────────── */}
+      <Section title="Sommaire">
+        <div className="grid grid-cols-2 gap-4">
+          <Toggle
+            label="Page de couverture"
+            checked={defaultValues.hasCover}
+            onChange={() => {}}
             name="hasCover"
-            defaultChecked={defaultValues.hasCover}
-            className="accent-[color:var(--accent)]"
+            useFormCheckbox
           />
-          <span className="fl-label">Page de couverture</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
+          <Toggle
+            label="Logo"
+            checked={defaultValues.hasLogo}
+            onChange={() => {}}
             name="hasLogo"
-            defaultChecked={defaultValues.hasLogo}
-            className="accent-[color:var(--accent)]"
+            useFormCheckbox
           />
-          <span className="fl-label">Logo</span>
-        </label>
-      </div>
+        </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="fl-label">Pied de page</span>
-        <input
-          name="footer"
-          maxLength={500}
-          defaultValue={defaultValues.footer}
-          className="fl-input"
-          placeholder="Ex : © Ma Pâtisserie 2025"
+        <Toggle
+          label="Activer le sommaire"
+          checked={defaultValues.hasToc}
+          onChange={() => {}}
+          name="hasToc"
+          useFormCheckbox
         />
-      </label>
 
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Mode du sommaire</span>
+          <SegmentedControl
+            value={theme.tocMode}
+            onChange={(v) => setT("tocMode", v)}
+            options={[
+              { value: "hidden", label: "Caché" },
+              { value: "flat", label: "Liste plate" },
+              { value: "by-section", label: "Par catégorie" },
+            ]}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="fl-label">Titre du sommaire</span>
+          <input
+            type="text"
+            value={theme.tocTitle}
+            onChange={(e) => setT("tocTitle", e.target.value)}
+            maxLength={80}
+            className="fl-input"
+            placeholder="Contenu"
+          />
+        </label>
+
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <Toggle
+            label="Pointillés (· · · · ·)"
+            checked={theme.tocDots}
+            onChange={(v) => setT("tocDots", v)}
+          />
+          <Toggle
+            label="Numéros de page"
+            checked={theme.tocPageNumbers}
+            onChange={(v) => setT("tocPageNumbers", v)}
+          />
+        </div>
+      </Section>
+
+      {/* ── Actions ──────────────────────────────────────── */}
       {error && (
         <p className="text-sm" style={{ color: "var(--danger)" }}>
           {error}
         </p>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap sticky bottom-2 bg-[color:var(--surface)] p-3 rounded-md border border-[color:var(--border)]">
         <button
           type="submit"
           disabled={pending}
@@ -152,6 +358,28 @@ export function CookbookConfigForm({
         >
           {pending ? "Enregistrement…" : "Enregistrer"}
         </button>
+        <button
+          type="button"
+          onClick={resetTheme}
+          disabled={pending}
+          className="fl-btn"
+        >
+          Réinitialiser le thème
+        </button>
+        <a
+          href={`/cookbooks/${cookbookId}/pdf`}
+          target="_blank"
+          rel="noreferrer"
+          className="fl-btn"
+          style={{ fontSize: "0.8rem" }}
+        >
+          ⬇ Aperçu PDF
+        </a>
+        {isDirty && !saved && (
+          <span className="fl-label" style={{ color: "var(--accent)" }}>
+            Modifications non enregistrées
+          </span>
+        )}
         {saved && (
           <span className="fl-label" style={{ color: "var(--accent-2)" }}>
             ✓ Enregistré
@@ -159,5 +387,172 @@ export function CookbookConfigForm({
         )}
       </div>
     </form>
+  );
+}
+
+// ─── Sous-composants ─────────────────────────────────────────────────────────
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details
+      open
+      className="fl-card"
+      style={{ padding: 0 }}
+    >
+      <summary
+        className="cursor-pointer select-none px-4 py-3 fl-label"
+        style={{ fontSize: "0.85rem", color: "var(--text)" }}
+      >
+        {title}
+      </summary>
+      <div className="px-4 pb-4 flex flex-col gap-4">{children}</div>
+    </details>
+  );
+}
+
+function ColorRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="fl-label">{label}</span>
+        <span className="text-xs text-[color:var(--muted)] font-mono">{value}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {THEME_COLORS.map((c) => {
+          const selected = c.toLowerCase() === value.toLowerCase();
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onChange(c)}
+              className="rounded-full transition-transform"
+              style={{
+                width: 24,
+                height: 24,
+                background: c,
+                border: selected
+                  ? "2px solid var(--text)"
+                  : "1px solid var(--border)",
+                transform: selected ? "scale(1.1)" : "none",
+              }}
+              aria-label={`Couleur ${c}`}
+            />
+          );
+        })}
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-7 h-7 rounded-full cursor-pointer border border-[color:var(--border)]"
+          aria-label="Couleur personnalisée"
+          title="Choisir une couleur personnalisée"
+          style={{ padding: 0, background: "transparent" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div
+      className="inline-flex rounded-md overflow-hidden border"
+      style={{ borderColor: "var(--border)" }}
+      role="tablist"
+    >
+      {options.map((o) => {
+        const selected = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className="px-3 py-1.5 text-sm transition-colors"
+            style={{
+              background: selected ? "var(--accent)" : "transparent",
+              color: selected ? "var(--bg)" : "var(--text)",
+              fontWeight: selected ? 600 : 400,
+              borderRight: "1px solid var(--border)",
+            }}
+            role="tab"
+            aria-selected={selected}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+  help,
+  name,
+  useFormCheckbox,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  help?: string;
+  /** Si défini, la case est gérée comme une checkbox HTML standard, soumise via le formulaire. */
+  name?: string;
+  useFormCheckbox?: boolean;
+}) {
+  if (useFormCheckbox && name) {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          name={name}
+          defaultChecked={checked}
+          disabled={disabled}
+          className="accent-[color:var(--accent)]"
+        />
+        <span className="fl-label">{label}</span>
+        {help && (
+          <span className="text-xs text-[color:var(--muted)]">({help})</span>
+        )}
+      </label>
+    );
+  }
+
+  return (
+    <label
+      className="flex items-center gap-2 cursor-pointer"
+      style={{ opacity: disabled ? 0.5 : 1 }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="accent-[color:var(--accent)]"
+      />
+      <span className="fl-label">{label}</span>
+      {help && (
+        <span className="text-xs text-[color:var(--muted)]">({help})</span>
+      )}
+    </label>
   );
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCookbookDetail, listPdfTemplates } from "@/lib/cookbooks";
+import { getCookbookDetail } from "@/lib/cookbooks";
 import { CookbookEntryRow } from "@/components/CookbookEntryRow";
 import { CookbookConfigForm } from "@/components/CookbookConfigForm";
 import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
 import { ShareButton } from "@/components/ShareButton";
 import { getActiveToken } from "@/lib/share";
+import { parseTheme } from "@/lib/pdf/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,8 @@ export default async function CookbookDetailPage({
   const cookbookId = Number(id);
   if (isNaN(cookbookId)) notFound();
 
-  const [cookbook, templates, shareToken] = await Promise.all([
+  const [cookbook, shareToken] = await Promise.all([
     getCookbookDetail(cookbookId),
-    listPdfTemplates(),
     getActiveToken("cookbook", cookbookId),
   ]);
 
@@ -118,13 +118,12 @@ export default async function CookbookDetailPage({
             name: cookbook.name,
             description: cookbook.description ?? "",
             format: cookbook.format,
-            templateId: cookbook.templateId,
             hasToc: cookbook.hasToc,
             hasCover: cookbook.hasCover,
             hasLogo: cookbook.hasLogo,
             footer: cookbook.footer ?? "",
           }}
-          templates={templates}
+          defaultTheme={parseTheme(cookbook.coverConfig)}
         />
       </section>
 

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -43,8 +44,6 @@ export async function updateCookbookConfig(
   const format = (String(formData.get("format") ?? "A4") === "A5"
     ? "A5"
     : "A4") as "A4" | "A5";
-  const templateIdRaw = formData.get("templateId");
-  const templateId = templateIdRaw ? Number(templateIdRaw) : null;
   const hasToc = formData.get("hasToc") === "on";
   const hasCover = formData.get("hasCover") === "on";
   const hasLogo = formData.get("hasLogo") === "on";
@@ -52,17 +51,34 @@ export async function updateCookbookConfig(
 
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
+  // Theme : JSON sérialisé depuis le client.
+  const themeRaw = formData.get("theme");
+  let themeData: Prisma.InputJsonValue | undefined;
+  if (typeof themeRaw === "string" && themeRaw.length > 0) {
+    try {
+      const parsed = cookbookThemeSchema.safeParse(JSON.parse(themeRaw));
+      if (parsed.success) {
+        themeData = parsed.data as unknown as Prisma.InputJsonValue;
+      } else {
+        // En cas de payload invalide on retombe sur la version tolérante.
+        themeData = parseTheme(JSON.parse(themeRaw)) as unknown as Prisma.InputJsonValue;
+      }
+    } catch {
+      return { ok: false, error: "Configuration de thème invalide." };
+    }
+  }
+
   await prisma.cookbook.update({
     where: { id },
     data: {
       name: name.slice(0, 200),
       description: description ? description.slice(0, 2000) : null,
       format,
-      templateId,
       hasToc,
       hasCover,
       hasLogo,
       footer: footer ? footer.slice(0, 500) : null,
+      ...(themeData !== undefined ? { coverConfig: themeData } : {}),
     },
   });
 
