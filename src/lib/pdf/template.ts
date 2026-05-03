@@ -1,11 +1,12 @@
 import {
   type CookbookTheme,
   type CoverLayout,
+  type BgPattern,
   DEFAULT_THEME,
-  FONT_FAMILIES,
-  TEXT_SIZE_PT,
-  TITLE_SIZE_PT,
+  FONTS,
+  titleSizeFor,
   MARGIN_MM,
+  googleFontsHref,
 } from "./theme";
 
 /**
@@ -88,6 +89,74 @@ function shade(hex: string, amount: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
+/**
+ * CSS du fond de page (recette + sommaire) selon le pattern choisi.
+ * Tous les patterns sont 100% CSS / SVG-data-url, sans image externe,
+ * compatibles avec Puppeteer pour le rendu PDF.
+ */
+export function backgroundCss(
+  pattern: BgPattern,
+  bg: string,
+  accent: string,
+  text: string,
+  imageUrl: string,
+  imageOpacity: number,
+): string {
+  switch (pattern) {
+    case "plain":
+      return `background: ${bg};`;
+
+    case "gradient-soft":
+      return `background: linear-gradient(180deg, ${bg} 0%, ${shade(bg, 0.08)} 100%);`;
+
+    case "paper": {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95  0 0 0 0 0.92  0 0 0 0 0.85  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>`;
+      return `background: ${bg} url("data:image/svg+xml;utf8,${svg}") repeat;`;
+    }
+
+    case "lined": {
+      const line = mute(text, 0.85);
+      return `background: ${bg}; background-image: repeating-linear-gradient(0deg, transparent 0, transparent 7mm, ${line} 7mm, ${line} 7.05mm);`;
+    }
+
+    case "grid": {
+      const line = mute(text, 0.9);
+      return `background: ${bg}; background-image: linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px); background-size: 5mm 5mm;`;
+    }
+
+    case "dotted": {
+      const dot = mute(text, 0.8);
+      return `background: ${bg}; background-image: radial-gradient(${dot} 0.5px, transparent 0.5px); background-size: 4mm 4mm;`;
+    }
+
+    case "vintage":
+      return `background: linear-gradient(135deg, #f6efdc 0%, #ecdfb8 100%); color: #3a2a18;`;
+
+    case "accent-corner": {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><polygon points='0,0 200,0 0,200' fill='${encodeURIComponent(accent)}' fill-opacity='0.18'/></svg>`;
+      return `background: ${bg} url("data:image/svg+xml;utf8,${svg}") no-repeat top left; background-size: 60mm 60mm;`;
+    }
+
+    case "image": {
+      if (!imageUrl) return `background: ${bg};`;
+      // Image en cover avec opacité réglable, par-dessus la couleur de fond.
+      const a = Math.max(0, Math.min(1, 1 - imageOpacity));
+      const overlay = hexToRgba(bg, a);
+      return `background: linear-gradient(${overlay}, ${overlay}), url("${imageUrl.replace(/"/g, '%22')}") center / cover no-repeat, ${bg};`;
+    }
+
+    default:
+      return `background: ${bg};`;
+  }
+}
+
+/** "#fff" + 0.5 → "rgba(255,255,255,0.5)" */
+function hexToRgba(hex: string, alpha: number): string {
+  const c = hexToRgb(hex);
+  if (!c) return `rgba(255,255,255,${alpha})`;
+  return `rgba(${c.r},${c.g},${c.b},${alpha})`;
+}
+
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex);
   if (!m) return null;
@@ -103,11 +172,21 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 // ─── CSS dépendant du thème ───────────────────────────────────────────────────
 
 export function buildCss(theme: CookbookTheme): string {
-  const titleFont = FONT_FAMILIES[theme.titleFont];
-  const bodyFont = FONT_FAMILIES[theme.bodyFont];
-  const baseSize = TEXT_SIZE_PT[theme.textSize];
-  const titleSize = TITLE_SIZE_PT[theme.textSize];
+  const titleFont = (FONTS[theme.titleFont] ?? FONTS.arial).family;
+  const bodyFont = (FONTS[theme.bodyFont] ?? FONTS.arial).family;
+  const baseSize = theme.textSize;
+  const titleSize = titleSizeFor(theme.textSize);
   const margin = MARGIN_MM[theme.marginSize];
+
+  // Fond de page (recette + sommaire)
+  const bgCss = backgroundCss(
+    theme.bgPattern,
+    theme.bgColor,
+    theme.accentColor,
+    theme.textColor,
+    theme.bgImageUrl,
+    theme.bgImageOpacity,
+  );
 
   const ingFlex =
     theme.ingredientsRatio === "narrow"
@@ -131,7 +210,7 @@ export function buildCss(theme: CookbookTheme): string {
       font-family: ${bodyFont};
       font-size: ${baseSize}pt;
       color: ${theme.textColor};
-      background: ${theme.bgColor};
+      ${bgCss}
       line-height: 1.5;
     }
 
@@ -239,6 +318,69 @@ export function buildCss(theme: CookbookTheme): string {
       border-top: 2px solid ${theme.accentColor};
       border-bottom: 2px solid ${theme.accentColor};
       padding: 8mm 14mm;
+    }
+
+    /* Layout : typo géante (titre énorme, pas de fond) */
+    .cover-typo-large {
+      background: ${theme.bgColor};
+      color: ${theme.textColor};
+    }
+    .cover-typo-large .cover-inner {
+      text-align: center;
+      padding: 0 16mm;
+    }
+    .cover-typo-large .cover-title {
+      font-size: ${titleSize + 24}pt;
+      letter-spacing: -0.02em;
+      color: ${theme.accentColor};
+    }
+
+    /* Layout : typo empilée (titre + sous-titre alignés à gauche) */
+    .cover-typo-stacked {
+      background: ${theme.bgColor};
+      color: ${theme.textColor};
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+    .cover-typo-stacked .cover-inner {
+      padding: 38mm 18mm 0;
+      text-align: left;
+      width: 100%;
+    }
+    .cover-typo-stacked .cover-title {
+      text-align: left;
+      font-size: ${titleSize + 16}pt;
+      color: ${theme.accentColor};
+      line-height: 1;
+    }
+    .cover-typo-stacked .cover-subtitle {
+      text-align: left;
+      margin-top: 4mm;
+      font-style: italic;
+    }
+
+    /* Layout : typo + filets fins (pure typo, deux filets discrets) */
+    .cover-typo-divider {
+      background: ${theme.bgColor};
+      color: ${theme.textColor};
+    }
+    .cover-typo-divider .cover-inner {
+      text-align: center;
+      padding: 0 18mm;
+    }
+    .cover-typo-divider .cover-inner::before,
+    .cover-typo-divider .cover-inner::after {
+      content: "";
+      display: block;
+      width: 30mm;
+      height: 1px;
+      background: ${theme.accentColor};
+      margin: 8mm auto;
+    }
+    .cover-typo-divider .cover-title {
+      font-size: ${titleSize + 10}pt;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
 
     /* Sommaire */
@@ -636,10 +778,14 @@ export function buildCookbookHtml(opts: {
 
   const footerHtml = footer ? `<div class="footer-note">${esc(footer)}</div>` : "";
 
+  const fontsLink = googleFontsHref(theme);
+  const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
+
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  ${fontsTag}
   <style>${css}</style>
 </head>
 <body>
@@ -656,11 +802,14 @@ export function buildSingleRecipeHtml(
 ): string {
   const css = buildCss(theme).replace("page-break-before: always;", "page-break-before: auto;");
   const card = renderRecipeCard(snap, "single", null, "", theme);
+  const fontsLink = googleFontsHref(theme);
+  const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  ${fontsTag}
   <style>${css}</style>
 </head>
 <body>${card}</body>
