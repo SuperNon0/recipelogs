@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import {
   buildCss,
+  backgroundCss,
   renderCover,
   renderRecipeCard,
   type RecipeSnap,
 } from "@/lib/pdf/template";
-import type { CookbookTheme } from "@/lib/pdf/theme";
+import { googleFontsHref, type CookbookTheme } from "@/lib/pdf/theme";
 
 const SAMPLE_RECIPE: RecipeSnap = {
   name: "Tarte aux fraises",
@@ -26,7 +27,22 @@ const SAMPLE_RECIPE: RecipeSnap = {
   steps:
     "Étaler la pâte sablée et foncer un cercle de 22 cm.\nCuire à blanc 15 min à 180 °C.\nLaisser refroidir, garnir de crème pâtissière.\nDisposer les fraises coupées en deux sur la crème.\nSaupoudrer de sucre glace au moment de servir.",
   totalMassG: 1080,
-  subRecipes: [],
+  subRecipes: [
+    {
+      label: "Crème pâtissière",
+      childName: "Crème pâtissière vanille",
+      ingredients: [
+        { name: "Lait entier", quantityG: 250 },
+        { name: "Jaunes d'œufs", quantityG: 60 },
+        { name: "Sucre", quantityG: 60 },
+        { name: "Maïzena", quantityG: 25 },
+        { name: "Gousse de vanille", quantityG: 5 },
+      ],
+      totalMassG: 400,
+      steps:
+        "Faire bouillir le lait avec la vanille fendue.\nBlanchir les jaunes avec le sucre, ajouter la maïzena.\nVerser le lait chaud sur le mélange, remettre sur le feu jusqu'à épaississement.\nFilmer au contact et réserver au frais.",
+    },
+  ],
 };
 
 export function CookbookPreview({
@@ -56,15 +72,25 @@ export function CookbookPreview({
       : "";
 
     const recipeHtml = renderRecipeCard(SAMPLE_RECIPE, "single", 1, "", theme);
+    const fontsLink = googleFontsHref(theme);
+    const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
+    const recipeBg = backgroundCss(
+      theme.bgPattern,
+      theme.bgColor,
+      theme.accentColor,
+      theme.textColor,
+      theme.bgImageUrl,
+      theme.bgImageOpacity,
+    );
 
     return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  ${fontsTag}
   <style>
-    html, body { background: #888; }
+    html, body { background: #555; margin: 0; padding: 8px; }
     .preview-page {
-      background: ${theme.bgColor};
       width: 100%;
       aspect-ratio: 1 / 1.414;
       box-shadow: 0 4px 16px rgba(0,0,0,0.3);
@@ -81,12 +107,17 @@ export function CookbookPreview({
       width: 100%;
     }
     ${css}
+    body { background: #555; }
+    .preview-page.bg-recipe {
+      ${recipeBg}
+      color: ${theme.textColor};
+    }
     .recipe { min-height: auto; page-break-before: auto; }
   </style>
 </head>
 <body>
   ${coverHtml ? `<div class="preview-page cover-wrap">${coverHtml}</div>` : ""}
-  <div class="preview-page">${recipeHtml}</div>
+  <div class="preview-page bg-recipe">${recipeHtml}</div>
 </body>
 </html>`;
   }, [theme, cookbookName, description, hasCover]);

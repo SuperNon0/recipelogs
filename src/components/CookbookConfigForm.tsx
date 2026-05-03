@@ -1,25 +1,32 @@
 "use client";
 
-import { useTransition, useState, useMemo } from "react";
+import { useRef, useTransition, useState, useMemo } from "react";
 import { updateCookbookConfig } from "@/app/actions/cookbooks";
 import {
   type CookbookTheme,
   type CoverLayout,
+  type BgPattern,
+  type FontKey,
   THEME_COLORS,
   DEFAULT_THEME,
   COVER_LAYOUTS,
   COVER_LAYOUT_LABELS,
+  BG_PATTERNS,
+  BG_PATTERN_LABELS,
+  FONTS,
+  FONT_LABELS,
+  FONT_KEYS,
+  TEXT_SIZE_MIN,
+  TEXT_SIZE_MAX,
+  TEXT_SIZE_STEP,
 } from "@/lib/pdf/theme";
 import { CookbookPreview } from "./CookbookPreview";
 
-type FontKey = CookbookTheme["titleFont"];
-
-const FONT_OPTIONS: { value: FontKey; label: string }[] = [
-  { value: "sans", label: "Sans-serif" },
-  { value: "serif", label: "Serif moderne" },
-  { value: "classic", label: "Serif classique" },
-  { value: "rounded", label: "Sans arrondi" },
-  { value: "mono", label: "Monospace" },
+const FONT_GROUPS: { label: string; cat: "sans" | "serif" | "display" | "mono" }[] = [
+  { label: "Sans-serif", cat: "sans" },
+  { label: "Serif", cat: "serif" },
+  { label: "Display", cat: "display" },
+  { label: "Mono", cat: "mono" },
 ];
 
 export function CookbookConfigForm({
@@ -277,51 +284,50 @@ export function CookbookConfigForm({
         />
       </Section>
 
-      {/* ── Typographie ──────────────────────────────────── */}
-      <Section title="Typographie">
-        <div className="grid grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Police des titres</span>
-            <select
-              value={theme.titleFont}
-              onChange={(e) => setT("titleFont", e.target.value as FontKey)}
-              className="fl-input"
-            >
-              {FONT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Police du corps</span>
-            <select
-              value={theme.bodyFont}
-              onChange={(e) => setT("bodyFont", e.target.value as FontKey)}
-              className="fl-input"
-            >
-              {FONT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
+      {/* ── Fond de page ─────────────────────────────────── */}
+      <Section title="Fond de page">
         <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Taille du texte</span>
-          <SegmentedControl
-            value={theme.textSize}
-            onChange={(v) => setT("textSize", v)}
-            options={[
-              { value: "small", label: "Petite" },
-              { value: "medium", label: "Moyenne" },
-              { value: "large", label: "Grande" },
-            ]}
+          <span className="fl-label">Style de fond</span>
+          <BgPatternGrid
+            value={theme.bgPattern}
+            accentColor={theme.accentColor}
+            bgColor={theme.bgColor}
+            onChange={(v) => setT("bgPattern", v)}
           />
         </label>
+
+        {theme.bgPattern === "image" && (
+          <ImageUploadRow
+            value={theme.bgImageUrl}
+            onChange={(v) => setT("bgImageUrl", v)}
+            opacity={theme.bgImageOpacity}
+            onOpacityChange={(v) => setT("bgImageOpacity", v)}
+          />
+        )}
+      </Section>
+
+      {/* ── Typographie ──────────────────────────────────── */}
+      <Section title="Typographie">
+        <FontPicker
+          label="Police des titres"
+          value={theme.titleFont}
+          onChange={(v) => setT("titleFont", v)}
+        />
+        <FontPicker
+          label="Police du corps"
+          value={theme.bodyFont}
+          onChange={(v) => setT("bodyFont", v)}
+        />
+
+        <NumberStepper
+          label="Taille du texte"
+          value={theme.textSize}
+          min={TEXT_SIZE_MIN}
+          max={TEXT_SIZE_MAX}
+          step={TEXT_SIZE_STEP}
+          unit="pt"
+          onChange={(v) => setT("textSize", v)}
+        />
       </Section>
 
       {/* ── Mise en page recette ─────────────────────────── */}
@@ -636,6 +642,367 @@ function CoverLayoutGrid({
   );
 }
 
+// ─── Picker de polices grouped ───────────────────────────────────────────────
+
+function FontPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: FontKey;
+  onChange: (v: FontKey) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="fl-label">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as FontKey)}
+        className="fl-input"
+        style={{ fontFamily: FONTS[value]?.family }}
+      >
+        {FONT_GROUPS.map((group) => {
+          const keys = FONT_KEYS.filter((k) => FONTS[k].category === group.cat);
+          if (keys.length === 0) return null;
+          return (
+            <optgroup key={group.cat} label={group.label}>
+              {keys.map((key) => (
+                <option key={key} value={key} style={{ fontFamily: FONTS[key].family }}>
+                  {FONT_LABELS[key]}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
+      </select>
+      <span
+        className="text-xs text-[color:var(--muted)]"
+        style={{ fontFamily: FONTS[value]?.family }}
+      >
+        Aperçu : Tarte aux fraises 1 234 g
+      </span>
+    </label>
+  );
+}
+
+// ─── Stepper numérique +/− ────────────────────────────────────────────────────
+
+function NumberStepper({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  onChange: (v: number) => void;
+}) {
+  const dec = () => onChange(Math.max(min, Math.round((value - step) * 10) / 10));
+  const inc = () => onChange(Math.min(max, Math.round((value + step) * 10) / 10));
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="fl-label">{label}</span>
+        <span className="font-mono text-sm" style={{ color: "var(--accent)" }}>
+          {value}{unit ? ` ${unit}` : ""}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={dec}
+          disabled={value <= min}
+          className="fl-btn"
+          style={{ width: 36, height: 36, padding: 0, fontSize: "1.1rem", fontWeight: 700 }}
+          aria-label="Diminuer"
+        >
+          −
+        </button>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="flex-1"
+          style={{
+            accentColor: "var(--accent)",
+            background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--border) ${pct}%, var(--border) 100%)`,
+          }}
+        />
+        <button
+          type="button"
+          onClick={inc}
+          disabled={value >= max}
+          className="fl-btn"
+          style={{ width: 36, height: 36, padding: 0, fontSize: "1.1rem", fontWeight: 700 }}
+          aria-label="Augmenter"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Picker des fonds (avec mini-aperçu) ─────────────────────────────────────
+
+function BgPatternGrid({
+  value,
+  accentColor,
+  bgColor,
+  onChange,
+}: {
+  value: BgPattern;
+  accentColor: string;
+  bgColor: string;
+  onChange: (v: BgPattern) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {BG_PATTERNS.map((p) => {
+        const selected = p === value;
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange(p)}
+            className="rounded-md p-2 flex flex-col items-center gap-1.5 transition-colors"
+            style={{
+              border: selected
+                ? "2px solid var(--accent)"
+                : "1px solid var(--border)",
+              background: "var(--card)",
+            }}
+            aria-pressed={selected}
+          >
+            <BgPatternThumb pattern={p} accent={accentColor} bg={bgColor} />
+            <span className="text-[0.65rem] text-[color:var(--muted)] text-center leading-tight">
+              {BG_PATTERN_LABELS[p]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BgPatternThumb({
+  pattern,
+  accent,
+  bg,
+}: {
+  pattern: BgPattern;
+  accent: string;
+  bg: string;
+}) {
+  const w = 60, h = 80;
+  let bgStyle: React.CSSProperties = { background: bg };
+  let inner: React.ReactNode = null;
+  switch (pattern) {
+    case "plain":
+      break;
+    case "gradient-soft":
+      bgStyle = { background: `linear-gradient(180deg, ${bg}, #d8d4cb)` };
+      break;
+    case "paper":
+      bgStyle = { background: `${bg}` };
+      inner = (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage:
+              "radial-gradient(rgba(0,0,0,0.07) 0.5px, transparent 0.5px)",
+            backgroundSize: "3px 3px",
+          }}
+        />
+      );
+      break;
+    case "lined":
+      bgStyle = {
+        background: bg,
+        backgroundImage:
+          "repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0,0,0,0.18) 8px, rgba(0,0,0,0.18) 9px)",
+      };
+      break;
+    case "grid":
+      bgStyle = {
+        background: bg,
+        backgroundImage:
+          "linear-gradient(rgba(0,0,0,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.18) 1px, transparent 1px)",
+        backgroundSize: "8px 8px",
+      };
+      break;
+    case "dotted":
+      bgStyle = {
+        background: bg,
+        backgroundImage:
+          "radial-gradient(rgba(0,0,0,0.3) 0.7px, transparent 0.7px)",
+        backgroundSize: "6px 6px",
+      };
+      break;
+    case "vintage":
+      bgStyle = { background: "linear-gradient(135deg, #f6efdc, #ecdfb8)" };
+      break;
+    case "accent-corner":
+      bgStyle = { background: bg };
+      inner = (
+        <svg
+          viewBox={`0 0 ${w} ${h}`}
+          width={w}
+          height={h}
+          style={{ position: "absolute", inset: 0 }}
+        >
+          <polygon points={`0,0 ${w},0 0,${h * 0.7}`} fill={accent} fillOpacity={0.25} />
+        </svg>
+      );
+      break;
+    case "image":
+      bgStyle = {
+        background: bg,
+      };
+      inner = (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--muted)",
+            fontSize: "0.65rem",
+          }}
+        >
+          📷
+        </div>
+      );
+      break;
+  }
+  return (
+    <div
+      style={{
+        ...bgStyle,
+        width: w,
+        height: h,
+        position: "relative",
+        border: "1px solid rgba(0,0,0,0.15)",
+        overflow: "hidden",
+      }}
+    >
+      {inner}
+    </div>
+  );
+}
+
+// ─── Upload d'image ──────────────────────────────────────────────────────────
+
+function ImageUploadRow({
+  value,
+  onChange,
+  opacity,
+  onOpacityChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  opacity: number;
+  onOpacityChange: (v: number) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Le fichier doit être une image.");
+      return;
+    }
+    if (file.size > 2_000_000) {
+      setError("Image trop lourde (max 2 Mo).");
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result));
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <span className="fl-label">URL ou upload d'une image</span>
+        <input
+          type="text"
+          value={value && !value.startsWith("data:") ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://exemple.com/mon-fond.jpg"
+          className="fl-input"
+        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            className="fl-btn"
+            onClick={() => fileRef.current?.click()}
+          >
+            📁 Choisir un fichier…
+          </button>
+          {value && (
+            <button
+              type="button"
+              className="fl-btn"
+              onClick={() => onChange("")}
+              style={{ color: "var(--danger)" }}
+            >
+              ✕ Retirer
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            onChange={onPickFile}
+            className="hidden"
+          />
+        </div>
+        {value && (
+          <div
+            className="rounded-md overflow-hidden mt-1"
+            style={{
+              width: 80,
+              height: 80,
+              border: "1px solid var(--border)",
+              backgroundImage: `url("${value.replace(/"/g, "%22")}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        )}
+        {error && <span className="text-xs" style={{ color: "var(--danger)" }}>{error}</span>}
+      </div>
+
+      <NumberStepper
+        label="Opacité de l'image"
+        value={opacity}
+        min={0.05}
+        max={1}
+        step={0.05}
+        onChange={onOpacityChange}
+      />
+    </div>
+  );
+}
+
 /** Vignette SVG schématique pour chaque layout. */
 function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
   const w = 60, h = 80;
@@ -721,6 +1088,41 @@ function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
           <line x1={10} y1={48} x2={w - 10} y2={48} stroke={fill} strokeWidth="1" />
           <text x={w / 2} y={44} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt}>
             Titre
+          </text>
+        </>
+      );
+      break;
+    case "typo-large":
+      inner = (
+        <>
+          {common}
+          <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={fill}>
+            Titre
+          </text>
+        </>
+      );
+      break;
+    case "typo-stacked":
+      inner = (
+        <>
+          {common}
+          <text x={6} y={28} fontSize="9" fontWeight="700" fill={fill}>
+            Titre
+          </text>
+          <text x={6} y={36} fontSize="4" fill={txt} fontStyle="italic">
+            sous-titre
+          </text>
+        </>
+      );
+      break;
+    case "typo-divider":
+      inner = (
+        <>
+          {common}
+          <line x1={20} y1={32} x2={w - 20} y2={32} stroke={fill} strokeWidth="0.6" />
+          <line x1={20} y1={50} x2={w - 20} y2={50} stroke={fill} strokeWidth="0.6" />
+          <text x={w / 2} y={43} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt} letterSpacing="0.3">
+            TITRE
           </text>
         </>
       );

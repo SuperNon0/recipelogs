@@ -136,6 +136,17 @@ systemctl daemon-reload
 systemctl enable recipelog
 systemctl start recipelog
 
+# ── 10b. Sudoers (déclencher deploy.sh depuis l'app) ────
+echo "==> Sudoers : permettre à ${APP_USER} de lancer deploy.sh sans mot de passe..."
+SUDO_FILE="/etc/sudoers.d/recipelog-deploy"
+cat > "${SUDO_FILE}" <<SUDOERS
+# Permet à l'app RecipeLog de déclencher sa propre mise à jour
+# depuis le bouton "Mise à jour" dans /settings.
+${APP_USER} ALL=(root) NOPASSWD: ${APP_DIR}/deploy/proxmox/deploy.sh
+SUDOERS
+chmod 0440 "${SUDO_FILE}"
+visudo -c -f "${SUDO_FILE}" >/dev/null && echo "    OK"
+
 # ── 11. Nginx ────────────────────────────────────────────
 echo "==> Configuration Nginx..."
 cp "$(dirname "$0")/../nginx.conf" /etc/nginx/sites-available/recipelog 2>/dev/null || \

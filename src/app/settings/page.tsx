@@ -1,6 +1,7 @@
 import { listAllCategories } from "@/lib/recipes";
 import { CategoryManager } from "@/components/CategoryManager";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
+import { DeployButton } from "@/components/DeployButton";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,19 @@ export default async function SettingsPage() {
       <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
         Paramètres
       </h1>
+
+      {/* Mise à jour */}
+      <section className="fl-card flex flex-col gap-4">
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            Mise à jour du site
+          </h2>
+          <p className="fl-label mt-1">
+            Récupère les dernières évolutions depuis GitHub
+          </p>
+        </div>
+        <DeployButton />
+      </section>
 
       {/* Catégories */}
       <section className="fl-card flex flex-col gap-4">
