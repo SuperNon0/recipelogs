@@ -8,6 +8,7 @@ import {
   MARGIN_MM,
   googleFontsHref,
 } from "./theme";
+import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 
 /**
  * Slug historique conservé pour compatibilité descendante.
@@ -477,6 +478,41 @@ export function buildCss(theme: CookbookTheme): string {
       line-height: 1.5;
     }
     .step-num { font-weight: 700; }
+    /* Étapes en HTML enrichi (Tiptap) */
+    .steps-rich { line-height: 1.55; }
+    .steps-rich p { margin: 0 0 2mm; }
+    .steps-rich h3 {
+      font-family: ${titleFont};
+      font-size: ${baseSize + 1.5}pt;
+      font-weight: 700;
+      color: ${theme.accentColor};
+      margin: 3mm 0 1.5mm;
+    }
+    .steps-rich h4 {
+      font-family: ${titleFont};
+      font-size: ${baseSize + 0.5}pt;
+      font-weight: 700;
+      margin: 2mm 0 1mm;
+    }
+    .steps-rich ul, .steps-rich ol { padding-left: 5mm; margin: 1mm 0 2mm; }
+    .steps-rich li { margin-bottom: 0.8mm; }
+    .steps-rich strong, .steps-rich b { font-weight: 700; }
+    .steps-rich em, .steps-rich i { font-style: italic; }
+    .steps-rich u { text-decoration: underline; }
+    .steps-rich s, .steps-rich del { text-decoration: line-through; }
+    .steps-rich mark { padding: 0 1mm; border-radius: 1mm; }
+    .steps-rich code {
+      font-family: "Courier New", monospace;
+      background: ${mute(theme.textColor, 0.92)};
+      padding: 0 1mm; border-radius: 1mm;
+      font-size: ${baseSize - 0.5}pt;
+    }
+    .steps-rich blockquote {
+      margin: 2mm 0; padding-left: 3mm;
+      border-left: 2px solid ${theme.accentColor};
+      color: ${mute(theme.textColor, 0.3)};
+      font-style: italic;
+    }
     .source {
       font-size: ${baseSize - 1.5}pt; color: ${mute(theme.textColor)};
       font-style: italic; text-align: center;
@@ -549,6 +585,11 @@ function renderIngredients(items: { name: string; quantityG: number }[], totalG:
 }
 
 function renderSteps(raw: string): string {
+  // Si le contenu est du HTML enrichi (Tiptap), on le sanitize et on le rend tel quel
+  if (looksLikeHtml(raw)) {
+    return `<div class="steps-rich">${sanitizeRichText(raw)}</div>`;
+  }
+  // Sinon : ancien format texte → numérotation 1. 2. 3. comme avant
   const numbered = numberSteps(raw);
   return numbered
     .split(/\r?\n/)

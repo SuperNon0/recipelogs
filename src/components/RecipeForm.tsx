@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
+import { RichTextEditor } from "./RichTextEditor";
 
 type IngredientRow = {
   name: string;
@@ -297,12 +298,10 @@ export function RecipeForm({
         </div>
       </Field>
 
-      <Field label="Étapes (texte libre)">
-        <textarea
+      <Field label="Étapes (mise en forme : gras, italique, couleur…)">
+        <RichTextEditor
           name="steps"
-          className="fl-input"
-          rows={10}
-          defaultValue={initial?.steps ?? ""}
+          initialHtml={initial?.steps ?? ""}
           placeholder={"1. Préparer la pâte...\n2. Cuire 20 min à 180°C\n..."}
         />
       </Field>

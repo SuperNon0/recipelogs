@@ -11,6 +11,7 @@ import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
 import { listShoppingLists } from "@/lib/shopping";
 import { ShareButton } from "@/components/ShareButton";
 import { getActiveToken } from "@/lib/share";
+import { sanitizeRichText, looksLikeHtml } from "@/lib/sanitizeRichText";
 
 export const dynamic = "force-dynamic";
 
@@ -158,16 +159,26 @@ export default async function RecipePage({
           <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
             Étapes
           </h2>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.88rem",
-              lineHeight: 1.6,
-            }}
-          >
-            {recipe.stepsBlock.content}
-          </pre>
+          {looksLikeHtml(recipe.stepsBlock.content) ? (
+            <div
+              className="rte-content"
+              style={{ fontSize: "0.92rem", lineHeight: 1.6 }}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeRichText(recipe.stepsBlock.content),
+              }}
+            />
+          ) : (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.88rem",
+                lineHeight: 1.6,
+              }}
+            >
+              {recipe.stepsBlock.content}
+            </pre>
+          )}
         </section>
       )}
 
