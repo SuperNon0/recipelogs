@@ -26,6 +26,8 @@
     "@tiptap/extension-underline": "^3.22.5",
     "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
+    "jszip": "^3.10.1",
+    "linkedom": "^0.18.12",
     "next": "15.1.4",
     "puppeteer": "^24.41.0",
     "react": "19.0.0",
