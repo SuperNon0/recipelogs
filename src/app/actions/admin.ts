@@ -87,7 +87,11 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
   }
 
   // Process détaché. La sortie va dans LOG_FILE. Le script supprimera le lock à la fin.
-  const cmd = `(sudo /bin/bash ${DEPLOY_SCRIPT} >> ${LOG_FILE} 2>&1; rm -f ${LOCK_FILE}) &`;
+  // IMPORTANT : on appelle le script DIRECTEMENT (pas via /bin/bash <script>),
+  // sinon sudo voit la commande comme "/bin/bash" et la règle NOPASSWD
+  // sur "/opt/recipelog/deploy/proxmox/deploy.sh" ne matche pas.
+  // Le script doit avoir son shebang (#!/usr/bin/env bash) et être exécutable.
+  const cmd = `(sudo -n ${DEPLOY_SCRIPT} >> ${LOG_FILE} 2>&1; rm -f ${LOCK_FILE}) &`;
   const child = spawn("/bin/bash", ["-c", cmd], {
     detached: true,
     stdio: "ignore",
