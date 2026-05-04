@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { triggerDeploy } from "@/app/actions/admin";
+import { triggerDeploy, clearDeployLock } from "@/app/actions/admin";
 import { MaintenanceOverlay } from "./MaintenanceOverlay";
+
+type DeployError = { message: string; hint?: string };
 
 export function DeployButton() {
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState(false);
   const [overlayBootedAt, setOverlayBootedAt] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DeployError | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
 
   function handleClick() {
     setError(null);
@@ -18,9 +21,20 @@ export function DeployButton() {
         setOverlayBootedAt(result.bootedAt);
         setConfirm(false);
       } else {
-        setError(result.error);
+        setError({ message: result.error, hint: result.hint });
       }
     });
+  }
+
+  async function handleUnlock() {
+    setUnlocking(true);
+    const r = await clearDeployLock();
+    setUnlocking(false);
+    if (r.ok) {
+      setError(null);
+    } else {
+      setError({ message: r.error });
+    }
   }
 
   if (overlayBootedAt !== null) {
@@ -80,16 +94,44 @@ export function DeployButton() {
 
       {error && (
         <div
-          className="text-sm"
+          className="flex flex-col gap-2 text-sm"
           style={{
             color: "var(--danger)",
-            padding: "8px 12px",
+            padding: "10px 14px",
             background: "rgba(232, 92, 71, 0.08)",
             border: "1px solid var(--danger)",
             borderRadius: 8,
           }}
         >
-          ⚠️ {error}
+          <div>⚠️ {error.message}</div>
+          {error.hint && (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.75rem",
+                background: "var(--bg)",
+                color: "var(--text)",
+                padding: 8,
+                borderRadius: 6,
+                lineHeight: 1.4,
+                overflow: "auto",
+              }}
+            >
+              {error.hint}
+            </pre>
+          )}
+          {error.message.toLowerCase().includes("en cours") && (
+            <button
+              type="button"
+              onClick={handleUnlock}
+              disabled={unlocking}
+              className="fl-btn fl-btn-secondary self-start"
+              style={{ fontSize: "0.75rem" }}
+            >
+              {unlocking ? "Déblocage…" : "🔓 Forcer le déblocage du lock"}
+            </button>
+          )}
         </div>
       )}
     </div>
