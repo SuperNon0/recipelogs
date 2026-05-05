@@ -224,24 +224,27 @@ model Cookbook {
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
 
-  template PdfTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  template PdfTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
   entries  CookbookRecipe[]
+  chapters CookbookChapter[]
 
   @@index([updatedAt(sort: Desc)])
   @@map("cookbooks")
 }
 
 model CookbookRecipe {
-  id                 Int                 @id @default(autoincrement())
-  cookbookId         Int                 @map("cookbook_id")
-  recipeId           Int                 @map("recipe_id")
-  position           Int                 @default(0)
-  linkMode           LinkMode            @default(linked) @map("link_mode")
-  snapshotData       Json?               @map("snapshot_data")
-  snapshotDate       DateTime?           @map("snapshot_date")
-  subrecipeMode      SubRecipeRenderMode @default(single) @map("subrecipe_mode")
+  id                Int                 @id @default(autoincrement())
+  cookbookId        Int                 @map("cookbook_id")
+  recipeId          Int                 @map("recipe_id")
+  position          Int                 @default(0)
+  linkMode          LinkMode            @default(linked) @map("link_mode")
+  snapshotData      Json?               @map("snapshot_data")
+  snapshotDate      DateTime?           @map("snapshot_date")
+  subrecipeMode     SubRecipeRenderMode @default(single) @map("subrecipe_mode")
   /** Si true, cette recette se colle à la précédente sur la même page PDF. */
-  groupWithPrevious  Boolean             @default(false) @map("group_with_previous")
+  groupWithPrevious Boolean             @default(false) @map("group_with_previous")
+  /** Si non vide, déclenche un titre de section au-dessus de cette entrée. */
+  sectionTitle      String?             @map("section_title")
 
   cookbook Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
   recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
@@ -249,6 +252,25 @@ model CookbookRecipe {
   @@index([cookbookId, position])
   @@index([recipeId])
   @@map("cookbooks_recipes")
+}
+
+/**
+ * Pages chapitre intercalées entre les recettes.
+ * Partagent le champ `position` avec les CookbookRecipe pour un ordre unifié.
+ */
+model CookbookChapter {
+  id         Int      @id @default(autoincrement())
+  cookbookId Int      @map("cookbook_id")
+  position   Int      @default(0)
+  title      String
+  intro      String?  @db.Text
+  imageUrl   String?  @map("image_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cookbook Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+
+  @@index([cookbookId, position])
+  @@map("cookbooks_chapters")
 }
 
 // ─────────────────────────────────────────────────────────────
