@@ -26,7 +26,7 @@ export default async function CookbookDetailPage({
 
   if (!cookbook) notFound();
 
-  const entries = cookbook.entries.map((e, idx) => ({
+  const entries = cookbook.entries.map((e) => ({
     id: e.id,
     position: e.position,
     recipeName: e.recipe.name,
@@ -34,10 +34,11 @@ export default async function CookbookDetailPage({
     linkMode: e.linkMode as "linked" | "snapshot",
     subrecipeMode: e.subrecipeMode as "single" | "separate",
     snapshotDate: e.snapshotDate,
+    groupWithPrevious: e.groupWithPrevious ?? false,
   }));
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-8">
+    <div className="max-w-6xl mx-auto flex flex-col gap-8">
       {/* Header */}
       <div className="flex items-baseline justify-between">
         <div>

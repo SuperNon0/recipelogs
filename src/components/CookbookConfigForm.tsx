@@ -5,14 +5,14 @@ import { updateCookbookConfig } from "@/app/actions/cookbooks";
 import {
   type CookbookTheme,
   type CoverLayout,
-  type BgPattern,
+  type CoverBgPattern,
   type FontKey,
   THEME_COLORS,
   DEFAULT_THEME,
   COVER_LAYOUTS,
   COVER_LAYOUT_LABELS,
-  BG_PATTERNS,
-  BG_PATTERN_LABELS,
+  COVER_BG_PATTERNS,
+  COVER_BG_PATTERN_LABELS,
   FONTS,
   FONT_LABELS,
   FONT_KEYS,
@@ -50,12 +50,10 @@ export function CookbookConfigForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Champs métadonnées contrôlés (pour que l'aperçu se mette à jour)
   const [name, setName] = useState(defaultValues.name);
   const [description, setDescription] = useState(defaultValues.description);
   const [hasCover, setHasCover] = useState(defaultValues.hasCover);
   const [hasToc, setHasToc] = useState(defaultValues.hasToc);
-  const [hasLogo, setHasLogo] = useState(defaultValues.hasLogo);
   const [format, setFormat] = useState(defaultValues.format);
   const [footer, setFooter] = useState(defaultValues.footer);
 
@@ -71,21 +69,9 @@ export function CookbookConfigForm({
       description !== defaultValues.description ||
       hasCover !== defaultValues.hasCover ||
       hasToc !== defaultValues.hasToc ||
-      hasLogo !== defaultValues.hasLogo ||
       format !== defaultValues.format ||
       footer !== defaultValues.footer,
-    [
-      theme,
-      defaultTheme,
-      name,
-      description,
-      hasCover,
-      hasToc,
-      hasLogo,
-      format,
-      footer,
-      defaultValues,
-    ],
+    [theme, defaultTheme, name, description, hasCover, hasToc, format, footer, defaultValues],
   );
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -97,7 +83,8 @@ export function CookbookConfigForm({
     fd.set("footer", footer);
     if (hasCover) fd.set("hasCover", "on");
     if (hasToc) fd.set("hasToc", "on");
-    if (hasLogo) fd.set("hasLogo", "on");
+    // hasLogo : conservé en BDD mais pas modifiable depuis l'UI pour l'instant
+    if (defaultValues.hasLogo) fd.set("hasLogo", "on");
     fd.set("theme", JSON.stringify(theme));
 
     setError(null);
@@ -118,347 +105,342 @@ export function CookbookConfigForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      {/* ── Aperçu live ─────────────────────────────────── */}
-      <div className="sticky top-2 z-10 rounded-md p-2 bg-[color:var(--surface)] border border-[color:var(--border)] flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <span className="fl-label" style={{ fontSize: "0.8rem" }}>
-            Aperçu (mise à jour en direct)
-          </span>
-          <a
-            href={`/cookbooks/${cookbookId}/pdf`}
-            target="_blank"
-            rel="noreferrer"
-            className="fl-label hover:text-[color:var(--text)]"
-            style={{ fontSize: "0.75rem" }}
-          >
-            ⬇ PDF complet
-          </a>
-        </div>
-        <CookbookPreview
-          cookbookName={name}
-          description={description}
-          theme={theme}
-          hasCover={hasCover}
-        />
-      </div>
-
-      {/* ── Identité ─────────────────────────────────────── */}
-      <Section title="Identité du cahier">
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Nom *</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            maxLength={200}
-            className="fl-input"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Description</span>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            maxLength={2000}
-            className="fl-input"
-          />
-        </label>
-
-        <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-6">
+      {/* ── Colonne gauche : formulaire ───────────────── */}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 min-w-0">
+        {/* Identité */}
+        <Section title="Identité du cahier">
           <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Format</span>
-            <select
+            <span className="fl-label">Nom *</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              maxLength={200}
+              className="fl-input"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Description (apparaît sous le titre sur la couverture)</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              maxLength={2000}
+              className="fl-input"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Format de page</span>
+            <SegmentedControl
               value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="fl-input"
-            >
-              <option value="A4">A4</option>
-              <option value="A5">A5</option>
-            </select>
+              onChange={setFormat}
+              options={[
+                { value: "A4", label: "A4 (210 × 297 mm)" },
+                { value: "A5", label: "A5 (148 × 210 mm)" },
+              ]}
+            />
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Marges</span>
-            <select
-              value={theme.marginSize}
-              onChange={(e) => setT("marginSize", e.target.value as CookbookTheme["marginSize"])}
+            <span className="fl-label">Pied de page (sur chaque page)</span>
+            <input
+              value={footer}
+              onChange={(e) => setFooter(e.target.value)}
+              maxLength={500}
               className="fl-input"
-            >
-              <option value="small">Petites</option>
-              <option value="medium">Moyennes</option>
-              <option value="large">Grandes</option>
-            </select>
+              placeholder="Ex : © Ma Pâtisserie 2025"
+            />
           </label>
-        </div>
+        </Section>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Pied de page</span>
-          <input
-            value={footer}
-            onChange={(e) => setFooter(e.target.value)}
-            maxLength={500}
-            className="fl-input"
-            placeholder="Ex : © Ma Pâtisserie 2025"
+        {/* Couleurs des recettes */}
+        <Section title="Couleurs des recettes">
+          <p className="text-xs text-[color:var(--muted)]">
+            Le fond des pages de recettes est toujours blanc (impression sur feuille blanche).
+          </p>
+          <ColorRow
+            label="Couleur d'accent (titres, traits)"
+            value={theme.accentColor}
+            onChange={(v) => setT("accentColor", v)}
           />
-        </label>
-      </Section>
+          <ColorRow
+            label="Couleur du texte"
+            value={theme.textColor}
+            onChange={(v) => setT("textColor", v)}
+          />
+        </Section>
 
-      {/* ── Couverture ───────────────────────────────────── */}
-      <Section title="Page de couverture">
-        <Toggle
-          label="Activer la page de couverture"
-          checked={hasCover}
-          onChange={setHasCover}
-        />
+        {/* Typographie */}
+        <Section title="Typographie">
+          <FontPicker
+            label="Police des titres"
+            value={theme.titleFont}
+            onChange={(v) => setT("titleFont", v)}
+          />
+          <FontPicker
+            label="Police du corps"
+            value={theme.bodyFont}
+            onChange={(v) => setT("bodyFont", v)}
+          />
+          <NumberStepper
+            label="Taille du texte"
+            value={theme.textSize}
+            min={TEXT_SIZE_MIN}
+            max={TEXT_SIZE_MAX}
+            step={TEXT_SIZE_STEP}
+            unit="pt"
+            onChange={(v) => setT("textSize", v)}
+          />
+        </Section>
 
-        {hasCover && (
-          <>
-            <label className="flex flex-col gap-1.5">
-              <span className="fl-label">Disposition</span>
-              <CoverLayoutGrid
-                value={theme.coverLayout}
-                onChange={(v) => setT("coverLayout", v)}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="fl-label">Sous-titre (override description)</span>
-              <input
-                type="text"
-                value={theme.coverSubtitle}
-                onChange={(e) => setT("coverSubtitle", e.target.value)}
-                maxLength={200}
-                className="fl-input"
-                placeholder="Vide → utilise la description du cahier"
-              />
-            </label>
-
-            <ColorRow
-              label="Couleur de fond"
-              value={theme.coverBgColor}
-              onChange={(v) => setT("coverBgColor", v)}
+        {/* Mise en page recette */}
+        <Section title="Mise en page de la recette">
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Position des ingrédients</span>
+            <SegmentedControl
+              value={theme.ingredientsPosition}
+              onChange={(v) => setT("ingredientsPosition", v)}
+              options={[
+                { value: "left", label: "Gauche" },
+                { value: "right", label: "Droite" },
+                { value: "top", label: "En haut" },
+              ]}
             />
-
-            <Toggle
-              label="Dégradé"
-              checked={theme.coverGradient}
-              onChange={(v) => setT("coverGradient", v)}
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Largeur de la colonne ingrédients</span>
+            <SegmentedControl
+              value={theme.ingredientsRatio}
+              onChange={(v) => setT("ingredientsRatio", v)}
+              options={[
+                { value: "narrow", label: "Étroite" },
+                { value: "balanced", label: "Équilibrée" },
+                { value: "wide", label: "Large" },
+              ]}
             />
+          </label>
+        </Section>
 
-            {theme.coverGradient && (
+        {/* Sections affichées */}
+        <Section title="Sections affichées sur la fiche">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <Toggle label="Tags" checked={theme.showTags} onChange={(v) => setT("showTags", v)} />
+            <Toggle label="Source" checked={theme.showSource} onChange={(v) => setT("showSource", v)} />
+            <Toggle label="Note ★" checked={theme.showRating} onChange={(v) => setT("showRating", v)} />
+            <Toggle label="Notes & astuces" checked={theme.showNotes} onChange={(v) => setT("showNotes", v)} />
+            <Toggle label="Masse totale" checked={theme.showTotalMass} onChange={(v) => setT("showTotalMass", v)} />
+            <Toggle label="Taille de portion" checked={theme.showPortion} onChange={(v) => setT("showPortion", v)} />
+            <Toggle label="Numéros de page" checked={theme.showPageNumbers} onChange={(v) => setT("showPageNumbers", v)} />
+          </div>
+        </Section>
+
+        {/* Couverture */}
+        <Section title="Page de couverture">
+          <Toggle
+            label="Activer la page de couverture"
+            checked={hasCover}
+            onChange={setHasCover}
+          />
+
+          {hasCover && (
+            <>
+              <label className="flex flex-col gap-1.5">
+                <span className="fl-label">Disposition du texte</span>
+                <CoverLayoutGrid
+                  value={theme.coverLayout}
+                  onChange={(v) => setT("coverLayout", v)}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="fl-label">Style de fond</span>
+                <CoverBgPatternGrid
+                  value={theme.coverBgPattern}
+                  c1={theme.coverBgColor}
+                  c2={theme.coverBgColor2}
+                  accent={theme.accentColor}
+                  onChange={(v) => setT("coverBgPattern", v)}
+                />
+              </label>
+
+              {theme.coverBgPattern !== "image" && (
+                <ColorRow
+                  label="Couleur du fond"
+                  value={theme.coverBgColor}
+                  onChange={(v) => setT("coverBgColor", v)}
+                />
+              )}
+
+              {(theme.coverBgPattern === "gradient-diagonal" ||
+                theme.coverBgPattern === "gradient-vertical" ||
+                theme.coverBgPattern === "gradient-radial") && (
+                <ColorRow
+                  label="Couleur de fond (2ᵉ couleur du dégradé)"
+                  value={theme.coverBgColor2}
+                  onChange={(v) => setT("coverBgColor2", v)}
+                />
+              )}
+
+              {theme.coverBgPattern === "image" && (
+                <ImageUploadRow
+                  value={theme.coverBgImageUrl}
+                  onChange={(v) => setT("coverBgImageUrl", v)}
+                  opacity={theme.coverBgImageOpacity}
+                  onOpacityChange={(v) => setT("coverBgImageOpacity", v)}
+                />
+              )}
+
               <ColorRow
-                label="Couleur de fond (2ème)"
-                value={theme.coverBgColor2}
-                onChange={(v) => setT("coverBgColor2", v)}
+                label="Couleur du texte de la couverture"
+                value={theme.coverTextColor}
+                onChange={(v) => setT("coverTextColor", v)}
               />
-            )}
+            </>
+          )}
+        </Section>
 
-            <ColorRow
-              label="Couleur du texte"
-              value={theme.coverTextColor}
-              onChange={(v) => setT("coverTextColor", v)}
-            />
-          </>
+        {/* Sommaire */}
+        <Section title="Sommaire">
+          <Toggle
+            label="Activer le sommaire"
+            checked={hasToc}
+            onChange={setHasToc}
+          />
+
+          {hasToc && (
+            <>
+              <label className="flex flex-col gap-1.5">
+                <span className="fl-label">Mode du sommaire</span>
+                <SegmentedControl
+                  value={theme.tocMode}
+                  onChange={(v) => setT("tocMode", v)}
+                  options={[
+                    { value: "hidden", label: "Caché" },
+                    { value: "flat", label: "Liste plate" },
+                    { value: "by-section", label: "Par catégorie" },
+                  ]}
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="fl-label">Titre du sommaire</span>
+                <input
+                  type="text"
+                  value={theme.tocTitle}
+                  onChange={(e) => setT("tocTitle", e.target.value)}
+                  maxLength={80}
+                  className="fl-input"
+                  placeholder="Contenu"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <Toggle
+                  label="Pointillés (· · · · ·)"
+                  checked={theme.tocDots}
+                  onChange={(v) => setT("tocDots", v)}
+                />
+                <Toggle
+                  label="Numéros de page"
+                  checked={theme.tocPageNumbers}
+                  onChange={(v) => setT("tocPageNumbers", v)}
+                />
+              </div>
+            </>
+          )}
+        </Section>
+
+        {/* Actions */}
+        {error && (
+          <p className="text-sm" style={{ color: "var(--danger)" }}>
+            {error}
+          </p>
         )}
-      </Section>
 
-      {/* ── Couleurs ─────────────────────────────────────── */}
-      <Section title="Couleurs (page de recette)">
-        <ColorRow
-          label="Couleur d'accent (titres, traits)"
-          value={theme.accentColor}
-          onChange={(v) => setT("accentColor", v)}
-        />
-        <ColorRow
-          label="Couleur du texte"
-          value={theme.textColor}
-          onChange={(v) => setT("textColor", v)}
-        />
-        <ColorRow
-          label="Couleur de fond"
-          value={theme.bgColor}
-          onChange={(v) => setT("bgColor", v)}
-        />
-      </Section>
-
-      {/* ── Fond de page ─────────────────────────────────── */}
-      <Section title="Fond de page">
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Style de fond</span>
-          <BgPatternGrid
-            value={theme.bgPattern}
-            accentColor={theme.accentColor}
-            bgColor={theme.bgColor}
-            onChange={(v) => setT("bgPattern", v)}
-          />
-        </label>
-
-        {theme.bgPattern === "image" && (
-          <ImageUploadRow
-            value={theme.bgImageUrl}
-            onChange={(v) => setT("bgImageUrl", v)}
-            opacity={theme.bgImageOpacity}
-            onOpacityChange={(v) => setT("bgImageOpacity", v)}
-          />
-        )}
-      </Section>
-
-      {/* ── Typographie ──────────────────────────────────── */}
-      <Section title="Typographie">
-        <FontPicker
-          label="Police des titres"
-          value={theme.titleFont}
-          onChange={(v) => setT("titleFont", v)}
-        />
-        <FontPicker
-          label="Police du corps"
-          value={theme.bodyFont}
-          onChange={(v) => setT("bodyFont", v)}
-        />
-
-        <NumberStepper
-          label="Taille du texte"
-          value={theme.textSize}
-          min={TEXT_SIZE_MIN}
-          max={TEXT_SIZE_MAX}
-          step={TEXT_SIZE_STEP}
-          unit="pt"
-          onChange={(v) => setT("textSize", v)}
-        />
-      </Section>
-
-      {/* ── Mise en page recette ─────────────────────────── */}
-      <Section title="Mise en page de la recette">
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Position des ingrédients</span>
-          <SegmentedControl
-            value={theme.ingredientsPosition}
-            onChange={(v) => setT("ingredientsPosition", v)}
-            options={[
-              { value: "left", label: "Gauche" },
-              { value: "right", label: "Droite" },
-              { value: "top", label: "En haut" },
-            ]}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Largeur de la colonne ingrédients</span>
-          <SegmentedControl
-            value={theme.ingredientsRatio}
-            onChange={(v) => setT("ingredientsRatio", v)}
-            options={[
-              { value: "narrow", label: "Étroite" },
-              { value: "balanced", label: "Équilibrée" },
-              { value: "wide", label: "Large" },
-            ]}
-          />
-        </label>
-      </Section>
-
-      {/* ── Sections affichées ───────────────────────────── */}
-      <Section title="Sections affichées sur la fiche">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          <Toggle label="Tags" checked={theme.showTags} onChange={(v) => setT("showTags", v)} />
-          <Toggle label="Source" checked={theme.showSource} onChange={(v) => setT("showSource", v)} />
-          <Toggle label="Note ★" checked={theme.showRating} onChange={(v) => setT("showRating", v)} />
-          <Toggle label="Notes & astuces" checked={theme.showNotes} onChange={(v) => setT("showNotes", v)} />
-          <Toggle label="Masse totale" checked={theme.showTotalMass} onChange={(v) => setT("showTotalMass", v)} />
-          <Toggle label="Taille de portion" checked={theme.showPortion} onChange={(v) => setT("showPortion", v)} />
-          <Toggle label="Numéros de page" checked={theme.showPageNumbers} onChange={(v) => setT("showPageNumbers", v)} />
-          <Toggle label="Logo" checked={hasLogo} onChange={setHasLogo} />
+        <div className="flex items-center gap-3 flex-wrap sticky bottom-2 bg-[color:var(--surface)] p-3 rounded-md border border-[color:var(--border)] z-10">
+          <button
+            type="submit"
+            disabled={pending}
+            className="fl-btn fl-btn-primary"
+          >
+            {pending ? "Enregistrement…" : "Enregistrer"}
+          </button>
+          <button
+            type="button"
+            onClick={resetTheme}
+            disabled={pending}
+            className="fl-btn"
+          >
+            Réinitialiser le thème
+          </button>
+          {isDirty && !saved && (
+            <span className="fl-label" style={{ color: "var(--accent)" }}>
+              Modifications non enregistrées
+            </span>
+          )}
+          {saved && (
+            <span className="fl-label" style={{ color: "var(--accent-2)" }}>
+              ✓ Enregistré
+            </span>
+          )}
         </div>
-      </Section>
+      </form>
 
-      {/* ── Sommaire ─────────────────────────────────────── */}
-      <Section title="Sommaire">
-        <Toggle
-          label="Activer le sommaire"
-          checked={hasToc}
-          onChange={setHasToc}
-        />
+      {/* ── Colonne droite : aperçu flottant ──────────── */}
+      <aside className="hidden lg:block">
+        <div className="sticky top-4 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="fl-label" style={{ fontSize: "0.8rem" }}>
+              Aperçu (mise à jour en direct)
+            </span>
+            <a
+              href={`/cookbooks/${cookbookId}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="fl-label hover:text-[color:var(--text)]"
+              style={{ fontSize: "0.75rem" }}
+            >
+              ⬇ PDF complet
+            </a>
+          </div>
+          <CookbookPreview
+            cookbookName={name}
+            description={description}
+            theme={theme}
+            hasCover={hasCover}
+          />
+        </div>
+      </aside>
 
-        {hasToc && (
-          <>
-            <label className="flex flex-col gap-1.5">
-              <span className="fl-label">Mode du sommaire</span>
-              <SegmentedControl
-                value={theme.tocMode}
-                onChange={(v) => setT("tocMode", v)}
-                options={[
-                  { value: "hidden", label: "Caché" },
-                  { value: "flat", label: "Liste plate" },
-                  { value: "by-section", label: "Par catégorie" },
-                ]}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="fl-label">Titre du sommaire</span>
-              <input
-                type="text"
-                value={theme.tocTitle}
-                onChange={(e) => setT("tocTitle", e.target.value)}
-                maxLength={80}
-                className="fl-input"
-                placeholder="Contenu"
-              />
-            </label>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <Toggle
-                label="Pointillés (· · · · ·)"
-                checked={theme.tocDots}
-                onChange={(v) => setT("tocDots", v)}
-              />
-              <Toggle
-                label="Numéros de page"
-                checked={theme.tocPageNumbers}
-                onChange={(v) => setT("tocPageNumbers", v)}
-              />
-            </div>
-          </>
-        )}
-      </Section>
-
-      {/* ── Actions ──────────────────────────────────────── */}
-      {error && (
-        <p className="text-sm" style={{ color: "var(--danger)" }}>
-          {error}
-        </p>
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap sticky bottom-2 bg-[color:var(--surface)] p-3 rounded-md border border-[color:var(--border)]">
-        <button
-          type="submit"
-          disabled={pending}
-          className="fl-btn fl-btn-primary"
-        >
-          {pending ? "Enregistrement…" : "Enregistrer"}
-        </button>
-        <button
-          type="button"
-          onClick={resetTheme}
-          disabled={pending}
-          className="fl-btn"
-        >
-          Réinitialiser le thème
-        </button>
-        {isDirty && !saved && (
-          <span className="fl-label" style={{ color: "var(--accent)" }}>
-            Modifications non enregistrées
-          </span>
-        )}
-        {saved && (
-          <span className="fl-label" style={{ color: "var(--accent-2)" }}>
-            ✓ Enregistré
-          </span>
-        )}
-      </div>
-    </form>
+      {/* Aperçu mobile : en haut, quand on n'est pas en lg */}
+      <aside className="lg:hidden order-first">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="fl-label" style={{ fontSize: "0.8rem" }}>
+              Aperçu
+            </span>
+            <a
+              href={`/cookbooks/${cookbookId}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="fl-label hover:text-[color:var(--text)]"
+              style={{ fontSize: "0.75rem" }}
+            >
+              ⬇ PDF complet
+            </a>
+          </div>
+          <CookbookPreview
+            cookbookName={name}
+            description={description}
+            theme={theme}
+            hasCover={hasCover}
+          />
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -466,11 +448,7 @@ export function CookbookConfigForm({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details
-      open
-      className="fl-card"
-      style={{ padding: 0 }}
-    >
+    <details open className="fl-card" style={{ padding: 0 }}>
       <summary
         className="cursor-pointer select-none px-4 py-3 fl-label"
         style={{ fontSize: "0.85rem", color: "var(--text)" }}
@@ -578,13 +556,11 @@ function Toggle({
   checked,
   onChange,
   disabled,
-  help,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
-  help?: string;
 }) {
   return (
     <label
@@ -599,50 +575,9 @@ function Toggle({
         className="accent-[color:var(--accent)]"
       />
       <span className="fl-label">{label}</span>
-      {help && (
-        <span className="text-xs text-[color:var(--muted)]">({help})</span>
-      )}
     </label>
   );
 }
-
-function CoverLayoutGrid({
-  value,
-  onChange,
-}: {
-  value: CoverLayout;
-  onChange: (v: CoverLayout) => void;
-}) {
-  return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {COVER_LAYOUTS.map((layout) => {
-        const selected = layout === value;
-        return (
-          <button
-            key={layout}
-            type="button"
-            onClick={() => onChange(layout)}
-            className="rounded-md p-2 flex flex-col items-center gap-1.5 transition-colors"
-            style={{
-              border: selected
-                ? "2px solid var(--accent)"
-                : "1px solid var(--border)",
-              background: "var(--card)",
-            }}
-            aria-pressed={selected}
-          >
-            <CoverLayoutThumb layout={layout} />
-            <span className="text-[0.65rem] text-[color:var(--muted)] text-center leading-tight">
-              {COVER_LAYOUT_LABELS[layout]}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Picker de polices grouped ───────────────────────────────────────────────
 
 function FontPicker({
   label,
@@ -685,8 +620,6 @@ function FontPicker({
     </label>
   );
 }
-
-// ─── Stepper numérique +/− ────────────────────────────────────────────────────
 
 function NumberStepper({
   label,
@@ -755,40 +688,32 @@ function NumberStepper({
   );
 }
 
-// ─── Picker des fonds (avec mini-aperçu) ─────────────────────────────────────
-
-function BgPatternGrid({
+function CoverLayoutGrid({
   value,
-  accentColor,
-  bgColor,
   onChange,
 }: {
-  value: BgPattern;
-  accentColor: string;
-  bgColor: string;
-  onChange: (v: BgPattern) => void;
+  value: CoverLayout;
+  onChange: (v: CoverLayout) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {BG_PATTERNS.map((p) => {
-        const selected = p === value;
+    <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+      {COVER_LAYOUTS.map((layout) => {
+        const selected = layout === value;
         return (
           <button
-            key={p}
+            key={layout}
             type="button"
-            onClick={() => onChange(p)}
+            onClick={() => onChange(layout)}
             className="rounded-md p-2 flex flex-col items-center gap-1.5 transition-colors"
             style={{
-              border: selected
-                ? "2px solid var(--accent)"
-                : "1px solid var(--border)",
+              border: selected ? "2px solid var(--accent)" : "1px solid var(--border)",
               background: "var(--card)",
             }}
             aria-pressed={selected}
           >
-            <BgPatternThumb pattern={p} accent={accentColor} bg={bgColor} />
+            <CoverLayoutThumb layout={layout} />
             <span className="text-[0.65rem] text-[color:var(--muted)] text-center leading-tight">
-              {BG_PATTERN_LABELS[p]}
+              {COVER_LAYOUT_LABELS[layout]}
             </span>
           </button>
         );
@@ -797,66 +722,160 @@ function BgPatternGrid({
   );
 }
 
-function BgPatternThumb({
-  pattern,
-  accent,
-  bg,
-}: {
-  pattern: BgPattern;
-  accent: string;
-  bg: string;
-}) {
+function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
   const w = 60, h = 80;
-  let bgStyle: React.CSSProperties = { background: bg };
+  const txt = "var(--text)";
+  const fill = "var(--accent)";
+  const border = "var(--border)";
+  const bgFill = "var(--bg)";
+
   let inner: React.ReactNode = null;
-  switch (pattern) {
-    case "plain":
-      break;
-    case "gradient-soft":
-      bgStyle = { background: `linear-gradient(180deg, ${bg}, #d8d4cb)` };
-      break;
-    case "paper":
-      bgStyle = { background: `${bg}` };
+  switch (layout) {
+    case "circle":
       inner = (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "radial-gradient(rgba(0,0,0,0.07) 0.5px, transparent 0.5px)",
-            backgroundSize: "3px 3px",
-          }}
-        />
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <circle cx={w / 2} cy={h / 2} r={16} fill={fill} fillOpacity={0.18} stroke={fill} />
+          <text x={w / 2} y={h / 2 + 1} textAnchor="middle" fontSize="6" fill={txt}>
+            Titre
+          </text>
+        </>
       );
       break;
-    case "lined":
-      bgStyle = {
-        background: bg,
-        backgroundImage:
-          "repeating-linear-gradient(0deg, transparent 0, transparent 8px, rgba(0,0,0,0.18) 8px, rgba(0,0,0,0.18) 9px)",
-      };
+    case "framed":
+      inner = (
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <rect x={12} y={28} width={w - 24} height={24} fill="none" stroke={txt} strokeWidth="0.7" />
+          <text x={w / 2} y={42} textAnchor="middle" fontSize="6" fill={txt}>
+            Titre
+          </text>
+        </>
+      );
       break;
-    case "grid":
-      bgStyle = {
-        background: bg,
-        backgroundImage:
-          "linear-gradient(rgba(0,0,0,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.18) 1px, transparent 1px)",
-        backgroundSize: "8px 8px",
-      };
+    case "full-bleed":
+      inner = (
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <text x={w / 2} y={h / 2 + 2} textAnchor="middle" fontSize="9" fontWeight="700" fill={txt}>
+            Titre
+          </text>
+        </>
+      );
       break;
-    case "dotted":
-      bgStyle = {
-        background: bg,
-        backgroundImage:
-          "radial-gradient(rgba(0,0,0,0.3) 0.7px, transparent 0.7px)",
-        backgroundSize: "6px 6px",
-      };
+    case "minimal":
+      inner = (
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <line x1={10} y1={36} x2={w - 10} y2={36} stroke={fill} strokeWidth="1" />
+          <line x1={10} y1={48} x2={w - 10} y2={48} stroke={fill} strokeWidth="1" />
+          <text x={w / 2} y={44} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt}>
+            Titre
+          </text>
+        </>
+      );
       break;
-    case "vintage":
-      bgStyle = { background: "linear-gradient(135deg, #f6efdc, #ecdfb8)" };
+    case "typo-large":
+      inner = (
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={fill}>
+            Titre
+          </text>
+        </>
+      );
+      break;
+    case "typo-divider":
+      inner = (
+        <>
+          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={bgFill} stroke={border} />
+          <line x1={20} y1={32} x2={w - 20} y2={32} stroke={fill} strokeWidth="0.6" />
+          <line x1={20} y1={50} x2={w - 20} y2={50} stroke={fill} strokeWidth="0.6" />
+          <text x={w / 2} y={43} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt}>
+            TITRE
+          </text>
+        </>
+      );
+      break;
+  }
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width={42} height={56}>
+      {inner}
+    </svg>
+  );
+}
+
+function CoverBgPatternGrid({
+  value,
+  c1,
+  c2,
+  accent,
+  onChange,
+}: {
+  value: CoverBgPattern;
+  c1: string;
+  c2: string;
+  accent: string;
+  onChange: (v: CoverBgPattern) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+      {COVER_BG_PATTERNS.map((p) => {
+        const selected = p === value;
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onChange(p)}
+            className="rounded-md p-2 flex flex-col items-center gap-1.5 transition-colors"
+            style={{
+              border: selected ? "2px solid var(--accent)" : "1px solid var(--border)",
+              background: "var(--card)",
+            }}
+            aria-pressed={selected}
+          >
+            <CoverBgPatternThumb pattern={p} c1={c1} c2={c2} accent={accent} />
+            <span className="text-[0.65rem] text-[color:var(--muted)] text-center leading-tight">
+              {COVER_BG_PATTERN_LABELS[p]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CoverBgPatternThumb({
+  pattern,
+  c1,
+  c2,
+  accent,
+}: {
+  pattern: CoverBgPattern;
+  c1: string;
+  c2: string;
+  accent: string;
+}) {
+  const w = 50, h = 66;
+  let bgStyle: React.CSSProperties = { background: c1 };
+  let inner: React.ReactNode = null;
+
+  switch (pattern) {
+    case "plain":
+      bgStyle = { background: c1 };
+      break;
+    case "gradient-diagonal":
+      bgStyle = { background: `linear-gradient(135deg, ${c1}, ${c2})` };
+      break;
+    case "gradient-vertical":
+      bgStyle = { background: `linear-gradient(180deg, ${c1}, ${c2})` };
+      break;
+    case "gradient-radial":
+      bgStyle = { background: `radial-gradient(circle at center, ${c1}, ${c2})` };
       break;
     case "accent-corner":
-      bgStyle = { background: bg };
+      bgStyle = { background: c1 };
       inner = (
         <svg
           viewBox={`0 0 ${w} ${h}`}
@@ -864,14 +883,12 @@ function BgPatternThumb({
           height={h}
           style={{ position: "absolute", inset: 0 }}
         >
-          <polygon points={`0,0 ${w},0 0,${h * 0.7}`} fill={accent} fillOpacity={0.25} />
+          <polygon points={`0,0 ${w},0 0,${h * 0.75}`} fill={accent} fillOpacity={0.5} />
         </svg>
       );
       break;
     case "image":
-      bgStyle = {
-        background: bg,
-      };
+      bgStyle = { background: c1 };
       inner = (
         <div
           style={{
@@ -889,6 +906,7 @@ function BgPatternThumb({
       );
       break;
   }
+
   return (
     <div
       style={{
@@ -898,14 +916,13 @@ function BgPatternThumb({
         position: "relative",
         border: "1px solid rgba(0,0,0,0.15)",
         overflow: "hidden",
+        borderRadius: 3,
       }}
     >
       {inner}
     </div>
   );
 }
-
-// ─── Upload d'image ──────────────────────────────────────────────────────────
 
 function ImageUploadRow({
   value,
@@ -941,7 +958,7 @@ function ImageUploadRow({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <span className="fl-label">URL ou upload d'une image</span>
+        <span className="fl-label">URL ou upload d&apos;une image</span>
         <input
           type="text"
           value={value && !value.startsWith("data:") ? value : ""}
@@ -1000,138 +1017,5 @@ function ImageUploadRow({
         onChange={onOpacityChange}
       />
     </div>
-  );
-}
-
-/** Vignette SVG schématique pour chaque layout. */
-function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
-  const w = 60, h = 80;
-  const fill = "var(--accent)";
-  const stroke = "var(--border)";
-  const txt = "var(--text)";
-  const common = (
-    <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill="var(--bg)" stroke={stroke} />
-  );
-
-  let inner: React.ReactNode = null;
-  switch (layout) {
-    case "circle":
-      inner = (
-        <>
-          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={fill} stroke={stroke} />
-          <circle cx={w / 2} cy={h / 2} r={16} fill="var(--bg)" />
-          <text x={w / 2} y={h / 2 + 1} textAnchor="middle" fontSize="6" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "framed":
-      inner = (
-        <>
-          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={fill} stroke={stroke} />
-          <rect x={12} y={28} width={w - 24} height={24} fill="none" stroke={txt} strokeWidth="0.7" />
-          <text x={w / 2} y={42} textAnchor="middle" fontSize="6" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "half-top":
-      inner = (
-        <>
-          {common}
-          <rect x={0.5} y={0.5} width={w - 1} height={h / 2} fill={fill} />
-          <text x={w / 2} y={h * 0.6} textAnchor="middle" fontSize="6" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "half-bottom":
-      inner = (
-        <>
-          {common}
-          <rect x={0.5} y={h / 2} width={w - 1} height={h / 2 - 0.5} fill={fill} />
-          <text x={w / 2} y={h * 0.4} textAnchor="middle" fontSize="6" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "full-bleed":
-      inner = (
-        <>
-          <rect x={0.5} y={0.5} width={w - 1} height={h - 1} fill={fill} stroke={stroke} />
-          <text x={w / 2} y={h / 2 + 2} textAnchor="middle" fontSize="7" fontWeight="700" fill="white">
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "banner-top":
-      inner = (
-        <>
-          {common}
-          <rect x={0.5} y={0.5} width={w - 1} height={14} fill={fill} />
-          <text x={w / 2} y={28} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "minimal":
-      inner = (
-        <>
-          {common}
-          <line x1={10} y1={36} x2={w - 10} y2={36} stroke={fill} strokeWidth="1" />
-          <line x1={10} y1={48} x2={w - 10} y2={48} stroke={fill} strokeWidth="1" />
-          <text x={w / 2} y={44} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "typo-large":
-      inner = (
-        <>
-          {common}
-          <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={fill}>
-            Titre
-          </text>
-        </>
-      );
-      break;
-    case "typo-stacked":
-      inner = (
-        <>
-          {common}
-          <text x={6} y={28} fontSize="9" fontWeight="700" fill={fill}>
-            Titre
-          </text>
-          <text x={6} y={36} fontSize="4" fill={txt} fontStyle="italic">
-            sous-titre
-          </text>
-        </>
-      );
-      break;
-    case "typo-divider":
-      inner = (
-        <>
-          {common}
-          <line x1={20} y1={32} x2={w - 20} y2={32} stroke={fill} strokeWidth="0.6" />
-          <line x1={20} y1={50} x2={w - 20} y2={50} stroke={fill} strokeWidth="0.6" />
-          <text x={w / 2} y={43} textAnchor="middle" fontSize="6" fontWeight="700" fill={txt} letterSpacing="0.3">
-            TITRE
-          </text>
-        </>
-      );
-      break;
-  }
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width={42} height={56}>
-      {inner}
-    </svg>
   );
 }

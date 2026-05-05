@@ -232,14 +232,16 @@ model Cookbook {
 }
 
 model CookbookRecipe {
-  id             Int                 @id @default(autoincrement())
-  cookbookId     Int                 @map("cookbook_id")
-  recipeId       Int                 @map("recipe_id")
-  position       Int                 @default(0)
-  linkMode       LinkMode            @default(linked) @map("link_mode")
-  snapshotData   Json?               @map("snapshot_data")
-  snapshotDate   DateTime?           @map("snapshot_date")
-  subrecipeMode  SubRecipeRenderMode @default(single) @map("subrecipe_mode")
+  id                 Int                 @id @default(autoincrement())
+  cookbookId         Int                 @map("cookbook_id")
+  recipeId           Int                 @map("recipe_id")
+  position           Int                 @default(0)
+  linkMode           LinkMode            @default(linked) @map("link_mode")
+  snapshotData       Json?               @map("snapshot_data")
+  snapshotDate       DateTime?           @map("snapshot_date")
+  subrecipeMode      SubRecipeRenderMode @default(single) @map("subrecipe_mode")
+  /** Si true, cette recette se colle à la précédente sur la même page PDF. */
+  groupWithPrevious  Boolean             @default(false) @map("group_with_previous")
 
   cookbook Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
   recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)

@@ -24,6 +24,7 @@ export async function GET(
     snap: NonNullable<RecipeSnapshot>;
     subrecipeMode: "single" | "separate";
     separateSnaps?: NonNullable<RecipeSnapshot>[];
+    grouped?: boolean;
   }[] = [];
 
   for (const entry of cookbook.entries) {
@@ -38,7 +39,10 @@ export async function GET(
 
     if (!snap) continue;
 
-    const entryData: (typeof entries)[number] = { snap, subrecipeMode };
+    // groupWithPrevious : si true, cette entrée colle à la précédente sur la même page
+    const grouped = (entry as unknown as { groupWithPrevious?: boolean }).groupWithPrevious === true;
+
+    const entryData: (typeof entries)[number] = { snap, subrecipeMode, grouped };
 
     if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
       entryData.separateSnaps = snap.subRecipes.map(
@@ -68,7 +72,6 @@ export async function GET(
   const html = buildCookbookHtml({
     cookbookName: cookbook.name,
     description: cookbook.description,
-    footer: cookbook.footer,
     hasCover: cookbook.hasCover,
     hasToc: cookbook.hasToc,
     format: cookbook.format as "A4" | "A5",
@@ -76,7 +79,9 @@ export async function GET(
     entries,
   });
 
-  const pdf = await renderHtmlToPdf(html, cookbook.format as "A4" | "A5");
+  const pdf = await renderHtmlToPdf(html, cookbook.format as "A4" | "A5", {
+    footer: cookbook.footer,
+  });
 
   const filename = `${cookbook.name.replace(/[^a-z0-9\-]/gi, "_")}.pdf`;
   return new NextResponse(pdf.buffer as ArrayBuffer, {

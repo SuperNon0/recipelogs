@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-// ─── Palettes & options (UI helpers) ──────────────────────────────────────────
+// ─── Palette commune ──────────────────────────────────────────────────────────
 
-/** Palette inspirée Recipe Keeper : 31 couleurs. */
 export const THEME_COLORS = [
   "#ffffff", "#000000", "#4a4a4a", "#9a9a9a", "#d8d4cb",
   "#1f4060", "#2868b8", "#3a8ad8", "#7fbeef", "#9ed8e8",
@@ -15,40 +14,18 @@ export const THEME_COLORS = [
 // ─── Polices ──────────────────────────────────────────────────────────────────
 
 export type FontDef = {
-  /** Stack CSS complète. */
   family: string;
-  /** Nom Google Fonts (pour injection <link>). Si undefined → police système. */
   google?: string;
-  /** Poids à charger depuis Google Fonts. */
   weights?: number[];
-  /** Catégorie pour regrouper dans l'UI. */
   category: "sans" | "serif" | "mono" | "display";
 };
 
 export const FONTS: Record<string, FontDef> = {
-  // Système — disponibles partout sans téléchargement
-  arial: {
-    family: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
-    category: "sans",
-  },
-  helvetica: {
-    family: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-    category: "sans",
-  },
-  georgia: {
-    family: 'Georgia, "Times New Roman", Times, serif',
-    category: "serif",
-  },
-  times: {
-    family: '"Times New Roman", Times, serif',
-    category: "serif",
-  },
-  courier: {
-    family: '"Courier New", Courier, monospace',
-    category: "mono",
-  },
-
-  // Google Fonts — police du site (DM Mono / DM Serif Display)
+  arial: { family: 'Arial, "Helvetica Neue", Helvetica, sans-serif', category: "sans" },
+  helvetica: { family: '"Helvetica Neue", Helvetica, Arial, sans-serif', category: "sans" },
+  georgia: { family: 'Georgia, "Times New Roman", Times, serif', category: "serif" },
+  times: { family: '"Times New Roman", Times, serif', category: "serif" },
+  courier: { family: '"Courier New", Courier, monospace', category: "mono" },
   "dm-mono": {
     family: '"DM Mono", ui-monospace, Menlo, monospace',
     google: "DM Mono",
@@ -61,20 +38,13 @@ export const FONTS: Record<string, FontDef> = {
     weights: [400],
     category: "display",
   },
-
-  // Google Fonts — sans-serif populaires
   inter: {
     family: '"Inter", -apple-system, sans-serif',
     google: "Inter",
     weights: [400, 600, 700],
     category: "sans",
   },
-  lato: {
-    family: '"Lato", sans-serif',
-    google: "Lato",
-    weights: [400, 700],
-    category: "sans",
-  },
+  lato: { family: '"Lato", sans-serif', google: "Lato", weights: [400, 700], category: "sans" },
   "open-sans": {
     family: '"Open Sans", sans-serif',
     google: "Open Sans",
@@ -93,8 +63,6 @@ export const FONTS: Record<string, FontDef> = {
     weights: [400, 600, 700],
     category: "sans",
   },
-
-  // Google Fonts — serif populaires
   lora: {
     family: '"Lora", Georgia, serif',
     google: "Lora",
@@ -136,7 +104,6 @@ export const FONT_LABELS: Record<FontKey, string> = {
   playfair: "Playfair Display",
 };
 
-/** Migration des anciens slugs vers les nouvelles clés. */
 const LEGACY_FONT_MAP: Record<string, FontKey> = {
   sans: "arial",
   serif: "dm-serif",
@@ -150,15 +117,13 @@ const fontSchema = z
   .transform((v) => (v in LEGACY_FONT_MAP ? LEGACY_FONT_MAP[v] : v))
   .pipe(z.enum(FONT_KEYS as [FontKey, ...FontKey[]]));
 
-// ─── Tailles & marges ─────────────────────────────────────────────────────────
+// ─── Tailles ──────────────────────────────────────────────────────────────────
 
-/** Taille de texte en pt — désormais numérique (7 à 16). */
 export const TEXT_SIZE_MIN = 7;
 export const TEXT_SIZE_MAX = 16;
 export const TEXT_SIZE_DEFAULT = 10;
 export const TEXT_SIZE_STEP = 0.5;
 
-/** Le titre est dérivé : titleSize = textSize * 2.2. */
 export function titleSizeFor(textSize: number): number {
   return Math.round(textSize * 2.2 * 10) / 10;
 }
@@ -172,51 +137,18 @@ const textSizeSchema = z
   ])
   .pipe(z.number().min(TEXT_SIZE_MIN).max(TEXT_SIZE_MAX));
 
-export const MARGIN_MM = {
-  small: 8,
-  medium: 12,
-  large: 18,
-} as const;
-
-// ─── Fonds (patterns) ─────────────────────────────────────────────────────────
-
-export const BG_PATTERNS = [
-  "plain",
-  "gradient-soft",
-  "paper",
-  "lined",
-  "grid",
-  "dotted",
-  "vintage",
-  "accent-corner",
-  "image",
-] as const;
-export type BgPattern = (typeof BG_PATTERNS)[number];
-
-export const BG_PATTERN_LABELS: Record<BgPattern, string> = {
-  plain: "Uni",
-  "gradient-soft": "Dégradé subtil",
-  paper: "Papier crème",
-  lined: "Lignes (cahier)",
-  grid: "Quadrillage",
-  dotted: "Pointillés",
-  vintage: "Parchemin",
-  "accent-corner": "Coin d'accent",
-  image: "Image personnalisée",
-};
-
 // ─── Couvertures ──────────────────────────────────────────────────────────────
 
+/**
+ * Layouts de couverture = uniquement le PLACEMENT du texte (titre + description).
+ * Le fond est géré séparément via `coverBgPattern`.
+ */
 export const COVER_LAYOUTS = [
   "circle",
   "framed",
-  "half-top",
-  "half-bottom",
   "full-bleed",
-  "banner-top",
   "minimal",
   "typo-large",
-  "typo-stacked",
   "typo-divider",
 ] as const;
 export type CoverLayout = (typeof COVER_LAYOUTS)[number];
@@ -224,14 +156,30 @@ export type CoverLayout = (typeof COVER_LAYOUTS)[number];
 export const COVER_LAYOUT_LABELS: Record<CoverLayout, string> = {
   circle: "Cercle centré",
   framed: "Cadre centré",
-  "half-top": "Bandeau haut",
-  "half-bottom": "Bandeau bas",
-  "full-bleed": "Plein bleed",
-  "banner-top": "Bannière fine",
-  minimal: "Minimaliste",
+  "full-bleed": "Centré (pleine page)",
+  minimal: "Minimaliste (filets)",
   "typo-large": "Typo géante",
-  "typo-stacked": "Typo empilée",
   "typo-divider": "Typo + filets",
+};
+
+/** Fonds de couverture — uniquement les "trucs jolis". */
+export const COVER_BG_PATTERNS = [
+  "plain",
+  "gradient-diagonal",
+  "gradient-vertical",
+  "gradient-radial",
+  "accent-corner",
+  "image",
+] as const;
+export type CoverBgPattern = (typeof COVER_BG_PATTERNS)[number];
+
+export const COVER_BG_PATTERN_LABELS: Record<CoverBgPattern, string> = {
+  plain: "Uni",
+  "gradient-diagonal": "Dégradé diagonal",
+  "gradient-vertical": "Dégradé vertical",
+  "gradient-radial": "Dégradé radial",
+  "accent-corner": "Coin d'accent",
+  image: "Image personnalisée",
 };
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
@@ -241,15 +189,9 @@ const hex = z
   .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Couleur hex invalide");
 
 export const cookbookThemeSchema = z.object({
-  // Couleurs (recette)
+  // Recette : couleurs (le fond est TOUJOURS blanc — feuille d'imprimante)
   accentColor: hex.default("#A52A2A"),
   textColor: hex.default("#111111"),
-  bgColor: hex.default("#ffffff"),
-  bgPattern: z.enum(BG_PATTERNS).default("plain"),
-  /** URL ou data: URL de l'image de fond (utilisée si bgPattern === "image"). */
-  bgImageUrl: z.string().max(2_500_000).default(""),
-  /** Opacité de l'image de fond (0.05 à 1). */
-  bgImageOpacity: z.number().min(0.05).max(1).default(0.6),
 
   // Typographie
   titleFont: fontSchema.default("arial"),
@@ -277,26 +219,18 @@ export const cookbookThemeSchema = z.object({
 
   // Couverture
   coverLayout: z.enum(COVER_LAYOUTS).default("circle"),
+  coverBgPattern: z.enum(COVER_BG_PATTERNS).default("gradient-diagonal"),
   coverBgColor: hex.default("#d35a4a"),
   coverBgColor2: hex.default("#6ea8d8"),
-  coverGradient: z.boolean().default(true),
   coverTextColor: hex.default("#111111"),
-  coverSubtitle: z.string().max(200).default(""),
-
-  // Cahier
-  marginSize: z.enum(["small", "medium", "large"]).default("medium"),
+  coverBgImageUrl: z.string().max(2_500_000).default(""),
+  coverBgImageOpacity: z.number().min(0.05).max(1).default(0.7),
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;
 
-/** Valeurs par défaut = visuel actuel. Zéro régression. */
 export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
 
-/**
- * Lecture tolérante : accepte n'importe quel JSON et tombe sur les defaults
- * pour les champs invalides ou manquants. Jamais d'exception.
- * Migre automatiquement les anciens slugs (textSize: "medium" → 10, etc.)
- */
 export function parseTheme(raw: unknown): CookbookTheme {
   if (raw == null || typeof raw !== "object") return DEFAULT_THEME;
 
@@ -305,6 +239,27 @@ export function parseTheme(raw: unknown): CookbookTheme {
   for (const key of Object.keys(cookbookThemeSchema.shape) as (keyof CookbookTheme)[]) {
     if (key in partial) out[key] = partial[key];
   }
+
+  // Migration douce : `coverGradient: true` (ancien schéma) → coverBgPattern: gradient-diagonal
+  if (
+    !("coverBgPattern" in out) &&
+    "coverGradient" in partial &&
+    partial.coverGradient === true
+  ) {
+    out.coverBgPattern = "gradient-diagonal";
+  }
+  if (
+    !("coverBgPattern" in out) &&
+    "coverGradient" in partial &&
+    partial.coverGradient === false
+  ) {
+    out.coverBgPattern = "plain";
+  }
+  // Migration douce : ancien `bgImageUrl` → coverBgImageUrl si on est en pattern image
+  if (!("coverBgImageUrl" in out) && "bgImageUrl" in partial) {
+    out.coverBgImageUrl = partial.bgImageUrl;
+  }
+
   const parsed = cookbookThemeSchema.safeParse(out);
   if (parsed.success) return parsed.data;
 
@@ -318,10 +273,6 @@ export function parseTheme(raw: unknown): CookbookTheme {
   return result as CookbookTheme;
 }
 
-/**
- * Construit le href Google Fonts pour les polices nécessitant un download.
- * Retourne `null` si toutes les polices sont système.
- */
 export function googleFontsHref(theme: CookbookTheme): string | null {
   const families = new Set<string>();
   for (const key of [theme.titleFont, theme.bodyFont]) {
