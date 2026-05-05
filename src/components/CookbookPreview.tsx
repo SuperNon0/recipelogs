@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   buildCss,
-  backgroundCss,
   renderCover,
   renderRecipeCard,
   type RecipeSnap,
@@ -12,7 +11,7 @@ import { FONTS, googleFontsHref, type CookbookTheme } from "@/lib/pdf/theme";
 
 const SAMPLE_RECIPE: RecipeSnap = {
   name: "Tarte aux fraises",
-  source: "Pierre Hermé · Patisserie",
+  source: "Pierre Hermé · Pâtisserie",
   notesTips:
     "Cuire à blanc le fond pendant 15 min à 180 °C. Laisser refroidir avant de garnir.",
   rating: 4,
@@ -43,7 +42,7 @@ const SAMPLE_RECIPE: RecipeSnap = {
         "Faire bouillir le lait avec la vanille fendue.\nBlanchir les jaunes avec le sucre, ajouter la maïzena.\nVerser le lait chaud sur le mélange, remettre sur le feu jusqu'à épaississement.\nFilmer au contact et réserver au frais.",
     },
     {
-      label: "Pâte sablée",
+      label: "Pâte sablée amande",
       childName: "Pâte sablée amande",
       ingredients: [
         { name: "Beurre doux", quantityG: 150 },
@@ -61,9 +60,9 @@ const SAMPLE_RECIPE: RecipeSnap = {
 
 const ZOOM_PRESETS = [
   { key: "S", label: "Petit", height: 420 },
-  { key: "M", label: "Moyen", height: 680 },
+  { key: "M", label: "Moyen", height: 640 },
   { key: "L", label: "Grand", height: 940 },
-  { key: "XL", label: "Plein écran", height: 0 /* fullscreen */ },
+  { key: "XL", label: "Plein écran", height: 0 },
 ] as const;
 
 type ZoomKey = (typeof ZOOM_PRESETS)[number]["key"];
@@ -84,10 +83,8 @@ export function CookbookPreview({
 
   const html = useMemo(() => {
     const css = buildCss(theme)
-      // Pour l'aperçu : pas de saut de page forcé, marges remises à zéro
       .replace(/page-break-before: always;/g, "page-break-before: auto;")
-      .replace(/page-break-after: always;/g, "page-break-after: auto;")
-      .replace(/@page \{[^}]*\}/, "@page { margin: 0; }");
+      .replace(/page-break-after: always;/g, "page-break-after: auto;");
 
     const coverHtml = hasCover
       ? renderCover({
@@ -100,17 +97,7 @@ export function CookbookPreview({
     const recipeHtml = renderRecipeCard(SAMPLE_RECIPE, "single", 1, "", theme);
     const fontsLink = googleFontsHref(theme);
     const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
-    const recipeBg = backgroundCss(
-      theme.bgPattern,
-      theme.bgColor,
-      theme.accentColor,
-      theme.textColor,
-      theme.bgImageUrl,
-      theme.bgImageOpacity,
-    );
 
-    // On force la police sur la page de recette et sur la couverture
-    // (au cas où buildCss serait shadowé par autre chose)
     const bodyFontFamily = (FONTS[theme.bodyFont] ?? FONTS.arial).family;
     const titleFontFamily = (FONTS[theme.titleFont] ?? FONTS.arial).family;
 
@@ -136,6 +123,7 @@ export function CookbookPreview({
       overflow: hidden;
       position: relative;
       font-family: ${bodyFontFamily};
+      background: #ffffff;
     }
     .preview-page.cover-wrap { padding: 0; }
     .preview-page .cover { height: 100%; width: 100%; }
@@ -148,22 +136,15 @@ export function CookbookPreview({
     .preview-page .notes-title {
       font-family: ${titleFontFamily} !important;
     }
-    .preview-page,
-    .preview-page * {
-      /* Le rendu interne se base sur la police du theme */
-    }
     ${css}
-    .preview-page.bg-recipe {
-      ${recipeBg}
-      color: ${theme.textColor};
-    }
+    body { background: #2a2a2a; }
     .recipe { min-height: auto; page-break-before: auto; }
   </style>
 </head>
 <body>
   <div class="scroll-area">
     ${coverHtml ? `<div class="preview-page cover-wrap">${coverHtml}</div>` : ""}
-    <div class="preview-page bg-recipe">${recipeHtml}</div>
+    <div class="preview-page">${recipeHtml}</div>
   </div>
 </body>
 </html>`;
@@ -201,7 +182,6 @@ export function CookbookPreview({
         <iframe
           title="Aperçu du cahier (plein écran)"
           srcDoc={html}
-          // allow-same-origin pour que les Google Fonts puissent charger
           sandbox="allow-same-origin"
           style={{
             flex: 1,
@@ -218,12 +198,8 @@ export function CookbookPreview({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Toolbar */}
       <div className="flex items-center gap-1 flex-wrap">
-        <span
-          className="fl-label"
-          style={{ fontSize: "0.7rem", marginRight: 4 }}
-        >
+        <span className="fl-label" style={{ fontSize: "0.7rem", marginRight: 4 }}>
           Taille :
         </span>
         {ZOOM_PRESETS.map((p) => {
@@ -264,7 +240,6 @@ export function CookbookPreview({
         })}
       </div>
 
-      {/* Iframe */}
       <div
         className="rounded-md overflow-hidden border"
         style={{
@@ -275,8 +250,6 @@ export function CookbookPreview({
         <iframe
           title="Aperçu du cahier"
           srcDoc={html}
-          // allow-same-origin pour que les Google Fonts puissent charger
-          // (sandbox="" donne une origine "null" → fetch CSS bloqué)
           sandbox="allow-same-origin"
           style={{
             width: "100%",

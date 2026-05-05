@@ -172,6 +172,18 @@ export async function moveCookbookEntry(
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
 
+export async function toggleGroupWithPrevious(
+  entryId: number,
+  value: boolean,
+  cookbookId: number,
+) {
+  await prisma.cookbookRecipe.update({
+    where: { id: entryId },
+    data: { groupWithPrevious: value },
+  });
+  revalidatePath(`/cookbooks/${cookbookId}`);
+}
+
 export async function refreshSnapshot(entryId: number, cookbookId: number) {
   const entry = await prisma.cookbookRecipe.findUnique({
     where: { id: entryId },

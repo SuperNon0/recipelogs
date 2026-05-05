@@ -6,6 +6,7 @@ import {
   moveCookbookEntry,
   refreshSnapshot,
   removeFromCookbook,
+  toggleGroupWithPrevious,
 } from "@/app/actions/cookbooks";
 
 export type CookbookEntryRowData = {
@@ -16,6 +17,7 @@ export type CookbookEntryRowData = {
   linkMode: "linked" | "snapshot";
   subrecipeMode: "single" | "separate";
   snapshotDate: Date | null;
+  groupWithPrevious: boolean;
 };
 
 export function CookbookEntryRow({
@@ -105,6 +107,25 @@ export function CookbookEntryRow({
           </button>
         </div>
       </div>
+
+      {!isFirst && (
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={entry.groupWithPrevious}
+            disabled={pending}
+            onChange={(e) =>
+              startTransition(() =>
+                toggleGroupWithPrevious(entry.id, e.target.checked, cookbookId),
+              )
+            }
+            className="accent-[color:var(--accent)]"
+          />
+          <span className="fl-label" style={{ color: "var(--text)" }}>
+            🔗 Coller à la recette précédente sur la même page
+          </span>
+        </label>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {entry.linkMode === "linked" ? (
