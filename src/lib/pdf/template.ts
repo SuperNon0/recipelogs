@@ -12,6 +12,23 @@ import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
 type SubrecipeMode = "single" | "separate";
 
+/** Une entrée de cahier dans le PDF : soit une recette, soit une page chapitre. */
+export type CookbookEntryUnion =
+  | {
+      type: "recipe";
+      snap: RecipeSnap;
+      subrecipeMode: SubrecipeMode;
+      separateSnaps?: RecipeSnap[];
+      portion?: string;
+      grouped?: boolean;
+      sectionTitle?: string | null;
+    }
+  | {
+      type: "chapter";
+      title: string;
+      intro: string;
+    };
+
 export type RecipeSnap = {
   recipeId?: number;
   name: string;
@@ -268,6 +285,60 @@ export function buildCss(theme: CookbookTheme): string {
     }
     .toc-entry .toc-leader-empty { flex: 1 1 auto; }
     .toc-entry .toc-num { color: ${theme.textColor}; flex: 0 0 auto; }
+
+    /* ─── Page chapitre ─── */
+    .chapter-page {
+      page-break-before: always;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 95vh;
+      padding: 0 20mm;
+      text-align: center;
+    }
+    .chapter-title {
+      font-family: ${titleFont};
+      font-size: ${titleSize + 14}pt;
+      font-weight: 700;
+      color: ${theme.accentColor};
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+    }
+    .chapter-intro {
+      font-family: ${bodyFont};
+      font-size: ${baseSize + 1.5}pt;
+      color: ${mute(theme.textColor, 0.2)};
+      max-width: 120mm;
+      margin-top: 8mm;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .chapter-rule {
+      width: 30mm;
+      height: 1.5px;
+      background: ${theme.accentColor};
+      margin: 6mm 0;
+    }
+
+    /* ─── Titre de section au-dessus d'une recette ─── */
+    .section-title {
+      page-break-before: always;
+      font-family: ${titleFont};
+      font-size: ${titleSize - 2}pt;
+      font-weight: 700;
+      color: ${theme.accentColor};
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 4mm 0 2mm;
+      border-bottom: 1px solid ${theme.accentColor};
+      margin-bottom: 4mm;
+    }
+    .section-title + .recipe {
+      page-break-before: auto;
+    }
 
     /* ─── Recette ─── */
     .recipe {
@@ -577,35 +648,65 @@ export function renderCover(opts: {
 // ─── Sommaire ─────────────────────────────────────────────────────────────────
 
 function renderToc(
-  entries: { name: string; pageNum: number; categories?: string[] }[],
+  entries: {
+    name: string;
+    pageNum: number;
+    categories?: string[];
+    isChapter?: boolean;
+  }[],
   theme: CookbookTheme,
 ): string {
   if (theme.tocMode === "hidden" || entries.length === 0) return "";
 
-  const renderEntry = (label: string, page: number) => {
+  const renderEntry = (label: string, page: number, isChapter?: boolean) => {
     const leader = theme.tocDots
       ? `<span class="toc-leader"></span>`
       : `<span class="toc-leader-empty"></span>`;
     const pageHtml = theme.tocPageNumbers
       ? `<span class="toc-num">${page}</span>`
       : "";
-    return `<div class="toc-entry"><span class="toc-label">${esc(label)}</span>${leader}${pageHtml}</div>`;
+    const labelStyle = isChapter
+      ? ' style="font-weight:700;color:' + theme.accentColor + '"'
+      : "";
+    return `<div class="toc-entry"${labelStyle}><span class="toc-label">${esc(label)}</span>${leader}${pageHtml}</div>`;
   };
 
   let body = "";
   if (theme.tocMode === "by-section") {
-    const groups = new Map<string, typeof entries>();
+    // Les chapitres ouvrent leur propre section dans le sommaire
+    let currentSection: string | null = null;
+    const groups: { title: string; entries: typeof entries }[] = [];
+    let currentList: typeof entries = [];
+
     for (const e of entries) {
-      const key = (e.categories && e.categories[0]) || "Autres";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(e);
+      if (e.isChapter) {
+        if (currentList.length > 0) {
+          groups.push({ title: currentSection ?? "Autres", entries: currentList });
+        }
+        currentSection = e.name;
+        currentList = [];
+      } else {
+        const cat: string = (e.categories && e.categories[0]) || currentSection || "Autres";
+        if (cat !== currentSection) {
+          if (currentList.length > 0) {
+            groups.push({ title: currentSection ?? "Autres", entries: currentList });
+            currentList = [];
+          }
+          currentSection = cat;
+        }
+        currentList.push(e);
+      }
     }
-    for (const [groupName, list] of groups.entries()) {
-      body += `<div class="toc-group-title"><span>${esc(groupName)}</span></div>`;
-      body += list.map((e) => renderEntry(e.name, e.pageNum)).join("");
+    if (currentList.length > 0) {
+      groups.push({ title: currentSection ?? "Autres", entries: currentList });
+    }
+
+    for (const g of groups) {
+      body += `<div class="toc-group-title"><span>${esc(g.title)}</span></div>`;
+      body += g.entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
     }
   } else {
-    body = entries.map((e) => renderEntry(e.name, e.pageNum)).join("");
+    body = entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
   }
 
   return `
@@ -617,6 +718,15 @@ function renderToc(
 
 // ─── API publique ─────────────────────────────────────────────────────────────
 
+function renderChapterPage(title: string, intro: string): string {
+  return `
+    <section class="chapter-page">
+      <div class="chapter-title">${esc(title)}</div>
+      <div class="chapter-rule"></div>
+      ${intro ? `<div class="chapter-intro">${esc(intro)}</div>` : ""}
+    </section>`;
+}
+
 export function buildCookbookHtml(opts: {
   cookbookName: string;
   description?: string | null;
@@ -627,14 +737,7 @@ export function buildCookbookHtml(opts: {
   format: "A4" | "A5";
   template?: TemplateSlug;
   theme?: CookbookTheme;
-  entries: {
-    snap: RecipeSnap;
-    subrecipeMode: SubrecipeMode;
-    separateSnaps?: RecipeSnap[];
-    portion?: string;
-    /** Si true, cette entrée colle à la précédente (pas de saut de page). */
-    grouped?: boolean;
-  }[];
+  entries: CookbookEntryUnion[];
 }): string {
   const { cookbookName, description, hasCover, hasToc, entries } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
@@ -645,16 +748,31 @@ export function buildCookbookHtml(opts: {
   let body = "";
   if (hasCover) body += renderCover({ cookbookName, description, theme });
 
+  // Précalcul des numéros de page pour le sommaire
   if (hasToc) {
     let pageNumPreview = 1;
-    const tocEntries: { name: string; pageNum: number; categories?: string[] }[] = [];
+    const tocEntries: {
+      name: string;
+      pageNum: number;
+      categories?: string[];
+      isChapter?: boolean;
+    }[] = [];
+
     for (const entry of entries) {
+      if (entry.type === "chapter") {
+        tocEntries.push({
+          name: entry.title,
+          pageNum: pageNumPreview,
+          isChapter: true,
+        });
+        pageNumPreview += 1;
+        continue;
+      }
       tocEntries.push({
         name: entry.snap.name,
         pageNum: pageNumPreview,
         categories: entry.snap.categories,
       });
-      // Recettes "grouped" partagent la page de la précédente — page count inchangé
       const usesNewPage = !entry.grouped;
       if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
         pageNumPreview += (usesNewPage ? 1 : 0) + entry.separateSnaps.length;
@@ -665,8 +783,19 @@ export function buildCookbookHtml(opts: {
     body += renderToc(tocEntries, theme);
   }
 
+  // Rendu des entrées
   let pageNum = 1;
   for (const entry of entries) {
+    if (entry.type === "chapter") {
+      body += renderChapterPage(entry.title, entry.intro);
+      pageNum += 1;
+      continue;
+    }
+
+    if (entry.sectionTitle) {
+      body += `<div class="section-title">${esc(entry.sectionTitle)}</div>`;
+    }
+
     const grouped = !!entry.grouped;
     if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
       body += renderRecipeCard(entry.snap, "single", pageNum, entry.portion ?? "", theme, { grouped });

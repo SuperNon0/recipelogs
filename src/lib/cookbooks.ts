@@ -23,9 +23,15 @@ export async function getCookbookDetail(id: number) {
               id: true,
               name: true,
               updatedAt: true,
+              categories: {
+                include: { category: { select: { name: true, color: true } } },
+              },
             },
           },
         },
+      },
+      chapters: {
+        orderBy: { position: "asc" },
       },
     },
   });

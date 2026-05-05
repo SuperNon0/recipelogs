@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildCookbookHtml } from "@/lib/pdf/template";
+import { buildCookbookHtml, type CookbookEntryUnion } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
 import { parseTheme } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
@@ -20,14 +20,29 @@ export async function GET(
   const cookbook = await getCookbookDetail(cookbookId);
   if (!cookbook) return new NextResponse("Not found", { status: 404 });
 
-  const entries: {
-    snap: NonNullable<RecipeSnapshot>;
-    subrecipeMode: "single" | "separate";
-    separateSnaps?: NonNullable<RecipeSnapshot>[];
-    grouped?: boolean;
-  }[] = [];
+  // Fusion des entrées (recettes + chapitres) ordonnée par position
+  type RawEntry =
+    | { kind: "recipe"; data: (typeof cookbook.entries)[number] }
+    | { kind: "chapter"; data: (typeof cookbook.chapters)[number] };
 
-  for (const entry of cookbook.entries) {
+  const allRaw: RawEntry[] = [
+    ...cookbook.entries.map((e) => ({ kind: "recipe" as const, data: e })),
+    ...cookbook.chapters.map((c) => ({ kind: "chapter" as const, data: c })),
+  ].sort((a, b) => a.data.position - b.data.position);
+
+  const entries: CookbookEntryUnion[] = [];
+
+  for (const raw of allRaw) {
+    if (raw.kind === "chapter") {
+      entries.push({
+        type: "chapter",
+        title: raw.data.title,
+        intro: raw.data.intro ?? "",
+      });
+      continue;
+    }
+
+    const entry = raw.data;
     const subrecipeMode = entry.subrecipeMode as "single" | "separate";
     let snap: NonNullable<RecipeSnapshot> | null = null;
 
@@ -39,13 +54,19 @@ export async function GET(
 
     if (!snap) continue;
 
-    // groupWithPrevious : si true, cette entrée colle à la précédente sur la même page
-    const grouped = (entry as unknown as { groupWithPrevious?: boolean }).groupWithPrevious === true;
+    const grouped = entry.groupWithPrevious === true;
+    const sectionTitle = entry.sectionTitle ?? null;
 
-    const entryData: (typeof entries)[number] = { snap, subrecipeMode, grouped };
+    const recipeEntry: Extract<CookbookEntryUnion, { type: "recipe" }> = {
+      type: "recipe",
+      snap,
+      subrecipeMode,
+      grouped,
+      sectionTitle,
+    };
 
     if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
-      entryData.separateSnaps = snap.subRecipes.map(
+      recipeEntry.separateSnaps = snap.subRecipes.map(
         (sr): SnapEntry => ({
           recipeId: entry.recipeId,
           name: sr.label ?? sr.childName,
@@ -64,7 +85,7 @@ export async function GET(
       );
     }
 
-    entries.push(entryData);
+    entries.push(recipeEntry);
   }
 
   const theme = parseTheme(cookbook.coverConfig);

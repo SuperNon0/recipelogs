@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCookbookDetail } from "@/lib/cookbooks";
-import { CookbookEntryRow } from "@/components/CookbookEntryRow";
+import {
+  CookbookEntriesTable,
+  type Entry,
+} from "@/components/CookbookEntriesTable";
 import { CookbookConfigForm } from "@/components/CookbookConfigForm";
+import { CookbookTabs } from "@/components/CookbookTabs";
 import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
 import { ShareButton } from "@/components/ShareButton";
 import { getActiveToken } from "@/lib/share";
@@ -26,21 +30,41 @@ export default async function CookbookDetailPage({
 
   if (!cookbook) notFound();
 
-  const entries = cookbook.entries.map((e) => ({
-    id: e.id,
-    position: e.position,
-    recipeName: e.recipe.name,
-    recipeId: e.recipe.id,
-    linkMode: e.linkMode as "linked" | "snapshot",
-    subrecipeMode: e.subrecipeMode as "single" | "separate",
-    snapshotDate: e.snapshotDate,
-    groupWithPrevious: e.groupWithPrevious ?? false,
-  }));
+  // Fusion des recettes et chapitres dans une liste ordonnée par position
+  const entries: Entry[] = [
+    ...cookbook.entries.map(
+      (e): Entry => ({
+        type: "recipe",
+        id: e.id,
+        position: e.position,
+        recipeId: e.recipe.id,
+        recipeName: e.recipe.name,
+        categories: e.recipe.categories.map((rc) => ({
+          name: rc.category.name,
+          color: rc.category.color,
+        })),
+        linkMode: e.linkMode as "linked" | "snapshot",
+        subrecipeMode: e.subrecipeMode as "single" | "separate",
+        groupWithPrevious: e.groupWithPrevious ?? false,
+        sectionTitle: e.sectionTitle ?? null,
+        snapshotDate: e.snapshotDate,
+      }),
+    ),
+    ...cookbook.chapters.map(
+      (c): Entry => ({
+        type: "chapter",
+        id: c.id,
+        position: c.position,
+        title: c.title,
+        intro: c.intro,
+      }),
+    ),
+  ].sort((a, b) => a.position - b.position);
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8">
+    <div className="max-w-6xl mx-auto flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <Link
             href="/cookbooks"
@@ -48,10 +72,7 @@ export default async function CookbookDetailPage({
           >
             ← Cahiers
           </Link>
-          <h1
-            className="fl-title-serif mt-1"
-            style={{ fontSize: "1.6rem" }}
-          >
+          <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
             {cookbook.name}
           </h1>
           {cookbook.description && (
@@ -60,7 +81,7 @@ export default async function CookbookDetailPage({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
           <ShareButton
             entityType="cookbook"
             entityId={cookbookId}
@@ -76,70 +97,54 @@ export default async function CookbookDetailPage({
         </div>
       </div>
 
-      {/* Entries */}
-      <section>
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="fl-label" style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-            Recettes ({entries.length})
-          </h2>
-        </div>
+      {/* 2 onglets : Recettes / Apparence */}
+      <CookbookTabs
+        recipes={
+          <div className="flex flex-col gap-6">
+            <CookbookEntriesTable
+              cookbookId={cookbookId}
+              initial={entries}
+            />
 
-        {entries.length === 0 ? (
-          <div className="fl-card text-center py-8">
-            <p className="text-[color:var(--muted)] text-sm">
-              Aucune recette dans ce cahier.
-            </p>
-            <p className="text-[color:var(--muted)] text-xs mt-1">
-              Ajoutez des recettes depuis la fiche recette.
-            </p>
+            <section>
+              <h2
+                className="fl-label mb-3"
+                style={{ fontSize: "0.9rem", color: "var(--danger)" }}
+              >
+                Zone dangereuse
+              </h2>
+              <div
+                className="fl-card"
+                style={{ borderColor: "var(--danger-muted, #3a1a1a)" }}
+              >
+                <p className="text-sm text-[color:var(--muted)] mb-3">
+                  La suppression du cahier est irréversible. Les recettes ne sont
+                  pas supprimées.
+                </p>
+                <DeleteCookbookButton
+                  cookbookId={cookbookId}
+                  cookbookName={cookbook.name}
+                />
+              </div>
+            </section>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {entries.map((entry, idx) => (
-              <CookbookEntryRow
-                key={entry.id}
-                cookbookId={cookbookId}
-                entry={entry}
-                isFirst={idx === 0}
-                isLast={idx === entries.length - 1}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Config */}
-      <section>
-        <h2 className="fl-label mb-3" style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-          Configuration
-        </h2>
-        <CookbookConfigForm
-          cookbookId={cookbookId}
-          defaultValues={{
-            name: cookbook.name,
-            description: cookbook.description ?? "",
-            format: cookbook.format,
-            hasToc: cookbook.hasToc,
-            hasCover: cookbook.hasCover,
-            hasLogo: cookbook.hasLogo,
-            footer: cookbook.footer ?? "",
-          }}
-          defaultTheme={parseTheme(cookbook.coverConfig)}
-        />
-      </section>
-
-      {/* Danger zone */}
-      <section>
-        <h2 className="fl-label mb-3" style={{ fontSize: "0.9rem", color: "var(--danger)" }}>
-          Zone dangereuse
-        </h2>
-        <div className="fl-card" style={{ borderColor: "var(--danger-muted, #3a1a1a)" }}>
-          <p className="text-sm text-[color:var(--muted)] mb-3">
-            La suppression du cahier est irréversible. Les recettes ne sont pas supprimées.
-          </p>
-          <DeleteCookbookButton cookbookId={cookbookId} cookbookName={cookbook.name} />
-        </div>
-      </section>
+        }
+        apparence={
+          <CookbookConfigForm
+            cookbookId={cookbookId}
+            defaultValues={{
+              name: cookbook.name,
+              description: cookbook.description ?? "",
+              format: cookbook.format,
+              hasToc: cookbook.hasToc,
+              hasCover: cookbook.hasCover,
+              hasLogo: cookbook.hasLogo,
+              footer: cookbook.footer ?? "",
+            }}
+            defaultTheme={parseTheme(cookbook.coverConfig)}
+          />
+        }
+      />
     </div>
   );
 }

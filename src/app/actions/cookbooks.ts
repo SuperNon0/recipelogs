@@ -184,6 +184,136 @@ export async function toggleGroupWithPrevious(
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
 
+export async function setSectionTitle(
+  entryId: number,
+  title: string,
+  cookbookId: number,
+) {
+  const t = title.trim().slice(0, 200);
+  await prisma.cookbookRecipe.update({
+    where: { id: entryId },
+    data: { sectionTitle: t || null },
+  });
+  revalidatePath(`/cookbooks/${cookbookId}`);
+}
+
+// ─── Chapitres ───────────────────────────────────────────────────────────────
+
+export async function addChapter(
+  cookbookId: number,
+  data: { title: string; intro?: string },
+): Promise<ActionResult> {
+  const title = data.title.trim();
+  if (!title) return { ok: false, error: "Le titre du chapitre est obligatoire." };
+
+  // Position : à la fin (max position toutes entrées confondues + 1)
+  const [maxRecipe, maxChapter] = await Promise.all([
+    prisma.cookbookRecipe.aggregate({
+      where: { cookbookId },
+      _max: { position: true },
+    }),
+    prisma.cookbookChapter.aggregate({
+      where: { cookbookId },
+      _max: { position: true },
+    }),
+  ]);
+  const maxPos = Math.max(
+    maxRecipe._max.position ?? -1,
+    maxChapter._max.position ?? -1,
+  );
+
+  await prisma.cookbookChapter.create({
+    data: {
+      cookbookId,
+      title: title.slice(0, 200),
+      intro: data.intro?.trim().slice(0, 5000) || null,
+      position: maxPos + 1,
+    },
+  });
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true };
+}
+
+export async function updateChapter(
+  chapterId: number,
+  data: { title: string; intro?: string },
+  cookbookId: number,
+): Promise<ActionResult> {
+  const title = data.title.trim();
+  if (!title) return { ok: false, error: "Le titre du chapitre est obligatoire." };
+
+  await prisma.cookbookChapter.update({
+    where: { id: chapterId },
+    data: {
+      title: title.slice(0, 200),
+      intro: data.intro?.trim().slice(0, 5000) || null,
+    },
+  });
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true };
+}
+
+export async function deleteChapter(chapterId: number, cookbookId: number) {
+  await prisma.cookbookChapter.delete({ where: { id: chapterId } });
+  revalidatePath(`/cookbooks/${cookbookId}`);
+}
+
+// ─── Réorganisation unifiée (recettes + chapitres) ───────────────────────────
+
+/**
+ * Sauvegarde un nouvel ordre des entrées du cahier après un drag-and-drop.
+ * `entries` : liste ordonnée d'entrées avec leur type ("recipe" ou "chapter") et id.
+ * On réécrit la `position` séquentiellement (0..N-1) sur chaque table.
+ */
+export async function reorderCookbookEntries(
+  cookbookId: number,
+  entries: { type: "recipe" | "chapter"; id: number }[],
+): Promise<ActionResult> {
+  // Vérifie que tout appartient bien au cahier
+  const recipeIds = entries.filter((e) => e.type === "recipe").map((e) => e.id);
+  const chapterIds = entries.filter((e) => e.type === "chapter").map((e) => e.id);
+
+  const [recipes, chapters] = await Promise.all([
+    prisma.cookbookRecipe.findMany({
+      where: { id: { in: recipeIds }, cookbookId },
+      select: { id: true },
+    }),
+    prisma.cookbookChapter.findMany({
+      where: { id: { in: chapterIds }, cookbookId },
+      select: { id: true },
+    }),
+  ]);
+
+  if (recipes.length !== recipeIds.length || chapters.length !== chapterIds.length) {
+    return { ok: false, error: "Une ou plusieurs entrées n'appartiennent pas à ce cahier." };
+  }
+
+  // Mise à jour atomique : la position de chaque entrée correspond à son index dans la liste
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e.type === "recipe") {
+      ops.push(
+        prisma.cookbookRecipe.update({
+          where: { id: e.id },
+          data: { position: i },
+        }),
+      );
+    } else {
+      ops.push(
+        prisma.cookbookChapter.update({
+          where: { id: e.id },
+          data: { position: i },
+        }),
+      );
+    }
+  }
+
+  await prisma.$transaction(ops);
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true };
+}
+
 export async function refreshSnapshot(entryId: number, cookbookId: number) {
   const entry = await prisma.cookbookRecipe.findUnique({
     where: { id: entryId },
