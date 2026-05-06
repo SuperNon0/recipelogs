@@ -298,11 +298,11 @@ export function RecipeForm({
         </div>
       </Field>
 
-      <Field label="Étapes (mise en forme : gras, italique, couleur…)">
+      <Field label="Étapes (mise en forme : gras, italique, souligné)">
         <RichTextEditor
           name="steps"
           initialHtml={initial?.steps ?? ""}
-          placeholder={"1. Préparer la pâte...\n2. Cuire 20 min à 180°C\n..."}
+          placeholder={"Préparer la pâte...\nCuire 20 min à 180°C\n..."}
         />
       </Field>
 

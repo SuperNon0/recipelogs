@@ -93,7 +93,6 @@ export async function GET(
   const theme = parseTheme(cookbook.coverConfig);
   const format = cookbook.format as "A4" | "A5";
   const hasCoverOrToc = cookbook.hasCover || cookbook.hasToc;
-  const hasFooterText = !!(cookbook.footer && cookbook.footer.trim().length > 0);
 
   // Pass 1 : couverture + sommaire (sans footer ni numéro de page)
   // Pass 2 : recettes (avec footer + numéro de page commençant à 1)
@@ -118,13 +117,13 @@ export async function GET(
       format,
       theme,
       entries,
-      hasFooter: hasFooterText || theme.showPageNumbers,
+      hasFooter: true,
     });
     pdfBuffers.push(
       await renderHtmlToPdf(recipesHtml, format, {
         footer: cookbook.footer,
         footerAlign: theme.footerAlign,
-        showPageNumber: theme.showPageNumbers,
+        showPageNumber: true,
       }),
     );
   }
