@@ -156,15 +156,18 @@ export function CookbookConfigForm({
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Alignement du pied de page</span>
+            <span className="fl-label">
+              Alignement du pied de page
+              <span className="text-xs text-[color:var(--muted)] ml-1">
+                (le numéro de page reste centré)
+              </span>
+            </span>
             <SegmentedControl
               value={theme.footerAlign}
               onChange={(v) => setT("footerAlign", v)}
               options={[
                 { value: "left", label: "⟸ Gauche" },
-                { value: "center", label: "⇔ Centre" },
                 { value: "right", label: "⟹ Droite" },
-                { value: "justify", label: "☰ Justifié" },
               ]}
             />
           </label>

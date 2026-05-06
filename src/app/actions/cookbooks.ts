@@ -332,3 +332,110 @@ export async function convertToLinked(entryId: number, cookbookId: number) {
   });
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
+
+// ─── Modification de la masse d'une recette figée ────────────────────────────
+
+type SnapIngredient = { name: string; quantityG: number };
+type SnapData = {
+  ingredients: SnapIngredient[];
+  totalMassG: number;
+  subRecipes?: {
+    ingredients: SnapIngredient[];
+    totalMassG: number;
+    [k: string]: unknown;
+  }[];
+  multiplier?: number;
+  [k: string]: unknown;
+};
+
+export type UpdateSnapshotMassPayload =
+  | { mode: "coefficient"; coefficient: number }
+  | { mode: "mass_target"; targetMassG: number }
+  | { mode: "pivot_ingredient"; pivotIndex: number; targetMassG: number };
+
+/**
+ * Recettes FIGÉES (📌 snapshot) uniquement : applique un coefficient à toutes
+ * les quantités du snapshot pour atteindre la masse demandée.
+ *
+ * Trois modes (identiques à la fiche recette) :
+ *  - `coefficient`     : multiplicateur direct (ex : 1.5)
+ *  - `mass_target`     : on vise une masse totale (ratio = cible / total actuel)
+ *  - `pivot_ingredient`: on fixe la masse d'un ingrédient (ratio = cible / qté actuelle)
+ */
+export async function updateSnapshotMass(
+  entryId: number,
+  payload: UpdateSnapshotMassPayload,
+  cookbookId: number,
+): Promise<ActionResult> {
+  const entry = await prisma.cookbookRecipe.findUnique({
+    where: { id: entryId },
+    select: { linkMode: true, snapshotData: true },
+  });
+  if (!entry) return { ok: false, error: "Entrée introuvable." };
+  if (entry.linkMode !== "snapshot" || !entry.snapshotData) {
+    return { ok: false, error: "Cette entrée n'est pas figée." };
+  }
+
+  const snap = entry.snapshotData as unknown as SnapData;
+
+  let ratio: number;
+  if (payload.mode === "coefficient") {
+    if (!Number.isFinite(payload.coefficient) || payload.coefficient <= 0) {
+      return { ok: false, error: "Coefficient invalide (doit être > 0)." };
+    }
+    ratio = payload.coefficient;
+  } else if (payload.mode === "mass_target") {
+    if (!Number.isFinite(payload.targetMassG) || payload.targetMassG <= 0) {
+      return { ok: false, error: "Masse cible invalide." };
+    }
+    if (!snap.totalMassG || snap.totalMassG <= 0) {
+      return { ok: false, error: "Masse totale actuelle nulle, impossible de calculer." };
+    }
+    ratio = payload.targetMassG / snap.totalMassG;
+  } else {
+    if (!snap.ingredients || !snap.ingredients[payload.pivotIndex]) {
+      return { ok: false, error: "Ingrédient pivot introuvable." };
+    }
+    const pivot = snap.ingredients[payload.pivotIndex];
+    if (!pivot.quantityG || pivot.quantityG <= 0) {
+      return { ok: false, error: "Quantité du pivot nulle, impossible de calculer." };
+    }
+    if (!Number.isFinite(payload.targetMassG) || payload.targetMassG <= 0) {
+      return { ok: false, error: "Masse cible du pivot invalide." };
+    }
+    ratio = payload.targetMassG / pivot.quantityG;
+  }
+
+  const newSnap: SnapData = {
+    ...snap,
+    ingredients: snap.ingredients.map((i) => ({
+      ...i,
+      quantityG: round3(i.quantityG * ratio),
+    })),
+    totalMassG: round3(snap.totalMassG * ratio),
+    subRecipes: (snap.subRecipes ?? []).map((sr) => ({
+      ...sr,
+      ingredients: sr.ingredients.map((i) => ({
+        ...i,
+        quantityG: round3(i.quantityG * ratio),
+      })),
+      totalMassG: round3(sr.totalMassG * ratio),
+    })),
+    multiplier: round3((snap.multiplier ?? 1) * ratio),
+  };
+
+  await prisma.cookbookRecipe.update({
+    where: { id: entryId },
+    data: {
+      snapshotData: newSnap as unknown as Prisma.InputJsonValue,
+      snapshotDate: new Date(),
+    },
+  });
+
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true };
+}
+
+function round3(x: number): number {
+  return Math.round(x * 1000) / 1000;
+}

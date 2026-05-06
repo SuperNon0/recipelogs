@@ -29,6 +29,7 @@ import {
   updateChapter,
   addChapter,
 } from "@/app/actions/cookbooks";
+import { EditSnapshotMassModal } from "./EditSnapshotMassModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ export function CookbookEntriesTable({
             strategy={verticalListSortingStrategy}
           >
             <div
-              className="flex flex-col rounded-md overflow-hidden border"
+              className="flex flex-col rounded-md border"
               style={{ borderColor: "var(--border)" }}
             >
               {entries.map((entry, idx) => (
@@ -213,6 +214,7 @@ function RecipeRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingSection, setEditingSection] = useState(false);
   const [sectionDraft, setSectionDraft] = useState(entry.sectionTitle ?? "");
+  const [massModalOpen, setMassModalOpen] = useState(false);
 
   const linkBadge =
     entry.linkMode === "linked"
@@ -430,6 +432,14 @@ function RecipeRow({
                 ) : (
                   <>
                     <MenuButton
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setMassModalOpen(true);
+                      }}
+                    >
+                      ⚖️ Modifier la masse
+                    </MenuButton>
+                    <MenuButton
                       onClick={() =>
                         startTransition(() => {
                           setMenuOpen(false);
@@ -477,6 +487,15 @@ function RecipeRow({
           )}
         </div>
       </div>
+
+      {massModalOpen && (
+        <EditSnapshotMassModal
+          cookbookId={cookbookId}
+          entryId={entry.id}
+          recipeName={entry.recipeName}
+          onClose={() => setMassModalOpen(false)}
+        />
+      )}
     </>
   );
 }

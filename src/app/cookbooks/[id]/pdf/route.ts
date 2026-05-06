@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildCookbookHtml, type CookbookEntryUnion } from "@/lib/pdf/template";
-import { renderHtmlToPdf } from "@/lib/pdf/renderer";
+import {
+  buildCoverTocHtml,
+  buildRecipesHtml,
+  type CookbookEntryUnion,
+} from "@/lib/pdf/template";
+import { renderHtmlToPdf, mergePdfs } from "@/lib/pdf/renderer";
 import { parseTheme } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
@@ -87,21 +91,45 @@ export async function GET(
   }
 
   const theme = parseTheme(cookbook.coverConfig);
+  const format = cookbook.format as "A4" | "A5";
+  const hasCoverOrToc = cookbook.hasCover || cookbook.hasToc;
+  const hasFooterText = !!(cookbook.footer && cookbook.footer.trim().length > 0);
 
-  const html = buildCookbookHtml({
-    cookbookName: cookbook.name,
-    description: cookbook.description,
-    hasCover: cookbook.hasCover,
-    hasToc: cookbook.hasToc,
-    format: cookbook.format as "A4" | "A5",
-    theme,
-    entries,
-  });
+  // Pass 1 : couverture + sommaire (sans footer ni numéro de page)
+  // Pass 2 : recettes (avec footer + numéro de page commençant à 1)
+  // → fusion via pdf-lib pour que la 1ʳᵉ recette affiche bien « 1 ».
+  const pdfBuffers: Uint8Array[] = [];
 
-  const pdf = await renderHtmlToPdf(html, cookbook.format as "A4" | "A5", {
-    footer: cookbook.footer,
-    footerAlign: theme.footerAlign,
-  });
+  if (hasCoverOrToc) {
+    const coverTocHtml = buildCoverTocHtml({
+      cookbookName: cookbook.name,
+      description: cookbook.description,
+      hasCover: cookbook.hasCover,
+      hasToc: cookbook.hasToc,
+      format,
+      theme,
+      entries,
+    });
+    pdfBuffers.push(await renderHtmlToPdf(coverTocHtml, format, {}));
+  }
+
+  if (entries.length > 0) {
+    const recipesHtml = buildRecipesHtml({
+      format,
+      theme,
+      entries,
+      hasFooter: hasFooterText || theme.showPageNumbers,
+    });
+    pdfBuffers.push(
+      await renderHtmlToPdf(recipesHtml, format, {
+        footer: cookbook.footer,
+        footerAlign: theme.footerAlign,
+        showPageNumber: theme.showPageNumbers,
+      }),
+    );
+  }
+
+  const pdf = await mergePdfs(pdfBuffers);
 
   const filename = `${cookbook.name.replace(/[^a-z0-9\-]/gi, "_")}.pdf`;
   return new NextResponse(pdf.buffer as ArrayBuffer, {
