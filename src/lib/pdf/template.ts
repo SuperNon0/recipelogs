@@ -494,11 +494,6 @@ export function buildCss(
       font-size: ${baseSize + 3}pt; font-weight: 700; color: ${theme.accentColor};
       margin-bottom: 2mm;
     }
-    .page-num {
-      position: absolute;
-      bottom: 0; right: 0;
-      font-size: ${baseSize - 0.5}pt; color: ${theme.textColor};
-    }
     .muted { color: ${mute(theme.textColor)}; font-style: italic; }
   `;
 }
@@ -548,7 +543,8 @@ function renderRating(rating: number | null | undefined): string {
 export function renderRecipeCard(
   snap: RecipeSnap,
   subrecipeMode: SubrecipeMode,
-  pageNum: number | null,
+  /** Conservé pour compatibilité descendante (non utilisé : numérotation via footer Puppeteer). */
+  _pageNum: number | null,
   portion: string,
   theme: CookbookTheme,
 ): string {
@@ -604,10 +600,6 @@ export function renderRecipeCard(
     ? `<div class="notes"><div class="notes-title">Notes & astuces</div>${esc(snap.notesTips)}</div>`
     : "";
 
-  const pageNumHtml = theme.showPageNumbers && pageNum !== null
-    ? `<div class="page-num">${pageNum}</div>`
-    : "";
-
   return `
     <section class="recipe">
       <h2 class="recipe-title">${esc(snap.name)}</h2>
@@ -628,7 +620,6 @@ export function renderRecipeCard(
       ${subrecipesHtml}
       ${sourceHtml}
       ${notesHtml}
-      ${pageNumHtml}
     </section>`;
 }
 
@@ -734,94 +725,124 @@ function renderChapterPage(title: string, intro: string): string {
     </section>`;
 }
 
-export function buildCookbookHtml(opts: {
+/**
+ * Calcule, pour chaque entrée du cahier, son numéro de page LOGIQUE
+ * (la 1ʳᵉ recette = page 1, la couverture et le sommaire ne sont pas comptés).
+ */
+function computeTocEntries(entries: CookbookEntryUnion[]): {
+  name: string;
+  pageNum: number;
+  categories?: string[];
+  isChapter?: boolean;
+}[] {
+  let pageNumPreview = 1;
+  const tocEntries: {
+    name: string;
+    pageNum: number;
+    categories?: string[];
+    isChapter?: boolean;
+  }[] = [];
+
+  for (const entry of entries) {
+    if (entry.type === "chapter") {
+      tocEntries.push({
+        name: entry.title,
+        pageNum: pageNumPreview,
+        isChapter: true,
+      });
+      pageNumPreview += 1;
+      continue;
+    }
+    tocEntries.push({
+      name: entry.snap.name,
+      pageNum: pageNumPreview,
+      categories: entry.snap.categories,
+    });
+    if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
+      pageNumPreview += 1 + entry.separateSnaps.length;
+    } else {
+      pageNumPreview += 1;
+    }
+  }
+  return tocEntries;
+}
+
+/**
+ * HTML de la couverture + sommaire UNIQUEMENT.
+ * Rendu en pass séparé (sans pied de page Puppeteer) pour ne pas afficher
+ * de numéro de page sur la couverture / le sommaire.
+ */
+export function buildCoverTocHtml(opts: {
   cookbookName: string;
   description?: string | null;
-  /** Pied de page : géré par Puppeteer (footerTemplate), pas dans le HTML body. */
-  footer?: string | null;
   hasCover: boolean;
   hasToc: boolean;
   format: "A4" | "A5";
-  template?: TemplateSlug;
   theme?: CookbookTheme;
   entries: CookbookEntryUnion[];
 }): string {
   const { cookbookName, description, hasCover, hasToc, entries } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
   const format = opts.format;
-  const hasFooter = !!(opts.footer && opts.footer.trim().length > 0);
-  // Marges par défaut, élargies en bas pour réserver la place au pied de page Puppeteer.
-  const margins = hasFooter
-    ? { top: 10, right: 12, bottom: 16, left: 12 }
-    : { top: 10, right: 12, bottom: 10, left: 12 };
+  // Pas de marge basse réservée au footer : ce pass ne porte pas de footer.
+  const margins = { top: 10, right: 12, bottom: 10, left: 12 };
   const css = buildCss(theme, { format, bleedFirstPage: hasCover, margins });
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
 
   let body = "";
   if (hasCover) body += renderCover({ cookbookName, description, theme });
+  if (hasToc) body += renderToc(computeTocEntries(entries), theme);
 
-  // Offset de pagination : on imprime des numéros qui correspondent à la page
-  // physique du PDF (cover + TOC inclus), pas à l'index logique de la recette.
-  const pageOffset = (hasCover ? 1 : 0) + (hasToc ? 1 : 0);
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  ${fontsTag}
+  <style>${css}</style>
+</head>
+<body>${body}</body>
+</html>`;
+}
 
-  // Précalcul des numéros de page pour le sommaire
-  if (hasToc) {
-    let pageNumPreview = 1 + pageOffset;
-    const tocEntries: {
-      name: string;
-      pageNum: number;
-      categories?: string[];
-      isChapter?: boolean;
-    }[] = [];
+/**
+ * HTML des recettes (et chapitres) UNIQUEMENT.
+ * Le numéro de page est rendu par Puppeteer dans le footer, ce qui garantit
+ * qu'il commence bien à 1 sur la 1ʳᵉ recette du PDF final fusionné.
+ */
+export function buildRecipesHtml(opts: {
+  format: "A4" | "A5";
+  theme?: CookbookTheme;
+  entries: CookbookEntryUnion[];
+  hasFooter: boolean;
+}): string {
+  const { entries, hasFooter } = opts;
+  const theme = opts.theme ?? DEFAULT_THEME;
+  const format = opts.format;
+  // Marge basse élargie quand un pied de page est rendu pour réserver l'espace.
+  const margins = hasFooter
+    ? { top: 10, right: 12, bottom: 16, left: 12 }
+    : { top: 10, right: 12, bottom: 10, left: 12 };
+  const css = buildCss(theme, { format, margins });
+  const fontsLink = googleFontsHref(theme);
+  const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
 
-    for (const entry of entries) {
-      if (entry.type === "chapter") {
-        tocEntries.push({
-          name: entry.title,
-          pageNum: pageNumPreview,
-          isChapter: true,
-        });
-        pageNumPreview += 1;
-        continue;
-      }
-      tocEntries.push({
-        name: entry.snap.name,
-        pageNum: pageNumPreview,
-        categories: entry.snap.categories,
-      });
-      if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-        pageNumPreview += 1 + entry.separateSnaps.length;
-      } else {
-        pageNumPreview += 1;
-      }
-    }
-    body += renderToc(tocEntries, theme);
-  }
-
-  // Rendu des entrées
-  let pageNum = 1 + pageOffset;
+  let body = "";
   for (const entry of entries) {
     if (entry.type === "chapter") {
       body += renderChapterPage(entry.title, entry.intro);
-      pageNum += 1;
       continue;
     }
-
     if (entry.sectionTitle) {
       body += `<div class="section-title">${esc(entry.sectionTitle)}</div>`;
     }
-
     if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-      body += renderRecipeCard(entry.snap, "single", pageNum, entry.portion ?? "", theme);
-      pageNum += 1;
+      body += renderRecipeCard(entry.snap, "single", null, entry.portion ?? "", theme);
       for (const sub of entry.separateSnaps) {
-        body += renderRecipeCard(sub, "single", pageNum, "", theme);
-        pageNum += 1;
+        body += renderRecipeCard(sub, "single", null, "", theme);
       }
     } else {
-      body += renderRecipeCard(entry.snap, entry.subrecipeMode, pageNum, entry.portion ?? "", theme);
-      pageNum += 1;
+      body += renderRecipeCard(entry.snap, entry.subrecipeMode, null, entry.portion ?? "", theme);
     }
   }
 
@@ -832,9 +853,7 @@ export function buildCookbookHtml(opts: {
   ${fontsTag}
   <style>${css}</style>
 </head>
-<body>
-  ${body}
-</body>
+<body>${body}</body>
 </html>`;
 }
 

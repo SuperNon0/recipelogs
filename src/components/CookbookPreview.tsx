@@ -12,13 +12,13 @@ const ZOOM_PRESETS = [
 
 type ZoomKey = (typeof ZOOM_PRESETS)[number]["key"];
 
-const DEBOUNCE_MS = 700;
-
 /**
- * Aperçu PDF "fidèle" : on POST la config en cours sur l'API preview-pdf,
- * on récupère le binaire PDF, on l'affiche dans une iframe via un Blob URL.
+ * Aperçu PDF "fidèle" : la génération est lancée UNIQUEMENT quand l'utilisateur
+ * clique sur le bouton « Mettre à jour l'aperçu ». Cela évite de saturer le
+ * serveur en lançant Puppeteer à chaque frappe au clavier.
  *
- * La requête est débouncée pour éviter de relancer Puppeteer à chaque frappe.
+ * Le bouton fonctionne sans devoir enregistrer la config : on POSTe la version
+ * en cours sur l'API preview-pdf.
  */
 export function CookbookPreview({
   cookbookId,
@@ -44,51 +44,17 @@ export function CookbookPreview({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Marque l'aperçu comme « périmé » dès qu'une option change après la dernière génération. */
+  const [stale, setStale] = useState(false);
 
   const prevUrlRef = useRef<string | null>(null);
   const reqIdRef = useRef(0);
+  const generatedOnceRef = useRef(false);
 
+  // Marque l'aperçu comme périmé à chaque modif (mais sans déclencher la génération).
   useEffect(() => {
-    const handle = setTimeout(async () => {
-      const myId = ++reqIdRef.current;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/cookbooks/${cookbookId}/preview-pdf`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: cookbookName,
-            description,
-            format,
-            hasCover,
-            hasToc,
-            footer,
-            theme,
-          }),
-        });
-        if (myId !== reqIdRef.current) return; // une requête plus récente est en cours
-        if (!res.ok) {
-          setError(`Erreur ${res.status}`);
-          setLoading(false);
-          return;
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-        prevUrlRef.current = url;
-        setPdfUrl(url);
-        setLoading(false);
-      } catch (e) {
-        if (myId !== reqIdRef.current) return;
-        setError(e instanceof Error ? e.message : "Erreur réseau");
-        setLoading(false);
-      }
-    }, DEBOUNCE_MS);
-
-    return () => clearTimeout(handle);
+    if (generatedOnceRef.current) setStale(true);
   }, [
-    cookbookId,
     cookbookName,
     description,
     format,
@@ -105,8 +71,52 @@ export function CookbookPreview({
     };
   }, []);
 
+  async function generatePreview() {
+    const myId = ++reqIdRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cookbooks/${cookbookId}/preview-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: cookbookName,
+          description,
+          format,
+          hasCover,
+          hasToc,
+          footer,
+          theme,
+        }),
+      });
+      if (myId !== reqIdRef.current) return;
+      if (!res.ok) {
+        setError(`Erreur ${res.status}`);
+        setLoading(false);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+      prevUrlRef.current = url;
+      setPdfUrl(url);
+      setStale(false);
+      generatedOnceRef.current = true;
+      setLoading(false);
+    } catch (e) {
+      if (myId !== reqIdRef.current) return;
+      setError(e instanceof Error ? e.message : "Erreur réseau");
+      setLoading(false);
+    }
+  }
+
   const currentZoom = ZOOM_PRESETS.find((z) => z.key === zoom) ?? ZOOM_PRESETS[1];
   const iframeSrc = pdfUrl ? `${pdfUrl}#toolbar=0&navpanes=0` : "";
+  const refreshLabel = !pdfUrl
+    ? "🔄 Générer l'aperçu PDF"
+    : stale
+      ? "🔄 Mettre à jour l'aperçu PDF"
+      : "🔄 Régénérer l'aperçu";
 
   if (fullscreen) {
     return (
@@ -122,7 +132,7 @@ export function CookbookPreview({
           gap: 8,
         }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="fl-label" style={{ color: "var(--text)" }}>
             Aperçu PDF plein écran
             {loading && (
@@ -131,14 +141,25 @@ export function CookbookPreview({
               </span>
             )}
           </span>
-          <button
-            type="button"
-            onClick={() => setFullscreen(false)}
-            className="fl-btn fl-btn-secondary"
-            style={{ fontSize: "0.8rem" }}
-          >
-            ✕ Fermer
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={generatePreview}
+              disabled={loading}
+              className="fl-btn fl-btn-primary"
+              style={{ fontSize: "0.8rem" }}
+            >
+              {loading ? "…" : refreshLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="fl-btn fl-btn-secondary"
+              style={{ fontSize: "0.8rem" }}
+            >
+              ✕ Fermer
+            </button>
+          </div>
         </div>
         <div
           style={{
@@ -149,7 +170,7 @@ export function CookbookPreview({
             overflow: "hidden",
           }}
         >
-          {iframeSrc && (
+          {iframeSrc ? (
             <iframe
               title="Aperçu PDF (plein écran)"
               src={iframeSrc}
@@ -161,6 +182,8 @@ export function CookbookPreview({
                 background: "#2a2a2a",
               }}
             />
+          ) : (
+            <EmptyState />
           )}
           {loading && <LoadingOverlay />}
           {error && !loading && <ErrorOverlay message={error} />}
@@ -171,6 +194,27 @@ export function CookbookPreview({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={generatePreview}
+          disabled={loading}
+          className={stale || !pdfUrl ? "fl-btn fl-btn-primary" : "fl-btn"}
+          style={{ fontSize: "0.78rem" }}
+          title="Génère un PDF d'aperçu fidèle (sans avoir à enregistrer)"
+        >
+          {loading ? "Génération…" : refreshLabel}
+        </button>
+        {stale && !loading && pdfUrl && (
+          <span
+            className="fl-label"
+            style={{ fontSize: "0.7rem", color: "var(--accent)" }}
+          >
+            ⚠️ Aperçu obsolète
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center gap-1 flex-wrap">
         <span className="fl-label" style={{ fontSize: "0.7rem", marginRight: 4 }}>
           Taille :
@@ -211,14 +255,6 @@ export function CookbookPreview({
             </button>
           );
         })}
-        {loading && (
-          <span
-            className="fl-label"
-            style={{ fontSize: "0.7rem", color: "var(--muted)", marginLeft: 6 }}
-          >
-            · génération du PDF…
-          </span>
-        )}
       </div>
 
       <div
@@ -230,7 +266,7 @@ export function CookbookPreview({
           height: currentZoom.height,
         }}
       >
-        {iframeSrc && (
+        {iframeSrc ? (
           <iframe
             title="Aperçu PDF du cahier"
             src={iframeSrc}
@@ -242,10 +278,32 @@ export function CookbookPreview({
               background: "#2a2a2a",
             }}
           />
+        ) : (
+          <EmptyState />
         )}
-        {loading && !pdfUrl && <LoadingOverlay />}
+        {loading && <LoadingOverlay />}
         {error && !loading && <ErrorOverlay message={error} />}
       </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#aaa",
+        fontSize: "0.85rem",
+        textAlign: "center",
+        padding: 16,
+      }}
+    >
+      Clique sur « Générer l&apos;aperçu PDF » pour voir le résultat fidèle.
     </div>
   );
 }
@@ -261,7 +319,7 @@ function LoadingOverlay() {
         justifyContent: "center",
         color: "#ccc",
         fontSize: "0.85rem",
-        background: "rgba(0,0,0,0.25)",
+        background: "rgba(0,0,0,0.35)",
         pointerEvents: "none",
       }}
     >

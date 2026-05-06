@@ -228,8 +228,8 @@ export const cookbookThemeSchema = z.object({
   coverBgImageUrl: z.string().max(2_500_000).default(""),
   coverBgImageOpacity: z.number().min(0.05).max(1).default(0.7),
 
-  // Pied de page
-  footerAlign: z.enum(["left", "center", "right", "justify"]).default("center"),
+  // Pied de page (alignement du texte ; le numéro de page est toujours centré)
+  footerAlign: z.enum(["left", "right"]).default("left"),
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;

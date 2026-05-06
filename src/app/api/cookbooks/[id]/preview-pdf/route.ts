@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildCookbookHtml, type CookbookEntryUnion } from "@/lib/pdf/template";
-import { renderHtmlToPdf } from "@/lib/pdf/renderer";
+import {
+  buildCoverTocHtml,
+  buildRecipesHtml,
+  type CookbookEntryUnion,
+} from "@/lib/pdf/template";
+import { renderHtmlToPdf, mergePdfs } from "@/lib/pdf/renderer";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
@@ -25,7 +29,6 @@ export async function POST(
   const cookbook = await getCookbookDetail(cookbookId);
   if (!cookbook) return new NextResponse("Not found", { status: 404 });
 
-  // Payload depuis le client : on tolère un objet partiel.
   let payload: Record<string, unknown> = {};
   try {
     payload = (await req.json()) as Record<string, unknown>;
@@ -50,13 +53,11 @@ export async function POST(
     ? payload.footer
     : (cookbook.footer ?? "");
 
-  // Theme : on tente de valider strictement, sinon on retombe sur le tolérant.
   const themeParsed = cookbookThemeSchema.safeParse(payload.theme);
   const theme = themeParsed.success
     ? themeParsed.data
     : parseTheme(payload.theme ?? cookbook.coverConfig);
 
-  // Reconstruction des entrées (mêmes données que la route PDF complète).
   type RawEntry =
     | { kind: "recipe"; data: (typeof cookbook.entries)[number] }
     | { kind: "chapter"; data: (typeof cookbook.chapters)[number] };
@@ -119,8 +120,6 @@ export async function POST(
     entries.push(recipeEntry);
   }
 
-  // Si le cahier est vide, on ajoute une recette d'exemple pour que l'aperçu
-  // ne soit pas une page blanche.
   if (entries.length === 0) {
     entries.push({
       type: "recipe",
@@ -148,20 +147,39 @@ export async function POST(
     });
   }
 
-  const html = buildCookbookHtml({
-    cookbookName: name,
-    description,
-    hasCover,
-    hasToc,
+  const hasCoverOrToc = hasCover || hasToc;
+  const hasFooterText = !!(footer && footer.trim().length > 0);
+
+  const pdfBuffers: Uint8Array[] = [];
+
+  if (hasCoverOrToc) {
+    const coverTocHtml = buildCoverTocHtml({
+      cookbookName: name,
+      description,
+      hasCover,
+      hasToc,
+      format,
+      theme,
+      entries,
+    });
+    pdfBuffers.push(await renderHtmlToPdf(coverTocHtml, format, {}));
+  }
+
+  const recipesHtml = buildRecipesHtml({
     format,
     theme,
     entries,
+    hasFooter: hasFooterText || theme.showPageNumbers,
   });
+  pdfBuffers.push(
+    await renderHtmlToPdf(recipesHtml, format, {
+      footer,
+      footerAlign: theme.footerAlign,
+      showPageNumber: theme.showPageNumbers,
+    }),
+  );
 
-  const pdf = await renderHtmlToPdf(html, format, {
-    footer,
-    footerAlign: theme.footerAlign,
-  });
+  const pdf = await mergePdfs(pdfBuffers);
 
   return new NextResponse(pdf.buffer as ArrayBuffer, {
     headers: {
