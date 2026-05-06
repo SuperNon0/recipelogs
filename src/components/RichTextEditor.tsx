@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -13,6 +13,12 @@ import Placeholder from "@tiptap/extension-placeholder";
  *
  * Le placeholder utilise l'extension officielle Tiptap pour s'afficher
  * correctement en haut de la zone d'édition.
+ *
+ * IMPORTANT : on force un re-render React à chaque transaction de l'éditeur
+ * Tiptap (frappe, sélection, format) via `setTick`. Sans ça :
+ *   - les boutons G / I / S ne mettent pas à jour leur état actif
+ *   - le <input hidden> qui contient le HTML reste avec l'ancienne valeur,
+ *     et au moment du submit du formulaire les étapes ne sont pas envoyées.
  */
 export function RichTextEditor({
   name,
@@ -23,6 +29,9 @@ export function RichTextEditor({
   initialHtml?: string;
   placeholder?: string;
 }) {
+  // Compteur incrémenté à chaque transaction pour forcer un re-render.
+  const [, setTick] = useState(0);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -52,6 +61,8 @@ export function RichTextEditor({
         class: "rte-content",
       },
     },
+    // Toute transaction (frappe, mise en forme, sélection) → re-render React.
+    onTransaction: () => setTick((t) => t + 1),
   });
 
   useEffect(() => {
@@ -76,12 +87,13 @@ export function RichTextEditor({
     padding: "0.3rem 0.6rem",
     background: active ? "var(--accent)" : "transparent",
     color: active ? "var(--bg)" : "var(--text)",
-    border: "1px solid var(--border)",
+    border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
     borderRadius: 6,
     cursor: "pointer",
     fontSize: "0.8rem",
     fontWeight: active ? 700 : 500,
     minWidth: 32,
+    transition: "background-color 100ms ease, color 100ms ease",
   });
 
   return (
@@ -103,6 +115,7 @@ export function RichTextEditor({
           style={btn(editor.isActive("bold"))}
           onClick={() => editor.chain().focus().toggleBold().run()}
           aria-label="Gras"
+          aria-pressed={editor.isActive("bold")}
         >
           <b>G</b>
         </button>
@@ -111,6 +124,7 @@ export function RichTextEditor({
           style={btn(editor.isActive("italic"))}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           aria-label="Italique"
+          aria-pressed={editor.isActive("italic")}
         >
           <i>I</i>
         </button>
@@ -119,6 +133,7 @@ export function RichTextEditor({
           style={btn(editor.isActive("underline"))}
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           aria-label="Souligné"
+          aria-pressed={editor.isActive("underline")}
         >
           <u>S</u>
         </button>
@@ -136,6 +151,7 @@ export function RichTextEditor({
           type="button"
           style={btn(false)}
           onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().undo()}
           aria-label="Annuler"
           title="Annuler"
         >
@@ -145,6 +161,7 @@ export function RichTextEditor({
           type="button"
           style={btn(false)}
           onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().redo()}
           aria-label="Rétablir"
           title="Rétablir"
         >
