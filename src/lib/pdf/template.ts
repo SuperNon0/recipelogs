@@ -20,7 +20,6 @@ export type CookbookEntryUnion =
       subrecipeMode: SubrecipeMode;
       separateSnaps?: RecipeSnap[];
       portion?: string;
-      grouped?: boolean;
       sectionTitle?: string | null;
     }
   | {
@@ -128,7 +127,7 @@ export function coverBackgroundCss(theme: CookbookTheme): string {
     case "gradient-radial":
       return `background: radial-gradient(circle at center, ${c1} 0%, ${c2} 100%);`;
     case "accent-corner": {
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><polygon points='0,0 200,0 0,200' fill='${encodeURIComponent(theme.accentColor)}' fill-opacity='0.55'/></svg>`;
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><polygon points='0,0 200,0 0,200' fill='${encodeURIComponent(theme.coverAccentColor)}' fill-opacity='0.55'/></svg>`;
       return `background: ${c1} url("data:image/svg+xml;utf8,${svg}") no-repeat top left; background-size: 60mm 60mm;`;
     }
     case "image": {
@@ -144,7 +143,16 @@ export function coverBackgroundCss(theme: CookbookTheme): string {
 
 // ─── CSS principal ────────────────────────────────────────────────────────────
 
-export function buildCss(theme: CookbookTheme): string {
+export function buildCss(
+  theme: CookbookTheme,
+  pageOptions: {
+    format?: "A4" | "A5";
+    /** Si true, la première page (= la couverture) est sans marges (full bleed). */
+    bleedFirstPage?: boolean;
+    /** Marges (en mm) appliquées via @page sur les pages NON couverture. */
+    margins?: { top: number; right: number; bottom: number; left: number };
+  } = {},
+): string {
   const titleFont = (FONTS[theme.titleFont] ?? FONTS.arial).family;
   const bodyFont = (FONTS[theme.bodyFont] ?? FONTS.arial).family;
   const baseSize = theme.textSize;
@@ -161,9 +169,18 @@ export function buildCss(theme: CookbookTheme): string {
   const stackedColumns = theme.ingredientsPosition === "top";
   const coverBg = coverBackgroundCss(theme);
 
+  const format = pageOptions.format ?? "A4";
+  const m = pageOptions.margins ?? { top: 10, right: 12, bottom: 16, left: 12 };
+  const pageRules = `
+    @page {
+      size: ${format};
+      margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;
+    }
+    ${pageOptions.bleedFirstPage ? `@page :first { margin: 0; }` : ""}
+  `;
+
   return `
-    /* Pas de @page size : Puppeteer applique le format A4/A5 via son API.
-       Pas de margin non plus : géré par Puppeteer. */
+    ${pageRules}
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: ${bodyFont};
@@ -345,13 +362,6 @@ export function buildCss(theme: CookbookTheme): string {
       page-break-before: always;
       position: relative;
       min-height: 95vh;
-    }
-    /* Recette "collée" à la précédente : pas de saut de page */
-    .recipe.recipe-grouped {
-      page-break-before: auto;
-      margin-top: 8mm;
-      padding-top: 6mm;
-      border-top: 1px solid ${mute(theme.textColor, 0.7)};
     }
     .recipe-title {
       font-family: ${titleFont};
@@ -541,7 +551,6 @@ export function renderRecipeCard(
   pageNum: number | null,
   portion: string,
   theme: CookbookTheme,
-  options: { grouped?: boolean } = {},
 ): string {
   const ingHtml = snap.ingredients.length > 0
     ? renderIngredients(snap.ingredients, snap.totalMassG, theme.showTotalMass)
@@ -599,10 +608,8 @@ export function renderRecipeCard(
     ? `<div class="page-num">${pageNum}</div>`
     : "";
 
-  const cls = options.grouped ? "recipe recipe-grouped" : "recipe";
-
   return `
-    <section class="${cls}">
+    <section class="recipe">
       <h2 class="recipe-title">${esc(snap.name)}</h2>
       ${categoriesHtml}
       ${tagsHtml}
@@ -741,16 +748,26 @@ export function buildCookbookHtml(opts: {
 }): string {
   const { cookbookName, description, hasCover, hasToc, entries } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
-  const css = buildCss(theme);
+  const format = opts.format;
+  const hasFooter = !!(opts.footer && opts.footer.trim().length > 0);
+  // Marges par défaut, élargies en bas pour réserver la place au pied de page Puppeteer.
+  const margins = hasFooter
+    ? { top: 10, right: 12, bottom: 16, left: 12 }
+    : { top: 10, right: 12, bottom: 10, left: 12 };
+  const css = buildCss(theme, { format, bleedFirstPage: hasCover, margins });
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
 
   let body = "";
   if (hasCover) body += renderCover({ cookbookName, description, theme });
 
+  // Offset de pagination : on imprime des numéros qui correspondent à la page
+  // physique du PDF (cover + TOC inclus), pas à l'index logique de la recette.
+  const pageOffset = (hasCover ? 1 : 0) + (hasToc ? 1 : 0);
+
   // Précalcul des numéros de page pour le sommaire
   if (hasToc) {
-    let pageNumPreview = 1;
+    let pageNumPreview = 1 + pageOffset;
     const tocEntries: {
       name: string;
       pageNum: number;
@@ -773,10 +790,9 @@ export function buildCookbookHtml(opts: {
         pageNum: pageNumPreview,
         categories: entry.snap.categories,
       });
-      const usesNewPage = !entry.grouped;
       if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-        pageNumPreview += (usesNewPage ? 1 : 0) + entry.separateSnaps.length;
-      } else if (usesNewPage) {
+        pageNumPreview += 1 + entry.separateSnaps.length;
+      } else {
         pageNumPreview += 1;
       }
     }
@@ -784,7 +800,7 @@ export function buildCookbookHtml(opts: {
   }
 
   // Rendu des entrées
-  let pageNum = 1;
+  let pageNum = 1 + pageOffset;
   for (const entry of entries) {
     if (entry.type === "chapter") {
       body += renderChapterPage(entry.title, entry.intro);
@@ -796,17 +812,16 @@ export function buildCookbookHtml(opts: {
       body += `<div class="section-title">${esc(entry.sectionTitle)}</div>`;
     }
 
-    const grouped = !!entry.grouped;
     if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-      body += renderRecipeCard(entry.snap, "single", pageNum, entry.portion ?? "", theme, { grouped });
-      if (!grouped) pageNum += 1;
+      body += renderRecipeCard(entry.snap, "single", pageNum, entry.portion ?? "", theme);
+      pageNum += 1;
       for (const sub of entry.separateSnaps) {
         body += renderRecipeCard(sub, "single", pageNum, "", theme);
         pageNum += 1;
       }
     } else {
-      body += renderRecipeCard(entry.snap, entry.subrecipeMode, pageNum, entry.portion ?? "", theme, { grouped });
-      if (!grouped) pageNum += 1;
+      body += renderRecipeCard(entry.snap, entry.subrecipeMode, pageNum, entry.portion ?? "", theme);
+      pageNum += 1;
     }
   }
 
@@ -828,7 +843,8 @@ export function buildSingleRecipeHtml(
   format: "A4" | "A5" = "A4",
   theme: CookbookTheme = DEFAULT_THEME,
 ): string {
-  const css = buildCss(theme).replace("page-break-before: always;", "page-break-before: auto;");
+  const css = buildCss(theme, { format })
+    .replace("page-break-before: always;", "page-break-before: auto;");
   const card = renderRecipeCard(snap, "single", null, "", theme);
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";

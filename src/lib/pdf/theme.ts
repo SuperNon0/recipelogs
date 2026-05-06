@@ -222,9 +222,14 @@ export const cookbookThemeSchema = z.object({
   coverBgPattern: z.enum(COVER_BG_PATTERNS).default("gradient-diagonal"),
   coverBgColor: hex.default("#d35a4a"),
   coverBgColor2: hex.default("#6ea8d8"),
+  /** Couleur d'accent propre à la couverture (motif "accent-corner"). Indépendante de l'accent recette. */
+  coverAccentColor: hex.default("#1f4060"),
   coverTextColor: hex.default("#111111"),
   coverBgImageUrl: z.string().max(2_500_000).default(""),
   coverBgImageOpacity: z.number().min(0.05).max(1).default(0.7),
+
+  // Pied de page
+  footerAlign: z.enum(["left", "center", "right", "justify"]).default("center"),
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;

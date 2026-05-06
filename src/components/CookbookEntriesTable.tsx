@@ -21,7 +21,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import {
   reorderCookbookEntries,
-  toggleGroupWithPrevious,
   setSectionTitle,
   refreshSnapshot,
   convertToLinked,
@@ -42,7 +41,6 @@ export type RecipeEntry = {
   categories: { name: string; color: string }[];
   linkMode: "linked" | "snapshot";
   subrecipeMode: "single" | "separate";
-  groupWithPrevious: boolean;
   sectionTitle: string | null;
   snapshotDate: Date | null;
 };
@@ -148,7 +146,6 @@ export function CookbookEntriesTable({
                   entry={entry}
                   index={idx}
                   cookbookId={cookbookId}
-                  isFirst={idx === 0}
                 />
               ))}
             </div>
@@ -165,12 +162,10 @@ function SortableEntryRow({
   entry,
   index,
   cookbookId,
-  isFirst,
 }: {
   entry: Entry;
   index: number;
   cookbookId: number;
-  isFirst: boolean;
 }) {
   const sortable = useSortable({ id: DND_ID(entry) });
   const style: React.CSSProperties = {
@@ -188,7 +183,6 @@ function SortableEntryRow({
           entry={entry}
           index={index}
           cookbookId={cookbookId}
-          isFirst={isFirst}
           dragHandleProps={{ ...sortable.attributes, ...sortable.listeners }}
         />
       ) : (
@@ -208,13 +202,11 @@ function RecipeRow({
   entry,
   index,
   cookbookId,
-  isFirst,
   dragHandleProps,
 }: {
   entry: RecipeEntry;
   index: number;
   cookbookId: number;
-  isFirst: boolean;
   dragHandleProps: Record<string, unknown>;
 }) {
   const [pending, startTransition] = useTransition();
@@ -386,39 +378,7 @@ function RecipeRow({
           >
             {subBadge.emoji}
           </span>
-          {entry.groupWithPrevious && !isFirst && (
-            <span
-              title="Collée à la précédente sur la même page"
-              style={{ fontSize: "0.75rem", color: "var(--accent)" }}
-            >
-              ↳
-            </span>
-          )}
         </div>
-
-        {/* Group toggle (compact) */}
-        {!isFirst && (
-          <label
-            className="flex items-center gap-1 cursor-pointer flex-shrink-0"
-            title="Coller à la recette précédente sur la même page"
-          >
-            <input
-              type="checkbox"
-              checked={entry.groupWithPrevious}
-              disabled={pending}
-              onChange={(e) =>
-                startTransition(() =>
-                  toggleGroupWithPrevious(entry.id, e.target.checked, cookbookId),
-                )
-              }
-              className="accent-[color:var(--accent)]"
-              style={{ width: 14, height: 14 }}
-            />
-            <span className="text-xs text-[color:var(--muted)] hidden sm:inline">
-              ↳ même page
-            </span>
-          </label>
-        )}
 
         {/* Actions menu */}
         <div className="relative flex-shrink-0">

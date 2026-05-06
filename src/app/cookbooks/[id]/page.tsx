@@ -45,7 +45,6 @@ export default async function CookbookDetailPage({
         })),
         linkMode: e.linkMode as "linked" | "snapshot",
         subrecipeMode: e.subrecipeMode as "single" | "separate",
-        groupWithPrevious: e.groupWithPrevious ?? false,
         sectionTitle: e.sectionTitle ?? null,
         snapshotDate: e.snapshotDate,
       }),
