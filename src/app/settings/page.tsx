@@ -2,11 +2,16 @@ import { listAllCategories } from "@/lib/recipes";
 import { CategoryManager } from "@/components/CategoryManager";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
 import { DeployButton } from "@/components/DeployButton";
+import { RecipePdfSettingsForm } from "@/components/RecipePdfSettingsForm";
+import { getRecipePdfSettings } from "@/app/actions/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const categories = await listAllCategories();
+  const [categories, recipePdfSettings] = await Promise.all([
+    listAllCategories(),
+    getRecipePdfSettings(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -38,6 +43,19 @@ export default async function SettingsPage() {
           </p>
         </div>
         <CategoryManager categories={categories} />
+      </section>
+
+      {/* PDF d'une recette seule */}
+      <section className="fl-card flex flex-col gap-4">
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            PDF d&apos;une recette
+          </h2>
+          <p className="fl-label mt-1">
+            Style appliqué quand tu télécharges le PDF d&apos;une recette individuelle
+          </p>
+        </div>
+        <RecipePdfSettingsForm initial={recipePdfSettings} />
       </section>
 
       {/* Import Recipe Keeper */}

@@ -236,6 +236,61 @@ export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;
 
 export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
 
+// ─── Réglages PDF d'une recette seule ────────────────────────────────────────
+
+/**
+ * Sous-ensemble du thème cahier appliqué quand on télécharge le PDF d'UNE
+ * recette unique (route /recipes/[id]/pdf).
+ *
+ * Stocké comme un JSON dans la table `settings` sous la clé `recipePdfSettings`.
+ */
+export const recipePdfSettingsSchema = z.object({
+  format: z.enum(["A4", "A5"]).default("A4"),
+  textColor: hex.default("#111111"),
+  accentColor: hex.default("#A52A2A"),
+  titleFont: fontSchema.default("arial"),
+  bodyFont: fontSchema.default("arial"),
+  textSize: textSizeSchema.default(TEXT_SIZE_DEFAULT),
+  showTags: z.boolean().default(true),
+  showSource: z.boolean().default(true),
+  showRating: z.boolean().default(false),
+  showNotes: z.boolean().default(true),
+  showTotalMass: z.boolean().default(true),
+  showPortion: z.boolean().default(true),
+});
+
+export type RecipePdfSettings = z.infer<typeof recipePdfSettingsSchema>;
+export const DEFAULT_RECIPE_PDF_SETTINGS: RecipePdfSettings =
+  recipePdfSettingsSchema.parse({});
+
+/**
+ * Convertit les réglages PDF d'une recette seule en thème cahier pour
+ * réutiliser l'infrastructure existante de rendu (buildSingleRecipeHtml).
+ */
+export function recipePdfSettingsToTheme(s: RecipePdfSettings): CookbookTheme {
+  return {
+    ...DEFAULT_THEME,
+    textColor: s.textColor,
+    accentColor: s.accentColor,
+    titleFont: s.titleFont,
+    bodyFont: s.bodyFont,
+    textSize: s.textSize,
+    showTags: s.showTags,
+    showSource: s.showSource,
+    showRating: s.showRating,
+    showNotes: s.showNotes,
+    showTotalMass: s.showTotalMass,
+    showPortion: s.showPortion,
+  };
+}
+
+export function parseRecipePdfSettings(raw: unknown): RecipePdfSettings {
+  if (raw == null || typeof raw !== "object") return DEFAULT_RECIPE_PDF_SETTINGS;
+  const parsed = recipePdfSettingsSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  return DEFAULT_RECIPE_PDF_SETTINGS;
+}
+
 export function parseTheme(raw: unknown): CookbookTheme {
   if (raw == null || typeof raw !== "object") return DEFAULT_THEME;
 

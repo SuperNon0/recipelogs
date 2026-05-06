@@ -158,15 +158,11 @@ export function buildCss(
   const baseSize = theme.textSize;
   const titleSize = titleSizeFor(theme.textSize);
 
-  const ingFlex =
-    theme.ingredientsRatio === "narrow"
-      ? "0 0 38%"
-      : theme.ingredientsRatio === "balanced"
-        ? "0 0 50%"
-        : "0 0 60%";
-
-  const colsDirection = theme.ingredientsPosition === "right" ? "row-reverse" : "row";
-  const stackedColumns = theme.ingredientsPosition === "top";
+  // Réglages désormais fixes (retirés de l'UI) :
+  // ingrédients toujours à gauche en colonne étroite.
+  const ingFlex = "0 0 38%";
+  const colsDirection = "row";
+  const stackedColumns = false;
   const coverBg = coverBackgroundCss(theme);
 
   const format = pageOptions.format ?? "A4";
@@ -224,14 +220,14 @@ export function buildCss(
     .cover-circle .cover-inner {
       width: 78mm; height: 78mm;
       background: #ffffff;
-      color: #111111;
+      color: ${theme.coverTextColor};
       border-radius: 50%;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       text-align: center; padding: 8mm;
     }
-    .cover-circle .cover-title { color: #111111; }
-    .cover-circle .cover-subtitle { color: #666666; }
+    .cover-circle .cover-title { color: ${theme.coverTextColor}; }
+    .cover-circle .cover-subtitle { color: ${mute(theme.coverTextColor, 0.4)}; }
 
     .cover-framed .cover-inner {
       border: 2px solid currentColor;
@@ -654,58 +650,21 @@ function renderToc(
   }[],
   theme: CookbookTheme,
 ): string {
-  if (theme.tocMode === "hidden" || entries.length === 0) return "";
+  if (entries.length === 0) return "";
 
+  // Sommaire fixe en mode « liste plate » + numéros de page toujours affichés.
   const renderEntry = (label: string, page: number, isChapter?: boolean) => {
     const leader = theme.tocDots
       ? `<span class="toc-leader"></span>`
       : `<span class="toc-leader-empty"></span>`;
-    const pageHtml = theme.tocPageNumbers
-      ? `<span class="toc-num">${page}</span>`
-      : "";
+    const pageHtml = `<span class="toc-num">${page}</span>`;
     const labelStyle = isChapter
       ? ' style="font-weight:700;color:' + theme.accentColor + '"'
       : "";
     return `<div class="toc-entry"${labelStyle}><span class="toc-label">${esc(label)}</span>${leader}${pageHtml}</div>`;
   };
 
-  let body = "";
-  if (theme.tocMode === "by-section") {
-    // Les chapitres ouvrent leur propre section dans le sommaire
-    let currentSection: string | null = null;
-    const groups: { title: string; entries: typeof entries }[] = [];
-    let currentList: typeof entries = [];
-
-    for (const e of entries) {
-      if (e.isChapter) {
-        if (currentList.length > 0) {
-          groups.push({ title: currentSection ?? "Autres", entries: currentList });
-        }
-        currentSection = e.name;
-        currentList = [];
-      } else {
-        const cat: string = (e.categories && e.categories[0]) || currentSection || "Autres";
-        if (cat !== currentSection) {
-          if (currentList.length > 0) {
-            groups.push({ title: currentSection ?? "Autres", entries: currentList });
-            currentList = [];
-          }
-          currentSection = cat;
-        }
-        currentList.push(e);
-      }
-    }
-    if (currentList.length > 0) {
-      groups.push({ title: currentSection ?? "Autres", entries: currentList });
-    }
-
-    for (const g of groups) {
-      body += `<div class="toc-group-title"><span>${esc(g.title)}</span></div>`;
-      body += g.entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
-    }
-  } else {
-    body = entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
-  }
+  const body = entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
 
   return `
     <div class="toc">

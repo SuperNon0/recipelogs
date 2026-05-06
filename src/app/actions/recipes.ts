@@ -157,6 +157,49 @@ export async function deleteRecipe(id: number) {
   redirect("/");
 }
 
+/**
+ * Applique un multiplicateur global aux quantités de la recette parente
+ * et écrit ces nouvelles quantités EN BASE comme nouvelle référence.
+ *
+ * - Ne touche PAS aux sous-recettes liées : leur configuration (calcMode,
+ *   calcValue, isLocked) reste inchangée.
+ * - Si le multiplicateur est ~1 (pas de changement utile), on no-op.
+ */
+export async function applyMultiplierToRecipe(
+  id: number,
+  multiplier: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isFinite(multiplier) || multiplier <= 0) {
+    return { ok: false, error: "Multiplicateur invalide." };
+  }
+  // No-op si on est très proche de 1 (à 0.1 ‰ près).
+  if (Math.abs(multiplier - 1) < 1e-4) return { ok: true };
+
+  const ingredients = await prisma.ingredient.findMany({
+    where: { recipeId: id },
+    select: { id: true, quantityG: true },
+  });
+  if (ingredients.length === 0) {
+    return { ok: false, error: "Aucun ingrédient à mettre à jour." };
+  }
+
+  await prisma.$transaction(
+    ingredients.map((ing) =>
+      prisma.ingredient.update({
+        where: { id: ing.id },
+        data: {
+          quantityG: Math.round(Number(ing.quantityG) * multiplier * 1000) / 1000,
+        },
+      }),
+    ),
+  );
+
+  revalidatePath("/");
+  revalidatePath("/favorites");
+  revalidatePath(`/recipes/${id}`);
+  return { ok: true };
+}
+
 export async function toggleFavorite(id: number) {
   const r = await prisma.recipe.findUnique({
     where: { id },

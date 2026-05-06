@@ -148,7 +148,6 @@ export async function POST(
   }
 
   const hasCoverOrToc = hasCover || hasToc;
-  const hasFooterText = !!(footer && footer.trim().length > 0);
 
   const pdfBuffers: Uint8Array[] = [];
 
@@ -169,13 +168,13 @@ export async function POST(
     format,
     theme,
     entries,
-    hasFooter: hasFooterText || theme.showPageNumbers,
+    hasFooter: true,
   });
   pdfBuffers.push(
     await renderHtmlToPdf(recipesHtml, format, {
       footer,
       footerAlign: theme.footerAlign,
-      showPageNumber: theme.showPageNumbers,
+      showPageNumber: true,
     }),
   );
 

@@ -9,6 +9,7 @@ import {
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
+import { applyMultiplierToRecipe } from "@/app/actions/recipes";
 
 // ─────────────────────────────────────────────
 // Types
@@ -98,6 +99,8 @@ export function RecipeBody({
   return (
     <div className="flex flex-col gap-5">
       <MultiplierPanel
+        recipeId={recipeId}
+        hasSubRecipes={subRecipes.length > 0}
         mode={mode}
         setMode={setMode}
         coefInput={coefInput}
@@ -144,6 +147,8 @@ export function RecipeBody({
 // ─────────────────────────────────────────────
 
 function MultiplierPanel({
+  recipeId,
+  hasSubRecipes,
   mode,
   setMode,
   coefInput,
@@ -159,6 +164,8 @@ function MultiplierPanel({
   effectiveTotalG,
   onReset,
 }: {
+  recipeId: number;
+  hasSubRecipes: boolean;
   mode: Mode;
   setMode: (m: Mode) => void;
   coefInput: string;
@@ -174,21 +181,64 @@ function MultiplierPanel({
   effectiveTotalG: number;
   onReset: () => void;
 }) {
+  const [savePending, startSaveTransition] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const dirty = Math.abs(globalCoef - 1) > 1e-4;
+
+  const handleApply = () => {
+    if (!dirty) return;
+    const msg = hasSubRecipes
+      ? `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?\n\nLes sous-recettes liées NE SERONT PAS modifiées.`
+      : `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?`;
+    if (!confirm(msg)) return;
+    setSaveError(null);
+    startSaveTransition(async () => {
+      const r = await applyMultiplierToRecipe(recipeId, globalCoef);
+      if (!r.ok) {
+        setSaveError(r.error);
+        return;
+      }
+      onReset();
+    });
+  };
+
   return (
     <section className="fl-card flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between flex-wrap gap-2">
         <h2 className="fl-title-serif" style={{ fontSize: "1.15rem" }}>
           Multiplicateur
         </h2>
-        <button
-          type="button"
-          onClick={onReset}
-          className="fl-btn fl-btn-secondary"
-          style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-        >
-          Réinitialiser
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={savePending}
+            className="fl-btn fl-btn-secondary"
+            style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
+          >
+            Réinitialiser
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={!dirty || savePending}
+            className={dirty ? "fl-btn fl-btn-primary" : "fl-btn"}
+            style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
+            title={
+              dirty
+                ? "Écrit les quantités affichées comme nouvelle base de la recette"
+                : "Modifie d'abord le coefficient, la masse totale ou un pivot"
+            }
+          >
+            {savePending ? "Mise à jour…" : "Mettre à jour la recette"}
+          </button>
+        </div>
       </div>
+      {saveError && (
+        <p className="text-sm" style={{ color: "var(--danger)" }}>
+          {saveError}
+        </p>
+      )}
 
       <ModeSwitcher mode={mode} setMode={setMode} />
 

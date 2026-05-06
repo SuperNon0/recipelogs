@@ -213,34 +213,6 @@ export function CookbookConfigForm({
           />
         </Section>
 
-        {/* Mise en page recette */}
-        <Section title="Mise en page de la recette">
-          <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Position des ingrédients</span>
-            <SegmentedControl
-              value={theme.ingredientsPosition}
-              onChange={(v) => setT("ingredientsPosition", v)}
-              options={[
-                { value: "left", label: "Gauche" },
-                { value: "right", label: "Droite" },
-                { value: "top", label: "En haut" },
-              ]}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="fl-label">Largeur de la colonne ingrédients</span>
-            <SegmentedControl
-              value={theme.ingredientsRatio}
-              onChange={(v) => setT("ingredientsRatio", v)}
-              options={[
-                { value: "narrow", label: "Étroite" },
-                { value: "balanced", label: "Équilibrée" },
-                { value: "wide", label: "Large" },
-              ]}
-            />
-          </label>
-        </Section>
-
         {/* Sections affichées */}
         <Section title="Sections affichées sur la fiche">
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -250,7 +222,6 @@ export function CookbookConfigForm({
             <Toggle label="Notes & astuces" checked={theme.showNotes} onChange={(v) => setT("showNotes", v)} />
             <Toggle label="Masse totale" checked={theme.showTotalMass} onChange={(v) => setT("showTotalMass", v)} />
             <Toggle label="Taille de portion" checked={theme.showPortion} onChange={(v) => setT("showPortion", v)} />
-            <Toggle label="Numéros de page" checked={theme.showPageNumbers} onChange={(v) => setT("showPageNumbers", v)} />
           </div>
         </Section>
 
@@ -338,19 +309,6 @@ export function CookbookConfigForm({
           {hasToc && (
             <>
               <label className="flex flex-col gap-1.5">
-                <span className="fl-label">Mode du sommaire</span>
-                <SegmentedControl
-                  value={theme.tocMode}
-                  onChange={(v) => setT("tocMode", v)}
-                  options={[
-                    { value: "hidden", label: "Caché" },
-                    { value: "flat", label: "Liste plate" },
-                    { value: "by-section", label: "Par catégorie" },
-                  ]}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5">
                 <span className="fl-label">Titre du sommaire</span>
                 <input
                   type="text"
@@ -362,18 +320,11 @@ export function CookbookConfigForm({
                 />
               </label>
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <Toggle
-                  label="Pointillés (· · · · ·)"
-                  checked={theme.tocDots}
-                  onChange={(v) => setT("tocDots", v)}
-                />
-                <Toggle
-                  label="Numéros de page"
-                  checked={theme.tocPageNumbers}
-                  onChange={(v) => setT("tocPageNumbers", v)}
-                />
-              </div>
+              <Toggle
+                label="Pointillés (· · · · ·)"
+                checked={theme.tocDots}
+                onChange={(v) => setT("tocDots", v)}
+              />
             </>
           )}
         </Section>
