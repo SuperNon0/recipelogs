@@ -5,6 +5,15 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
+import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
+
+/**
+ * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
+ * Évite de stocker `<p></p>` quand l'éditeur Tiptap est laissé vide.
+ */
+function hasMeaningfulSteps(raw: unknown): raw is string {
+  return typeof raw === "string" && !isStepsHtmlEffectivelyEmpty(raw);
+}
 
 function parseForm(formData: FormData) {
   const raw: Record<string, unknown> = {
@@ -79,10 +88,9 @@ export async function createRecipe(formData: FormData) {
             create: data.categoryIds.map((categoryId) => ({ categoryId })),
           }
         : undefined,
-      stepsBlock:
-        data.steps && data.steps.trim()
-          ? { create: { content: data.steps.trim() } }
-          : undefined,
+      stepsBlock: hasMeaningfulSteps(data.steps)
+        ? { create: { content: data.steps.trim() } }
+        : undefined,
     },
   });
 
@@ -133,7 +141,7 @@ export async function updateRecipe(id: number, formData: FormData) {
       });
     }
 
-    if (data.steps && data.steps.trim()) {
+    if (hasMeaningfulSteps(data.steps)) {
       await tx.stepsBlock.upsert({
         where: { recipeId: id },
         update: { content: data.steps.trim() },
