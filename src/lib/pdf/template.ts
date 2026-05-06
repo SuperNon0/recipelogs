@@ -536,6 +536,22 @@ function stripLeadingStepNumberingInHtml(html: string): string {
   );
 }
 
+/**
+ * Vrai si la chaîne est effectivement vide une fois les balises HTML
+ * et les entités d'espace retirées. Utile pour traiter `<p></p>` ou
+ * `<p>&nbsp;</p>` (sortie typique d'un éditeur Tiptap vide) comme « pas
+ * de contenu » et afficher un — à la place.
+ */
+export function isStepsHtmlEffectivelyEmpty(raw: string | null | undefined): boolean {
+  if (!raw) return true;
+  const text = raw
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, "")
+    .trim();
+  return text.length === 0;
+}
+
 function renderSteps(raw: string): string {
   if (looksLikeHtml(raw)) {
     const sanitized = sanitizeRichText(raw);
@@ -576,7 +592,10 @@ export function renderRecipeCard(
     ? renderIngredients(snap.ingredients, snap.totalMassG, theme.showTotalMass)
     : "<p class='muted'>Aucun ingrédient.</p>";
 
-  const stepsHtml = snap.steps ? renderSteps(snap.steps) : "<p class='muted'>—</p>";
+  const stepsHtml =
+    snap.steps && !isStepsHtmlEffectivelyEmpty(snap.steps)
+      ? renderSteps(snap.steps)
+      : "<p class='muted'>—</p>";
 
   let subrecipesHtml = "";
   if (subrecipeMode === "single" && snap.subRecipes.length > 0) {
@@ -592,7 +611,11 @@ export function renderRecipeCard(
             </div>
             <div class="col col-prep">
               <div class="col-title">Préparation</div>
-              ${sr.steps ? renderSteps(sr.steps) : "<p class='muted'>—</p>"}
+              ${
+                sr.steps && !isStepsHtmlEffectivelyEmpty(sr.steps)
+                  ? renderSteps(sr.steps)
+                  : "<p class='muted'>—</p>"
+              }
             </div>
           </div>
         </div>`,
