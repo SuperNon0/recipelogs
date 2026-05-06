@@ -66,16 +66,6 @@ function esc(s: string | null | undefined): string {
     .replace(/"/g, "&quot;");
 }
 
-function numberSteps(raw: string): string {
-  const lines = raw
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const alreadyNumbered = lines.every((l) => /^\d+[.)]\s/.test(l));
-  if (alreadyNumbered) return lines.join("\n");
-  return lines.map((l, i) => `${i + 1}. ${l}`).join("\n");
-}
-
 function mute(hex: string, amount = 0.5): string {
   const c = hexToRgb(hex);
   if (!c) return "#888";
@@ -418,7 +408,28 @@ export function buildCss(
     }
     .step { margin-bottom: 3mm; line-height: 1.5; }
     .step-num { font-weight: 700; }
-    .steps-rich { line-height: 1.55; }
+    .steps-rich {
+      line-height: 1.55;
+      counter-reset: step;
+    }
+    /* Numérotation auto des étapes (1. 2. 3. …) sur chaque paragraphe
+       de premier niveau, qu'il vienne de l'éditeur Tiptap ou d'un import. */
+    .steps-rich > p {
+      counter-increment: step;
+      position: relative;
+      padding-left: 8mm;
+      margin: 0 0 2.5mm;
+    }
+    .steps-rich > p::before {
+      content: counter(step) ".";
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-weight: 700;
+      color: ${theme.accentColor};
+      font-variant-numeric: tabular-nums;
+      min-width: 6mm;
+    }
     .steps-rich p { margin: 0 0 2mm; }
     .steps-rich h3 {
       font-family: ${titleFont};
@@ -512,22 +523,39 @@ function renderIngredients(items: { name: string; quantityG: number }[], totalG:
   return list + totalLine;
 }
 
+/**
+ * Enlève « 1. », « 1) », « 1- », etc. en tout début de chaque <p>
+ * (et tolère les espaces ou &nbsp;). Utile pour les anciennes recettes où
+ * l'utilisateur avait tapé la numérotation à la main : la numérotation
+ * automatique (CSS counters sur .steps-rich > p) prend désormais le relais.
+ */
+function stripLeadingStepNumberingInHtml(html: string): string {
+  return html.replace(
+    /<p([^>]*)>(?:\s|&nbsp;)*\d+\s*[.)\-]\s+/g,
+    "<p$1>",
+  );
+}
+
 function renderSteps(raw: string): string {
   if (looksLikeHtml(raw)) {
-    return `<div class="steps-rich">${sanitizeRichText(raw)}</div>`;
+    const sanitized = sanitizeRichText(raw);
+    const cleaned = stripLeadingStepNumberingInHtml(sanitized);
+    return `<div class="steps-rich">${cleaned}</div>`;
   }
-  const numbered = numberSteps(raw);
-  return numbered
+  // Mode texte brut (legacy) : converti en <p> pour profiter aussi de la
+  // numérotation auto via CSS.
+  const lines = raw
     .split(/\r?\n/)
+    .map((l) => l.trim())
     .filter(Boolean)
     .map((line) => {
-      const m = line.match(/^(\d+[.)])\s+(.+)$/);
-      if (m) {
-        return `<div class="step"><span class="step-num">${esc(m[1])}</span> ${esc(m[2])}</div>`;
-      }
-      return `<div class="step">${esc(line)}</div>`;
-    })
-    .join("");
+      // strip "1. " / "1) " / "1- " en début de ligne si présent
+      const m = line.match(/^\d+\s*[.)\-]\s+(.+)$/);
+      return m ? m[1] : line;
+    });
+  if (lines.length === 0) return "";
+  const html = lines.map((l) => `<p>${esc(l)}</p>`).join("");
+  return `<div class="steps-rich">${html}</div>`;
 }
 
 function renderRating(rating: number | null | undefined): string {
