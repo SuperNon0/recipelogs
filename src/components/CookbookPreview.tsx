@@ -1,62 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  buildCss,
-  renderCover,
-  renderRecipeCard,
-  type RecipeSnap,
-} from "@/lib/pdf/template";
-import { FONTS, googleFontsHref, type CookbookTheme } from "@/lib/pdf/theme";
-
-const SAMPLE_RECIPE: RecipeSnap = {
-  name: "Tarte aux fraises",
-  source: "Pierre Hermé · Pâtisserie",
-  notesTips:
-    "Cuire à blanc le fond pendant 15 min à 180 °C. Laisser refroidir avant de garnir.",
-  rating: 4,
-  tags: ["Été", "Fraîche", "Classique"],
-  categories: ["Tartes"],
-  ingredients: [
-    { name: "Pâte sablée", quantityG: 250 },
-    { name: "Fraises gariguette", quantityG: 500 },
-    { name: "Crème pâtissière", quantityG: 300 },
-    { name: "Sucre glace", quantityG: 30 },
-  ],
-  steps:
-    "Étaler la pâte sablée et foncer un cercle de 22 cm.\nCuire à blanc 15 min à 180 °C.\nLaisser refroidir, garnir de crème pâtissière.\nDisposer les fraises coupées en deux sur la crème.\nSaupoudrer de sucre glace au moment de servir.",
-  totalMassG: 1080,
-  subRecipes: [
-    {
-      label: "Crème pâtissière vanille",
-      childName: "Crème pâtissière vanille",
-      ingredients: [
-        { name: "Lait entier", quantityG: 250 },
-        { name: "Jaunes d'œufs", quantityG: 60 },
-        { name: "Sucre", quantityG: 60 },
-        { name: "Maïzena", quantityG: 25 },
-        { name: "Gousse de vanille", quantityG: 5 },
-      ],
-      totalMassG: 400,
-      steps:
-        "Faire bouillir le lait avec la vanille fendue.\nBlanchir les jaunes avec le sucre, ajouter la maïzena.\nVerser le lait chaud sur le mélange, remettre sur le feu jusqu'à épaississement.\nFilmer au contact et réserver au frais.",
-    },
-    {
-      label: "Pâte sablée amande",
-      childName: "Pâte sablée amande",
-      ingredients: [
-        { name: "Beurre doux", quantityG: 150 },
-        { name: "Sucre glace", quantityG: 90 },
-        { name: "Poudre d'amande", quantityG: 30 },
-        { name: "Œuf", quantityG: 50 },
-        { name: "Farine T55", quantityG: 250 },
-      ],
-      totalMassG: 570,
-      steps:
-        "Crémer le beurre pommade avec le sucre glace.\nAjouter l'œuf et la poudre d'amande.\nIncorporer la farine sans trop travailler.\nFraser, filmer et réserver 1h au frais.",
-    },
-  ],
-};
+import { useEffect, useRef, useState } from "react";
+import { type CookbookTheme } from "@/lib/pdf/theme";
 
 const ZOOM_PRESETS = [
   { key: "S", label: "Petit", height: 420 },
@@ -67,90 +12,101 @@ const ZOOM_PRESETS = [
 
 type ZoomKey = (typeof ZOOM_PRESETS)[number]["key"];
 
+const DEBOUNCE_MS = 700;
+
+/**
+ * Aperçu PDF "fidèle" : on POST la config en cours sur l'API preview-pdf,
+ * on récupère le binaire PDF, on l'affiche dans une iframe via un Blob URL.
+ *
+ * La requête est débouncée pour éviter de relancer Puppeteer à chaque frappe.
+ */
 export function CookbookPreview({
+  cookbookId,
   cookbookName,
   description,
   theme,
   hasCover,
+  hasToc,
+  format,
+  footer,
 }: {
+  cookbookId: number;
   cookbookName: string;
   description?: string;
   theme: CookbookTheme;
   hasCover: boolean;
+  hasToc: boolean;
+  format: string;
+  footer: string;
 }) {
   const [zoom, setZoom] = useState<ZoomKey>("M");
   const [fullscreen, setFullscreen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const html = useMemo(() => {
-    const css = buildCss(theme)
-      .replace(/page-break-before: always;/g, "page-break-before: auto;")
-      .replace(/page-break-after: always;/g, "page-break-after: auto;");
+  const prevUrlRef = useRef<string | null>(null);
+  const reqIdRef = useRef(0);
 
-    const coverHtml = hasCover
-      ? renderCover({
-          cookbookName: cookbookName || "Mon cahier",
-          description: description || "",
-          theme,
-        })
-      : "";
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      const myId = ++reqIdRef.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/cookbooks/${cookbookId}/preview-pdf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: cookbookName,
+            description,
+            format,
+            hasCover,
+            hasToc,
+            footer,
+            theme,
+          }),
+        });
+        if (myId !== reqIdRef.current) return; // une requête plus récente est en cours
+        if (!res.ok) {
+          setError(`Erreur ${res.status}`);
+          setLoading(false);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+        prevUrlRef.current = url;
+        setPdfUrl(url);
+        setLoading(false);
+      } catch (e) {
+        if (myId !== reqIdRef.current) return;
+        setError(e instanceof Error ? e.message : "Erreur réseau");
+        setLoading(false);
+      }
+    }, DEBOUNCE_MS);
 
-    const recipeHtml = renderRecipeCard(SAMPLE_RECIPE, "single", 1, "", theme);
-    const fontsLink = googleFontsHref(theme);
-    const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
+    return () => clearTimeout(handle);
+  }, [
+    cookbookId,
+    cookbookName,
+    description,
+    format,
+    hasCover,
+    hasToc,
+    footer,
+    theme,
+  ]);
 
-    const bodyFontFamily = (FONTS[theme.bodyFont] ?? FONTS.arial).family;
-    const titleFontFamily = (FONTS[theme.titleFont] ?? FONTS.arial).family;
-
-    return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  ${fontsTag}
-  <style>
-    html, body { margin: 0; padding: 0; background: #2a2a2a; }
-    .scroll-area {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-    .preview-page {
-      width: min(640px, 100%);
-      aspect-ratio: 1 / 1.414;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      padding: 12mm 14mm;
-      overflow: hidden;
-      position: relative;
-      font-family: ${bodyFontFamily};
-      background: #ffffff;
-    }
-    .preview-page.cover-wrap { padding: 0; }
-    .preview-page .cover { height: 100%; width: 100%; }
-    .preview-page .cover-title,
-    .preview-page .recipe-title,
-    .preview-page .col-title,
-    .preview-page .toc-section-title,
-    .preview-page .toc-group-title,
-    .preview-page .subrecipe-title,
-    .preview-page .notes-title {
-      font-family: ${titleFontFamily} !important;
-    }
-    ${css}
-    body { background: #2a2a2a; }
-    .recipe { min-height: auto; page-break-before: auto; }
-  </style>
-</head>
-<body>
-  <div class="scroll-area">
-    ${coverHtml ? `<div class="preview-page cover-wrap">${coverHtml}</div>` : ""}
-    <div class="preview-page">${recipeHtml}</div>
-  </div>
-</body>
-</html>`;
-  }, [theme, cookbookName, description, hasCover]);
+  // Cleanup à la destruction
+  useEffect(() => {
+    return () => {
+      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+    };
+  }, []);
 
   const currentZoom = ZOOM_PRESETS.find((z) => z.key === zoom) ?? ZOOM_PRESETS[1];
+  const iframeSrc = pdfUrl ? `${pdfUrl}#toolbar=0&navpanes=0` : "";
 
   if (fullscreen) {
     return (
@@ -168,7 +124,12 @@ export function CookbookPreview({
       >
         <div className="flex items-center justify-between">
           <span className="fl-label" style={{ color: "var(--text)" }}>
-            Aperçu plein écran
+            Aperçu PDF plein écran
+            {loading && (
+              <span style={{ color: "var(--muted)", marginLeft: 8 }}>
+                · génération…
+              </span>
+            )}
           </span>
           <button
             type="button"
@@ -179,19 +140,31 @@ export function CookbookPreview({
             ✕ Fermer
           </button>
         </div>
-        <iframe
-          title="Aperçu du cahier (plein écran)"
-          srcDoc={html}
-          sandbox="allow-same-origin"
+        <div
           style={{
             flex: 1,
-            width: "100%",
-            border: 0,
-            display: "block",
+            position: "relative",
             background: "#2a2a2a",
             borderRadius: 8,
+            overflow: "hidden",
           }}
-        />
+        >
+          {iframeSrc && (
+            <iframe
+              title="Aperçu PDF (plein écran)"
+              src={iframeSrc}
+              style={{
+                width: "100%",
+                height: "100%",
+                border: 0,
+                display: "block",
+                background: "#2a2a2a",
+              }}
+            />
+          )}
+          {loading && <LoadingOverlay />}
+          {error && !loading && <ErrorOverlay message={error} />}
+        </div>
       </div>
     );
   }
@@ -238,6 +211,14 @@ export function CookbookPreview({
             </button>
           );
         })}
+        {loading && (
+          <span
+            className="fl-label"
+            style={{ fontSize: "0.7rem", color: "var(--muted)", marginLeft: 6 }}
+          >
+            · génération du PDF…
+          </span>
+        )}
       </div>
 
       <div
@@ -245,21 +226,67 @@ export function CookbookPreview({
         style={{
           borderColor: "var(--border)",
           background: "#2a2a2a",
+          position: "relative",
+          height: currentZoom.height,
         }}
       >
-        <iframe
-          title="Aperçu du cahier"
-          srcDoc={html}
-          sandbox="allow-same-origin"
-          style={{
-            width: "100%",
-            height: currentZoom.height,
-            border: 0,
-            display: "block",
-            background: "#2a2a2a",
-          }}
-        />
+        {iframeSrc && (
+          <iframe
+            title="Aperçu PDF du cahier"
+            src={iframeSrc}
+            style={{
+              width: "100%",
+              height: "100%",
+              border: 0,
+              display: "block",
+              background: "#2a2a2a",
+            }}
+          />
+        )}
+        {loading && !pdfUrl && <LoadingOverlay />}
+        {error && !loading && <ErrorOverlay message={error} />}
       </div>
+    </div>
+  );
+}
+
+function LoadingOverlay() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#ccc",
+        fontSize: "0.85rem",
+        background: "rgba(0,0,0,0.25)",
+        pointerEvents: "none",
+      }}
+    >
+      ⏳ Génération de l&apos;aperçu PDF…
+    </div>
+  );
+}
+
+function ErrorOverlay({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--danger)",
+        fontSize: "0.85rem",
+        background: "rgba(0,0,0,0.4)",
+        textAlign: "center",
+        padding: 16,
+      }}
+    >
+      Aperçu indisponible : {message}
     </div>
   );
 }

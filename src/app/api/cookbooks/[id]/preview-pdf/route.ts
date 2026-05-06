@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { getCookbookDetail, buildRecipeSnapshot } from "@/lib/cookbooks";
 import { buildCookbookHtml, type CookbookEntryUnion } from "@/lib/pdf/template";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
-import { parseTheme } from "@/lib/pdf/theme";
+import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
 type SnapEntry = NonNullable<RecipeSnapshot>;
 
-export async function GET(
-  _req: Request,
+/**
+ * Génère un PDF d'aperçu en utilisant la configuration NON enregistrée
+ * envoyée dans le corps de la requête (theme, name, options de cahier).
+ * Les entrées (recettes + chapitres) sont lues depuis la BDD telles quelles.
+ */
+export async function POST(
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -20,7 +25,38 @@ export async function GET(
   const cookbook = await getCookbookDetail(cookbookId);
   if (!cookbook) return new NextResponse("Not found", { status: 404 });
 
-  // Fusion des entrées (recettes + chapitres) ordonnée par position
+  // Payload depuis le client : on tolère un objet partiel.
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = (await req.json()) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+
+  const name = typeof payload.name === "string" && payload.name.trim()
+    ? payload.name
+    : cookbook.name;
+  const description = typeof payload.description === "string"
+    ? payload.description
+    : (cookbook.description ?? "");
+  const format = (payload.format === "A5" ? "A5" : "A4") as "A4" | "A5";
+  const hasCover = payload.hasCover !== undefined
+    ? !!payload.hasCover
+    : cookbook.hasCover;
+  const hasToc = payload.hasToc !== undefined
+    ? !!payload.hasToc
+    : cookbook.hasToc;
+  const footer = typeof payload.footer === "string"
+    ? payload.footer
+    : (cookbook.footer ?? "");
+
+  // Theme : on tente de valider strictement, sinon on retombe sur le tolérant.
+  const themeParsed = cookbookThemeSchema.safeParse(payload.theme);
+  const theme = themeParsed.success
+    ? themeParsed.data
+    : parseTheme(payload.theme ?? cookbook.coverConfig);
+
+  // Reconstruction des entrées (mêmes données que la route PDF complète).
   type RawEntry =
     | { kind: "recipe"; data: (typeof cookbook.entries)[number] }
     | { kind: "chapter"; data: (typeof cookbook.chapters)[number] };
@@ -51,16 +87,13 @@ export async function GET(
     } else {
       snap = await buildRecipeSnapshot(entry.recipeId);
     }
-
     if (!snap) continue;
-
-    const sectionTitle = entry.sectionTitle ?? null;
 
     const recipeEntry: Extract<CookbookEntryUnion, { type: "recipe" }> = {
       type: "recipe",
       snap,
       subrecipeMode,
-      sectionTitle,
+      sectionTitle: entry.sectionTitle ?? null,
     };
 
     if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
@@ -86,28 +119,54 @@ export async function GET(
     entries.push(recipeEntry);
   }
 
-  const theme = parseTheme(cookbook.coverConfig);
+  // Si le cahier est vide, on ajoute une recette d'exemple pour que l'aperçu
+  // ne soit pas une page blanche.
+  if (entries.length === 0) {
+    entries.push({
+      type: "recipe",
+      snap: {
+        name: "Recette d'exemple",
+        source: "Aperçu",
+        notesTips: null,
+        rating: null,
+        photoPath: null,
+        tags: ["Aperçu"],
+        categories: ["Démo"],
+        ingredients: [
+          { name: "Farine", quantityG: 250 },
+          { name: "Sucre", quantityG: 100 },
+          { name: "Beurre", quantityG: 125 },
+          { name: "Œufs", quantityG: 50 },
+        ],
+        steps:
+          "Mélanger les ingrédients secs.\nIncorporer le beurre fondu.\nAjouter les œufs.\nEnfourner 25 min à 180°C.",
+        totalMassG: 525,
+        subRecipes: [],
+      },
+      subrecipeMode: "single",
+      sectionTitle: null,
+    });
+  }
 
   const html = buildCookbookHtml({
-    cookbookName: cookbook.name,
-    description: cookbook.description,
-    hasCover: cookbook.hasCover,
-    hasToc: cookbook.hasToc,
-    format: cookbook.format as "A4" | "A5",
+    cookbookName: name,
+    description,
+    hasCover,
+    hasToc,
+    format,
     theme,
     entries,
   });
 
-  const pdf = await renderHtmlToPdf(html, cookbook.format as "A4" | "A5", {
-    footer: cookbook.footer,
+  const pdf = await renderHtmlToPdf(html, format, {
+    footer,
     footerAlign: theme.footerAlign,
   });
 
-  const filename = `${cookbook.name.replace(/[^a-z0-9\-]/gi, "_")}.pdf`;
   return new NextResponse(pdf.buffer as ArrayBuffer, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
     },
   });
 }

@@ -3,17 +3,20 @@ import puppeteer from "puppeteer";
 /**
  * Rendu HTML → PDF via Puppeteer (Chromium headless).
  *
- * - `format` (A4/A5) est respecté nativement (le CSS @page n'a plus de `size`).
- * - `footer` est rendu sur chaque page via le mécanisme natif de Puppeteer
- *   (`displayHeaderFooter` + `footerTemplate`), pas via `position: fixed`
- *   qui ne marche que sur la première page.
+ * - Le format (A4/A5) et les marges sont contrôlés par les règles CSS @page
+ *   du HTML (preferCSSPageSize: true), ce qui permet d'avoir une couverture
+ *   en full-bleed via @page :first { margin: 0 }.
+ * - Le pied de page est rendu sur chaque page via Puppeteer
+ *   (`displayHeaderFooter` + `footerTemplate`). Sur la page de couverture
+ *   (margin: 0), l'espace est nul → le footer ne s'imprime pas, ce qui est
+ *   exactement ce qu'on veut.
  */
 export async function renderHtmlToPdf(
   html: string,
   format: "A4" | "A5" = "A4",
   options: {
     footer?: string | null;
-    coverFirstPage?: boolean;
+    footerAlign?: "left" | "center" | "right" | "justify";
   } = {},
 ): Promise<Uint8Array> {
   const browser = await puppeteer.launch({
@@ -33,22 +36,21 @@ export async function renderHtmlToPdf(
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
       : "";
+    const align = options.footerAlign ?? "center";
 
     const pdf = await page.pdf({
       format,
       printBackground: true,
-      // Marges minimales si pas de footer ; un peu plus en bas pour laisser
-      // la place au footer Puppeteer.
-      margin: hasFooter
-        ? { top: "10mm", bottom: "16mm", left: "12mm", right: "12mm" }
-        : { top: "10mm", bottom: "10mm", left: "12mm", right: "12mm" },
+      // Délègue les marges au CSS (@page) pour pouvoir avoir une couverture
+      // en full-bleed (@page :first { margin: 0 }).
+      preferCSSPageSize: true,
       displayHeaderFooter: hasFooter,
       headerTemplate: '<span style="display:none"></span>',
       footerTemplate: hasFooter
         ? `<div style="
             font-size: 8pt;
             color: #888;
-            text-align: center;
+            text-align: ${align};
             width: 100%;
             padding: 0 12mm;
             font-family: -apple-system, Arial, sans-serif;

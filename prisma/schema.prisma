@@ -241,8 +241,6 @@ model CookbookRecipe {
   snapshotData      Json?               @map("snapshot_data")
   snapshotDate      DateTime?           @map("snapshot_date")
   subrecipeMode     SubRecipeRenderMode @default(single) @map("subrecipe_mode")
-  /** Si true, cette recette se colle à la précédente sur la même page PDF. */
-  groupWithPrevious Boolean             @default(false) @map("group_with_previous")
   /** Si non vide, déclenche un titre de section au-dessus de cette entrée. */
   sectionTitle      String?             @map("section_title")
 

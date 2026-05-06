@@ -154,6 +154,20 @@ export function CookbookConfigForm({
               placeholder="Ex : © Ma Pâtisserie 2025"
             />
           </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="fl-label">Alignement du pied de page</span>
+            <SegmentedControl
+              value={theme.footerAlign}
+              onChange={(v) => setT("footerAlign", v)}
+              options={[
+                { value: "left", label: "⟸ Gauche" },
+                { value: "center", label: "⇔ Centre" },
+                { value: "right", label: "⟹ Droite" },
+                { value: "justify", label: "☰ Justifié" },
+              ]}
+            />
+          </label>
         </Section>
 
         {/* Couleurs des recettes */}
@@ -261,7 +275,7 @@ export function CookbookConfigForm({
                   value={theme.coverBgPattern}
                   c1={theme.coverBgColor}
                   c2={theme.coverBgColor2}
-                  accent={theme.accentColor}
+                  accent={theme.coverAccentColor}
                   onChange={(v) => setT("coverBgPattern", v)}
                 />
               </label>
@@ -281,6 +295,14 @@ export function CookbookConfigForm({
                   label="Couleur de fond (2ᵉ couleur du dégradé)"
                   value={theme.coverBgColor2}
                   onChange={(v) => setT("coverBgColor2", v)}
+                />
+              )}
+
+              {theme.coverBgPattern === "accent-corner" && (
+                <ColorRow
+                  label="Couleur du coin d'accent"
+                  value={theme.coverAccentColor}
+                  onChange={(v) => setT("coverAccentColor", v)}
                 />
               )}
 
@@ -407,10 +429,14 @@ export function CookbookConfigForm({
             </a>
           </div>
           <CookbookPreview
+            cookbookId={cookbookId}
             cookbookName={name}
             description={description}
             theme={theme}
             hasCover={hasCover}
+            hasToc={hasToc}
+            format={format}
+            footer={footer}
           />
         </div>
       </aside>
@@ -433,10 +459,14 @@ export function CookbookConfigForm({
             </a>
           </div>
           <CookbookPreview
+            cookbookId={cookbookId}
             cookbookName={name}
             description={description}
             theme={theme}
             hasCover={hasCover}
+            hasToc={hasToc}
+            format={format}
+            footer={footer}
           />
         </div>
       </aside>
