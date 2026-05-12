@@ -101,25 +101,55 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
             </button>
           </form>
         ) : (
-          <div key={f.id} className="flex items-center gap-2 flex-wrap">
-            <span
-              className="fl-tag"
+          <div
+            key={f.id}
+            className="flex items-center gap-3 flex-wrap py-1"
+          >
+            {/* Pastille colorée + nom lisible (texte standard, pas dans la couleur) */}
+            <div
+              className="flex items-center gap-2 flex-1 min-w-0"
               style={{
-                background: `${f.color}22`,
-                color: f.color,
-                borderColor: `${f.color}55`,
+                padding: "0.4rem 0.75rem",
+                background: `${f.color}1a`,
+                border: `1px solid ${f.color}55`,
+                borderRadius: 8,
               }}
             >
-              📁 {f.name}
-            </span>
-            <span className="fl-label text-xs">
-              {f._count.recipes} recette{f._count.recipes > 1 ? "s" : ""}
-            </span>
+              <span
+                aria-hidden
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 4,
+                  background: f.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                className="fl-title-serif"
+                style={{
+                  fontSize: "0.95rem",
+                  color: "var(--text)",
+                  lineHeight: 1.1,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {f.name}
+              </span>
+              <span
+                className="fl-label"
+                style={{ fontSize: "0.7rem", marginLeft: 4 }}
+              >
+                · {f._count.recipes} recette{f._count.recipes > 1 ? "s" : ""}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => setEditingId(f.id)}
-              className="fl-label hover:text-[color:var(--text)]"
-              style={{ fontSize: "0.8rem" }}
+              className="fl-btn fl-btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
             >
               Éditer
             </button>
@@ -127,8 +157,12 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
               type="button"
               onClick={() => handleDelete(f.id, f.name, f._count.recipes)}
               disabled={pending}
-              className="fl-label hover:text-[color:var(--danger)]"
-              style={{ fontSize: "0.8rem" }}
+              className="fl-btn"
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.3rem 0.6rem",
+                color: "var(--danger)",
+              }}
             >
               Supprimer
             </button>

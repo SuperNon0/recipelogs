@@ -1,4 +1,4 @@
-# RecipeLog — Cahier des charges V1.1
+# RecipeLog — Cahier des charges V1.2
 
 > **Gestion de recettes de pâtisserie — Application web auto-hébergée**
 
@@ -7,13 +7,80 @@
 | | |
 |---|---|
 | **Projet** | RecipeLog |
-| **Version** | 1.1 — Ajustements sous-recettes & cahiers |
+| **Version** | 1.2 — Livré + Dossiers, refonte UX/PDF |
 | **Domaine** | `recipe.super-nono.cc` |
 | **Écosystème** | `super-nono.cc` |
 | **Hébergement** | Proxmox LXC · Cloudflare Zero Trust |
 | **Cible** | Usage personnel — Pâtissier BTM 2ᵉ année |
 | **Langue** | Français |
 | **Design system** | FuelLog (dark · DM Serif Display · DM Mono) |
+| **Stack** | Next.js 15 · TypeScript · Prisma 6 · PostgreSQL 15 · Tailwind v4 · Puppeteer · pdf-lib |
+
+---
+
+## 📝 Changelog V1.1 → V1.2 (itérations post-mise en production)
+
+Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itérations correctives et fonctionnelles** suite à l'usage réel par le commanditaire. Les évolutions principales :
+
+### 🆕 Nouvelles fonctionnalités
+
+- **📁 Dossiers de recettes** : 1 dossier max par recette (rangement par grand type — Tartes, Entremets, etc.). Section CRUD dans `/settings`. Seed initial de 8 dossiers de pâtisserie.
+- **🗂️ Vue explorateur sur `/recettes`** : grille de cards de dossiers (style Apple Files) + section « Sans dossier » en bas. Bouton « 📋 Tout afficher » pour la vue groupée plate. Fil d'Ariane quand on entre dans un dossier.
+- **🔍 Combobox catégories** : remplace la grille de 50+ chips par une saisie filtrée + dropdown (la liste des catégories pouvait dépasser 60 entrées chez l'utilisateur).
+- **📄 Réglages PDF d'une recette individuelle** : nouvelle section `/settings` pour personnaliser format A4/A5, couleurs, polices, sections affichées du PDF d'une recette seule.
+- **⚖️ Mettre à jour la recette** : bouton à côté de « Réinitialiser » sur la fiche recette → applique le coefficient/masse/pivot affiché et l'écrit comme nouvelle base en BDD (les sous-recettes liées ne sont pas touchées).
+- **⚖️ Modifier la masse d'une recette figée** dans un cahier : nouvelle entrée du menu « ⋯ » avec les 3 modes (coefficient / masse / pivot) recalculant le snapshot proportionnellement.
+- **🔄 Aperçu PDF manuel** dans la config d'un cahier : bouton « Mettre à jour l'aperçu » qui régénère le vrai PDF côté serveur sans avoir besoin d'enregistrer (Puppeteer ne tourne que sur clic, plus sur chaque frappe).
+
+### 🛠️ Refontes / fixes majeurs
+
+- **PDF — toujours 1 page par recette** : suppression du choix « 📄 Fiche unique / 📚 Séparées ». La recette parente et chaque sous-recette sont rendues sur leur propre page. Chaque page de sous-recette porte la mention `SOUS-RECETTE DE · [parent]` sous le titre.
+- **PDF — sous-recettes indentées dans le sommaire** (préfixe `↳`, indentation 8mm, texte plus discret).
+- **PDF — numérotation logique** : la couverture et le sommaire ne sont pas comptés. La 1ʳᵉ recette = page « 1 ». Implémenté via 2 passes Puppeteer (cover+TOC sans footer / recettes avec footer) fusionnées via **`pdf-lib`** (nouvelle dépendance).
+- **PDF — pied de page en 3 zones** : gauche / **numéro centré** / droite. Alignement réduit à `Gauche` ou `Droite` (le centre est réservé au numéro de page).
+- **PDF — couverture pleine page** (`@page :first { margin: 0 }` + `preferCSSPageSize`) et couleur d'accent de la couverture **découplée** de celle des recettes (`coverAccentColor` indépendant).
+- **PDF — fix couleur du texte de la couverture** : était hardcodée sur le layout cercle.
+- **PDF — étapes auto-numérotées (1. 2. 3.)** via CSS counters sur tous les PDF. Strip automatique de la numérotation manuelle existante en compatibilité.
+- **PDF — étapes vides** : affichage `—` au lieu de « 1. » seul si l'éditeur Tiptap a sauvegardé `<p></p>`.
+
+### 🎨 UX & simplifications
+
+- **Éditeur d'étapes Tiptap** : toolbar réduite à **Gras / Italique / Souligné** (+ undo/redo). Tout le reste (titres, listes, couleurs, surlignage, code, citations, barré) retiré. Fix re-render React à chaque transaction (les étapes ne se sauvegardaient pas / les boutons ne changeaient pas de couleur). Placeholder via extension officielle Tiptap.
+- **Formulaire de cahier épuré** : suppression de « Position des ingrédients », « Largeur colonne », « Mode du sommaire », « Numéros de page » → tous fixés aux bonnes valeurs par défaut (gauche / étroite / liste plate / toujours activé).
+- **Menu « ⋯ » des entrées de cahier** : fix du clipping (`overflow-hidden` retiré) qui cachait le dropdown sur les dernières lignes du tableau.
+- **Page de cahier refondue (wave 2)** : 2 onglets (Recettes / Apparence), liste compacte, drag-and-drop, pages chapitres, titres de section. Remplace l'ancienne page linéaire.
+- **Réorganisation des couleurs/labels** dans `/settings` pour meilleure lisibilité des dossiers et catégories (pastille + nom en texte standard plutôt que texte dans la couleur).
+- **Bouton « 🚀 Mettre à jour le site »** dans `/settings` + script `deploy.sh` Proxmox qui enchaîne git pull / install / migrate / build / restart.
+
+### 📥 Import / intégrations
+
+- **Import Recipe Keeper en HTML/ZIP** : parser microdata (140 recettes importées chez l'utilisateur) avec extraction automatique de la photo principale.
+
+### 🗃️ Schéma BDD — modifications
+
+- ➕ Nouvelle table `folders` (id, name unique, color, icon)
+- ➕ Nouvelle colonne `recipes.folder_id` (FK, `ON DELETE SET NULL`)
+- ➕ Nouvelles colonnes sur `cookbooks_recipes` :
+  - `section_title` (titre de section affiché au-dessus d'une entrée)
+- ➕ Nouvelle table `cookbooks_chapters` (id, cookbook_id, position, title, intro, image_url)
+- 📌 Le champ `cookbooks_recipes.subrecipe_mode` reste en BDD pour compat mais est **ignoré au rendu** (toujours traité comme « separate »)
+- 📌 La colonne `cookbooks_recipes.group_with_previous` a été **droppée** (fonctionnalité abandonnée)
+- 📌 Settings clé `recipePdfSettings` (JSON) — réglages du PDF d'une recette individuelle
+
+### 🏗️ Stack technique retenu
+
+| Couche | Choix | Commentaire |
+|---|---|---|
+| Framework | **Next.js 15** (App Router, Server Actions) | SSR + actions serveur intégrées |
+| Langage | **TypeScript strict** | typecheck propre obligatoire |
+| ORM | **Prisma 6** | migrations versionnées, types auto-générés |
+| Base | **PostgreSQL 15+** (ext `pg_trgm`) | recherche fuzzy `pg_trgm` |
+| Style | **Tailwind CSS v4** + tokens FuelLog | dark only |
+| Validation | **Zod** | sécurise tous les inputs / form data |
+| PDF | **Puppeteer 24** + **pdf-lib** | rendu Chromium + fusion multi-pass |
+| Éditeur riche | **Tiptap v3** (StarterKit + Underline + Placeholder) | étapes des recettes |
+| Tests | **Vitest 4** | 50 tests unitaires en place |
+| Déploiement | **LXC Debian 12** + script `deploy.sh` | géré depuis l'UI via `/settings` |
 
 ---
 
@@ -115,22 +182,32 @@ Le projet se découpe en une **V1 (MVP complet)** à développer immédiatement,
 - Recherche par **nom** de recette
 - Recherche par **tag**
 - Recherche par **catégorie**
+- **Navigation par dossier** (vue explorateur sur `/recettes`)
+  - Page d'accueil affiche les **cards de dossiers** + section « Sans dossier »
+  - Clic sur un dossier → vue filtrée du dossier + fil d'Ariane
+  - Bouton **« 📋 Tout afficher »** → liste plate de toutes les recettes groupées par dossier
 - Onglet dédié **Favoris**
-- Filtres par tag et catégorie dans la liste principale
+- Filtres par tag et catégorie dans la liste principale (chips horizontaux)
 
 #### 2.1.5 Impression PDF
 
-- **Impression d'une recette unique** depuis la fiche (bouton direct + menu 3 points)
+- **Impression d'une recette unique** depuis la fiche (bouton direct).
+  Le style est configurable globalement dans `/settings → PDF d'une recette` (format A4/A5, couleurs, polices, sections affichées).
 - **Système de cahiers** : création d'un cahier vide, puis ajout de recettes depuis chaque fiche via « Ajouter au cahier »
 - **Mode de liaison au choix à chaque ajout** :
-  - **🔗 Liée dynamique** : le cahier reflète toujours la version actuelle de la recette (modifications automatiquement propagées)
-  - **📌 Figée (snapshot)** : copie figée au moment de l'ajout, non affectée par les modifications ultérieures de la recette source
-- **Intégration des sous-recettes dans un cahier** au moment de l'ajout d'une recette contenant des sous-recettes :
-  - **📄 Fiche unique** : les sous-recettes sont intégrées (dépliées) dans la fiche principale du PDF
-  - **📚 Recettes séparées** : la recette principale et chaque sous-recette deviennent des fiches distinctes dans le cahier
+  - **🔗 Liée dynamique** : le cahier reflète toujours la version actuelle de la recette
+  - **📌 Figée (snapshot)** : copie figée au moment de l'ajout
+  - Actions post-ajout dans le cahier : `Figer maintenant` / `Mettre à jour le snapshot` / `Reconvertir en liée` / `⚖️ Modifier la masse` (sur les figées : 3 modes coef/masse/pivot recalculant le snapshot)
+- **Rendu des sous-recettes** : **toujours 1 page par recette** (parente + chaque sous-recette). Chaque page de sous-recette porte la mention `SOUS-RECETTE DE · [parent]` sous le titre.
+  Les sous-recettes apparaissent indentées dans le sommaire (préfixe `↳`).
+  *Le choix « Fiche unique / Séparées » de la V1.1 a été retiré au profit de ce comportement unique.*
+- **Numérotation des pages** : la couverture et le sommaire ne sont pas comptés. La 1ʳᵉ recette = page « 1 ». Implémentation : 2 passes Puppeteer (cover+TOC sans footer / recettes avec footer) fusionnées via `pdf-lib`.
+- **Pied de page** : 3 zones (gauche / **numéro centré** / droite). L'utilisateur choisit l'alignement du texte (gauche ou droite ; le centre est réservé au numéro de page).
+- **Couverture pleine page** (`@page :first { margin: 0 }`) avec **couleur d'accent indépendante** de la couleur d'accent des recettes.
+- **Étapes auto-numérotées** (1. 2. 3.) via CSS counters sur chaque `<p>` de premier niveau. La numérotation manuelle existante dans les vieilles recettes est strippée automatiquement avant rendu.
+- **Aperçu PDF manuel** dans la config du cahier : bouton « Mettre à jour l'aperçu » qui régénère le vrai PDF côté serveur (sans devoir enregistrer la config). Plus de fetch automatique pour ne pas saturer Puppeteer.
 - Formats supportés : **A4 et A5**
-- **3 à 4 templates** de mise en page au choix, avec possibilité d'en ajouter ultérieurement
-- Paramètres du cahier : réorganisation (drag & drop), sommaire on/off, page de garde on/off et personnalisable (style, police, taille), logo on/off, numérotation, pied de page
+- Paramètres du cahier : réorganisation (drag & drop), sommaire on/off, page de garde on/off et personnalisable (layouts cercle/cadre/full-bleed/minimal/typo-large/typo-divider, dégradés ou image de fond, couleur d'accent du coin), logo on/off, pied de page
 - Partage d'un cahier via lien public (téléchargement PDF anonyme)
 - Téléchargement PDF uniquement (pas d'impression directe CUPS en V1)
 
@@ -152,11 +229,15 @@ Le projet se découpe en une **V1 (MVP complet)** à développer immédiatement,
 
 #### 2.1.8 Paramètres
 
-- Gestion du logo personnel (upload + toggle activer/désactiver)
-- Gestion de la base d'ingrédients (si mode B utilisé)
-- Gestion des catégories
-- Export/import JSON manuel
-- Toggle mode de saisie des ingrédients (A : libre / B : base réutilisable)
+Section unique `/settings` regroupant :
+
+- **🚀 Mise à jour du site** : bouton qui lance `deploy.sh` sur le LXC (git pull / install / migrate / build / restart) avec overlay de maintenance.
+- **📁 Dossiers** : CRUD complet — créer / renommer / changer couleur / supprimer. Compte de recettes par dossier. Supprimer un dossier ne supprime jamais les recettes (passage en « Sans dossier » via `ON DELETE SET NULL`).
+- **🏷️ Catégories** : CRUD identique aux dossiers (tags secondaires).
+- **📄 PDF d'une recette** : format A4/A5, couleur d'accent (titres/traits), couleur du texte, polices titres + corps, taille du texte, sections affichées (Tags, Source, Note, Notes & astuces, Masse totale, Taille de portion). Stocké dans `settings` sous la clé `recipePdfSettings`.
+- **📥 Import Recipe Keeper** : 2 onglets — *ZIP / HTML* (parser microdata + photos) et *CSV* (legacy).
+- Gestion du logo personnel (upload + toggle) *— prévu, non implémenté à ce jour*
+- Export/import JSON manuel *— prévu, non implémenté à ce jour*
 
 ### 2.2 V2 — Évolutions prévues
 
@@ -732,27 +813,37 @@ Schéma de principe pour PostgreSQL. Le développeur est libre d'adapter (nommag
 
 ### 7.1 Entités principales
 
+> **Source de vérité** : `prisma/schema.prisma` — ce tableau est descriptif, le schéma Prisma fait foi.
+
 | Table | Description |
 |---|---|
-| **`recipes`** | Recette principale — nom, photo, tags[], source, notes, favorite, rating, created_at, updated_at |
-| **`ingredients`** | Ingrédient d'une recette — name (si mode A), ingredient_id (si mode B), quantity_g, position, recipe_id |
+| **`recipes`** | Recette principale — name, photo_path, source, notes_tips, favorite, rating, **folder_id** (FK nullable, ON DELETE SET NULL), created_at, updated_at |
+| **`folders`** 🆕 | Dossier de rangement — name (unique), color, icon. Une recette = 0 ou 1 dossier max. |
+| **`ingredients`** | Ingrédient d'une recette — name (si mode A), ingredient_base_id (si mode B), quantity_g, position, recipe_id |
 | **`ingredients_base`** | Base réutilisable — name, default_unit, created_at |
-| **`steps_block`** | Bloc de texte libre des étapes — content (text), recipe_id |
-| **`sub_recipes`** | Référence d'une recette en sous-recette d'une autre — parent_id, child_id, label, calc_mode, calc_value, position, **is_locked** (bool, pour verrouillage 🔒) |
+| **`steps_block`** | Bloc HTML riche des étapes (sortie Tiptap) — content (text), recipe_id. Stocke `<p>…</p>` avec balises `<strong>`, `<em>`, `<u>` (les autres balises sont sanitizées). |
+| **`sub_recipes`** | Référence d'une recette en sous-recette d'une autre — parent_id, child_id, label, calc_mode, calc_value, pivot_ingredient_id, position, **is_locked** (bool, pour verrouillage 🔒) |
 | **`variants`** | Variante d'une recette — source_recipe_id, variant_recipe_id, note |
-| **`categories`** | Catégorie — name, color, icon |
+| **`categories`** | Catégorie — name (unique), color, icon |
 | **`recipes_categories`** | Table de jointure recettes ↔ catégories (N-N) |
-| **`tags`** | Tags libres — name, recipe_id (ou table pivot si réutilisables) |
+| **`tags`** | Tags libres par recette — name, recipe_id |
 | **`comments`** | Commentaires datés — content, created_at, recipe_id |
-| **`cookbooks`** | Cahier de recettes — name, description, format (A4/A5), template_id, has_toc, has_cover, cover_config (jsonb), has_logo, page_numbering_config (jsonb), footer (text) |
-| **`cookbooks_recipes`** | Jointure cahier ↔ recettes — cookbook_id, recipe_id, position, **link_mode** (linked/snapshot), **snapshot_data** (jsonb, si snapshot), **snapshot_date** (timestamp), **subrecipe_mode** (single/separate) |
-| **`cookbook_snapshots`** | Optionnel — stockage des snapshots figés avec snapshot_data complet au moment de l'ajout |
+| **`cookbooks`** | Cahier de recettes — name, description, format (A4/A5), template_id, has_toc, has_cover, cover_config (jsonb : layouts, dégradés, couleurs, polices, alignement footer, etc.), has_logo, page_numbering_config (jsonb), footer (text) |
+| **`cookbooks_recipes`** | Jointure cahier ↔ recettes — cookbook_id, recipe_id, position, **link_mode** (linked/snapshot), **snapshot_data** (jsonb), **snapshot_date**, **subrecipe_mode** (conservé pour compat, mais **ignoré au rendu**), **section_title** (titre de section optionnel au-dessus de l'entrée) |
+| **`cookbooks_chapters`** 🆕 | Pages chapitre intercalées entre les recettes — cookbook_id, position, title, intro, image_url. Position partagée avec cookbooks_recipes pour un ordre unifié drag-and-drop. |
 | **`shopping_lists`** | Liste de courses — name, type (recipes/free/mixed) |
 | **`shopping_list_items`** | Item d'une liste — name, quantity_g (nullable), recipe_id (nullable), checked, position |
 | **`shopping_list_recipes`** | Recettes liées à une liste avec coefficient |
 | **`share_tokens`** | Tokens publics — token, entity_type (recipe/cookbook), entity_id, created_at, revoked_at |
-| **`settings`** | Paramètres globaux (clé-valeur) — ingredient_mode (A/B), logo_enabled, logo_path... |
+| **`settings`** | Paramètres globaux (clé-valeur jsonb) — `ingredient_mode`, `logo_enabled`, `recipePdfSettings` (réglages du PDF d'une recette) |
 | **`pdf_templates`** | Templates PDF disponibles — name, description, slug, preview_path, is_custom |
+
+#### Champs `cookbooks_recipes` retirés ou ignorés
+
+| Champ | État | Raison |
+|---|---|---|
+| `subrecipe_mode` | **Conservé en BDD, ignoré au rendu** | Le PDF rend systématiquement chaque recette sur sa propre page (le choix « unique / séparées » a été simplifié) |
+| `group_with_previous` | **Droppé** (migration `20260506100000_drop_group_with_previous`) | Fonctionnalité « coller à la précédente » abandonnée après itération utilisateur |
 
 ### 7.2 Relations principales
 
@@ -802,29 +893,33 @@ Schéma de principe pour PostgreSQL. Le développeur est libre d'adapter (nommag
 
 ## 8. Arborescence & navigation
 
-### 8.1 Arborescence des écrans
+### 8.1 Arborescence des écrans (réelle, telle que livrée)
 
 ```
-/ (accueil)
-├── /recipes                        Liste + recherche + filtres
-│   ├── /recipes/new                Création nouvelle recette
-│   └── /recipes/:id                Fiche recette détaillée
-│       ├── /recipes/:id/edit       Édition
-│       └── /recipes/:id/share      Gestion du lien public
-├── /favorites                      Vue filtrée des favoris
-├── /cookbooks                      Liste des cahiers
-│   ├── /cookbooks/new              Création cahier
-│   └── /cookbooks/:id              Configuration + génération PDF
-├── /shopping                       Listes de courses
-│   ├── /shopping/new               Nouvelle liste
-│   └── /shopping/:id               Détail / mode courses
-├── /ingredients                    (si mode B) Base d'ingrédients
-├── /settings                       Paramètres globaux
-│   ├── /settings/general           Mode ingrédient, logo, langue
-│   ├── /settings/categories        Gestion catégories
-│   ├── /settings/import-export     JSON import/export
-│   └── /settings/about             À propos, version
-└── /p/:token                       Vue publique (hors auth ZT)
+/                                    Vue explorateur (cards dossiers + sans dossier)
+├── /?folder=:id                     Vue filtrée d'un dossier
+├── /?folder=none                    Vue « Sans dossier »
+├── /?view=all                       Liste plate groupée par dossier (« Tout afficher »)
+├── /?q=… &tag=… &category=:id       Recherche / filtres
+├── /recipes/new[?folder=:id]        Création nouvelle recette
+├── /recipes/:id                     Fiche recette détaillée
+├── /recipes/:id/edit                Édition
+├── /recipes/:id/pdf                 PDF de la recette seule (style défini dans /settings)
+├── /favorites                       Vue filtrée des favoris
+├── /cookbooks                       Liste des cahiers
+├── /cookbooks/new                   Création cahier
+├── /cookbooks/:id                   Détail cahier (onglets Recettes / Apparence)
+├── /cookbooks/:id/pdf               PDF complet du cahier (2 passes + merge pdf-lib)
+├── /api/cookbooks/:id/preview-pdf   Aperçu PDF (POST, theme non-enregistré)
+├── /api/cookbooks/:id/entries/:eid/snapshot
+│                                    Lecture d'un snapshot (pour modal Modifier la masse)
+├── /shopping                        Listes de courses
+│   ├── /shopping/new                Nouvelle liste
+│   └── /shopping/:id                Détail / mode courses
+├── /settings                        Paramètres globaux (page unique)
+├── /share/:token                    Vue publique (hors auth ZT)
+├── /api/health                      Healthcheck
+└── /api/deploy/log                  Stream des logs de déploiement
 ```
 
 ### 8.2 Parcours utilisateur clés
@@ -891,24 +986,35 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 
 ---
 
-## 10. Planning indicatif
+## 10. Planning et avancement
 
-Planning donné à titre indicatif, à adapter selon la disponibilité du développeur. Les phases peuvent se chevaucher partiellement.
+### 10.1 Phases du projet (V1.1 → V1.2)
 
-| Phase | Contenu | Durée |
+| Phase | Contenu | État |
 |---|---|---|
-| **1. Cadrage & setup** | Validation finale du CDC, setup du dépôt, choix stack, bootstrap projet, configuration LXC de dev | 1 semaine |
-| **2. Socle & recettes V1** | Modèle de données complet, CRUD recettes, authentification Zero Trust, design system intégré | 2 semaines |
-| **3. Multiplication & sous-recettes** | 3 modes de calcul, recalcul dynamique, système de sous-recettes en accordéon, propagation en cascade, verrouillage | 1-2 semaines |
-| **4. Cahiers & PDF** | Création cahiers, 4 templates PDF, génération, drag & drop, personnalisation page de garde, modes liée/figée et fiche unique/séparées | 2 semaines |
-| **5. Liste de courses** | CRUD listes, génération auto depuis recettes, fusion, cases à cocher, export PDF | 1 semaine |
-| **6. Partage public & paramètres** | Tokens, vue publique, paramètres globaux, import/export JSON | 1 semaine |
-| **7. Scripts Proxmox** | Scripts LXC, installation, mise à jour, backup, documentation | 3-4 jours |
-| **8. Tests & import initial** | Tests fonctionnels, import du PDF Recipe Keeper, validation, corrections | 1 semaine |
-| **9. Mise en production** | Déploiement sur `recipe.super-nono.cc`, configuration Cloudflare, recette finale | 2-3 jours |
+| **1. Cadrage & setup** | Validation CDC, setup du dépôt, choix stack (Next.js 15 + Prisma 6), bootstrap projet, configuration LXC de dev | ✅ Livré |
+| **2. Socle & recettes** | Modèle de données complet, CRUD recettes, design system FuelLog intégré | ✅ Livré |
+| **3. Multiplication & sous-recettes** | 3 modes de calcul, recalcul dynamique, sous-recettes en accordéon, propagation cascade, verrouillage 🔒 | ✅ Livré |
+| **4. Cahiers & PDF** | Création cahiers, templates PDF, génération via Puppeteer, drag & drop, page de garde, modes liée/figée | ✅ Livré |
+| **5. Liste de courses** | CRUD listes, génération auto depuis recettes, fusion, cases à cocher | ✅ Livré |
+| **6. Partage public & paramètres** | Tokens publics, vue lecture seule, paramètres globaux | ✅ Livré |
+| **7. Scripts Proxmox** | Scripts LXC (create-lxc, setup, deploy, backup, collect-logs) + bouton « Mettre à jour le site » | ✅ Livré |
+| **8. Tests & import** | 50 tests Vitest, import Recipe Keeper CSV + HTML/ZIP avec photos | ✅ Livré |
+| **9. Mise en production** | Déploiement sur `recipe.super-nono.cc` via Cloudflare Zero Trust | ✅ Livré |
+| **10. Itérations V1.2** | Dossiers, vue explorateur, combobox catégories, refonte PDF (1 page par recette, numérotation logique, sommaire avec sous-recettes), réglages PDF d'une recette, « Mettre à jour la recette », fix éditeur Tiptap, etc. | ✅ Livré |
 
-> **Total indicatif**
-> Environ **9 à 11 semaines** de développement solo, selon la disponibilité et l'expérience du développeur. Les fonctionnalités V2 ne sont pas incluses dans ce planning et feront l'objet d'un second lot ultérieur.
+### 10.2 Évolutions à venir (priorité indicative)
+
+| Priorité | Évolution | Notes |
+|---|---|---|
+| 🔼 | Logo personnel sur les cahiers | UI prévue, branchement à finaliser |
+| 🔼 | Import / Export JSON | Sauvegarde complète des données |
+| 🔽 | Coût de revient | Base d'ingrédients avec prix unitaire |
+| 🔽 | Liste de courses : groupement par rayon | UX magasin |
+| 🔽 | PWA + mode hors-ligne | Cuisine sans réseau |
+| 🔽 | Backups externes automatiques (S3/Backblaze) | À cron-ifier sur le LXC |
+
+> **Note** : ce CDC reste un document vivant. Les évolutions V2 listées en §2.2 demeurent valides, à prioriser selon les besoins de l'utilisateur.
 
 ---
 
