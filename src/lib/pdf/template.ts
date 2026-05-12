@@ -288,6 +288,15 @@ export function buildCss(
     }
     .toc-entry .toc-leader-empty { flex: 1 1 auto; }
     .toc-entry .toc-num { color: ${theme.textColor}; flex: 0 0 auto; }
+    /* Sous-recettes dans le sommaire : indentées sous leur parente, plus discrètes */
+    .toc-entry-sub {
+      padding-left: 8mm;
+      font-size: ${baseSize - 0.5}pt;
+      color: ${mute(theme.textColor, 0.25)};
+    }
+    .toc-entry-sub .toc-num {
+      color: ${mute(theme.textColor, 0.25)};
+    }
 
     /* ─── Page chapitre ─── */
     .chapter-page {
@@ -687,30 +696,28 @@ export function renderCover(opts: {
 
 // ─── Sommaire ─────────────────────────────────────────────────────────────────
 
-function renderToc(
-  entries: {
-    name: string;
-    pageNum: number;
-    categories?: string[];
-    isChapter?: boolean;
-  }[],
-  theme: CookbookTheme,
-): string {
+function renderToc(entries: TocEntry[], theme: CookbookTheme): string {
   if (entries.length === 0) return "";
 
   // Sommaire fixe en mode « liste plate » + numéros de page toujours affichés.
-  const renderEntry = (label: string, page: number, isChapter?: boolean) => {
+  const renderEntry = (e: TocEntry) => {
     const leader = theme.tocDots
       ? `<span class="toc-leader"></span>`
       : `<span class="toc-leader-empty"></span>`;
-    const pageHtml = `<span class="toc-num">${page}</span>`;
-    const labelStyle = isChapter
-      ? ' style="font-weight:700;color:' + theme.accentColor + '"'
-      : "";
-    return `<div class="toc-entry"${labelStyle}><span class="toc-label">${esc(label)}</span>${leader}${pageHtml}</div>`;
+    const pageHtml = `<span class="toc-num">${e.pageNum}</span>`;
+    let cls = "toc-entry";
+    let labelStyle = "";
+    let labelText = esc(e.name);
+    if (e.isChapter) {
+      labelStyle = ' style="font-weight:700;color:' + theme.accentColor + '"';
+    } else if (e.isSubrecipe) {
+      cls += " toc-entry-sub";
+      labelText = `↳ ${labelText}`;
+    }
+    return `<div class="${cls}"${labelStyle}><span class="toc-label">${labelText}</span>${leader}${pageHtml}</div>`;
   };
 
-  const body = entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
+  const body = entries.map(renderEntry).join("");
 
   return `
     <div class="toc">
@@ -734,19 +741,18 @@ function renderChapterPage(title: string, intro: string): string {
  * Calcule, pour chaque entrée du cahier, son numéro de page LOGIQUE
  * (la 1ʳᵉ recette = page 1, la couverture et le sommaire ne sont pas comptés).
  */
-function computeTocEntries(entries: CookbookEntryUnion[]): {
+type TocEntry = {
   name: string;
   pageNum: number;
   categories?: string[];
   isChapter?: boolean;
-}[] {
+  /** Si vrai, l'entrée est une sous-recette à afficher indentée sous sa parente. */
+  isSubrecipe?: boolean;
+};
+
+function computeTocEntries(entries: CookbookEntryUnion[]): TocEntry[] {
   let pageNumPreview = 1;
-  const tocEntries: {
-    name: string;
-    pageNum: number;
-    categories?: string[];
-    isChapter?: boolean;
-  }[] = [];
+  const tocEntries: TocEntry[] = [];
 
   for (const entry of entries) {
     if (entry.type === "chapter") {
@@ -758,14 +764,26 @@ function computeTocEntries(entries: CookbookEntryUnion[]): {
       pageNumPreview += 1;
       continue;
     }
+    // Recette parente
     tocEntries.push({
       name: entry.snap.name,
       pageNum: pageNumPreview,
       categories: entry.snap.categories,
     });
-    // 1 page pour la parente + 1 page par sous-recette (toujours séparées).
-    const subCount = entry.separateSnaps?.length ?? entry.snap.subRecipes.length;
-    pageNumPreview += 1 + subCount;
+    pageNumPreview += 1;
+
+    // Sous-recettes indentées dessous
+    const subs = entry.separateSnaps && entry.separateSnaps.length > 0
+      ? entry.separateSnaps.map((s) => s.name)
+      : entry.snap.subRecipes.map((sr) => sr.label ?? sr.childName);
+    for (const subName of subs) {
+      tocEntries.push({
+        name: subName,
+        pageNum: pageNumPreview,
+        isSubrecipe: true,
+      });
+      pageNumPreview += 1;
+    }
   }
   return tocEntries;
 }
