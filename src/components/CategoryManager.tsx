@@ -70,18 +70,44 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
             </button>
           </form>
         ) : (
-          <div key={cat.id} className="flex items-center gap-2">
-            <span
-              className="fl-tag"
-              style={{ background: `${cat.color}22`, color: cat.color, borderColor: `${cat.color}55` }}
+          <div key={cat.id} className="flex items-center gap-3 flex-wrap py-1">
+            <div
+              className="flex items-center gap-2 flex-1 min-w-0"
+              style={{
+                padding: "0.4rem 0.75rem",
+                background: `${cat.color}1a`,
+                border: `1px solid ${cat.color}55`,
+                borderRadius: 8,
+              }}
             >
-              {cat.name}
-            </span>
+              <span
+                aria-hidden
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: cat.color,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--text)",
+                  lineHeight: 1.1,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {cat.name}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => setEditingId(cat.id)}
-              className="fl-label hover:text-[color:var(--text)]"
-              style={{ fontSize: "0.8rem" }}
+              className="fl-btn fl-btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
             >
               Éditer
             </button>
@@ -89,8 +115,12 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
               type="button"
               onClick={() => handleDelete(cat.id, cat.name)}
               disabled={pending}
-              className="fl-label hover:text-[color:var(--danger)]"
-              style={{ fontSize: "0.8rem" }}
+              className="fl-btn"
+              style={{
+                fontSize: "0.75rem",
+                padding: "0.3rem 0.6rem",
+                color: "var(--danger)",
+              }}
             >
               Supprimer
             </button>
