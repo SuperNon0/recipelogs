@@ -9,8 +9,6 @@ import { renderHtmlToPdf, mergePdfs } from "@/lib/pdf/renderer";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
-type SnapEntry = NonNullable<RecipeSnapshot>;
-
 /**
  * Génère un PDF d'aperçu en utilisant la configuration NON enregistrée
  * envoyée dans le corps de la requête (theme, name, options de cahier).
@@ -80,7 +78,6 @@ export async function POST(
     }
 
     const entry = raw.data;
-    const subrecipeMode = entry.subrecipeMode as "single" | "separate";
     let snap: NonNullable<RecipeSnapshot> | null = null;
 
     if (entry.linkMode === "snapshot" && entry.snapshotData) {
@@ -90,34 +87,15 @@ export async function POST(
     }
     if (!snap) continue;
 
-    const recipeEntry: Extract<CookbookEntryUnion, { type: "recipe" }> = {
+    // Sous-recettes toujours rendues sur leur propre page : pas besoin de
+    // construire `separateSnaps` ici, `buildRecipesHtml` le fait à partir
+    // de `snap.subRecipes`.
+    entries.push({
       type: "recipe",
       snap,
-      subrecipeMode,
+      subrecipeMode: "single",
       sectionTitle: entry.sectionTitle ?? null,
-    };
-
-    if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
-      recipeEntry.separateSnaps = snap.subRecipes.map(
-        (sr): SnapEntry => ({
-          recipeId: entry.recipeId,
-          name: sr.label ?? sr.childName,
-          source: null,
-          notesTips: null,
-          rating: null,
-          photoPath: null,
-          tags: [],
-          categories: [],
-          ingredients: sr.ingredients,
-          steps: sr.steps,
-          totalMassG: sr.totalMassG,
-          subRecipes: [],
-          multiplier: 1,
-        }),
-      );
-    }
-
-    entries.push(recipeEntry);
+    });
   }
 
   if (entries.length === 0) {

@@ -220,11 +220,6 @@ function RecipeRow({
     entry.linkMode === "linked"
       ? { emoji: "🔗", title: "Liée", color: "var(--accent-2)" }
       : { emoji: "📌", title: "Figée", color: "var(--pending)" };
-  const subBadge =
-    entry.subrecipeMode === "single"
-      ? { emoji: "📄", title: "Fiche unique" }
-      : { emoji: "📚", title: "Sous-recettes séparées" };
-
   function handleSaveSection() {
     const v = sectionDraft.trim();
     startTransition(async () => {
@@ -373,12 +368,6 @@ function RecipeRow({
             }}
           >
             {linkBadge.emoji}
-          </span>
-          <span
-            title={subBadge.title}
-            style={{ fontSize: "0.85rem", padding: "0 4px" }}
-          >
-            {subBadge.emoji}
           </span>
         </div>
 

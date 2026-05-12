@@ -9,8 +9,6 @@ import { renderHtmlToPdf, mergePdfs } from "@/lib/pdf/renderer";
 import { parseTheme } from "@/lib/pdf/theme";
 import type { RecipeSnapshot } from "@/lib/cookbooks";
 
-type SnapEntry = NonNullable<RecipeSnapshot>;
-
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -47,7 +45,6 @@ export async function GET(
     }
 
     const entry = raw.data;
-    const subrecipeMode = entry.subrecipeMode as "single" | "separate";
     let snap: NonNullable<RecipeSnapshot> | null = null;
 
     if (entry.linkMode === "snapshot" && entry.snapshotData) {
@@ -58,36 +55,15 @@ export async function GET(
 
     if (!snap) continue;
 
-    const sectionTitle = entry.sectionTitle ?? null;
-
-    const recipeEntry: Extract<CookbookEntryUnion, { type: "recipe" }> = {
+    // Le rendu PDF traite désormais TOUJOURS les sous-recettes comme
+    // des pages séparées (subrecipeMode est ignoré). On laisse
+    // `buildRecipesHtml` les dériver depuis `snap.subRecipes`.
+    entries.push({
       type: "recipe",
       snap,
-      subrecipeMode,
-      sectionTitle,
-    };
-
-    if (subrecipeMode === "separate" && snap.subRecipes.length > 0) {
-      recipeEntry.separateSnaps = snap.subRecipes.map(
-        (sr): SnapEntry => ({
-          recipeId: entry.recipeId,
-          name: sr.label ?? sr.childName,
-          source: null,
-          notesTips: null,
-          rating: null,
-          photoPath: null,
-          tags: [],
-          categories: [],
-          ingredients: sr.ingredients,
-          steps: sr.steps,
-          totalMassG: sr.totalMassG,
-          subRecipes: [],
-          multiplier: 1,
-        }),
-      );
-    }
-
-    entries.push(recipeEntry);
+      subrecipeMode: "single",
+      sectionTitle: entry.sectionTitle ?? null,
+    });
   }
 
   const theme = parseTheme(cookbook.coverConfig);
