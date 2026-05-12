@@ -71,3 +71,45 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
   revalidatePath("/settings");
   return { ok: true };
 }
+
+// ─── Dossiers ───────────────────────────────────────────────────────────────
+
+export async function createFolder(formData: FormData): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  const color = String(formData.get("color") ?? "#888888").trim();
+  if (!name) return { ok: false, error: "Le nom est obligatoire." };
+
+  const exists = await prisma.folder.findFirst({ where: { name } });
+  if (exists) return { ok: false, error: "Ce dossier existe déjà." };
+
+  await prisma.folder.create({ data: { name: name.slice(0, 100), color } });
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function updateFolder(
+  id: number,
+  formData: FormData,
+): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  const color = String(formData.get("color") ?? "#888888").trim();
+  if (!name) return { ok: false, error: "Le nom est obligatoire." };
+
+  await prisma.folder.update({
+    where: { id },
+    data: { name: name.slice(0, 100), color },
+  });
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function deleteFolder(id: number): Promise<ActionResult> {
+  // ON DELETE SET NULL : les recettes du dossier passent en « Sans dossier »,
+  // elles ne sont pas supprimées.
+  await prisma.folder.delete({ where: { id } });
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return { ok: true };
+}

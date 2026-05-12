@@ -39,6 +39,25 @@ async function main() {
     });
   }
 
+  // Dossiers par défaut (1 dossier max par recette ; sert à classer par grand type)
+  const folders = [
+    { name: "Tartes", color: "#e87c47" },
+    { name: "Entremets", color: "#a78bfa" },
+    { name: "Glaces & sorbets", color: "#5cd4b0" },
+    { name: "Viennoiserie", color: "#e6c83a" },
+    { name: "Pains", color: "#bf8a4f" },
+    { name: "Confiserie", color: "#e85c8c" },
+    { name: "Crèmes & garnitures", color: "#4fc3a1" },
+    { name: "Pâtes de base", color: "#6b6f7a" },
+  ];
+  for (const f of folders) {
+    await prisma.folder.upsert({
+      where: { name: f.name },
+      update: { color: f.color },
+      create: f,
+    });
+  }
+
   // Paramètres initiaux
   await prisma.setting.upsert({
     where: { key: "ingredient_mode" },

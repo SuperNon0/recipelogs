@@ -38,6 +38,14 @@ function parseForm(formData: FormData) {
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0);
 
+  const folderIdRaw = formData.get("folderId");
+  if (folderIdRaw && String(folderIdRaw).trim() !== "") {
+    const n = Number(folderIdRaw);
+    raw.folderId = Number.isFinite(n) && n > 0 ? n : null;
+  } else {
+    raw.folderId = null;
+  }
+
   const names = formData.getAll("ingredientName").map((v) => String(v));
   const qtys = formData.getAll("ingredientQty").map((v) => String(v));
   const ingredients: { name: string; quantityG: number }[] = [];
@@ -73,6 +81,7 @@ export async function createRecipe(formData: FormData) {
       notesTips: data.notesTips || null,
       favorite: data.favorite ?? false,
       rating: data.rating ?? null,
+      folderId: data.folderId ?? null,
       ingredients: {
         create: data.ingredients.map((ing, idx) => ({
           name: ing.name,
@@ -111,6 +120,7 @@ export async function updateRecipe(id: number, formData: FormData) {
         notesTips: data.notesTips || null,
         favorite: data.favorite ?? false,
         rating: data.rating ?? null,
+        folderId: data.folderId ?? null,
       },
     });
 

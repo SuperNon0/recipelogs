@@ -15,6 +15,7 @@ export const recipeFormSchema = z.object({
   rating: z.coerce.number().int().min(1).max(5).optional().nullable(),
   tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
   categoryIds: z.array(z.coerce.number().int().positive()).optional(),
+  folderId: z.coerce.number().int().positive().nullable().optional(),
   ingredients: z.array(ingredientInputSchema).min(1).max(100),
 });
 

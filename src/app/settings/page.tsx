@@ -1,5 +1,6 @@
-import { listAllCategories } from "@/lib/recipes";
+import { listAllCategories, listAllFolders } from "@/lib/recipes";
 import { CategoryManager } from "@/components/CategoryManager";
+import { FolderManager } from "@/components/FolderManager";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
 import { DeployButton } from "@/components/DeployButton";
 import { RecipePdfSettingsForm } from "@/components/RecipePdfSettingsForm";
@@ -8,8 +9,9 @@ import { getRecipePdfSettings } from "@/app/actions/settings";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [categories, recipePdfSettings] = await Promise.all([
+  const [categories, folders, recipePdfSettings] = await Promise.all([
     listAllCategories(),
+    listAllFolders(),
     getRecipePdfSettings(),
   ]);
 
@@ -32,14 +34,29 @@ export default async function SettingsPage() {
         <DeployButton />
       </section>
 
+      {/* Dossiers */}
+      <section className="fl-card flex flex-col gap-4">
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            📁 Dossiers
+          </h2>
+          <p className="fl-label mt-1">
+            {folders.length} dossier{folders.length > 1 ? "s" : ""} · une recette
+            peut être rangée dans 0 ou 1 dossier
+          </p>
+        </div>
+        <FolderManager folders={folders} />
+      </section>
+
       {/* Catégories */}
       <section className="fl-card flex flex-col gap-4">
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            Catégories
+            🏷️ Catégories
           </h2>
           <p className="fl-label mt-1">
-            {categories.length} catégorie{categories.length > 1 ? "s" : ""}
+            {categories.length} catégorie{categories.length > 1 ? "s" : ""} ·
+            tags secondaires libres pour décrire la recette
           </p>
         </div>
         <CategoryManager categories={categories} />

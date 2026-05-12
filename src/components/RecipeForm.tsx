@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { RichTextEditor } from "./RichTextEditor";
+import { CategoryCombobox } from "./CategoryCombobox";
 
 type IngredientRow = {
   name: string;
@@ -22,17 +23,20 @@ export type RecipeFormInitial = {
   rating?: number | null;
   tags?: string[];
   categoryIds?: number[];
+  folderId?: number | null;
   ingredients?: { name: string; quantityG: number }[];
 };
 
 export function RecipeForm({
   initial,
   categories,
+  folders,
   action,
   submitLabel = "Enregistrer",
 }: {
   initial?: RecipeFormInitial;
   categories: { id: number; name: string; color: string }[];
+  folders: { id: number; name: string; color: string }[];
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
 }) {
@@ -44,9 +48,7 @@ export function RecipeForm({
         }))
       : [{ name: "", quantity: "" }],
   );
-  const [selectedCategories, setSelectedCategories] = useState<Set<number>>(
-    new Set(initial?.categoryIds ?? []),
-  );
+  const [folderId, setFolderId] = useState<number | "">(initial?.folderId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [ingredientMode, setIngredientMode] = useState<IngredientMode>("list");
@@ -71,14 +73,6 @@ export function RecipeForm({
       if (target < 0 || target >= rows.length) return rows;
       const next = rows.slice();
       [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
-    });
-
-  const toggleCategory = (id: number) =>
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
       return next;
     });
 
@@ -108,9 +102,6 @@ export function RecipeForm({
       setError("Au moins un ingrédient avec une quantité est obligatoire.");
       return;
     }
-    for (const id of selectedCategories) {
-      formData.append("categoryIds", String(id));
-    }
     setSubmitting(true);
     try {
       await action(formData);
@@ -133,29 +124,32 @@ export function RecipeForm({
         />
       </Field>
 
+      {folders.length > 0 && (
+        <Field label="📁 Dossier">
+          <select
+            name="folderId"
+            value={folderId}
+            onChange={(e) =>
+              setFolderId(e.target.value === "" ? "" : Number(e.target.value))
+            }
+            className="fl-input"
+          >
+            <option value="">— Aucun dossier —</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       {categories.length > 0 && (
         <Field label="Catégories">
-          <div className="flex flex-wrap gap-2">
-            {categories.map((c) => {
-              const active = selectedCategories.has(c.id);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => toggleCategory(c.id)}
-                  className="fl-tag"
-                  style={{
-                    background: active ? `${c.color}33` : "transparent",
-                    color: active ? c.color : "var(--muted)",
-                    borderColor: active ? `${c.color}88` : "var(--border)",
-                    cursor: "pointer",
-                  }}
-                >
-                  {c.name}
-                </button>
-              );
-            })}
-          </div>
+          <CategoryCombobox
+            allCategories={categories}
+            initialSelected={initial?.categoryIds ?? []}
+          />
         </Field>
       )}
 
