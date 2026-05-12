@@ -10,6 +10,7 @@ export type RecipeListItem = {
   totalMassG: number;
   tags: string[];
   categories: { id: number; name: string; color: string }[];
+  folderId: number | null;
   updatedAt: Date;
 };
 
@@ -18,6 +19,8 @@ export async function listRecipes(opts: {
   tag?: string;
   categoryId?: number;
   favoritesOnly?: boolean;
+  /** Filtre par dossier : number = ce dossier, "none" = sans dossier, undefined = tous. */
+  folderId?: number | "none";
 }): Promise<RecipeListItem[]> {
   const where: Prisma.RecipeWhereInput = {};
 
@@ -28,6 +31,11 @@ export async function listRecipes(opts: {
   if (opts.tag) where.tags = { some: { name: opts.tag } };
   if (opts.categoryId) {
     where.categories = { some: { categoryId: opts.categoryId } };
+  }
+  if (opts.folderId === "none") {
+    where.folderId = null;
+  } else if (typeof opts.folderId === "number") {
+    where.folderId = opts.folderId;
   }
 
   const recipes = await prisma.recipe.findMany({
@@ -57,9 +65,21 @@ export async function listRecipes(opts: {
       name: c.category.name,
       color: c.category.color,
     })),
+    folderId: r.folderId,
     updatedAt: r.updatedAt,
   }));
 }
+
+export async function listAllFolders() {
+  return prisma.folder.findMany({
+    orderBy: { name: "asc" },
+    include: {
+      _count: { select: { recipes: true } },
+    },
+  });
+}
+
+export type FolderWithCount = Awaited<ReturnType<typeof listAllFolders>>[number];
 
 export async function getRecipeDetail(id: number) {
   return prisma.recipe.findUnique({

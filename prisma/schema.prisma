@@ -24,8 +24,11 @@ model Recipe {
   notesTips  String?  @map("notes_tips") @db.Text
   favorite   Boolean  @default(false)
   rating     Int?
+  folderId   Int?     @map("folder_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+
+  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   stepsBlock  StepsBlock?
   ingredients Ingredient[]
@@ -45,7 +48,19 @@ model Recipe {
 
   @@index([updatedAt(sort: Desc)])
   @@index([favorite])
+  @@index([folderId])
   @@map("recipes")
+}
+
+model Folder {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  color String  @default("#888888")
+  icon  String?
+
+  recipes Recipe[]
+
+  @@map("folders")
 }
 
 model StepsBlock {

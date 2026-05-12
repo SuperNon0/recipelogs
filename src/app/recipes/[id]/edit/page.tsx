@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RecipeForm } from "@/components/RecipeForm";
 import { updateRecipe } from "@/app/actions/recipes";
-import { getRecipeDetail, listAllCategories } from "@/lib/recipes";
+import { getRecipeDetail, listAllCategories, listAllFolders } from "@/lib/recipes";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +15,10 @@ export default async function EditRecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const [recipe, categories] = await Promise.all([
+  const [recipe, categories, folders] = await Promise.all([
     getRecipeDetail(recipeId),
     listAllCategories(),
+    listAllFolders(),
   ]);
   if (!recipe) notFound();
 
@@ -43,6 +44,7 @@ export default async function EditRecipePage({
         action={action}
         submitLabel="Enregistrer"
         categories={categories}
+        folders={folders}
         initial={{
           id: recipe.id,
           name: recipe.name,
@@ -53,6 +55,7 @@ export default async function EditRecipePage({
           steps: recipe.stepsBlock?.content ?? "",
           tags: recipe.tags.map((t) => t.name),
           categoryIds: recipe.categories.map((c) => c.categoryId),
+          folderId: recipe.folderId,
           ingredients: recipe.ingredients.map((i) => ({
             name: i.name ?? i.ingredientBase?.name ?? "",
             quantityG: Number(i.quantityG),
