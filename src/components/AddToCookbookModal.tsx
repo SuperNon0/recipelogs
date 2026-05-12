@@ -62,7 +62,6 @@ function AddToCookbookModal({
   const [pending, startTransition] = useTransition();
   const [cookbookId, setCookbookId] = useState(cookbooks[0]?.id ?? 0);
   const [linkMode, setLinkMode] = useState<"linked" | "snapshot">("linked");
-  const [subrecipeMode, setSubrecipeMode] = useState<"single" | "separate">("single");
   const [error, setError] = useState<string | null>(null);
 
   // Multiplication (uniquement utilisée en mode snapshot/figée)
@@ -101,7 +100,7 @@ function AddToCookbookModal({
         cookbookId,
         recipeId,
         linkMode,
-        subrecipeMode,
+        "single",
         multiplier,
       );
       if (result.ok) {
@@ -281,32 +280,6 @@ function AddToCookbookModal({
             )}
           </div>
         )}
-
-        <div className="flex flex-col gap-1.5">
-          <span className="fl-label">Sous-recettes dans le PDF</span>
-          <div className="flex gap-3">
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="subrecipeMode"
-                value="single"
-                checked={subrecipeMode === "single"}
-                onChange={() => setSubrecipeMode("single")}
-              />
-              <span className="text-sm">📄 Fiche unique</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="subrecipeMode"
-                value="separate"
-                checked={subrecipeMode === "separate"}
-                onChange={() => setSubrecipeMode("separate")}
-              />
-              <span className="text-sm">📚 Séparées</span>
-            </label>
-          </div>
-        </div>
 
         {error && (
           <p className="text-sm" style={{ color: "var(--danger)" }}>

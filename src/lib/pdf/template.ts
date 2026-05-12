@@ -288,6 +288,15 @@ export function buildCss(
     }
     .toc-entry .toc-leader-empty { flex: 1 1 auto; }
     .toc-entry .toc-num { color: ${theme.textColor}; flex: 0 0 auto; }
+    /* Sous-recettes dans le sommaire : indentées sous leur parente, plus discrètes */
+    .toc-entry-sub {
+      padding-left: 8mm;
+      font-size: ${baseSize - 0.5}pt;
+      color: ${mute(theme.textColor, 0.25)};
+    }
+    .toc-entry-sub .toc-num {
+      color: ${mute(theme.textColor, 0.25)};
+    }
 
     /* ─── Page chapitre ─── */
     .chapter-page {
@@ -359,6 +368,15 @@ export function buildCss(
       font-size: ${baseSize - 0.5}pt; color: ${mute(theme.textColor)};
       text-align: center; margin-bottom: 1.5mm;
       font-style: italic;
+    }
+    /* Mention « Sous-recette de · [parent] » sous le titre des fiches sous-recette */
+    .subrecipe-of {
+      text-align: center;
+      font-size: ${baseSize - 0.5}pt;
+      color: ${theme.accentColor};
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 2mm;
     }
     .recipe-rating {
       text-align: center; margin-bottom: 2mm;
@@ -587,6 +605,8 @@ export function renderRecipeCard(
   _pageNum: number | null,
   portion: string,
   theme: CookbookTheme,
+  /** Si défini, affiche « Sous-recette de · [nom] » sous le titre. */
+  parentRecipeName?: string,
 ): string {
   const ingHtml = snap.ingredients.length > 0
     ? renderIngredients(snap.ingredients, snap.totalMassG, theme.showTotalMass)
@@ -597,31 +617,10 @@ export function renderRecipeCard(
       ? renderSteps(snap.steps)
       : "<p class='muted'>—</p>";
 
-  let subrecipesHtml = "";
-  if (subrecipeMode === "single" && snap.subRecipes.length > 0) {
-    subrecipesHtml = snap.subRecipes
-      .map(
-        (sr) => `
-        <div class="subrecipe-block">
-          <div class="subrecipe-title">${esc(sr.label ?? sr.childName)}</div>
-          <div class="columns">
-            <div class="col col-ing">
-              <div class="col-title">Ingrédients</div>
-              ${renderIngredients(sr.ingredients, sr.totalMassG, theme.showTotalMass)}
-            </div>
-            <div class="col col-prep">
-              <div class="col-title">Préparation</div>
-              ${
-                sr.steps && !isStepsHtmlEffectivelyEmpty(sr.steps)
-                  ? renderSteps(sr.steps)
-                  : "<p class='muted'>—</p>"
-              }
-            </div>
-          </div>
-        </div>`,
-      )
-      .join("");
-  }
+  // Sous-recettes inline retirées : on rend toujours une recette par page.
+  // L'argument `subrecipeMode` est conservé pour compat mais n'a plus d'effet.
+  const subrecipesHtml = "";
+  void subrecipeMode;
 
   const tags = snap.tags ?? [];
   const tagsHtml = theme.showTags && tags.length > 0
@@ -647,9 +646,14 @@ export function renderRecipeCard(
     ? `<div class="notes"><div class="notes-title">Notes & astuces</div>${esc(snap.notesTips)}</div>`
     : "";
 
+  const parentLabelHtml = parentRecipeName
+    ? `<div class="subrecipe-of">Sous-recette de · ${esc(parentRecipeName)}</div>`
+    : "";
+
   return `
     <section class="recipe">
       <h2 class="recipe-title">${esc(snap.name)}</h2>
+      ${parentLabelHtml}
       ${categoriesHtml}
       ${tagsHtml}
       ${ratingHtml}
@@ -692,30 +696,28 @@ export function renderCover(opts: {
 
 // ─── Sommaire ─────────────────────────────────────────────────────────────────
 
-function renderToc(
-  entries: {
-    name: string;
-    pageNum: number;
-    categories?: string[];
-    isChapter?: boolean;
-  }[],
-  theme: CookbookTheme,
-): string {
+function renderToc(entries: TocEntry[], theme: CookbookTheme): string {
   if (entries.length === 0) return "";
 
   // Sommaire fixe en mode « liste plate » + numéros de page toujours affichés.
-  const renderEntry = (label: string, page: number, isChapter?: boolean) => {
+  const renderEntry = (e: TocEntry) => {
     const leader = theme.tocDots
       ? `<span class="toc-leader"></span>`
       : `<span class="toc-leader-empty"></span>`;
-    const pageHtml = `<span class="toc-num">${page}</span>`;
-    const labelStyle = isChapter
-      ? ' style="font-weight:700;color:' + theme.accentColor + '"'
-      : "";
-    return `<div class="toc-entry"${labelStyle}><span class="toc-label">${esc(label)}</span>${leader}${pageHtml}</div>`;
+    const pageHtml = `<span class="toc-num">${e.pageNum}</span>`;
+    let cls = "toc-entry";
+    let labelStyle = "";
+    let labelText = esc(e.name);
+    if (e.isChapter) {
+      labelStyle = ' style="font-weight:700;color:' + theme.accentColor + '"';
+    } else if (e.isSubrecipe) {
+      cls += " toc-entry-sub";
+      labelText = `↳ ${labelText}`;
+    }
+    return `<div class="${cls}"${labelStyle}><span class="toc-label">${labelText}</span>${leader}${pageHtml}</div>`;
   };
 
-  const body = entries.map((e) => renderEntry(e.name, e.pageNum, e.isChapter)).join("");
+  const body = entries.map(renderEntry).join("");
 
   return `
     <div class="toc">
@@ -739,19 +741,18 @@ function renderChapterPage(title: string, intro: string): string {
  * Calcule, pour chaque entrée du cahier, son numéro de page LOGIQUE
  * (la 1ʳᵉ recette = page 1, la couverture et le sommaire ne sont pas comptés).
  */
-function computeTocEntries(entries: CookbookEntryUnion[]): {
+type TocEntry = {
   name: string;
   pageNum: number;
   categories?: string[];
   isChapter?: boolean;
-}[] {
+  /** Si vrai, l'entrée est une sous-recette à afficher indentée sous sa parente. */
+  isSubrecipe?: boolean;
+};
+
+function computeTocEntries(entries: CookbookEntryUnion[]): TocEntry[] {
   let pageNumPreview = 1;
-  const tocEntries: {
-    name: string;
-    pageNum: number;
-    categories?: string[];
-    isChapter?: boolean;
-  }[] = [];
+  const tocEntries: TocEntry[] = [];
 
   for (const entry of entries) {
     if (entry.type === "chapter") {
@@ -763,14 +764,24 @@ function computeTocEntries(entries: CookbookEntryUnion[]): {
       pageNumPreview += 1;
       continue;
     }
+    // Recette parente
     tocEntries.push({
       name: entry.snap.name,
       pageNum: pageNumPreview,
       categories: entry.snap.categories,
     });
-    if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-      pageNumPreview += 1 + entry.separateSnaps.length;
-    } else {
+    pageNumPreview += 1;
+
+    // Sous-recettes indentées dessous
+    const subs = entry.separateSnaps && entry.separateSnaps.length > 0
+      ? entry.separateSnaps.map((s) => s.name)
+      : entry.snap.subRecipes.map((sr) => sr.label ?? sr.childName);
+    for (const subName of subs) {
+      tocEntries.push({
+        name: subName,
+        pageNum: pageNumPreview,
+        isSubrecipe: true,
+      });
       pageNumPreview += 1;
     }
   }
@@ -846,13 +857,28 @@ export function buildRecipesHtml(opts: {
     if (entry.sectionTitle) {
       body += `<div class="section-title">${esc(entry.sectionTitle)}</div>`;
     }
-    if (entry.subrecipeMode === "separate" && entry.separateSnaps?.length) {
-      body += renderRecipeCard(entry.snap, "single", null, entry.portion ?? "", theme);
-      for (const sub of entry.separateSnaps) {
-        body += renderRecipeCard(sub, "single", null, "", theme);
-      }
-    } else {
-      body += renderRecipeCard(entry.snap, entry.subrecipeMode, null, entry.portion ?? "", theme);
+    // Recette parente sur sa propre page.
+    body += renderRecipeCard(entry.snap, "single", null, entry.portion ?? "", theme);
+    // Chaque sous-recette : sa propre page, avec mention « Sous-recette de · [parent] ».
+    // On utilise soit separateSnaps déjà construit côté route, soit on dérive
+    // depuis snap.subRecipes.
+    const subs = entry.separateSnaps && entry.separateSnaps.length > 0
+      ? entry.separateSnaps
+      : entry.snap.subRecipes.map((sr): RecipeSnap => ({
+          name: sr.label ?? sr.childName,
+          source: null,
+          notesTips: null,
+          rating: null,
+          photoPath: null,
+          tags: [],
+          categories: [],
+          ingredients: sr.ingredients,
+          steps: sr.steps,
+          totalMassG: sr.totalMassG,
+          subRecipes: [],
+        }));
+    for (const sub of subs) {
+      body += renderRecipeCard(sub, "single", null, "", theme, entry.snap.name);
     }
   }
 
@@ -872,19 +898,50 @@ export function buildSingleRecipeHtml(
   format: "A4" | "A5" = "A4",
   theme: CookbookTheme = DEFAULT_THEME,
 ): string {
-  const css = buildCss(theme, { format })
-    .replace("page-break-before: always;", "page-break-before: auto;");
-  const card = renderRecipeCard(snap, "single", null, "", theme);
+  // 1ʳᵉ recette : pas de saut de page avant (`page-break-before: auto`).
+  // Sous-recettes : saut de page automatique grâce au CSS .recipe par défaut
+  // (`page-break-before: always`).
+  let css = buildCss(theme, { format });
+  css = css.replace("page-break-before: always;", "page-break-before: auto;");
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
+
+  // Recette parente : on supprime le saut de page initial (.recipe-first).
+  // Sous-recettes : chacune est une carte indépendante avec saut de page.
+  const parentCard = renderRecipeCard(snap, "single", null, "", theme);
+  const subCards = snap.subRecipes
+    .map((sr) => {
+      // Convertit le format SubRecipe en RecipeSnap minimal pour réutiliser renderRecipeCard
+      const subSnap: RecipeSnap = {
+        name: sr.label ?? sr.childName,
+        source: null,
+        notesTips: null,
+        rating: null,
+        photoPath: null,
+        tags: [],
+        categories: [],
+        ingredients: sr.ingredients,
+        steps: sr.steps,
+        totalMassG: sr.totalMassG,
+        subRecipes: [],
+      };
+      return renderRecipeCard(subSnap, "single", null, "", theme, snap.name);
+    })
+    .join("");
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
   ${fontsTag}
-  <style>${css}</style>
+  <style>
+    ${css}
+    /* Force la 1ʳᵉ recette à ne PAS commencer par un saut de page */
+    body > section.recipe:first-child { page-break-before: auto; }
+    /* Les recettes suivantes (les sous-recettes) commencent toujours sur une nouvelle page */
+    body > section.recipe + section.recipe { page-break-before: always; }
+  </style>
 </head>
-<body>${card}</body>
+<body>${parentCard}${subCards}</body>
 </html>`;
 }
