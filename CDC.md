@@ -1,4 +1,4 @@
-# RecipeLog — Cahier des charges V1.2
+# RecipeLog — Cahier des charges V1.3
 
 > **Gestion de recettes de pâtisserie — Application web auto-hébergée**
 
@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Projet** | RecipeLog |
-| **Version** | 1.2 — Livré + Dossiers, refonte UX/PDF |
+| **Version** | 1.3 — Correctifs UI dossiers + recherche globale |
 | **Domaine** | `recipe.super-nono.cc` |
 | **Écosystème** | `super-nono.cc` |
 | **Hébergement** | Proxmox LXC · Cloudflare Zero Trust |
@@ -85,6 +85,35 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 | Éditeur riche | **Tiptap v3** (StarterKit + Underline + Placeholder) | étapes des recettes |
 | Tests | **Vitest 4** | 50 tests unitaires en place |
 | Déploiement | **LXC Debian 12** + script `deploy.sh` | géré depuis l'UI via `/settings` |
+
+---
+
+## 📝 Changelog V1.2 → V1.3 (correctifs UI dossiers + recherche)
+
+### 🐛 Bugs corrigés
+
+- **🔍 Recherche globale cassée par les dossiers** (`src/app/page.tsx`) : en vue explorateur, la liste de recettes était toujours chargée avec `folderId: "none"` (uniquement les recettes sans dossier), même quand une recherche ou un filtre était actif. Résultat : taper un nom de recette dans la barre de recherche ne retournait que les recettes non rangées dans un dossier.
+  - **Fix** : lorsqu'une recherche ou un filtre est actif en vue explorateur (`hasSearchOrFilters`), on passe `folderId: undefined` pour chercher dans **toutes** les recettes quel que soit leur dossier. Le filtre `folderId: "none"` est conservé uniquement pour l'affichage de la section « Sans dossier » en bas de l'explorateur quand aucun filtre n'est actif.
+
+### 🎨 Correctifs UI / responsive
+
+- **📱 FolderManager sur mobile** (`src/components/FolderManager.tsx`) : la ligne de chaque dossier dans `/settings` affichait le badge nom + les 3 boutons (« + Ajouter », « Éditer », « Supprimer ») côte à côte sur une seule ligne. Sur un petit écran, les boutons écrasaient le nom du dossier qui devenait illisible ou tronqué.
+  - **Fix** : la ligne passe en `flex-col` sur mobile et `flex-row` à partir de `sm:`. Les boutons sont regroupés dans un sous-conteneur `flex gap-2` qui reste sur une seule ligne, et le badge nom prend toute la largeur disponible sur mobile.
+
+- **📦 FolderCard trop grande** (`src/components/FolderCard.tsx`, `src/app/page.tsx`) : les cards de dossiers en vue explorateur utilisaient `aspect-ratio: 1/1` avec 2 colonnes sur mobile, produisant des blocs carrés d'environ 165 × 165 px, jugés trop imposants.
+  - **Fix** :
+    - Grille passée de `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` à **`grid-cols-3 sm:grid-cols-4 lg:grid-cols-5`** → 3 colonnes sur mobile, plus denses.
+    - `aspect-ratio` changé de `1 / 1` à **`4 / 3`** → cards plus courtes.
+    - Icône dossier réduite de `2.4rem` à `1.6rem`.
+    - Police du nom réduite de `1rem` à `0.85rem`, compteur à `0.68rem`.
+    - `gap-3` → `gap-2` pour la grille ; `gap-2` → `gap-1` à l'intérieur de la card.
+    - Ajout de `wordBreak: "break-word"` sur le nom pour éviter le débordement sur les noms longs.
+
+### 📌 Notes pour le prochain développeur
+
+- La logique d'affichage de `src/app/page.tsx` distingue 4 modes : **explorateur** (défaut, grille de dossiers), **dossier ouvert** (`?folder=<id>`), **sans dossier** (`?folder=none`), **tout afficher** (`?view=all`). La variable `hasSearchOrFilters` doit être vérifiée avant d'appliquer tout filtre de dossier sur le chargement des recettes en mode explorateur.
+- `FolderCard` est utilisée uniquement dans la `ExplorerView` de `page.tsx`. Si l'on souhaite afficher les dossiers ailleurs, importer depuis `@/components/FolderCard`.
+- `FolderManager` est un composant client (`"use client"`) dans `/settings`. Il gère CRUD dossiers + modal `AddRecipesToFolderModal`. Le layout responsive repose sur les classes Tailwind `flex-col sm:flex-row`.
 
 ---
 
@@ -1007,6 +1036,7 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 | **8. Tests & import** | 50 tests Vitest, import Recipe Keeper CSV + HTML/ZIP avec photos | ✅ Livré |
 | **9. Mise en production** | Déploiement sur `recipe.super-nono.cc` via Cloudflare Zero Trust | ✅ Livré |
 | **10. Itérations V1.2** | Dossiers, vue explorateur, combobox catégories, refonte PDF (1 page par recette, numérotation logique, sommaire avec sous-recettes), réglages PDF d'une recette, « Mettre à jour la recette », fix éditeur Tiptap, etc. | ✅ Livré |
+| **11. Correctifs V1.3** | Fix recherche globale (tous dossiers) · FolderManager responsive mobile · FolderCard réduite (3 cols, aspect 4/3) | ✅ Livré |
 
 ### 10.2 Évolutions à venir (priorité indicative)
 
@@ -1025,4 +1055,4 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 
 **Fin du document**
 
-*RecipeLog — Cahier des charges V1.1 — super-nono.cc*
+*RecipeLog — Cahier des charges V1.3 — super-nono.cc*

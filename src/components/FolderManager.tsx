@@ -105,11 +105,11 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
         ) : (
           <div
             key={f.id}
-            className="flex items-center gap-3 flex-wrap py-1"
+            className="flex flex-col sm:flex-row sm:items-center gap-2 py-1"
           >
-            {/* Pastille colorée + nom lisible (texte standard, pas dans la couleur) */}
+            {/* Pastille colorée + nom — pleine largeur sur mobile */}
             <div
-              className="flex items-center gap-2 flex-1 min-w-0"
+              className="flex items-center gap-2 min-w-0 sm:flex-1"
               style={{
                 padding: "0.4rem 0.75rem",
                 background: `${f.color}1a`,
@@ -133,50 +133,53 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
                   fontSize: "0.95rem",
                   color: "var(--text)",
                   lineHeight: 1.1,
-                  whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {f.name}
               </span>
               <span
                 className="fl-label"
-                style={{ fontSize: "0.7rem", marginLeft: 4 }}
+                style={{ fontSize: "0.7rem", marginLeft: 4, flexShrink: 0 }}
               >
                 · {f._count.recipes} recette{f._count.recipes > 1 ? "s" : ""}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setAddingToFolder(f)}
-              className="fl-btn fl-btn-primary"
-              style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-              title="Ranger des recettes existantes dans ce dossier"
-            >
-              + Ajouter
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingId(f.id)}
-              className="fl-btn fl-btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-            >
-              Éditer
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDelete(f.id, f.name, f._count.recipes)}
-              disabled={pending}
-              className="fl-btn"
-              style={{
-                fontSize: "0.75rem",
-                padding: "0.3rem 0.6rem",
-                color: "var(--danger)",
-              }}
-            >
-              Supprimer
-            </button>
+            {/* Boutons groupés sur une ligne */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setAddingToFolder(f)}
+                className="fl-btn fl-btn-primary"
+                style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+                title="Ranger des recettes existantes dans ce dossier"
+              >
+                + Ajouter
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingId(f.id)}
+                className="fl-btn fl-btn-secondary"
+                style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+              >
+                Éditer
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(f.id, f.name, f._count.recipes)}
+                disabled={pending}
+                className="fl-btn"
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "0.3rem 0.6rem",
+                  color: "var(--danger)",
+                }}
+              >
+                Supprimer
+              </button>
+            </div>
           </div>
         ),
       )}

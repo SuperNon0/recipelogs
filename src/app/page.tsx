@@ -50,7 +50,7 @@ export default async function HomePage({
     listAllCategories(),
     listAllFolders(),
     isExplorerView
-      ? listRecipes({ q, tag, categoryId, folderId: "none" })
+      ? listRecipes({ q, tag, categoryId, folderId: hasSearchOrFilters ? undefined : "none" })
       : listRecipes({ q, tag, categoryId, folderId: folderFilter }),
   ]);
 
@@ -200,7 +200,7 @@ function ExplorerView({
           <h2 className="fl-label" style={{ fontSize: "0.85rem" }}>
             📁 Dossiers
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
             {folders.map((f) => (
               <FolderCard
                 key={f.id}
