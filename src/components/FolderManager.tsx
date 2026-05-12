@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createFolder, updateFolder, deleteFolder } from "@/app/actions/settings";
+import { AddRecipesToFolderModal } from "./AddRecipesToFolderModal";
 
 type Folder = {
   id: number;
@@ -15,6 +16,7 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [addingToFolder, setAddingToFolder] = useState<Folder | null>(null);
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -147,6 +149,15 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
             </div>
             <button
               type="button"
+              onClick={() => setAddingToFolder(f)}
+              className="fl-btn fl-btn-primary"
+              style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+              title="Ranger des recettes existantes dans ce dossier"
+            >
+              + Ajouter
+            </button>
+            <button
+              type="button"
               onClick={() => setEditingId(f.id)}
               className="fl-btn fl-btn-secondary"
               style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
@@ -168,6 +179,13 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
             </button>
           </div>
         ),
+      )}
+
+      {addingToFolder && (
+        <AddRecipesToFolderModal
+          folder={addingToFolder}
+          onClose={() => setAddingToFolder(null)}
+        />
       )}
 
       {error && (

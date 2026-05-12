@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RecipeCard } from "@/components/RecipeCard";
 import { RecipeFilters } from "@/components/RecipeFilters";
 import { FolderCard } from "@/components/FolderCard";
+import { AddRecipesToFolderButton } from "@/components/AddRecipesToFolderButton";
 import { Fab } from "@/components/Fab";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -93,6 +94,15 @@ export default async function HomePage({
           <span className="fl-label">
             {recipes.length} {recipes.length > 1 ? "recettes" : "recette"}
           </span>
+          {currentFolder && (
+            <AddRecipesToFolderButton
+              folder={{
+                id: currentFolder.id,
+                name: currentFolder.name,
+                color: currentFolder.color,
+              }}
+            />
+          )}
           {isExplorerView ? (
             <Link
               href="/?view=all"
