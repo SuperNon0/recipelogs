@@ -26,6 +26,10 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 
 - **📁 Dossiers de recettes** : 1 dossier max par recette (rangement par grand type — Tartes, Entremets, etc.). Section CRUD dans `/settings`. Seed initial de 8 dossiers de pâtisserie.
 - **🗂️ Vue explorateur sur `/recettes`** : grille de cards de dossiers (style Apple Files) + section « Sans dossier » en bas. Bouton « 📋 Tout afficher » pour la vue groupée plate. Fil d'Ariane quand on entre dans un dossier.
+- **🗃️ Rangement en masse dans un dossier** (sans éditer chaque recette individuellement) : modal `AddRecipesToFolderModal` accessible à 2 endroits :
+  - dans `/settings` via le bouton **« + Ajouter »** sur chaque ligne de dossier (utile pour ranger des dizaines de recettes après un import initial)
+  - sur la vue d'un dossier via le bouton **« + Ranger des recettes ici »** (contextuel)
+  - Multi-sélection avec chips ×, autocomplétion débouncée 200ms, toggle « N'afficher que les recettes sans dossier » activé par défaut. Assignation en `updateMany` une seule requête SQL.
 - **🔍 Combobox catégories** : remplace la grille de 50+ chips par une saisie filtrée + dropdown (la liste des catégories pouvait dépasser 60 entrées chez l'utilisateur).
 - **📄 Réglages PDF d'une recette individuelle** : nouvelle section `/settings` pour personnaliser format A4/A5, couleurs, polices, sections affichées du PDF d'une recette seule.
 - **⚖️ Mettre à jour la recette** : bouton à côté de « Réinitialiser » sur la fiche recette → applique le coefficient/masse/pivot affiché et l'écrit comme nouvelle base en BDD (les sous-recettes liées ne sont pas touchées).
@@ -232,7 +236,7 @@ Le projet se découpe en une **V1 (MVP complet)** à développer immédiatement,
 Section unique `/settings` regroupant :
 
 - **🚀 Mise à jour du site** : bouton qui lance `deploy.sh` sur le LXC (git pull / install / migrate / build / restart) avec overlay de maintenance.
-- **📁 Dossiers** : CRUD complet — créer / renommer / changer couleur / supprimer. Compte de recettes par dossier. Supprimer un dossier ne supprime jamais les recettes (passage en « Sans dossier » via `ON DELETE SET NULL`).
+- **📁 Dossiers** : CRUD complet — créer / renommer / changer couleur / supprimer. Compte de recettes par dossier. Supprimer un dossier ne supprime jamais les recettes (passage en « Sans dossier » via `ON DELETE SET NULL`). **Bouton « + Ajouter »** sur chaque ligne qui ouvre la modal d'ajout en masse.
 - **🏷️ Catégories** : CRUD identique aux dossiers (tags secondaires).
 - **📄 PDF d'une recette** : format A4/A5, couleur d'accent (titres/traits), couleur du texte, polices titres + corps, taille du texte, sections affichées (Tags, Source, Note, Notes & astuces, Masse totale, Taille de portion). Stocké dans `settings` sous la clé `recipePdfSettings`.
 - **📥 Import Recipe Keeper** : 2 onglets — *ZIP / HTML* (parser microdata + photos) et *CSV* (legacy).
@@ -913,6 +917,7 @@ Schéma de principe pour PostgreSQL. Le développeur est libre d'adapter (nommag
 ├── /api/cookbooks/:id/preview-pdf   Aperçu PDF (POST, theme non-enregistré)
 ├── /api/cookbooks/:id/entries/:eid/snapshot
 │                                    Lecture d'un snapshot (pour modal Modifier la masse)
+├── /api/recipes?q=…&onlyNoFolder=1  Autocomplétion pour AddRecipesToFolderModal
 ├── /shopping                        Listes de courses
 │   ├── /shopping/new                Nouvelle liste
 │   └── /shopping/:id                Détail / mode courses

@@ -113,3 +113,35 @@ export async function deleteFolder(id: number): Promise<ActionResult> {
   revalidatePath("/");
   return { ok: true };
 }
+
+/**
+ * Range plusieurs recettes dans un dossier en une seule transaction.
+ * Si folderId = null, les recettes passent en « Sans dossier ».
+ */
+export async function assignRecipesToFolder(
+  folderId: number | null,
+  recipeIds: number[],
+): Promise<ActionResult & { count?: number }> {
+  const ids = recipeIds
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (ids.length === 0) {
+    return { ok: false, error: "Aucune recette sélectionnée." };
+  }
+  if (folderId !== null) {
+    const exists = await prisma.folder.findUnique({
+      where: { id: folderId },
+      select: { id: true },
+    });
+    if (!exists) return { ok: false, error: "Dossier introuvable." };
+  }
+
+  const result = await prisma.recipe.updateMany({
+    where: { id: { in: ids } },
+    data: { folderId },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true, count: result.count };
+}
