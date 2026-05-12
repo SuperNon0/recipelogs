@@ -18,21 +18,22 @@ export function FolderCard({
   return (
     <Link
       href={`/?folder=${id}`}
-      className="fl-card flex flex-col items-center justify-center gap-2 text-center hover:border-[color:var(--muted)] transition-colors"
+      className="fl-card flex flex-col items-center justify-center gap-1 text-center hover:border-[color:var(--muted)] transition-colors"
       style={{
-        aspectRatio: "1 / 1",
+        aspectRatio: "4 / 3",
         background: `linear-gradient(135deg, ${color}1a 0%, transparent 70%)`,
         borderColor: `${color}55`,
+        padding: "0.6rem 0.5rem",
       }}
     >
-      <span style={{ fontSize: "2.4rem", color }}>📁</span>
+      <span style={{ fontSize: "1.6rem", color }}>📁</span>
       <span
         className="fl-title-serif"
-        style={{ fontSize: "1rem", color: "var(--text)", lineHeight: 1.15 }}
+        style={{ fontSize: "0.85rem", color: "var(--text)", lineHeight: 1.2, wordBreak: "break-word" }}
       >
         {name}
       </span>
-      <span className="fl-label" style={{ fontSize: "0.75rem" }}>
+      <span className="fl-label" style={{ fontSize: "0.68rem" }}>
         {count} recette{count > 1 ? "s" : ""}
       </span>
     </Link>
