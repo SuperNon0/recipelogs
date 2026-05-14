@@ -103,6 +103,8 @@ export async function createRecipe(formData: FormData) {
     },
   });
 
+  await upsertIngredientBases(data.ingredients.map((i) => i.name));
+
   revalidatePath("/");
   revalidatePath("/favorites");
   redirect(`/recipes/${recipe.id}`);
@@ -161,6 +163,8 @@ export async function updateRecipe(id: number, formData: FormData) {
       await tx.stepsBlock.deleteMany({ where: { recipeId: id } });
     }
   });
+
+  await upsertIngredientBases(data.ingredients.map((i) => i.name));
 
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -286,4 +290,17 @@ export async function addComment(recipeId: number, formData: FormData) {
 export async function deleteComment(id: number, recipeId: number) {
   await prisma.comment.delete({ where: { id } });
   revalidatePath(`/recipes/${recipeId}`);
+}
+
+async function upsertIngredientBases(names: string[]) {
+  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  await Promise.all(
+    unique.map((name) =>
+      prisma.ingredientBase.upsert({
+        where: { name },
+        create: { name },
+        update: {},
+      }),
+    ),
+  );
 }

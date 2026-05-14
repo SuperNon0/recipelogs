@@ -114,6 +114,58 @@ export async function deleteFolder(id: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+// ─── Base d'ingrédients ──────────────────────────────────────────────────────
+
+export async function renameIngredientBase(
+  id: number,
+  formData: FormData,
+): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Le nom est obligatoire." };
+
+  const exists = await prisma.ingredientBase.findFirst({
+    where: { name, NOT: { id } },
+  });
+  if (exists) return { ok: false, error: "Cet ingrédient existe déjà." };
+
+  await prisma.ingredientBase.update({
+    where: { id },
+    data: { name: name.slice(0, 200) },
+  });
+  revalidatePath("/settings/ingredients");
+  return { ok: true };
+}
+
+export async function deleteIngredientBase(id: number): Promise<ActionResult> {
+  // ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
+  // seul le lien vers la base est supprimé.
+  await prisma.ingredientBase.delete({ where: { id } });
+  revalidatePath("/settings/ingredients");
+  return { ok: true };
+}
+
+// ─── Lien externe du logo ────────────────────────────────────────────────────
+
+const SITE_URL_KEY = "siteUrl";
+
+export async function getSiteUrl(): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { key: SITE_URL_KEY } });
+  if (!row || typeof row.value !== "string") return null;
+  return row.value || null;
+}
+
+export async function saveSiteUrl(formData: FormData): Promise<ActionResult> {
+  const url = String(formData.get("siteUrl") ?? "").trim();
+  await prisma.setting.upsert({
+    where: { key: SITE_URL_KEY },
+    update: { value: url },
+    create: { key: SITE_URL_KEY, value: url },
+  });
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 /**
  * Range plusieurs recettes dans un dossier en une seule transaction.
  * Si folderId = null, les recettes passent en « Sans dossier ».

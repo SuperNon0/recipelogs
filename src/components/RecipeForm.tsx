@@ -5,6 +5,7 @@ import { useState } from "react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { RichTextEditor } from "./RichTextEditor";
 import { CategoryCombobox } from "./CategoryCombobox";
+import { IngredientNameInput } from "./IngredientNameInput";
 
 type IngredientRow = {
   name: string;
@@ -235,15 +236,12 @@ export function RecipeForm({
                       )
                     }
                   />
-                  <input
-                    name="ingredientName"
-                    placeholder="Ingrédient"
-                    className="fl-input flex-1"
+                  <IngredientNameInput
                     value={row.name}
-                    onChange={(e) =>
+                    onChange={(name) =>
                       setIngredients((rows) =>
                         rows.map((r, i) =>
-                          i === idx ? { ...r, name: e.target.value } : r,
+                          i === idx ? { ...r, name } : r,
                         ),
                       )
                     }

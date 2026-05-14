@@ -121,6 +121,13 @@ export async function listRecipesMinimal(excludeId?: number) {
   return recipes;
 }
 
+export async function listAllIngredientBases() {
+  return prisma.ingredientBase.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, createdAt: true },
+  });
+}
+
 export async function listAllTags(): Promise<string[]> {
   const rows = await prisma.tag.findMany({
     distinct: ["name"],

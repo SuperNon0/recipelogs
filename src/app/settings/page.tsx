@@ -1,19 +1,21 @@
-import { listAllCategories, listAllFolders } from "@/lib/recipes";
-import { CategoryManager } from "@/components/CategoryManager";
-import { FolderManager } from "@/components/FolderManager";
+import Link from "next/link";
+import { listAllCategories, listAllFolders, listAllIngredientBases } from "@/lib/recipes";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
 import { DeployButton } from "@/components/DeployButton";
 import { RecipePdfSettingsForm } from "@/components/RecipePdfSettingsForm";
-import { getRecipePdfSettings } from "@/app/actions/settings";
+import { getRecipePdfSettings, getSiteUrl, saveSiteUrl } from "@/app/actions/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [categories, folders, recipePdfSettings] = await Promise.all([
-    listAllCategories(),
-    listAllFolders(),
-    getRecipePdfSettings(),
-  ]);
+  const [categories, folders, ingredientBases, recipePdfSettings, siteUrl] =
+    await Promise.all([
+      listAllCategories(),
+      listAllFolders(),
+      listAllIngredientBases(),
+      getRecipePdfSettings(),
+      getSiteUrl(),
+    ]);
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -34,8 +36,41 @@ export default async function SettingsPage() {
         <DeployButton />
       </section>
 
-      {/* Dossiers */}
+      {/* Lien du logo */}
       <section className="fl-card flex flex-col gap-4">
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            🔗 Lien du logo
+          </h2>
+          <p className="fl-label mt-1">
+            URL ouverte quand tu cliques sur le logo depuis l&apos;accueil · laisse vide
+            pour désactiver
+          </p>
+        </div>
+        <form action={saveSiteUrl} className="flex gap-2 flex-wrap">
+          <input
+            name="siteUrl"
+            type="url"
+            defaultValue={siteUrl ?? ""}
+            placeholder="https://mon-site.com"
+            className="fl-input flex-1"
+            style={{ fontSize: "0.9rem", minWidth: 200 }}
+          />
+          <button
+            type="submit"
+            className="fl-btn fl-btn-primary"
+            style={{ fontSize: "0.85rem" }}
+          >
+            Enregistrer
+          </button>
+        </form>
+      </section>
+
+      {/* Dossiers */}
+      <Link
+        href="/settings/folders"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
             📁 Dossiers
@@ -45,11 +80,14 @@ export default async function SettingsPage() {
             peut être rangée dans 0 ou 1 dossier
           </p>
         </div>
-        <FolderManager folders={folders} />
-      </section>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
 
       {/* Catégories */}
-      <section className="fl-card flex flex-col gap-4">
+      <Link
+        href="/settings/categories"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
             🏷️ Catégories
@@ -59,8 +97,25 @@ export default async function SettingsPage() {
             tags secondaires libres pour décrire la recette
           </p>
         </div>
-        <CategoryManager categories={categories} />
-      </section>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
+
+      {/* Ingrédients */}
+      <Link
+        href="/settings/ingredients"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            🧂 Ingrédients
+          </h2>
+          <p className="fl-label mt-1">
+            {ingredientBases.length} ingrédient{ingredientBases.length > 1 ? "s" : ""} dans
+            la base · autocomplétion à la saisie des recettes
+          </p>
+        </div>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
 
       {/* PDF d'une recette seule */}
       <section className="fl-card flex flex-col gap-4">
