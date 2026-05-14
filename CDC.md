@@ -88,7 +88,7 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 
 ---
 
-## 📝 Changelog V1.2 → V1.3 (correctifs UI dossiers + recherche)
+## 📝 Changelog V1.2 → V1.3 (correctifs UI dossiers + recherche + nouvelles fonctionnalités)
 
 ### 🐛 Bugs corrigés
 
@@ -98,22 +98,40 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 ### 🎨 Correctifs UI / responsive
 
 - **📱 FolderManager sur mobile** (`src/components/FolderManager.tsx`) : la ligne de chaque dossier dans `/settings` affichait le badge nom + les 3 boutons (« + Ajouter », « Éditer », « Supprimer ») côte à côte sur une seule ligne. Sur un petit écran, les boutons écrasaient le nom du dossier qui devenait illisible ou tronqué.
-  - **Fix** : la ligne passe en `flex-col` sur mobile et `flex-row` à partir de `sm:`. Les boutons sont regroupés dans un sous-conteneur `flex gap-2` qui reste sur une seule ligne, et le badge nom prend toute la largeur disponible sur mobile.
+  - **Fix** : la ligne passe en `flex-col` sur mobile et `flex-row` à partir de `sm:`. Même fix appliqué à `CategoryManager`.
 
 - **📦 FolderCard trop grande** (`src/components/FolderCard.tsx`, `src/app/page.tsx`) : les cards de dossiers en vue explorateur utilisaient `aspect-ratio: 1/1` avec 2 colonnes sur mobile, produisant des blocs carrés d'environ 165 × 165 px, jugés trop imposants.
-  - **Fix** :
-    - Grille passée de `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` à **`grid-cols-3 sm:grid-cols-4 lg:grid-cols-5`** → 3 colonnes sur mobile, plus denses.
-    - `aspect-ratio` changé de `1 / 1` à **`4 / 3`** → cards plus courtes.
-    - Icône dossier réduite de `2.4rem` à `1.6rem`.
-    - Police du nom réduite de `1rem` à `0.85rem`, compteur à `0.68rem`.
-    - `gap-3` → `gap-2` pour la grille ; `gap-2` → `gap-1` à l'intérieur de la card.
-    - Ajout de `wordBreak: "break-word"` sur le nom pour éviter le débordement sur les noms longs.
+  - **Fix** : grille → `grid-cols-3 sm:grid-cols-4 lg:grid-cols-5`, `aspect-ratio` → `4/3`, icône réduite à `1.6rem`, police à `0.85rem`.
+
+### 🆕 Nouvelles fonctionnalités
+
+- **🗂️ Paramètres allégés — sous-pages dédiées** : la page `/settings` ne montrait plus les listes complètes de dossiers et catégories (qui peuvent être très longues). Remplacées par des cartes cliquables avec compteur + flèche vers des sous-pages :
+  - `/settings/folders` → `FolderManager` complet (inchangé fonctionnellement)
+  - `/settings/categories` → `CategoryManager` complet
+  - `/settings/ingredients` → `IngredientBaseManager` (voir ci-dessous)
+  - Toutes les sous-pages ont un lien « ← Paramètres » de retour.
+
+- **🧂 Base d'ingrédients + autocomplétion** :
+  - La table `ingredients_base` (déjà dans le schéma Prisma depuis V1.2 mais inactive) est maintenant alimentée automatiquement : chaque nom d'ingrédient saisi dans `createRecipe` ou `updateRecipe` est upserted dans la base (dédoublonnage par nom unique).
+  - Nouveau composant `IngredientNameInput` : remplace le `<input>` texte brut dans le mode « liste » de `RecipeForm`. Déclenche une requête debounced (200 ms) vers `GET /api/ingredient-bases?q=` dès 2 caractères saisis et affiche un dropdown de suggestions.
+  - Nouvelle route API `GET /api/ingredient-bases` : recherche `contains` insensible à la casse, retourne 10 résultats max.
+  - `IngredientBaseManager` : composant client avec liste filtrable (champ de recherche si > 5 entrées), actions **Renommer** et **Supprimer**. Supprimer un ingrédient de la base ne supprime pas les noms sur les recettes existantes (ON DELETE SET NULL sur `ingredientBaseId`).
+  - Actions settings : `renameIngredientBase(id, formData)` et `deleteIngredientBase(id)`.
+
+- **🔗 Logo cliquable avec lien externe paramétrable** :
+  - Nouveau composant client `LogoLink` : sur la page d'accueil (`/`), clique vers l'URL externe configurée (ouvre dans un nouvel onglet) ; sur toutes les autres pages, clique vers `/` (comportement standard).
+  - `layout.tsx` devient `async` pour lire `siteUrl` depuis la table `Setting` (clé `"siteUrl"`) et le passer à `LogoLink`.
+  - Actions settings : `getSiteUrl()` et `saveSiteUrl(formData)`.
+  - `/settings` : champ URL + bouton « Enregistrer » pour configurer le lien (laisser vide pour désactiver).
 
 ### 📌 Notes pour le prochain développeur
 
 - La logique d'affichage de `src/app/page.tsx` distingue 4 modes : **explorateur** (défaut, grille de dossiers), **dossier ouvert** (`?folder=<id>`), **sans dossier** (`?folder=none`), **tout afficher** (`?view=all`). La variable `hasSearchOrFilters` doit être vérifiée avant d'appliquer tout filtre de dossier sur le chargement des recettes en mode explorateur.
-- `FolderCard` est utilisée uniquement dans la `ExplorerView` de `page.tsx`. Si l'on souhaite afficher les dossiers ailleurs, importer depuis `@/components/FolderCard`.
-- `FolderManager` est un composant client (`"use client"`) dans `/settings`. Il gère CRUD dossiers + modal `AddRecipesToFolderModal`. Le layout responsive repose sur les classes Tailwind `flex-col sm:flex-row`.
+- `FolderCard` est utilisée uniquement dans la `ExplorerView` de `page.tsx`.
+- `FolderManager` et `CategoryManager` sont des composants client (`"use client"`). Layout responsive : `flex-col sm:flex-row`.
+- La table `ingredients_base` est peuplée automatiquement via `upsertIngredientBases()` dans `src/app/actions/recipes.ts` — ne pas supprimer cette fonction ou les appels en fin de `createRecipe`/`updateRecipe`.
+- `layout.tsx` est maintenant `async` pour lire `siteUrl`. Ne pas le repasser en synchrone sans retirer l'appel `getSiteUrl()`.
+- Le pattern de sous-pages settings (`/settings/folders`, `/settings/categories`, `/settings/ingredients`) est standardisé : page Server Component, `export const dynamic = "force-dynamic"`, lien retour `← Paramètres`, carte `fl-card` autour du manager.
 
 ---
 
@@ -1036,7 +1054,7 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 | **8. Tests & import** | 50 tests Vitest, import Recipe Keeper CSV + HTML/ZIP avec photos | ✅ Livré |
 | **9. Mise en production** | Déploiement sur `recipe.super-nono.cc` via Cloudflare Zero Trust | ✅ Livré |
 | **10. Itérations V1.2** | Dossiers, vue explorateur, combobox catégories, refonte PDF (1 page par recette, numérotation logique, sommaire avec sous-recettes), réglages PDF d'une recette, « Mettre à jour la recette », fix éditeur Tiptap, etc. | ✅ Livré |
-| **11. Correctifs V1.3** | Fix recherche globale (tous dossiers) · FolderManager responsive mobile · FolderCard réduite (3 cols, aspect 4/3) | ✅ Livré |
+| **11. Correctifs + fonctionnalités V1.3** | Fix recherche globale · FolderManager/CategoryManager responsive mobile · FolderCard réduite · Paramètres allégés (sous-pages dossiers/catégories/ingrédients) · Autocomplétion ingrédients (IngredientBase activée) · Logo lien externe paramétrable | ✅ Livré |
 
 ### 10.2 Évolutions à venir (priorité indicative)
 
