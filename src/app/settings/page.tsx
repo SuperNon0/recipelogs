@@ -1,6 +1,5 @@
+import Link from "next/link";
 import { listAllCategories, listAllFolders } from "@/lib/recipes";
-import { CategoryManager } from "@/components/CategoryManager";
-import { FolderManager } from "@/components/FolderManager";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
 import { DeployButton } from "@/components/DeployButton";
 import { RecipePdfSettingsForm } from "@/components/RecipePdfSettingsForm";
@@ -35,7 +34,10 @@ export default async function SettingsPage() {
       </section>
 
       {/* Dossiers */}
-      <section className="fl-card flex flex-col gap-4">
+      <Link
+        href="/settings/folders"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
             📁 Dossiers
@@ -45,11 +47,14 @@ export default async function SettingsPage() {
             peut être rangée dans 0 ou 1 dossier
           </p>
         </div>
-        <FolderManager folders={folders} />
-      </section>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
 
       {/* Catégories */}
-      <section className="fl-card flex flex-col gap-4">
+      <Link
+        href="/settings/categories"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
             🏷️ Catégories
@@ -59,8 +64,8 @@ export default async function SettingsPage() {
             tags secondaires libres pour décrire la recette
           </p>
         </div>
-        <CategoryManager categories={categories} />
-      </section>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
 
       {/* PDF d'une recette seule */}
       <section className="fl-card flex flex-col gap-4">
