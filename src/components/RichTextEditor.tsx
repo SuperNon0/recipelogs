@@ -113,7 +113,7 @@ export function RichTextEditor({
         <button
           type="button"
           style={btn(editor.isActive("bold"))}
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
           aria-label="Gras"
           aria-pressed={editor.isActive("bold")}
         >
@@ -122,7 +122,7 @@ export function RichTextEditor({
         <button
           type="button"
           style={btn(editor.isActive("italic"))}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
           aria-label="Italique"
           aria-pressed={editor.isActive("italic")}
         >
@@ -131,7 +131,7 @@ export function RichTextEditor({
         <button
           type="button"
           style={btn(editor.isActive("underline"))}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
           aria-label="Souligné"
           aria-pressed={editor.isActive("underline")}
         >
@@ -150,7 +150,7 @@ export function RichTextEditor({
         <button
           type="button"
           style={btn(false)}
-          onClick={() => editor.chain().focus().undo().run()}
+          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().undo().run(); }}
           disabled={!editor.can().undo()}
           aria-label="Annuler"
           title="Annuler"
@@ -160,7 +160,7 @@ export function RichTextEditor({
         <button
           type="button"
           style={btn(false)}
-          onClick={() => editor.chain().focus().redo().run()}
+          onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().redo().run(); }}
           disabled={!editor.can().redo()}
           aria-label="Rétablir"
           title="Rétablir"
