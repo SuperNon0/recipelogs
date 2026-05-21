@@ -124,6 +124,11 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
   - Actions settings : `getSiteUrl()` et `saveSiteUrl(formData)`.
   - `/settings` : champ URL + bouton « Enregistrer » pour configurer le lien (laisser vide pour désactiver).
 
+### 🐛 Correctifs post-V1.3
+
+- **✏️ Boutons de formatage Tiptap (gras/italique/souligné)** (`src/components/RichTextEditor.tsx`) : les boutons utilisaient `onClick`, ce qui provoquait une perte de focus de l'éditeur avant l'exécution de la commande — la sélection était réinitialisée et le format basculait de façon imprévisible au clic sur un bouton ou dans la zone de texte.
+  - **Fix** : remplacement de `onClick` par `onMouseDown` + `e.preventDefault()` sur tous les boutons de la toolbar (G / I / S / undo / redo). Le `preventDefault()` empêche le blur, l'éditeur conserve le focus et la sélection, et la commande s'applique correctement.
+
 ### 📌 Notes pour le prochain développeur
 
 - La logique d'affichage de `src/app/page.tsx` distingue 4 modes : **explorateur** (défaut, grille de dossiers), **dossier ouvert** (`?folder=<id>`), **sans dossier** (`?folder=none`), **tout afficher** (`?view=all`). La variable `hasSearchOrFilters` doit être vérifiée avant d'appliquer tout filtre de dossier sur le chargement des recettes en mode explorateur.
