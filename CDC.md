@@ -124,6 +124,16 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
   - Actions settings : `getSiteUrl()` et `saveSiteUrl(formData)`.
   - `/settings` : champ URL + bouton « Enregistrer » pour configurer le lien (laisser vide pour désactiver).
 
+### 🆕 Nouvelles fonctionnalités post-V1.3
+
+- **⚖️ Unités d'ingrédients** (`prisma/schema.prisma`, `src/components/RecipeForm.tsx`, `src/components/RecipeBody.tsx`, `src/lib/pdf/template.ts`) : chaque ingrédient possède désormais une unité sélectionnable.
+  - **Unités disponibles** : `g` (défaut), `L`, `mL`, `pièce`, `QS` (quantité suffisante)
+  - **UX** : bouton-badge cliquable à côté du champ quantité → dropdown des 5 unités. Quand `QS` est sélectionné, le champ quantité disparaît.
+  - **Masse totale** : calculée uniquement sur les ingrédients en `g` (les autres unités sont exclues du total)
+  - **Affichage** : fiche recette + sous-recettes affichent l'unité à côté de la quantité. `QS` s'affiche en couleur accent sans nombre.
+  - **PDF** : même logique — `QS` en couleur, autres unités avec leur symbole.
+  - **BDD** : migration `20260522100000_add_ingredient_unit` — colonne `unit TEXT NOT NULL DEFAULT 'g'` sur la table `ingredients`.
+
 ### 🐛 Correctifs post-V1.3
 
 - **✏️ Boutons de formatage Tiptap (gras/italique/souligné)** (`src/components/RichTextEditor.tsx`) : les boutons utilisaient `onClick`, ce qui provoquait une perte de focus de l'éditeur avant l'exécution de la commande — la sélection était réinitialisée et le format basculait de façon imprévisible au clic sur un bouton ou dans la zone de texte.

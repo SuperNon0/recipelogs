@@ -82,16 +82,21 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   const ingredients = r.ingredients.map((i) => ({
     name: i.name ?? i.ingredientBase?.name ?? "—",
     quantityG: Number(i.quantityG) * k,
+    unit: i.unit ?? "g",
   }));
-  const totalMassG = ingredients.reduce((s, i) => s + i.quantityG, 0);
+  const totalMassG = ingredients.reduce(
+    (s, i) => s + (i.unit === "g" ? i.quantityG : 0),
+    0,
+  );
 
   const subRecipes = r.parentLinks.map((link) => {
     const childIngredients = link.child.ingredients.map((i) => ({
       name: i.name ?? i.ingredientBase?.name ?? "—",
       quantityG: Number(i.quantityG) * k,
+      unit: i.unit ?? "g",
     }));
     const childTotalG = childIngredients.reduce(
-      (s, i) => s + i.quantityG,
+      (s, i) => s + (i.unit === "g" ? i.quantityG : 0),
       0,
     );
     return {

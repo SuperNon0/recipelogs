@@ -59,6 +59,7 @@ export default async function EditRecipePage({
           ingredients: recipe.ingredients.map((i) => ({
             name: i.name ?? i.ingredientBase?.name ?? "",
             quantityG: Number(i.quantityG),
+            unit: i.unit ?? "g",
           })),
         }}
       />

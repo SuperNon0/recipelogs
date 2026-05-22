@@ -37,13 +37,13 @@ export type RecipeSnap = {
   photoPath?: string | null;
   tags?: string[];
   categories?: string[];
-  ingredients: { name: string; quantityG: number }[];
+  ingredients: { name: string; quantityG: number; unit?: string }[];
   steps: string | null;
   totalMassG: number;
   subRecipes: {
     label: string | null;
     childName: string;
-    ingredients: { name: string; quantityG: number }[];
+    ingredients: { name: string; quantityG: number; unit?: string }[];
     totalMassG: number;
     steps: string | null;
   }[];
@@ -525,20 +525,30 @@ export function buildCss(
 
 // ─── Rendu des morceaux ──────────────────────────────────────────────────────
 
-function renderIngredients(items: { name: string; quantityG: number }[], totalG: number, showTotal: boolean): string {
+function renderIngredients(items: { name: string; quantityG: number; unit?: string }[], totalG: number, showTotal: boolean): string {
   const list = items
-    .map(
-      (i) => `
+    .map((i) => {
+      const unit = i.unit ?? "g";
+      const qty = unit === "QS"
+        ? `<span class="ing-qty" style="color:var(--accent,#e8c547);font-weight:600">QS</span>`
+        : `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`;
+      return `
       <div class="ing-item">
-        <span class="ing-qty">${formatG(i.quantityG)}</span>
+        ${qty}
         <span class="ing-name">${esc(i.name)}</span>
-      </div>`,
-    )
+      </div>`;
+    })
     .join("");
   const totalLine = showTotal && totalG > 0
     ? `<div class="total-line">Total · ${formatG(totalG)}</div>`
     : "";
   return list + totalLine;
+}
+
+function formatIngQty(qty: number, unit: string): string {
+  if (unit === "g") return formatG(qty);
+  const n = qty.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+  return `${n} ${unit}`;
 }
 
 /**

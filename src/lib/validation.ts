@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+const INGREDIENT_UNITS = ["g", "L", "mL", "pièce", "QS"] as const;
+export type IngredientUnit = (typeof INGREDIENT_UNITS)[number];
+
 export const ingredientInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  quantityG: z.coerce.number().positive().max(1_000_000),
+  quantityG: z.coerce.number().nonnegative().max(1_000_000),
+  unit: z.enum(INGREDIENT_UNITS).default("g"),
   ingredientBaseId: z.coerce.number().int().positive().optional().nullable(),
 });
 

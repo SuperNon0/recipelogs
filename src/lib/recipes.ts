@@ -43,7 +43,7 @@ export async function listRecipes(opts: {
     include: {
       tags: true,
       categories: { include: { category: true } },
-      ingredients: { select: { quantityG: true } },
+      ingredients: { select: { quantityG: true, unit: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -56,7 +56,7 @@ export async function listRecipes(opts: {
     favorite: r.favorite,
     rating: r.rating,
     totalMassG: r.ingredients.reduce(
-      (sum, ing) => sum + Number(ing.quantityG),
+      (sum, ing) => sum + (ing.unit === "g" ? Number(ing.quantityG) : 0),
       0,
     ),
     tags: r.tags.map((t) => t.name),

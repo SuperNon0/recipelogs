@@ -7,9 +7,13 @@ import { RichTextEditor } from "./RichTextEditor";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 
+type IngredientUnit = "g" | "L" | "mL" | "pièce" | "QS";
+const UNITS: IngredientUnit[] = ["g", "L", "mL", "pièce", "QS"];
+
 type IngredientRow = {
   name: string;
   quantity: string;
+  unit: IngredientUnit;
 };
 
 type IngredientMode = "list" | "text";
@@ -25,7 +29,7 @@ export type RecipeFormInitial = {
   tags?: string[];
   categoryIds?: number[];
   folderId?: number | null;
-  ingredients?: { name: string; quantityG: number }[];
+  ingredients?: { name: string; quantityG: number; unit?: string }[];
 };
 
 export function RecipeForm({
@@ -45,9 +49,10 @@ export function RecipeForm({
     initial?.ingredients?.length
       ? initial.ingredients.map((i) => ({
           name: i.name,
-          quantity: String(i.quantityG),
+          quantity: i.unit === "QS" ? "" : String(i.quantityG),
+          unit: (i.unit as IngredientUnit) ?? "g",
         }))
-      : [{ name: "", quantity: "" }],
+      : [{ name: "", quantity: "", unit: "g" }],
   );
   const [folderId, setFolderId] = useState<number | "">(initial?.folderId ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -56,12 +61,12 @@ export function RecipeForm({
   const [freeText, setFreeText] = useState("");
 
   const totalG = ingredients.reduce(
-    (s, r) => s + (Number(r.quantity) || 0),
+    (s, r) => s + (r.unit === "g" ? Number(r.quantity) || 0 : 0),
     0,
   );
 
   const addRow = () =>
-    setIngredients((rows) => [...rows, { name: "", quantity: "" }]);
+    setIngredients((rows) => [...rows, { name: "", quantity: "", unit: "g" }]);
 
   const removeRow = (idx: number) =>
     setIngredients((rows) =>
@@ -88,6 +93,7 @@ export function RecipeForm({
       parsed.map((p) => ({
         name: p.name,
         quantity: p.quantityG > 0 ? String(p.quantityG) : "",
+        unit: "g" as IngredientUnit,
       })),
     );
     setIngredientMode("list");
@@ -99,8 +105,11 @@ export function RecipeForm({
       setError("Le nom est obligatoire.");
       return;
     }
-    if (totalG <= 0) {
-      setError("Au moins un ingrédient avec une quantité est obligatoire.");
+    const hasValidIngredient = ingredients.some(
+      (r) => r.name.trim() && (r.unit === "QS" || Number(r.quantity) > 0),
+    );
+    if (!hasValidIngredient) {
+      setError("Au moins un ingrédient avec une quantité (ou QS) est obligatoire.");
       return;
     }
     setSubmitting(true);
@@ -163,7 +172,7 @@ export function RecipeForm({
         />
       </Field>
 
-      <Field label={`Ingrédients * (masse totale : ${Math.round(totalG)} g)`}>
+      <Field label={`Ingrédients * (masse totale : ${Math.round(totalG)} g — ingrédients en g uniquement)`}>
         <div className="flex flex-col gap-3">
           <div className="flex gap-2">
             <button
@@ -210,8 +219,9 @@ export function RecipeForm({
               {/* Champs cachés pour conserver les ingrédients lors du submit */}
               {ingredients.map((row, idx) => (
                 <div key={idx} style={{ display: "none" }}>
-                  <input name="ingredientQty" value={row.quantity} readOnly />
+                  <input name="ingredientQty" value={row.unit === "QS" ? "0" : row.quantity} readOnly />
                   <input name="ingredientName" value={row.name} readOnly />
+                  <input name="ingredientUnit" value={row.unit} readOnly />
                 </div>
               ))}
             </div>
@@ -219,23 +229,36 @@ export function RecipeForm({
             <div className="flex flex-col gap-2">
               {ingredients.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    name="ingredientQty"
-                    placeholder="g"
-                    className="fl-input"
-                    style={{ width: 90, textAlign: "right" }}
-                    value={row.quantity}
-                    onChange={(e) =>
+                  {row.unit !== "QS" ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      name="ingredientQty"
+                      placeholder="0"
+                      className="fl-input"
+                      style={{ width: 80, textAlign: "right" }}
+                      value={row.quantity}
+                      onChange={(e) =>
+                        setIngredients((rows) =>
+                          rows.map((r, i) =>
+                            i === idx ? { ...r, quantity: e.target.value } : r,
+                          ),
+                        )
+                      }
+                    />
+                  ) : (
+                    <input type="hidden" name="ingredientQty" value="0" />
+                  )}
+                  <UnitSelector
+                    value={row.unit}
+                    onChange={(unit) =>
                       setIngredients((rows) =>
-                        rows.map((r, i) =>
-                          i === idx ? { ...r, quantity: e.target.value } : r,
-                        ),
+                        rows.map((r, i) => i === idx ? { ...r, unit } : r),
                       )
                     }
                   />
+                  <input type="hidden" name="ingredientUnit" value={row.unit} />
                   <IngredientNameInput
                     value={row.name}
                     onChange={(name) =>
@@ -372,6 +395,81 @@ export function RecipeForm({
         </Link>
       </div>
     </form>
+  );
+}
+
+function UnitSelector({
+  value,
+  onChange,
+}: {
+  value: IngredientUnit;
+  onChange: (u: IngredientUnit) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isQs = value === "QS";
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+        className="fl-btn fl-btn-secondary"
+        style={{
+          padding: "0.35rem 0.55rem",
+          fontSize: "0.8rem",
+          minWidth: 46,
+          fontWeight: 600,
+          background: isQs ? "var(--accent)" : undefined,
+          color: isQs ? "var(--bg)" : undefined,
+          borderColor: isQs ? "var(--accent)" : undefined,
+        }}
+        aria-label="Changer l'unité"
+      >
+        {value}
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "110%",
+            left: 0,
+            zIndex: 50,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            overflow: "hidden",
+            minWidth: 80,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+          }}
+        >
+          {UNITS.map((u) => (
+            <button
+              key={u}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(u);
+                setOpen(false);
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "0.45rem 0.8rem",
+                textAlign: "left",
+                fontSize: "0.85rem",
+                fontWeight: u === value ? 700 : 400,
+                background: u === value ? "var(--accent)" : "transparent",
+                color: u === value ? "var(--bg)" : "var(--text)",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
