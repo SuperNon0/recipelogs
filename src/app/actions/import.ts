@@ -300,3 +300,98 @@ export async function importRecipeKeeperHtmlOrZip(
 
   return { ok: true, imported, skipped, errors };
 }
+
+// ─── Import JSON ──────────────────────────────────────────────────────────────
+
+const VALID_UNITS = ["g", "L", "mL", "pièce", "QS"] as const;
+
+type JsonIngredient = { name: string; quantity: number; unit: string };
+type JsonRecipe = {
+  name: string;
+  yield?: string;
+  ingredients: JsonIngredient[];
+  steps?: string;
+  notes?: string | null;
+  source?: string | null;
+};
+
+export async function importRecipesFromJson(
+  formData: FormData,
+): Promise<ImportResult> {
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0)
+    return { ok: false, imported: 0, skipped: 0, errors: ["Aucun fichier fourni."] };
+
+  let recipes: JsonRecipe[];
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    recipes = Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return { ok: false, imported: 0, skipped: 0, errors: ["Fichier JSON invalide."] };
+  }
+
+  if (recipes.length === 0)
+    return { ok: false, imported: 0, skipped: 0, errors: ["Aucune recette dans le fichier."] };
+
+  let imported = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const r of recipes) {
+    if (!r.name?.trim()) { errors.push("Recette sans nom ignorée."); continue; }
+
+    try {
+      const exists = await prisma.recipe.findFirst({
+        where: { name: r.name.trim() },
+        select: { id: true },
+      });
+      if (exists) { skipped++; continue; }
+
+      const ingredients = (r.ingredients ?? [])
+        .filter((i) => i.name?.trim())
+        .map((i, position) => ({
+          name: i.name.trim(),
+          quantityG: Number(i.quantity) || 0,
+          unit: VALID_UNITS.includes(i.unit as (typeof VALID_UNITS)[number]) ? i.unit : "g",
+          position,
+        }));
+
+      const notesParts: string[] = [];
+      if (r.yield?.trim()) notesParts.push(`Rendement : ${r.yield.trim()}`);
+      if (r.notes?.trim()) notesParts.push(r.notes.trim());
+
+      await prisma.recipe.create({
+        data: {
+          name: r.name.trim(),
+          source: r.source?.trim() || null,
+          notesTips: notesParts.length > 0 ? notesParts.join("\n\n") : null,
+          stepsBlock: r.steps?.trim()
+            ? { create: { content: r.steps.trim() } }
+            : undefined,
+          ingredients: { create: ingredients },
+        },
+      });
+
+      const names = ingredients.map((i) => i.name).filter(Boolean);
+      const unique = [...new Set(names)];
+      await Promise.all(
+        unique.map((name) =>
+          prisma.ingredientBase.upsert({
+            where: { name },
+            create: { name },
+            update: {},
+          }),
+        ),
+      );
+
+      imported++;
+    } catch (err) {
+      errors.push(`"${r.name}" : ${err instanceof Error ? err.message : "erreur"}`);
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true, imported, skipped, errors };
+}

@@ -130,6 +130,22 @@ export default async function SettingsPage() {
         <RecipePdfSettingsForm initial={recipePdfSettings} />
       </section>
 
+      {/* Import JSON */}
+      <Link
+        href="/settings/import-json"
+        className="fl-card flex items-center justify-between gap-4 hover:border-[color:var(--muted)] transition-colors"
+      >
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+            📥 Import JSON
+          </h2>
+          <p className="fl-label mt-1">
+            Importer des recettes depuis un fichier JSON structuré
+          </p>
+        </div>
+        <span className="fl-label" style={{ fontSize: "1.1rem", flexShrink: 0 }}>→</span>
+      </Link>
+
       {/* Import Recipe Keeper */}
       <section className="fl-card flex flex-col gap-4">
         <div>
