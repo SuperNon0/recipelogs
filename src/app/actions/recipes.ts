@@ -48,12 +48,14 @@ function parseForm(formData: FormData) {
 
   const names = formData.getAll("ingredientName").map((v) => String(v));
   const qtys = formData.getAll("ingredientQty").map((v) => String(v));
-  const ingredients: { name: string; quantityG: number }[] = [];
+  const units = formData.getAll("ingredientUnit").map((v) => String(v));
+  const ingredients: { name: string; quantityG: number; unit: string }[] = [];
   for (let i = 0; i < names.length; i++) {
     const n = names[i]?.trim();
-    const q = Number(qtys[i]);
-    if (n && Number.isFinite(q) && q > 0) {
-      ingredients.push({ name: n, quantityG: q });
+    const unit = units[i] ?? "g";
+    const q = unit === "QS" ? 0 : Number(qtys[i]);
+    if (n && (unit === "QS" || (Number.isFinite(q) && q >= 0))) {
+      ingredients.push({ name: n, quantityG: q, unit });
     }
   }
   raw.ingredients = ingredients;
@@ -86,6 +88,7 @@ export async function createRecipe(formData: FormData) {
         create: data.ingredients.map((ing, idx) => ({
           name: ing.name,
           quantityG: ing.quantityG,
+          unit: ing.unit ?? "g",
           position: idx,
         })),
       },
@@ -132,6 +135,7 @@ export async function updateRecipe(id: number, formData: FormData) {
         recipeId: id,
         name: ing.name,
         quantityG: ing.quantityG,
+        unit: ing.unit ?? "g",
         position: idx,
       })),
     });

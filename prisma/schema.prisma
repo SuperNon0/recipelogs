@@ -90,6 +90,7 @@ model Ingredient {
   name             String?
   ingredientBaseId Int?     @map("ingredient_base_id")
   quantityG        Decimal  @map("quantity_g") @db.Decimal(10, 3)
+  unit             String   @default("g")
   position         Int      @default(0)
 
   recipe         Recipe          @relation(fields: [recipeId], references: [id], onDelete: Cascade)

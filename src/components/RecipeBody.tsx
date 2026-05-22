@@ -19,6 +19,7 @@ export type IngredientRow = {
   id: number;
   name: string;
   quantityG: number;
+  unit?: string;
 };
 
 export type SubRecipeRow = {
@@ -50,7 +51,7 @@ export function RecipeBody({
   subRecipes: SubRecipeRow[];
 }) {
   const baseTotalG = useMemo(
-    () => ingredients.reduce((s, i) => s + i.quantityG, 0),
+    () => ingredients.reduce((s, i) => s + ((!i.unit || i.unit === "g") ? i.quantityG : 0), 0),
     [ingredients],
   );
 
@@ -412,10 +413,14 @@ function IngredientsTable({
                   width: 130,
                 }}
               >
-                {(ing.quantityG * coef).toLocaleString("fr-FR", {
-                  maximumFractionDigits: 2,
-                })}{" "}
-                <span style={{ color: "var(--muted)" }}>g</span>
+                {ing.unit === "QS" ? (
+                  <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                ) : (
+                  <>
+                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                  </>
+                )}
               </td>
               <td className="py-1.5">{ing.name}</td>
             </tr>
@@ -455,7 +460,7 @@ function SubRecipeAccordion({
   const [, startTransition] = useTransition();
 
   const childBaseTotalG = subRecipe.childIngredients.reduce(
-    (s, i) => s + i.quantityG,
+    (s, i) => s + ((!i.unit || i.unit === "g") ? i.quantityG : 0),
     0,
   );
 
@@ -604,10 +609,14 @@ function SubRecipeAccordion({
                       width: 120,
                     }}
                   >
-                    {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", {
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    <span style={{ color: "var(--muted)" }}>g</span>
+                    {ing.unit === "QS" ? (
+                      <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                    ) : (
+                      <>
+                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                      </>
+                    )}
                   </td>
                   <td className="py-1">{ing.name}</td>
                 </tr>
