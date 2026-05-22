@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { JsonRecipeImport } from "@/components/JsonRecipeImport";
+import { ConversionPromptSection } from "@/components/ConversionPromptSection";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default function ImportJsonPage() {
         Import JSON
       </h1>
 
+      {/* Import du fichier */}
       <section className="fl-card flex flex-col gap-4">
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
@@ -29,6 +31,7 @@ export default function ImportJsonPage() {
         <JsonRecipeImport />
       </section>
 
+      {/* Format attendu */}
       <section className="fl-card flex flex-col gap-3">
         <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
           Format attendu
@@ -62,6 +65,23 @@ export default function ImportJsonPage() {
           Unités acceptées pour les ingrédients : <code>g</code> · <code>L</code> · <code>mL</code> · <code>pièce</code> · <code>QS</code>
         </p>
       </section>
+
+      {/* Séparateur */}
+      <div style={{ borderTop: "1px solid var(--border)", margin: "0.5rem 0" }} />
+
+      <div>
+        <h2 className="fl-title-serif" style={{ fontSize: "1.3rem" }}>
+          Convertir un livre de recettes
+        </h2>
+        <p className="fl-label mt-1">
+          Tu as scanné un livre ? Utilise l&apos;IA pour convertir le texte extrait en JSON importable.
+          Voici tout ce dont tu as besoin.
+        </p>
+      </div>
+
+      {/* Instructions de conversion */}
+      <ConversionPromptSection />
+
     </div>
   );
 }
