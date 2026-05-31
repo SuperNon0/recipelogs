@@ -121,5 +121,84 @@
     "steps": "",
     "notes": "",
     "source": ""
+  },
+  {
+    "name": "Crème Pâtissière",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 2042, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nIncorporer le beurre en morceaux et lisser au fouet.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "20% de chocolat noir sur la masse totale brute (~10 209 g).",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Praliné",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "praliné", "quantity": 1531, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer le praliné dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "15% de praliné sur la masse totale brute (~10 209 g).",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "pâte de café", "quantity": 204, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de café dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "2% de pâte de café sur la masse totale brute (~10 209 g). Ajuster selon l'intensité souhaitée.",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 1225, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de pistaches dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "12% de pâte de pistaches sur la masse totale brute (~10 209 g).",
+    "source": "Enzo Dusfour"
   }
 ]
