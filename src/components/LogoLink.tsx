@@ -16,8 +16,8 @@ export function LogoLink({ siteUrl }: { siteUrl: string | null }) {
       href={href}
       target={target}
       rel={rel}
-      className="font-serif text-2xl leading-none"
-      style={{ fontFamily: "var(--font-serif)" }}
+      className="font-serif leading-none"
+      style={{ fontFamily: "var(--font-serif)", fontSize: "1.8rem" }}
     >
       <span style={{ color: "var(--accent)" }}>recipe</span>
       <span style={{ color: "var(--text)", fontStyle: "italic" }}>log</span>

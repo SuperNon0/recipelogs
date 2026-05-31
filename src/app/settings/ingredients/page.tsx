@@ -9,7 +9,7 @@ export default async function IngredientsSettingsPage() {
   const ingredientBases = await listAllIngredientBases();
 
   return (
-    <div className="flex flex-col gap-6" style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", padding: "0 1.5rem", boxSizing: "border-box", maxWidth: "1400px", alignSelf: "center" }}>
+    <div className="flex flex-col gap-6 w-full">
       <div className="max-w-2xl w-full mx-auto">
         <Link
           href="/settings"
@@ -38,7 +38,10 @@ export default async function IngredientsSettingsPage() {
         <SyncIngredientsButton />
       </section>
 
-      <section className="fl-card flex flex-col gap-4 w-full">
+      <section
+        className="fl-card flex flex-col gap-4"
+        style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", padding: "1.3rem 1.5rem", boxSizing: "border-box", maxWidth: "1400px", alignSelf: "center" }}
+      >
         <IngredientBaseManager ingredientBases={ingredientBases} />
       </section>
     </div>
