@@ -79,6 +79,7 @@ model IngredientBase {
   name        String   @unique
   defaultUnit String   @default("g") @map("default_unit")
   createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   usages Ingredient[]
 
