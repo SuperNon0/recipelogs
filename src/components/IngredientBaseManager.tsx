@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useOptimistic, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   capitalizeIngredientBase,
@@ -50,6 +50,11 @@ export function IngredientBaseManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [optimisticBases, addOptimistic] = useOptimistic(
+    ingredientBases,
+    (state, { id, category }: { id: number; category: IngredientCategory }) =>
+      state.map((ing) => (ing.id === id ? { ...ing, category } : ing)),
+  );
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("az");
   const [mergingId, setMergingId] = useState<number | null>(null);
@@ -81,6 +86,7 @@ export function IngredientBaseManager({
     setError(null);
     setClassifyingId(null);
     void startTransition(async (): Promise<void> => {
+      addOptimistic({ id, category });
       const r = await setIngredientCategory(id, category);
       if (!r.ok) { setError(r.error); return; }
       router.refresh();
@@ -116,7 +122,7 @@ export function IngredientBaseManager({
   }
 
   const sorted = useMemo(() => {
-    let list = ingredientBases.filter((i) =>
+    let list = optimisticBases.filter((i) =>
       i.name.toLowerCase().includes(search.toLowerCase()),
     );
     if (sort === "none")  list = list.filter((i) => i._count.usages === 0);
@@ -130,21 +136,21 @@ export function IngredientBaseManager({
       case "modified": list = [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()); break;
     }
     return list;
-  }, [ingredientBases, search, sort]);
+  }, [optimisticBases, search, sort]);
 
-  const zeroCount  = ingredientBases.filter((i) => i._count.usages === 0).length;
-  const nocapCount = ingredientBases.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase()).length;
+  const zeroCount  = optimisticBases.filter((i) => i._count.usages === 0).length;
+  const nocapCount = optimisticBases.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase()).length;
 
   return (
     <div className="flex flex-col gap-4">
-      {ingredientBases.length === 0 && (
+      {optimisticBases.length === 0 && (
         <p className="text-sm text-[color:var(--muted)]">
           Aucun ingrédient pour le moment. Ils s&apos;ajoutent automatiquement quand tu
           crées ou modifies des recettes.
         </p>
       )}
 
-      {ingredientBases.length > 0 && (
+      {optimisticBases.length > 0 && (
         <div className="flex flex-col gap-2">
           <input
             type="search"
@@ -185,7 +191,7 @@ export function IngredientBaseManager({
             })}
           </div>
           <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            {sorted.length} / {ingredientBases.length} ingrédient{ingredientBases.length > 1 ? "s" : ""}
+            {sorted.length} / {optimisticBases.length} ingrédient{optimisticBases.length > 1 ? "s" : ""}
           </p>
         </div>
       )}
@@ -196,7 +202,7 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -210,21 +216,21 @@ export function IngredientBaseManager({
                 style={{
                   background: "var(--surface-alt, rgba(255,255,255,0.02))",
                   border: "1px solid var(--border)",
-                  borderRadius: 10,
-                  padding: "0.75rem",
-                  minHeight: 64,
+                  borderRadius: 14,
+                  padding: "1.4rem",
+                  minHeight: 100,
                 }}
               >
                 {/* En-tête colonne */}
                 <div
-                  className="flex items-center gap-1.5 mb-2 pb-2"
+                  className="flex items-center gap-2 mb-4 pb-3"
                   style={{ borderBottom: "1px solid var(--border)" }}
                 >
-                  <span style={{ fontSize: "1.1rem" }}>{cat.emoji}</span>
+                  <span style={{ fontSize: "1.5rem" }}>{cat.emoji}</span>
                   <span
                     style={{
                       flex: 1,
-                      fontSize: "0.88rem",
+                      fontSize: "1.05rem",
                       fontFamily: "var(--font-mono)",
                       fontWeight: 600,
                       color: cat.color,
@@ -232,7 +238,7 @@ export function IngredientBaseManager({
                   >
                     {cat.label}
                   </span>
-                  <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+                  <span style={{ fontSize: "0.9rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
                     {catItems.length}
                   </span>
                 </div>
@@ -254,14 +260,14 @@ export function IngredientBaseManager({
                       ).slice(0, 8);
 
                       return (
-                        <div key={ing.id} className="flex flex-col gap-1 py-1.5">
+                        <div key={ing.id} className="flex flex-col gap-2 py-3">
                           {/* Nom + count */}
-                          <div className="flex items-center gap-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
                             <Link
                               href={`/settings/ingredients/${ing.id}`}
                               className="flex-1 min-w-0 hover:opacity-75"
                               style={{
-                                fontSize: "0.9rem",
+                                fontSize: "1.05rem",
                                 fontFamily: "var(--font-mono)",
                                 color: "var(--text)",
                                 textDecoration: "none",
@@ -275,7 +281,7 @@ export function IngredientBaseManager({
                             </Link>
                             <span
                               style={{
-                                fontSize: "0.75rem",
+                                fontSize: "0.88rem",
                                 color: ing._count.usages === 0 ? "var(--danger)" : "var(--muted)",
                                 flexShrink: 0,
                                 fontFamily: "var(--font-mono)",
@@ -286,7 +292,7 @@ export function IngredientBaseManager({
                           </div>
 
                           {/* Boutons */}
-                          <div className="flex items-center gap-1 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {firstLetterLower && (
                               <button
                                 type="button"
@@ -294,7 +300,7 @@ export function IngredientBaseManager({
                                 onClick={() => handleCapitalize(ing.id, ing.name)}
                                 disabled={pending}
                                 className="fl-btn fl-btn-secondary"
-                                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", fontWeight: 600 }}
+                                style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem", fontWeight: 600 }}
                               >
                                 Aa
                               </button>
@@ -311,7 +317,7 @@ export function IngredientBaseManager({
                               }}
                               disabled={pending}
                               className={`fl-btn ${isClassifying ? "fl-btn-primary" : "fl-btn-secondary"}`}
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                              style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem" }}
                             >
                               {isClassifying ? "✕" : "Classer"}
                             </button>
@@ -320,14 +326,14 @@ export function IngredientBaseManager({
                               onClick={() => isMerging ? cancelMerge() : openMerge(ing.id)}
                               disabled={pending}
                               className={`fl-btn ${isMerging ? "fl-btn-primary" : "fl-btn-secondary"}`}
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                              style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem" }}
                             >
                               {isMerging ? "✕" : "⇌"}
                             </button>
                             <Link
                               href={`/settings/ingredients/${ing.id}`}
                               className="fl-btn fl-btn-secondary"
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
+                              style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem" }}
                             >
                               →
                             </Link>
@@ -336,7 +342,7 @@ export function IngredientBaseManager({
                               onClick={() => handleDelete(ing.id, ing.name)}
                               disabled={pending}
                               className="fl-btn"
-                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", color: "var(--danger)" }}
+                              style={{ fontSize: "0.85rem", padding: "0.45rem 0.9rem", color: "var(--danger)" }}
                             >
                               Supp
                             </button>
@@ -344,8 +350,8 @@ export function IngredientBaseManager({
 
                           {/* Picker de catégorie */}
                           {isClassifying && (
-                            <div className="flex flex-col gap-1 pt-0.5">
-                              <div className="grid grid-cols-2 gap-1">
+                            <div className="flex flex-col gap-1.5 pt-1">
+                              <div className="grid grid-cols-2 gap-1.5">
                                 {CATEGORIES.map((c) => {
                                   const isCurrentCol = c.key === cat.key;
                                   return (
@@ -355,8 +361,8 @@ export function IngredientBaseManager({
                                       onClick={() => handleSetCategory(ing.id, c.key)}
                                       disabled={pending || isCurrentCol}
                                       style={{
-                                        fontSize: "0.72rem",
-                                        padding: "0.3rem 0.45rem",
+                                        fontSize: "0.82rem",
+                                        padding: "0.45rem 0.6rem",
                                         borderRadius: 6,
                                         border: "1px solid",
                                         borderColor: isCurrentCol ? c.color : "var(--border)",
