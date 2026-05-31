@@ -1,4 +1,4 @@
-# RecipeLog — Cahier des charges V1.3
+# RecipeLog — Cahier des charges V1.4
 
 > **Gestion de recettes de pâtisserie — Application web auto-hébergée**
 
@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Projet** | RecipeLog |
-| **Version** | 1.3 — Correctifs UI dossiers + recherche globale |
+| **Version** | 1.4 — Quantités en fourchette · Gestion ingrédients avancée · Import amélioré |
 | **Domaine** | `recipe.super-nono.cc` |
 | **Écosystème** | `super-nono.cc` |
 | **Hébergement** | Proxmox LXC · Cloudflare Zero Trust |
@@ -147,6 +147,51 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 - La table `ingredients_base` est peuplée automatiquement via `upsertIngredientBases()` dans `src/app/actions/recipes.ts` — ne pas supprimer cette fonction ou les appels en fin de `createRecipe`/`updateRecipe`.
 - `layout.tsx` est maintenant `async` pour lire `siteUrl`. Ne pas le repasser en synchrone sans retirer l'appel `getSiteUrl()`.
 - Le pattern de sous-pages settings (`/settings/folders`, `/settings/categories`, `/settings/ingredients`) est standardisé : page Server Component, `export const dynamic = "force-dynamic"`, lien retour `← Paramètres`, carte `fl-card` autour du manager.
+
+---
+
+## 📝 Changelog V1.3 → V1.4 (quantités fourchette + gestion ingrédients + import)
+
+### 🆕 Nouvelles fonctionnalités
+
+- **↔ Quantités en fourchette (mode « entre »)** (`prisma/schema.prisma`, `src/lib/validation.ts`, `src/components/RecipeForm.tsx`, `src/components/RecipeBody.tsx`) :
+  - Chaque ingrédient peut désormais avoir une **quantité min et max** en plus de son unité habituelle.
+  - **UX** : le sélecteur d'unité expose un bouton **« ↔ entre (min/max) »** en bas du dropdown. Clic → deux champs quantité (min / max) + badge `↔` accentué. Le dropdown en mode fourchette propose toutes les unités sauf QS, avec un bouton **« ← unité simple »** pour revenir au mode standard.
+  - **Toutes les unités supportées** : g, L, cc, cs, pièce.
+  - **Affichage sur la fiche** : format `250/300g` ou `1/2 cs (≈10g)` (la masse estimée utilise la moyenne min+max).
+  - **Masse totale** : calculée sur la **moyenne** `(min+max)/2` pour les ingrédients en fourchette, sur la valeur exacte pour les autres.
+  - **BDD** : nouvelle colonne `ingredients.quantity_g_max DECIMAL(10,3) nullable` — migration `20260531140000_add_ingredient_quantity_max`.
+
+- **🧂 Gestion avancée de la base d'ingrédients** (`src/settings/ingredients/[id]/page.tsx`, `src/components/IngredientDetailClient.tsx`, `src/app/actions/settings.ts`) :
+  - **Page détail** `/settings/ingredients/:id` : formulaire de renommage avec **cascade automatique** (met à jour tous les ingrédients des recettes liés par ID ou par nom insensible à la casse), UI de **fusion** (picker de l'ingrédient cible, réassignation de toutes les recettes vers la cible puis suppression de la source), liste des recettes qui utilisent cet ingrédient avec lien direct.
+  - **Badge compteur** sur chaque ligne de la liste : nombre de recettes distinctes via requête SQL `COUNT(DISTINCT recipe_id)` tenant compte des liens directs ET des correspondances de nom (insensible à la casse).
+  - **Bouton « 🔄 Synchroniser »** dans `/settings/ingredients` : parcourt toutes les recettes et ajoute dans la base les ingrédients manquants (utile après un import ou si des entrées ont été ajoutées manuellement). Action `syncAllIngredientBases()`.
+
+- **📥 Import JSON amélioré** (`src/app/actions/import.ts`) :
+  - **Normalisation des unités à l'import** : `mL → g×1`, `cl → g×10`, `dl → g×100`, `kg → g×1000`, `cc`/`cs` acceptés nativement sans conversion.
+  - **Dédoublonnage insensible à la casse** : `findFirst` avec `mode: "insensitive"` avant création dans `ingredients_base` — évite les doublons `Lait`/`lait`.
+
+### 🛠️ Correctifs & améliorations UX
+
+- **📱 Autocomplétion ingrédients sur mobile** (`src/components/IngredientNameInput.tsx`) : le dropdown se fermait correctement sur desktop (mousedown) mais restait ouvert sur mobile (aucun listener touch). Fix : ajout d'un listener `touchstart` + `onBlur` avec délai 150 ms pour laisser les events `onMouseDown`/`onTouchEnd` s'exécuter avant la fermeture. Le bouton « + Ajouter » est remplacé par un message informatif (plus de soumission accidentelle sur mobile).
+
+- **⏱ Timeout d'overlay de déploiement** (`src/components/MaintenanceOverlay.tsx`) : porté de 5 min à **12 min** pour accommoder la durée réelle du build Next.js + Puppeteer sur le LXC. Redirection vers `/whats-new` à la fin.
+
+- **📦 pnpm — suppression des warnings de build scripts** (`package.json`) : ajout de `"pnpm": { "onlyBuiltDependencies": [...] }` listant explicitement les paquets autorisés à exécuter des scripts de build (Prisma, esbuild, sharp, puppeteer). Supprime les avertissements `Ignored build scripts` sur `pnpm install`.
+
+### 🗃️ Schéma BDD — modifications
+
+- ➕ Nouvelle colonne `ingredients.quantity_g_max` (`DECIMAL(10,3)`, nullable) — stocke la borne haute d'une quantité en fourchette. `quantity_g` stocke le minimum, `unit` reste l'unité effective.
+- Migration : `prisma/migrations/20260531140000_add_ingredient_quantity_max/migration.sql`
+
+### 📌 Notes pour le prochain développeur
+
+- **Mode fourchette** : `quantityGMax` est `null` pour un ingrédient simple et `> quantityG` pour une fourchette. Il n'existe pas d'unité `"entre"` en BDD — c'est un mode d'interface uniquement. Le `UnitSelector` de `RecipeForm.tsx` gère le basculement via les props `isRange` / `onRangeEnter` / `onRangeExit`.
+- `src/lib/recipes.ts` — `totalMassG` calcule `(quantityG + quantityGMax) / 2` pour les fourchettes (grammes uniquement).
+- `RecipeBody.tsx` — le rendu d'un ingrédient en fourchette affiche `${min}/${max} ${unit}`. Pour les unités avec facteur (cc ≈ 5g, cs ≈ 15g), la masse approximative est indiquée en parenthèses.
+- Ne pas ajouter `"QS"` aux options en mode fourchette (`UNITS_NO_QS` dans `RecipeForm.tsx`).
+- `syncAllIngredientBases()` peut être appelée sans danger : idempotente, ne crée que les entrées manquantes.
+- Le guide de conversion JSON (`CONVERSION_RECETTES_PROMPT.md`) a été mis à jour pour refléter que `mL` n'est plus une unité stockée (converti en `g×1` à l'import).
 
 ---
 
@@ -1070,6 +1115,7 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 | **9. Mise en production** | Déploiement sur `recipe.super-nono.cc` via Cloudflare Zero Trust | ✅ Livré |
 | **10. Itérations V1.2** | Dossiers, vue explorateur, combobox catégories, refonte PDF (1 page par recette, numérotation logique, sommaire avec sous-recettes), réglages PDF d'une recette, « Mettre à jour la recette », fix éditeur Tiptap, etc. | ✅ Livré |
 | **11. Correctifs + fonctionnalités V1.3** | Fix recherche globale · FolderManager/CategoryManager responsive mobile · FolderCard réduite · Paramètres allégés (sous-pages dossiers/catégories/ingrédients) · Autocomplétion ingrédients (IngredientBase activée) · Logo lien externe paramétrable | ✅ Livré |
+| **12. Fonctionnalités V1.4** | Quantités en fourchette (mode « entre » min/max sur toutes les unités) · Gestion avancée ingrédients (renommage cascade, fusion, page détail, sync automatique, badge compteur) · Import JSON amélioré (normalisation unités mL/cl/dl/kg, dedup insensible à la casse) · Fix autocomplétion mobile (touchstart) · Timeout overlay déploiement 12 min | ✅ Livré |
 
 ### 10.2 Évolutions à venir (priorité indicative)
 
@@ -1088,4 +1134,4 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 
 **Fin du document**
 
-*RecipeLog — Cahier des charges V1.3 — super-nono.cc*
+*RecipeLog — Cahier des charges V1.4 — super-nono.cc*

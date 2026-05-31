@@ -6,6 +6,7 @@ export type IngredientUnit = (typeof INGREDIENT_UNITS)[number];
 export const ingredientInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   quantityG: z.coerce.number().nonnegative().max(1_000_000),
+  quantityGMax: z.coerce.number().nonnegative().max(1_000_000).nullable().optional(),
   unit: z.enum(INGREDIENT_UNITS).default("g"),
   ingredientBaseId: z.coerce.number().int().positive().optional().nullable(),
 });

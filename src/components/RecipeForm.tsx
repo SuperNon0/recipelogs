@@ -21,6 +21,7 @@ const UNIT_LABELS: Record<IngredientUnit, string> = {
 type IngredientRow = {
   name: string;
   quantity: string;
+  quantityMax: string;  // empty = not a range; non-empty = max value
   unit: IngredientUnit;
 };
 
@@ -37,7 +38,7 @@ export type RecipeFormInitial = {
   tags?: string[];
   categoryIds?: number[];
   folderId?: number | null;
-  ingredients?: { name: string; quantityG: number; unit?: string }[];
+  ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
 };
 
 export function RecipeForm({
@@ -58,9 +59,10 @@ export function RecipeForm({
       ? initial.ingredients.map((i) => ({
           name: i.name,
           quantity: i.unit === "QS" ? "" : String(i.quantityG),
+          quantityMax: i.quantityGMax != null ? String(i.quantityGMax) : "",
           unit: (i.unit as IngredientUnit) ?? "g",
         }))
-      : [{ name: "", quantity: "", unit: "g" }],
+      : [{ name: "", quantity: "", quantityMax: "", unit: "g" }],
   );
   const [folderId, setFolderId] = useState<number | "">(initial?.folderId ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function RecipeForm({
   }, 0);
 
   const addRow = () =>
-    setIngredients((rows) => [...rows, { name: "", quantity: "", unit: "g" }]);
+    setIngredients((rows) => [...rows, { name: "", quantity: "", quantityMax: "", unit: "g" }]);
 
   const removeRow = (idx: number) =>
     setIngredients((rows) =>
@@ -104,6 +106,7 @@ export function RecipeForm({
       parsed.map((p) => ({
         name: p.name,
         quantity: p.quantityG > 0 ? String(p.quantityG) : "",
+        quantityMax: "",
         unit: "g" as IngredientUnit,
       })),
     );
@@ -231,6 +234,7 @@ export function RecipeForm({
               {ingredients.map((row, idx) => (
                 <div key={idx} style={{ display: "none" }}>
                   <input name="ingredientQty" value={row.unit === "QS" ? "0" : row.quantity} readOnly />
+                  <input name="ingredientQtyMax" value={row.quantityMax} readOnly />
                   <input name="ingredientName" value={row.name} readOnly />
                   <input name="ingredientUnit" value={row.unit} readOnly />
                 </div>
@@ -240,36 +244,72 @@ export function RecipeForm({
             <div className="flex flex-col gap-2">
               {ingredients.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
-                  {row.unit !== "QS" ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      name="ingredientQty"
-                      placeholder="0"
-                      className="fl-input"
-                      style={{ width: 80, textAlign: "right" }}
-                      value={row.quantity}
-                      onChange={(e) =>
-                        setIngredients((rows) =>
-                          rows.map((r, i) =>
-                            i === idx ? { ...r, quantity: e.target.value } : r,
-                          ),
-                        )
-                      }
-                    />
+                  {row.quantityMax !== "" ? (
+                    <>
+                      <input
+                        type="number" step="0.01" min="0"
+                        name="ingredientQty"
+                        placeholder="min"
+                        className="fl-input"
+                        style={{ width: 62, textAlign: "right", fontSize: "0.85rem" }}
+                        value={row.quantity}
+                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                      />
+                      <span style={{ color: "var(--muted)", fontSize: "0.8rem", flexShrink: 0 }}>—</span>
+                      <input
+                        type="number" step="0.01" min="0"
+                        name="ingredientQtyMax"
+                        placeholder="max"
+                        className="fl-input"
+                        style={{ width: 62, textAlign: "right", fontSize: "0.85rem" }}
+                        value={row.quantityMax}
+                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: e.target.value } : r))}
+                      />
+                      <UnitSelector
+                        value={row.unit}
+                        isRange={true}
+                        onChange={(u) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u } : r))}
+                        onRangeExit={() => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: "" } : r))}
+                      />
+                      <input type="hidden" name="ingredientUnit" value={row.unit} />
+                    </>
+                  ) : row.unit === "QS" ? (
+                    <>
+                      <input type="hidden" name="ingredientQty" value="0" />
+                      <input type="hidden" name="ingredientQtyMax" value="" />
+                      <UnitSelector
+                        value={row.unit}
+                        isRange={false}
+                        onChange={(unit) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit } : r))}
+                        onRangeExit={() => {}}
+                      />
+                      <input type="hidden" name="ingredientUnit" value={row.unit} />
+                    </>
                   ) : (
-                    <input type="hidden" name="ingredientQty" value="0" />
+                    <>
+                      <input
+                        type="number" step="0.01" min="0"
+                        name="ingredientQty"
+                        placeholder="0"
+                        className="fl-input"
+                        style={{ width: 80, textAlign: "right" }}
+                        value={row.quantity}
+                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                      />
+                      <input type="hidden" name="ingredientQtyMax" value="" />
+                      <UnitSelector
+                        value={row.unit}
+                        isRange={false}
+                        onChange={(u) => {
+                          if (u === "QS") setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u, quantity: "", quantityMax: "" } : r));
+                          else setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u } : r));
+                        }}
+                        onRangeEnter={() => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: row.quantity || "0", unit: row.unit === "QS" ? "g" : row.unit } : r))}
+                        onRangeExit={() => {}}
+                      />
+                      <input type="hidden" name="ingredientUnit" value={row.unit} />
+                    </>
                   )}
-                  <UnitSelector
-                    value={row.unit}
-                    onChange={(unit) =>
-                      setIngredients((rows) =>
-                        rows.map((r, i) => i === idx ? { ...r, unit } : r),
-                      )
-                    }
-                  />
-                  <input type="hidden" name="ingredientUnit" value={row.unit} />
                   <IngredientNameInput
                     value={row.name}
                     onChange={(name) =>
@@ -409,35 +449,64 @@ export function RecipeForm({
   );
 }
 
+const UNITS_NO_QS: IngredientUnit[] = ["g", "L", "cc", "cs", "pièce"];
+
 function UnitSelector({
   value,
   onChange,
+  isRange,
+  onRangeEnter,
+  onRangeExit,
 }: {
   value: IngredientUnit;
   onChange: (u: IngredientUnit) => void;
+  isRange: boolean;
+  onRangeEnter?: () => void;
+  onRangeExit?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const isQs = value === "QS";
+  const displayUnits = isRange ? UNITS_NO_QS : UNITS;
 
   return (
     <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-        className="fl-btn fl-btn-secondary"
-        style={{
-          padding: "0.35rem 0.55rem",
-          fontSize: "0.8rem",
-          minWidth: 46,
-          fontWeight: 600,
-          background: isQs ? "var(--accent)" : undefined,
-          color: isQs ? "var(--bg)" : undefined,
-          borderColor: isQs ? "var(--accent)" : undefined,
-        }}
-        aria-label="Changer l'unité"
-      >
-        {value}
-      </button>
+      {isRange ? (
+        <button
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+          className="fl-btn fl-btn-secondary"
+          style={{
+            padding: "0.35rem 0.55rem",
+            fontSize: "0.8rem",
+            minWidth: 46,
+            fontWeight: 600,
+            background: "var(--accent)",
+            color: "var(--bg)",
+            borderColor: "var(--accent)",
+          }}
+          aria-label="Mode entre (plage)"
+        >
+          ↔
+        </button>
+      ) : (
+        <button
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+          className="fl-btn fl-btn-secondary"
+          style={{
+            padding: "0.35rem 0.55rem",
+            fontSize: "0.8rem",
+            minWidth: 46,
+            fontWeight: 600,
+            background: isQs ? "var(--accent)" : undefined,
+            color: isQs ? "var(--bg)" : undefined,
+            borderColor: isQs ? "var(--accent)" : undefined,
+          }}
+          aria-label="Changer l'unité"
+        >
+          {value}
+        </button>
+      )}
       {open && (
         <div
           style={{
@@ -449,11 +518,11 @@ function UnitSelector({
             border: "1px solid var(--border)",
             borderRadius: 8,
             overflow: "hidden",
-            minWidth: 80,
+            minWidth: 120,
             boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
           }}
         >
-          {UNITS.map((u) => (
+          {displayUnits.map((u) => (
             <button
               key={u}
               type="button"
@@ -478,6 +547,47 @@ function UnitSelector({
               {UNIT_LABELS[u]}
             </button>
           ))}
+          {isRange ? (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); setOpen(false); if (onRangeExit) onRangeExit(); }}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "0.45rem 0.8rem",
+                textAlign: "left",
+                fontSize: "0.85rem",
+                fontWeight: 400,
+                background: "transparent",
+                color: "var(--muted)",
+                border: "none",
+                borderTop: "1px solid var(--border)",
+                cursor: "pointer",
+              }}
+            >
+              ← unité simple
+            </button>
+          ) : (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); setOpen(false); if (onRangeEnter) onRangeEnter(); }}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "0.45rem 0.8rem",
+                textAlign: "left",
+                fontSize: "0.85rem",
+                fontWeight: 400,
+                background: "transparent",
+                color: "var(--accent)",
+                border: "none",
+                borderTop: "1px solid var(--border)",
+                cursor: "pointer",
+              }}
+            >
+              ↔ entre (min/max)
+            </button>
+          )}
         </div>
       )}
     </div>

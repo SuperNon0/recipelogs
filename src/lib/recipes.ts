@@ -51,7 +51,7 @@ export async function listRecipes(opts: {
     include: {
       tags: true,
       categories: { include: { category: true } },
-      ingredients: { select: { quantityG: true, unit: true } },
+      ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -64,7 +64,9 @@ export async function listRecipes(opts: {
     favorite: r.favorite,
     rating: r.rating,
     totalMassG: r.ingredients.reduce((sum, ing) => {
-      const q = Number(ing.quantityG);
+      const q = ing.quantityGMax != null
+        ? (Number(ing.quantityG) + Number(ing.quantityGMax)) / 2
+        : Number(ing.quantityG);
       if (!ing.unit || ing.unit === "g") return sum + q;
       if (ing.unit === "cc") return sum + q * 5;
       if (ing.unit === "cs") return sum + q * 15;
