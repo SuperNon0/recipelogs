@@ -301,13 +301,13 @@ export async function deleteComment(id: number, recipeId: number) {
 
 async function upsertIngredientBases(names: string[]) {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  await Promise.all(
-    unique.map((name) =>
-      prisma.ingredientBase.upsert({
-        where: { name },
-        create: { name },
-        update: {},
-      }),
-    ),
-  );
+  for (const name of unique) {
+    // Chercher une correspondance insensible à la casse pour éviter les doublons
+    const existing = await prisma.ingredientBase.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+    if (!existing) {
+      await prisma.ingredientBase.create({ data: { name } }).catch(() => {});
+    }
+  }
 }

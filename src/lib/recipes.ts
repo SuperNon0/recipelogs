@@ -135,8 +135,38 @@ export async function listRecipesMinimal(excludeId?: number) {
 export async function listAllIngredientBases() {
   return prisma.ingredientBase.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, createdAt: true },
+    select: { id: true, name: true, createdAt: true, _count: { select: { usages: true } } },
   });
+}
+
+export async function getIngredientBaseDetail(id: number) {
+  const base = await prisma.ingredientBase.findUnique({
+    where: { id },
+    select: { id: true, name: true },
+  });
+  if (!base) return null;
+
+  // Recettes qui utilisent cet ingrédient (par ID ou par nom insensible à la casse)
+  const usages = await prisma.ingredient.findMany({
+    where: {
+      OR: [
+        { ingredientBaseId: id },
+        { name: { equals: base.name, mode: "insensitive" } },
+      ],
+    },
+    select: {
+      recipeId: true,
+      name: true,
+      recipe: { select: { id: true, name: true } },
+    },
+    distinct: ["recipeId"],
+    orderBy: { recipe: { name: "asc" } },
+  });
+
+  return {
+    base,
+    recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name })),
+  };
 }
 
 export async function listAllTags(): Promise<string[]> {

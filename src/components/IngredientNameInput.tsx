@@ -14,6 +14,7 @@ export function IngredientNameInput({
   placeholder?: string;
 }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [noMatch, setNoMatch] = useState(false);
   const [show, setShow] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -22,6 +23,7 @@ export function IngredientNameInput({
     if (timerRef.current) clearTimeout(timerRef.current);
     if (q.length < 2) {
       setSuggestions([]);
+      setNoMatch(false);
       setShow(false);
       return;
     }
@@ -32,9 +34,11 @@ export function IngredientNameInput({
         );
         const data: Suggestion[] = await res.json();
         setSuggestions(data);
-        setShow(data.length > 0);
+        setNoMatch(data.length === 0);
+        setShow(true);
       } catch {
         setSuggestions([]);
+        setNoMatch(false);
       }
     }, 200);
   };
@@ -118,6 +122,38 @@ export function IngredientNameInput({
               {s.name}
             </button>
           ))}
+          {noMatch && value.trim().length >= 2 && (
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setShow(false);
+                setNoMatch(false);
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: "0.45rem 0.75rem",
+                fontSize: "0.875rem",
+                fontFamily: "var(--font-mono)",
+                color: "var(--accent)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "var(--border)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "transparent";
+              }}
+            >
+              + Ajouter « {value.trim()} »
+            </button>
+          )}
         </div>
       )}
     </div>
