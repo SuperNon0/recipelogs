@@ -39,7 +39,7 @@ const KNOWN_CATEGORIES = ["base", "fruit", "preparation"] as const;
 const CATEGORIES: { key: IngredientCategory; label: string; emoji: string; color: string }[] = [
   { key: null,          label: "À classer",          emoji: "📋", color: "var(--muted)" },
   { key: "base",        label: "Ingrédient de base",  emoji: "🧂", color: "var(--accent)" },
-  { key: "fruit",       label: "Fruit",               emoji: "🍎", color: "#6db86d" },
+  { key: "fruit",       label: "Arôme",               emoji: "🌿", color: "#6db86d" },
   { key: "preparation", label: "Préparation",          emoji: "🍳", color: "#6b9fd4" },
 ];
 
@@ -158,9 +158,9 @@ export function IngredientBaseManager({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="fl-input"
-            style={{ fontSize: "0.9rem" }}
+            style={{ fontSize: "1.05rem", padding: "0.75rem 1rem" }}
           />
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {SORT_OPTIONS.map((opt) => {
               const isActive = sort === opt.key;
               const label =
@@ -173,10 +173,10 @@ export function IngredientBaseManager({
                   type="button"
                   onClick={() => setSort(opt.key)}
                   style={{
-                    padding: "0.25rem 0.6rem",
-                    fontSize: "0.72rem",
+                    padding: "0.4rem 0.85rem",
+                    fontSize: "0.85rem",
                     fontFamily: "var(--font-mono)",
-                    borderRadius: 6,
+                    borderRadius: 8,
                     border: "1px solid",
                     borderColor: isActive ? "var(--accent)" : "var(--border)",
                     background: isActive ? "rgba(232,197,71,0.12)" : "transparent",
@@ -190,7 +190,7 @@ export function IngredientBaseManager({
               );
             })}
           </div>
-          <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+          <p style={{ fontSize: "0.88rem", color: "var(--muted)" }}>
             {sorted.length} / {optimisticBases.length} ingrédient{optimisticBases.length > 1 ? "s" : ""}
           </p>
         </div>
@@ -202,7 +202,8 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
+        <div className="overflow-x-auto -mx-1 px-1">
+        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "repeat(4, minmax(300px, 1fr))" }}>
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -449,6 +450,7 @@ export function IngredientBaseManager({
               </div>
             );
           })}
+        </div>
         </div>
       )}
 
