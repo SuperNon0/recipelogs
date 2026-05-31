@@ -626,5 +626,111 @@
     "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer la pâte de pistaches à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
     "notes": "Utiliser une pâte de pistaches pure sans sucre ajouté pour une saveur plus nette.",
     "source": "IA"
+  },
+  {
+    "name": "Bavarois Vanille",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 120, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer le lait avec les gousses et les graines jusqu'à frémissement. Laisser infuser 10 min hors du feu.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud (filtré) sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C en remuant sans arrêt jusqu'à ce que la crème nappe la cuillère.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution complète.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois, en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Chocolat",
+    "yield": "Environ 1,5 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine puis le chocolat noir haché. Mélanger jusqu'à fonte complète et homogénéité. Mixer au mixeur plongeant.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre réduit à 80 g pour compenser l'apport sucrant du chocolat noir.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Framboise",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "purée de framboise", "quantity": 250, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 100, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer la purée de framboise et mélanger.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Gélatine légèrement augmentée (91 g) pour compenser l'acidité et l'eau de la purée. Sucre réduit à 100 g si la purée est déjà sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Fraise",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "purée de fraise", "quantity": 250, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 100, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer la purée de fraise et mélanger.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Gélatine légèrement augmentée (91 g) pour compenser l'acidité et l'eau de la purée. Sucre réduit à 100 g si la purée est déjà sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Praliné",
+    "yield": "Environ 1,4 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer le praliné et mixer au mixeur plongeant jusqu'à homogénéité.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre réduit à 80 g car le praliné est déjà sucré. Préférer un praliné 70% pour plus d'intensité.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Café",
+    "yield": "Environ 1,4 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "pâte de café", "quantity": 50, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 120, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de café. Mélanger jusqu'à dissolution et homogénéité complètes.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Ajuster la quantité de pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Citron",
+    "yield": "Environ 1,2 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "jus de citron", "quantity": 100, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 140, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait avec les zestes de citron jusqu'à frémissement. Laisser infuser 5 min hors du feu, filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Laisser tiédir à 35 °C puis incorporer le jus de citron froid — ne jamais ajouter le jus à chaud pour éviter la coagulation.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre augmenté à 140 g pour équilibrer l'acidité du citron. Gélatine augmentée à 91 g car l'acidité fragilise la prise. Le jus de citron s'ajoute obligatoirement hors du feu et tiédi pour ne pas faire cailler la crème.",
+    "source": "IA"
   }
 ]
