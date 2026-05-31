@@ -106,5 +106,20 @@
     "steps": "",
     "notes": "",
     "source": ""
+  },
+  {
+    "name": "Streusel",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre", "quantity": 125, "unit": "g" },
+      { "name": "sucre roux", "quantity": 125, "unit": "g" },
+      { "name": "farine T45", "quantity": 125, "unit": "g" },
+      { "name": "poudre de noisette", "quantity": 125, "unit": "g" },
+      { "name": "sel", "quantity": 0, "unit": "QS" },
+      { "name": "cannelle", "quantity": 5, "unit": "mL" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
   }
 ]
