@@ -42,6 +42,7 @@ export default async function RecipePage({
     id: i.id,
     name: i.name ?? i.ingredientBase?.name ?? "—",
     quantityG: Number(i.quantityG),
+    quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
     unit: i.unit ?? "g",
   }));
 
@@ -58,6 +59,7 @@ export default async function RecipePage({
       id: i.id,
       name: i.name ?? i.ingredientBase?.name ?? "—",
       quantityG: Number(i.quantityG),
+      quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
       unit: i.unit ?? "g",
     })),
     childSteps: link.child.stepsBlock?.content ?? null,
@@ -90,7 +92,7 @@ export default async function RecipePage({
             recipeId={recipe.id}
             cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
             totalMassG={ingredients.reduce((s, i) => s + (i.unit === "g" ? i.quantityG : 0), 0)}
-            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG, unit: i.unit }))}
+            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG, quantityGMax: i.quantityGMax, unit: i.unit }))}
           />
           <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
         </div>

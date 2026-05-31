@@ -19,6 +19,7 @@ export type IngredientRow = {
   id: number;
   name: string;
   quantityG: number;
+  quantityGMax?: number | null;
   unit?: string;
 };
 
@@ -52,9 +53,12 @@ export function RecipeBody({
 }) {
   const baseTotalG = useMemo(
     () => ingredients.reduce((s, i) => {
-      if (!i.unit || i.unit === "g") return s + i.quantityG;
-      if (i.unit === "cc") return s + i.quantityG * 5;
-      if (i.unit === "cs") return s + i.quantityG * 15;
+      const qty = i.quantityGMax != null
+        ? (i.quantityG + i.quantityGMax) / 2
+        : i.quantityG;
+      if (!i.unit || i.unit === "g") return s + qty;
+      if (i.unit === "cc") return s + qty * 5;
+      if (i.unit === "cs") return s + qty * 15;
       return s;
     }, 0),
     [ingredients],
@@ -420,6 +424,18 @@ function IngredientsTable({
               >
                 {ing.unit === "QS" ? (
                   <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                ) : ing.quantityGMax != null ? (
+                  <span>
+                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    <span style={{ color: "var(--muted)" }}>/</span>
+                    {(ing.quantityGMax * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                    {(ing.unit === "cc" || ing.unit === "cs") && (
+                      <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
+                        {" "}(≈{formatG(((ing.quantityG + ing.quantityGMax) / 2 * coef) * (ing.unit === "cc" ? 5 : 15))})
+                      </span>
+                    )}
+                  </span>
                 ) : (ing.unit === "cc" || ing.unit === "cs") ? (
                   <>
                     {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
@@ -473,9 +489,12 @@ function SubRecipeAccordion({
   const [, startTransition] = useTransition();
 
   const childBaseTotalG = subRecipe.childIngredients.reduce((s, i) => {
-    if (!i.unit || i.unit === "g") return s + i.quantityG;
-    if (i.unit === "cc") return s + i.quantityG * 5;
-    if (i.unit === "cs") return s + i.quantityG * 15;
+    const qty = i.quantityGMax != null
+      ? (i.quantityG + i.quantityGMax) / 2
+      : i.quantityG;
+    if (!i.unit || i.unit === "g") return s + qty;
+    if (i.unit === "cc") return s + qty * 5;
+    if (i.unit === "cs") return s + qty * 15;
     return s;
   }, 0);
 
@@ -626,6 +645,18 @@ function SubRecipeAccordion({
                   >
                     {ing.unit === "QS" ? (
                       <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                    ) : ing.quantityGMax != null ? (
+                      <span>
+                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        <span style={{ color: "var(--muted)" }}>/</span>
+                        {(ing.quantityGMax * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                        {(ing.unit === "cc" || ing.unit === "cs") && (
+                          <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
+                            {" "}(≈{formatG(((ing.quantityG + ing.quantityGMax) / 2 * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
+                          </span>
+                        )}
+                      </span>
                     ) : (ing.unit === "cc" || ing.unit === "cs") ? (
                       <>
                         {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
