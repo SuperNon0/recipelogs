@@ -202,7 +202,8 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {optimisticBases.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
+        <div className="overflow-x-auto -mx-1 px-1">
+        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "repeat(4, minmax(300px, 1fr))" }}>
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -271,9 +272,11 @@ export function IngredientBaseManager({
                                 fontFamily: "var(--font-mono)",
                                 color: "var(--text)",
                                 textDecoration: "none",
-                                lineHeight: 1.35,
-                                wordBreak: "break-word",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                               }}
+                              title={ing.name}
                             >
                               {ing.name}
                             </Link>
@@ -447,6 +450,7 @@ export function IngredientBaseManager({
               </div>
             );
           })}
+        </div>
         </div>
       )}
 
