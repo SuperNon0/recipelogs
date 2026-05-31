@@ -79,10 +79,10 @@ export function IngredientBaseManager({
 
   function handleSetCategory(id: number, category: IngredientCategory) {
     setError(null);
+    setClassifyingId(null);
     void startTransition(async (): Promise<void> => {
       const r = await setIngredientCategory(id, category);
       if (!r.ok) { setError(r.error); return; }
-      setClassifyingId(null);
       router.refresh();
     });
   }
@@ -196,7 +196,7 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
