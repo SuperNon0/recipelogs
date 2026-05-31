@@ -91,5 +91,20 @@
     "steps": "Travailler le beurre pour le rendre crémeux.\n\nAjouter le sucre, la vanille et la farine. Bien mélanger.\n\nIncorporer les blancs d'œufs.\n\nBeurrer et fariner la plaque. Dresser des bâtonnets à la poche à douille, suffisamment espacés.\n\nFaire cuire 7 à 8 min à 200 °C. Décoller aussitôt et laisser refroidir.",
     "notes": "2 gouttes d'extrait de vanille ou 1 sachet de sucre vanillé.",
     "source": "marmiton.org"
+  },
+  {
+    "name": "Biscuit Pain de Gênes",
+    "yield": null,
+    "ingredients": [
+      { "name": "pâte d'amande 50%", "quantity": 400, "unit": "g" },
+      { "name": "œufs", "quantity": 550, "unit": "g" },
+      { "name": "farine", "quantity": 85, "unit": "g" },
+      { "name": "sel", "quantity": 3, "unit": "g" },
+      { "name": "beurre motte", "quantity": 150, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 4, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
   }
 ]
