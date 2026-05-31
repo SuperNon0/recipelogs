@@ -796,5 +796,181 @@
     "steps": "Fendre et gratter les gousses de vanille. Chauffer le lait et la crème avec les gousses et les graines jusqu'à frémissement. Laisser infuser 10 min hors du feu puis filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution complète.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
     "notes": "L'infusion à froid prolongée (une nuit au réfrigérateur) intensifie davantage le parfum vanille.",
     "source": "IA"
+  },
+  {
+    "name": "Ganache Enrobage / Truffes",
+    "yield": "Environ 670 g (base chocolat noir)",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 200, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "chocolat noir 70%", "quantity": 400, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Hacher finement le chocolat et le placer dans un cul-de-poule.\n\nChauffer la crème avec le glucose jusqu'à frémissement.\n\nVerser la crème chaude sur le chocolat en trois fois, en émulsionnant depuis le centre à la maryse jusqu'à obtenir une ganache lisse et brillante.\n\nLaisser tiédir à 35 °C puis incorporer le beurre en morceaux. Mixer au mixeur plongeant.\n\nCouler dans un cadre ou une poche. Laisser cristalliser à 17 °C pendant 12 heures minimum avant utilisation.",
+    "notes": "ADAPTATIONS — mêmes quantités de crème et beurre, seul le chocolat change :\n• Chocolat au lait : 500 g (ratio 1:2,5 — le lait est plus souple, il faut plus de chocolat pour tenir)\n• Chocolat blanc : 600 g (ratio 1:3 — le blanc est très doux, maximum de chocolat pour la tenue)\nLe glucose apporte souplesse et allonge la durée de conservation.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Chocolat",
+    "yield": "Environ 800 g (base chocolat noir)",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "chocolat noir 70%", "quantity": 200, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement.\n\nVerser sur le chocolat haché en trois fois, en émulsionnant depuis le centre jusqu'à obtenir une ganache lisse.\n\nAjouter la crème froide et mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures (idéalement une nuit).\n\nMonter au batteur à vitesse moyenne jusqu'à obtenir une texture légère et pochable. Ne pas trop monter pour éviter le graining.",
+    "notes": "ADAPTATIONS — même quantité de crème chaude et froide, seul le chocolat change :\n• Chocolat au lait : 300 g (plus souple, besoin de plus de chocolat pour tenir)\n• Chocolat blanc : 400 g (très souple, ratio maximum)\nAttention : ne pas trop monter, surtout avec le chocolat blanc — s'arrêter dès que la texture est pochable.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Vanille",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer la crème chaude avec les gousses et les graines. Laisser infuser 15 min hors du feu. Filtrer.\n\nRéchauffer la crème infusée, la verser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Pour une intensité maximale, réaliser l'infusion la veille à froid (laisser macérer gousses + crème une nuit au réfrigérateur avant de chauffer).",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Café",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "pâte de café", "quantity": 30, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 300, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement. Incorporer la pâte de café et mélanger.\n\nVerser sur le chocolat au lait haché en trois fois, en émulsionnant depuis le centre.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Le chocolat au lait s'associe mieux au café que le blanc (accord naturel). Ajuster la pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Praliné",
+    "yield": "Environ 950 g",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 200, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement.\n\nVerser sur le chocolat au lait haché en trois fois, en émulsionnant depuis le centre. Ajouter le praliné et mixer au mixeur plongeant.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Préférer un praliné 70% noisette pour une ganache plus intense et moins sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Framboise",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 150, "unit": "g" },
+      { "name": "purée de framboise", "quantity": 100, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec la purée de framboise jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "La purée remplace une partie de la crème chaude — ne pas dépasser 40% de purée pour préserver la tenue après montage.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Citron",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "jus de citron", "quantity": 50, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec les zestes de citron. Laisser infuser 10 min hors du feu. Filtrer et réchauffer.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, puis incorporer le jus de citron froid — ne jamais ajouter le jus à chaud.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Le jus de citron s'ajoute obligatoirement tiédi pour éviter la coagulation de la crème. L'acidité peut légèrement liquéfier — bien respecter le temps de repos au froid.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Passion",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 150, "unit": "g" },
+      { "name": "purée de fruit de la passion", "quantity": 80, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec la purée de passion jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "La passion est très acide et aromatique — 80 g suffisent pour une ganache bien marquée. Augmenter jusqu'à 120 g maximum si plus d'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Citron",
+    "yield": "Environ 700 g",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 150, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "jus de citron", "quantity": 60, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose et les zestes. Laisser infuser 10 min, filtrer et réchauffer.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le jus de citron puis le beurre en morceaux. Mixer au mixeur plongeant.\n\nCouler en cadre ou en moules à bonbons. Laisser cristalliser à 17 °C minimum 12 heures.\n\nCouper et enrober de chocolat blanc tempéré.",
+    "notes": "Ganache ferme pour intérieur de bonbons. Le jus de citron s'incorpore obligatoirement tiédi. Le glucose assure la souplesse et la conservation.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Praliné",
+    "yield": "Environ 570 g",
+    "ingredients": [
+      { "name": "praliné noisette/amande", "quantity": 200, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" },
+      { "name": "crème liquide", "quantity": 100, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose jusqu'à frémissement.\n\nVerser sur le chocolat noir haché, émulsionner depuis le centre. Ajouter le praliné et mixer au mixeur plongeant.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer à nouveau.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober.",
+    "notes": "Utiliser un praliné 70% pour plus d'intensité. La combinaison praliné + chocolat noir évite l'excès de sucre.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Caramel",
+    "yield": "Environ 630 g",
+    "ingredients": [
+      { "name": "sucre semoule", "quantity": 150, "unit": "g" },
+      { "name": "crème liquide", "quantity": 200, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 200, "unit": "g" },
+      { "name": "beurre", "quantity": 50, "unit": "g" },
+      { "name": "fleur de sel", "quantity": 3, "unit": "g" }
+    ],
+    "steps": "Réaliser un caramel à sec avec le sucre jusqu'à coloration ambrée.\n\nDécuire avec la crème chaude (avec le glucose) versée en filet, en remuant sans cesse. Cuire à 107 °C.\n\nVerser le caramel chaud sur le chocolat au lait haché, émulsionner depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le beurre et la fleur de sel. Mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober.",
+    "notes": "Cuire le caramel à 107 °C pour un intérieur souple mais stable. La fleur de sel rehausse le caramel — indispensable.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Café",
+    "yield": "Environ 570 g",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 150, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "pâte de café", "quantity": 25, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 300, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose et la pâte de café jusqu'à frémissement. Bien mélanger pour dissoudre.\n\nVerser sur le chocolat noir haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober de chocolat noir.",
+    "notes": "Le chocolat noir amplifie l'amertume du café pour un bonbon intense. Réduire à 200 g de chocolat noir + 100 g de chocolat lait pour un résultat plus rond.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Passion",
+    "yield": "Environ 580 g",
+    "ingredients": [
+      { "name": "purée de fruit de la passion", "quantity": 100, "unit": "g" },
+      { "name": "crème liquide", "quantity": 80, "unit": "g" },
+      { "name": "glucose", "quantity": 25, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 350, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" }
+    ],
+    "steps": "Chauffer la purée de passion, la crème et le glucose jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober de chocolat blanc ou lait.",
+    "notes": "La passion est naturellement acide — bien vérifier la cristallisation avant d'enrober. Le chocolat blanc équilibre l'acidité du fruit.",
+    "source": "IA"
   }
 ]
