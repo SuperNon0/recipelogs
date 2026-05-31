@@ -526,5 +526,18 @@
     "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nFaire fondre le chocolat blanc et le laisser tiédir à 30 °C (le chocolat blanc est plus sensible à la chaleur).\n\nIncorporer le chocolat fondu à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en poches et réserver au froid minimum 4 heures.",
     "notes": "Ratio crème/chocolat : 4:1. Maximum de crème pour contrebalancer la sucrosité du chocolat blanc. Température d'incorporation du chocolat abaissée à 30 °C.",
     "source": ""
+  },
+  {
+    "name": "Mousse Fruit (base coco)",
+    "yield": null,
+    "ingredients": [
+      { "name": "purée coco", "quantity": 1, "unit": "L" },
+      { "name": "crème montée", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 85, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 130, "unit": "g" }
+    ],
+    "steps": "Chauffer la purée de coco avec le sucre jusqu'à dissolution.\n\nAjouter la masse gélatine et mélanger jusqu'à fonte complète.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à l'appareil purée/gélatine à la maryse en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Adaptable avec toute purée de fruit. Ratio purée:crème = 1:1.",
+    "source": ""
   }
 ]
