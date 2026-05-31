@@ -568,5 +568,21 @@
     "steps": "Faire cuire 100 g de sucre à sec jusqu'à caramélisation.\n\nFaire bouillir les 180 g de crème fleurette et la verser sur le caramel pour le décuire et le rendre souple.\n\nBattre les jaunes d'œufs avec les 25 g de sucre jusqu'à blanchiment, puis les incorporer à la crème caramel. Faire cuire doucement à 82 °C sans bouillir (à la nappe).\n\nRamollir les feuilles de gélatine dans de l'eau froide, les égoutter et les ajouter à la préparation chaude. Bien mélanger jusqu'à dissolution.\n\nLaisser refroidir à environ 25 °C.\n\nMonter les 350 g de crème fleurette en crème fouettée ferme.\n\nIncorporer délicatement la crème fouettée à la préparation au caramel à la maryse.\n\nVerser dans des verrines ou moules et laisser prendre au réfrigérateur minimum 3 heures.",
     "notes": "",
     "source": "marmiton.org"
+  },
+  {
+    "name": "Mousse Noisette",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de noisette (ou praliné noisette 50%)", "quantity": 250, "unit": "g" },
+      { "name": "lait entier", "quantity": 125, "unit": "mL" },
+      { "name": "crème liquide (anglaise)", "quantity": 125, "unit": "mL" },
+      { "name": "jaune d'œuf", "quantity": 60, "unit": "g" },
+      { "name": "sucre", "quantity": 50, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 70, "unit": "g" },
+      { "name": "crème montée", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème liquide ensemble jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le mélange lait/crème chaud sur les jaunes en fouettant, puis remettre sur feu doux. Cuire à 82 °C en remuant sans arrêt jusqu'à ce que la crème nappe la cuillère.\n\nHors du feu, ajouter la masse gélatine et la pâte de noisette. Mixer au mixeur plongeant jusqu'à homogénéité parfaite.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois, en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser un praliné noisette 70% pour une saveur plus intense et moins sucrée.",
+    "source": "IA"
   }
 ]
