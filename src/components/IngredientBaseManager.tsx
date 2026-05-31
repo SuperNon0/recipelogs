@@ -196,7 +196,7 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-start w-full">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
