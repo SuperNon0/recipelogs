@@ -263,7 +263,7 @@ export function IngredientBaseManager({
                       return (
                         <div key={ing.id} className="flex flex-col gap-2 py-3">
                           {/* Nom + count */}
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-start gap-2 min-w-0">
                             <Link
                               href={`/settings/ingredients/${ing.id}`}
                               className="flex-1 min-w-0 hover:opacity-75"
@@ -272,11 +272,9 @@ export function IngredientBaseManager({
                                 fontFamily: "var(--font-mono)",
                                 color: "var(--text)",
                                 textDecoration: "none",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                lineHeight: 1.35,
+                                wordBreak: "break-word",
                               }}
-                              title={ing.name}
                             >
                               {ing.name}
                             </Link>

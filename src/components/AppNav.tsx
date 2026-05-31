@@ -15,7 +15,7 @@ export function AppNav() {
   const pathname = usePathname();
   return (
     <nav className="border-b border-[color:var(--border)] overflow-x-auto fl-scroll-hidden">
-      <div className="max-w-5xl mx-auto flex items-stretch px-4">
+      <div className="max-w-[1400px] mx-auto flex items-stretch px-4">
         {NAV.map((item) => {
           const active = item.match(pathname);
           return (
