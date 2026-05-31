@@ -200,5 +200,84 @@
     "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de pistaches dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
     "notes": "12% de pâte de pistaches sur la masse totale brute (~10 209 g).",
     "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Mousseline",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte (à température ambiante) progressivement jusqu'à obtenir une crème légère et homogène.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 384, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement jusqu'à obtenir une crème légère et homogène.",
+    "notes": "20% de chocolat noir sur la masse totale brute (~1 922 g).",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Praliné",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "praliné", "quantity": 288, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis le praliné jusqu'à obtenir une crème légère et homogène.",
+    "notes": "15% de praliné sur la masse totale brute (~1 922 g).",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "pâte de café", "quantity": 38, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de café jusqu'à obtenir une crème légère et homogène.",
+    "notes": "2% de pâte de café sur la masse totale brute (~1 922 g). Ajuster selon l'intensité souhaitée.",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 231, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de pistaches jusqu'à obtenir une crème légère et homogène.",
+    "notes": "12% de pâte de pistaches sur la masse totale brute (~1 922 g).",
+    "source": ""
   }
 ]
