@@ -17,7 +17,7 @@ type IngredientBase = {
   _count: { usages: number };
 };
 
-type SortKey = "az" | "za" | "most" | "least" | "none" | "newest" | "modified";
+type SortKey = "az" | "za" | "most" | "least" | "none" | "nocap" | "newest" | "modified";
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "az",       label: "A → Z" },
@@ -25,6 +25,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "most",     label: "+ recettes" },
   { key: "least",    label: "− recettes" },
   { key: "none",     label: "Aucune recette" },
+  { key: "nocap",    label: "Majuscule manquante" },
   { key: "newest",   label: "Ajoutés récemment" },
   { key: "modified", label: "Modifiés récemment" },
 ];
@@ -93,7 +94,8 @@ export function IngredientBaseManager({
     let list = ingredientBases.filter((i) =>
       i.name.toLowerCase().includes(search.toLowerCase()),
     );
-    if (sort === "none") list = list.filter((i) => i._count.usages === 0);
+    if (sort === "none")  list = list.filter((i) => i._count.usages === 0);
+    if (sort === "nocap") list = list.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase());
     switch (sort) {
       case "az":       list = [...list].sort((a, b) => a.name.localeCompare(b.name, "fr")); break;
       case "za":       list = [...list].sort((a, b) => b.name.localeCompare(a.name, "fr")); break;
@@ -105,7 +107,8 @@ export function IngredientBaseManager({
     return list;
   }, [ingredientBases, search, sort]);
 
-  const zeroCount = ingredientBases.filter((i) => i._count.usages === 0).length;
+  const zeroCount  = ingredientBases.filter((i) => i._count.usages === 0).length;
+  const nocapCount = ingredientBases.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase()).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -130,9 +133,10 @@ export function IngredientBaseManager({
           <div className="flex flex-wrap gap-1.5">
             {SORT_OPTIONS.map((opt) => {
               const isActive = sort === opt.key;
-              const label = opt.key === "none"
-                ? `${opt.label}${zeroCount > 0 ? ` (${zeroCount})` : ""}`
-                : opt.label;
+              const label =
+                opt.key === "none"  ? `${opt.label}${zeroCount  > 0 ? ` (${zeroCount})`  : ""}` :
+                opt.key === "nocap" ? `${opt.label}${nocapCount > 0 ? ` (${nocapCount})` : ""}` :
+                opt.label;
               return (
                 <button
                   key={opt.key}
@@ -311,7 +315,9 @@ export function IngredientBaseManager({
 
       {sorted.length === 0 && ingredientBases.length > 0 && (
         <p className="text-sm text-[color:var(--muted)]">
-          {sort === "none" ? "Tous les ingrédients ont au moins une recette." : `Aucun résultat pour « ${search} ».`}
+          {sort === "none"  ? "Tous les ingrédients ont au moins une recette." :
+           sort === "nocap" ? "Toutes les premières lettres sont déjà en majuscule. 🎉" :
+           `Aucun résultat pour « ${search} ».`}
         </p>
       )}
     </div>
