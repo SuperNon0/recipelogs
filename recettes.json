@@ -1,0 +1,81 @@
+[
+  {
+    "name": "Sablé Breton",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 4250, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 3600, "unit": "g" },
+      { "name": "farine", "quantity": 7600, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 450, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 1900, "unit": "mL" },
+      { "name": "sel", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Biscuit Chocolat sans Farine",
+    "yield": null,
+    "ingredients": [
+      { "name": "blanc d'œuf", "quantity": 2500, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 2000, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 1650, "unit": "g" },
+      { "name": "sucre glace", "quantity": 580, "unit": "g" },
+      { "name": "cacao poudre", "quantity": 675, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Pâte Sablée",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 230, "unit": "g" },
+      { "name": "sucre cassonade", "quantity": 106, "unit": "g" },
+      { "name": "sel", "quantity": 3, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 24, "unit": "g" },
+      { "name": "poudre de noisette", "quantity": 160, "unit": "g" },
+      { "name": "farine", "quantity": 130, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 10, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "Remplacez la poudre de noisette par de la farine pour obtenir une pâte neutre.",
+    "source": ""
+  },
+  {
+    "name": "Brioche Salée",
+    "yield": null,
+    "ingredients": [
+      { "name": "farine gruau", "quantity": 1000, "unit": "g" },
+      { "name": "miel", "quantity": 20, "unit": "g" },
+      { "name": "sel", "quantity": 28, "unit": "g" },
+      { "name": "levure", "quantity": 65, "unit": "g" },
+      { "name": "œufs", "quantity": 400, "unit": "g" },
+      { "name": "levain", "quantity": 300, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 20, "unit": "g" },
+      { "name": "beurre motte", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "Recette adaptée pour navettes salées. Le sucre (20 g) et le miel (20 g) sont conservés en petite quantité uniquement pour activer la levure et assurer une belle coloration. Le sel est augmenté à 28 g pour relever le goût.",
+    "source": ""
+  },
+  {
+    "name": "Pâte à Babas",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème à 35%", "quantity": 50, "unit": "g" },
+      { "name": "lait", "quantity": 95, "unit": "g" },
+      { "name": "sel", "quantity": 4, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 23, "unit": "g" },
+      { "name": "levure", "quantity": 25, "unit": "g" },
+      { "name": "farine T45", "quantity": 305, "unit": "g" },
+      { "name": "œufs", "quantity": 150, "unit": "g" },
+      { "name": "beurre fondu", "quantity": 90, "unit": "g" }
+    ],
+    "steps": "Tiédir le lait et la crème à 30 °C, y dissoudre la levure, le sel et le sucre.\n\nIncorporer la farine, ajouter les 3/4 des œufs.\n\nPétrir légèrement sans donner trop de corps à la pâte.\n\nAjouter le reste des œufs puis mélanger jusqu'à leur absorption.\n\nFondre le beurre chaud et le verser sur la masse, couvrir sans mélanger.\n\nPlacer à l'étuve à 27/28 °C environ 15 min jusqu'à ce que le beurre tombe sous la pâte.\n\nHomogénéiser la pâte à la maryse et garnir les moules.\n\nLaisser pousser une seconde fois.\n\nEnfourner à 200 °C quelques minutes pour démarrer la pousse régulière, puis baisser à 170/175 °C environ 8 à 10 min.",
+    "notes": "",
+    "source": "C'est ma fournée !"
+  }
+]
