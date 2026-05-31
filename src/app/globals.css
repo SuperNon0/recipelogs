@@ -226,13 +226,13 @@ a {
 
 .fl-nav-item {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--muted);
-  padding: 0 1.1rem;
-  height: 40px;
-  border-bottom: 2px solid transparent;
+  padding: 0 1.6rem;
+  height: 54px;
+  border-bottom: 3px solid transparent;
   white-space: nowrap;
   transition: color 120ms ease, border-color 120ms ease;
   display: flex;
@@ -246,6 +246,7 @@ a {
 .fl-nav-item[aria-current="page"] {
   color: var(--accent);
   border-bottom-color: var(--accent);
+  font-weight: 600;
 }
 
 /* Scrollbar sobres */
