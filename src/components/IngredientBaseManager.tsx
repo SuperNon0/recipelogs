@@ -200,9 +200,8 @@ export function IngredientBaseManager({
         <p style={{ fontSize: "0.82rem", color: "var(--danger)" }}>{error}</p>
       )}
 
-      {/* 4 colonnes responsives — breakout pleine largeur */}
+      {/* 4 colonnes responsives */}
       {optimisticBases.length > 0 && (
-        <div style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", paddingLeft: "1.5rem", paddingRight: "1.5rem" }}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
@@ -448,7 +447,6 @@ export function IngredientBaseManager({
               </div>
             );
           })}
-        </div>
         </div>
       )}
 
