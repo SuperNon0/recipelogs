@@ -30,6 +30,7 @@ import {
   addChapter,
 } from "@/app/actions/cookbooks";
 import { EditSnapshotMassModal } from "./EditSnapshotMassModal";
+import { AddRecipesToCookbookModal } from "./AddRecipesToCookbookModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export function CookbookEntriesTable({
 }) {
   const [entries, setEntries] = useState<Entry[]>(initial);
   const [pending, startTransition] = useTransition();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Sync l'état local avec les props quand le serveur revalide
   useEffect(() => {
@@ -114,8 +116,25 @@ export function CookbookEntriesTable({
             </span>
           )}
         </p>
-        <AddChapterButton cookbookId={cookbookId} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="fl-btn fl-btn-primary"
+            style={{ fontSize: "0.8rem" }}
+          >
+            📖 Ajouter des recettes
+          </button>
+          <AddChapterButton cookbookId={cookbookId} />
+        </div>
       </div>
+
+      {showAddModal && (
+        <AddRecipesToCookbookModal
+          cookbookId={cookbookId}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
 
       {entries.length === 0 ? (
         <div className="fl-card text-center py-8">

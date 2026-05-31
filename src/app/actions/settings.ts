@@ -213,6 +213,17 @@ export async function mergeIngredientBases(
   return { ok: true };
 }
 
+export async function setIngredientCategory(
+  id: number,
+  category: "base" | "fruit" | "preparation" | null,
+): Promise<ActionResult> {
+  const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) return { ok: false, error: "Ingrédient introuvable." };
+  await prisma.ingredientBase.update({ where: { id }, data: { category } });
+  revalidatePath("/settings/ingredients");
+  return { ok: true };
+}
+
 export async function deleteIngredientBase(id: number): Promise<ActionResult> {
   // ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
   // seul le lien vers la base est supprimé.

@@ -93,6 +93,61 @@ export async function deleteCookbook(id: number) {
   redirect("/cookbooks");
 }
 
+export async function addMultipleRecipesToCookbook(
+  cookbookId: number,
+  recipeIds: number[],
+  linkMode: "linked" | "snapshot",
+): Promise<ActionResult & { added?: number; skipped?: number }> {
+  if (!recipeIds.length) return { ok: false, error: "Aucune recette sélectionnée." };
+
+  const cookbook = await prisma.cookbook.findUnique({ where: { id: cookbookId }, select: { id: true } });
+  if (!cookbook) return { ok: false, error: "Cahier introuvable." };
+
+  const existing = await prisma.cookbookRecipe.findMany({
+    where: { cookbookId },
+    select: { recipeId: true, position: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.recipeId));
+  const maxPos = existing.reduce((m, e) => Math.max(m, e.position), -1);
+
+  const toAdd = recipeIds.filter((id) => !existingIds.has(id));
+  const skipped = recipeIds.length - toAdd.length;
+  if (toAdd.length === 0) return { ok: true, added: 0, skipped };
+
+  if (linkMode === "linked") {
+    await prisma.cookbookRecipe.createMany({
+      data: toAdd.map((recipeId, idx) => ({
+        cookbookId,
+        recipeId,
+        position: maxPos + 1 + idx,
+        linkMode: "linked" as const,
+        subrecipeMode: "single" as const,
+        snapshotData: Prisma.JsonNull,
+        snapshotDate: null,
+      })),
+    });
+  } else {
+    for (let i = 0; i < toAdd.length; i++) {
+      const snap = await buildRecipeSnapshot(toAdd[i], 1);
+      if (!snap) continue;
+      await prisma.cookbookRecipe.create({
+        data: {
+          cookbookId,
+          recipeId: toAdd[i],
+          position: maxPos + 1 + i,
+          linkMode: "snapshot",
+          subrecipeMode: "single",
+          snapshotData: snap as unknown as Prisma.InputJsonValue,
+          snapshotDate: new Date(),
+        },
+      });
+    }
+  }
+
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true, added: toAdd.length, skipped };
+}
+
 export async function addRecipeToCookbook(
   cookbookId: number,
   recipeId: number,
