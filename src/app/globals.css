@@ -226,11 +226,12 @@ a {
 
 .fl-nav-item {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 0 1rem;
+  padding: 0 1.1rem;
+  height: 40px;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   transition: color 120ms ease, border-color 120ms ease;
