@@ -612,5 +612,19 @@
     "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer le praliné à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
     "notes": "Utiliser un praliné 70% noisette pour une saveur plus intense.",
     "source": "IA"
+  },
+  {
+    "name": "Mousse Pistache",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de pistaches", "quantity": 200, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer la pâte de pistaches à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser une pâte de pistaches pure sans sucre ajouté pour une saveur plus nette.",
+    "source": "IA"
   }
 ]
