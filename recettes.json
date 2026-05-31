@@ -126,7 +126,7 @@
     "name": "Crème Pâtissière",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "lait", "quantity": 6000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
       { "name": "poudre à crème", "quantity": 600, "unit": "g" },
@@ -141,7 +141,7 @@
     "name": "Crème Pâtissière Chocolat Noir",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "lait", "quantity": 6000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
       { "name": "poudre à crème", "quantity": 600, "unit": "g" },
@@ -157,7 +157,7 @@
     "name": "Crème Pâtissière Praliné",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "lait", "quantity": 6000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
       { "name": "poudre à crème", "quantity": 600, "unit": "g" },
@@ -173,7 +173,7 @@
     "name": "Crème Pâtissière Café",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "lait", "quantity": 6000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
       { "name": "poudre à crème", "quantity": 600, "unit": "g" },
@@ -189,7 +189,7 @@
     "name": "Crème Pâtissière Pistache",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 6, "unit": "L" },
+      { "name": "lait", "quantity": 6000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
       { "name": "poudre à crème", "quantity": 600, "unit": "g" },
@@ -205,7 +205,7 @@
     "name": "Crème Mousseline",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "lait", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 350, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
       { "name": "poudre à crème", "quantity": 120, "unit": "g" },
@@ -220,7 +220,7 @@
     "name": "Crème Mousseline Chocolat Noir",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "lait", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 350, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
       { "name": "poudre à crème", "quantity": 120, "unit": "g" },
@@ -236,7 +236,7 @@
     "name": "Crème Mousseline Praliné",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "lait", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 350, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
       { "name": "poudre à crème", "quantity": 120, "unit": "g" },
@@ -252,7 +252,7 @@
     "name": "Crème Mousseline Café",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "lait", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 350, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
       { "name": "poudre à crème", "quantity": 120, "unit": "g" },
@@ -268,7 +268,7 @@
     "name": "Crème Mousseline Pistache",
     "yield": null,
     "ingredients": [
-      { "name": "lait", "quantity": 1, "unit": "L" },
+      { "name": "lait", "quantity": 1000, "unit": "g" },
       { "name": "sucre semoule", "quantity": 350, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
       { "name": "poudre à crème", "quantity": 120, "unit": "g" },
@@ -403,7 +403,7 @@
       { "name": "sucre", "quantity": 200, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
       { "name": "crème liquide", "quantity": 400, "unit": "mL" },
-      { "name": "lait", "quantity": 250, "unit": "mL" }
+      { "name": "lait", "quantity": 250, "unit": "g" }
     ],
     "steps": "Faire bouillir le lait. Hors du feu, ajouter la crème et le sucre, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
     "notes": "",
@@ -416,7 +416,7 @@
       { "name": "sucre", "quantity": 150, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
       { "name": "crème liquide", "quantity": 400, "unit": "mL" },
-      { "name": "lait", "quantity": 250, "unit": "mL" },
+      { "name": "lait", "quantity": 250, "unit": "g" },
       { "name": "chocolat noir", "quantity": 200, "unit": "g" }
     ],
     "steps": "Faire fondre le chocolat noir et réserver.\n\nFaire bouillir le lait. Hors du feu, ajouter la crème, le sucre et le chocolat fondu, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
@@ -570,11 +570,11 @@
     "source": "marmiton.org"
   },
   {
-    "name": "Mousse Noisette",
+    "name": "Bavaroise Noisette",
     "yield": "Environ 1 kg",
     "ingredients": [
       { "name": "pâte de noisette (ou praliné noisette 50%)", "quantity": 250, "unit": "g" },
-      { "name": "lait entier", "quantity": 125, "unit": "mL" },
+      { "name": "lait entier", "quantity": 125, "unit": "g" },
       { "name": "crème liquide (anglaise)", "quantity": 125, "unit": "mL" },
       { "name": "jaune d'œuf", "quantity": 60, "unit": "g" },
       { "name": "sucre", "quantity": 50, "unit": "g" },
@@ -583,6 +583,34 @@
     ],
     "steps": "Chauffer le lait et la crème liquide ensemble jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le mélange lait/crème chaud sur les jaunes en fouettant, puis remettre sur feu doux. Cuire à 82 °C en remuant sans arrêt jusqu'à ce que la crème nappe la cuillère.\n\nHors du feu, ajouter la masse gélatine et la pâte de noisette. Mixer au mixeur plongeant jusqu'à homogénéité parfaite.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois, en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
     "notes": "Utiliser un praliné noisette 70% pour une saveur plus intense et moins sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse Café",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de café", "quantity": 80, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer la pâte de café à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Ajuster la quantité de pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse Praliné",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "praliné noisette/amande", "quantity": 200, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer le praliné à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser un praliné 70% noisette pour une saveur plus intense.",
     "source": "IA"
   }
 ]
