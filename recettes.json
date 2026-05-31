@@ -77,5 +77,19 @@
     "steps": "Tiédir le lait et la crème à 30 °C, y dissoudre la levure, le sel et le sucre.\n\nIncorporer la farine, ajouter les 3/4 des œufs.\n\nPétrir légèrement sans donner trop de corps à la pâte.\n\nAjouter le reste des œufs puis mélanger jusqu'à leur absorption.\n\nFondre le beurre chaud et le verser sur la masse, couvrir sans mélanger.\n\nPlacer à l'étuve à 27/28 °C environ 15 min jusqu'à ce que le beurre tombe sous la pâte.\n\nHomogénéiser la pâte à la maryse et garnir les moules.\n\nLaisser pousser une seconde fois.\n\nEnfourner à 200 °C quelques minutes pour démarrer la pousse régulière, puis baisser à 170/175 °C environ 8 à 10 min.",
     "notes": "",
     "source": "C'est ma fournée !"
+  },
+  {
+    "name": "Pâte à Langues de Chat",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre", "quantity": 60, "unit": "g" },
+      { "name": "farine", "quantity": 60, "unit": "g" },
+      { "name": "sucre en poudre", "quantity": 60, "unit": "g" },
+      { "name": "blanc d'œuf", "quantity": 2, "unit": "pièce" },
+      { "name": "vanille", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Travailler le beurre pour le rendre crémeux.\n\nAjouter le sucre, la vanille et la farine. Bien mélanger.\n\nIncorporer les blancs d'œufs.\n\nBeurrer et fariner la plaque. Dresser des bâtonnets à la poche à douille, suffisamment espacés.\n\nFaire cuire 7 à 8 min à 200 °C. Décoller aussitôt et laisser refroidir.",
+    "notes": "2 gouttes d'extrait de vanille ou 1 sachet de sucre vanillé.",
+    "source": "marmiton.org"
   }
 ]
