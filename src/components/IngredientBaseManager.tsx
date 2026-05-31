@@ -200,10 +200,10 @@ export function IngredientBaseManager({
         <p style={{ fontSize: "0.82rem", color: "var(--danger)" }}>{error}</p>
       )}
 
-      {/* 4 colonnes responsives */}
-      {ingredientBases.length > 0 && (
-        <div className="overflow-x-auto -mx-1 px-1">
-        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "repeat(4, minmax(300px, 1fr))" }}>
+      {/* 4 colonnes responsives — breakout pleine largeur */}
+      {optimisticBases.length > 0 && (
+        <div style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", paddingLeft: "1.5rem", paddingRight: "1.5rem" }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -452,7 +452,7 @@ export function IngredientBaseManager({
         </div>
       )}
 
-      {sorted.length === 0 && ingredientBases.length > 0 && (
+      {sorted.length === 0 && optimisticBases.length > 0 && (
         <p className="text-sm text-[color:var(--muted)]">
           {sort === "none"  ? "Tous les ingrédients ont au moins une recette." :
            sort === "nocap" ? "Toutes les premières lettres sont déjà en majuscule. 🎉" :
