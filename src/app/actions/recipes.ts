@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
+import { normalizeForSearch } from "@/lib/recipes";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -79,6 +80,7 @@ export async function createRecipe(formData: FormData) {
   const recipe = await prisma.recipe.create({
     data: {
       name: data.name,
+      nameNormalized: normalizeForSearch(data.name),
       source: data.source || null,
       notesTips: data.notesTips || null,
       favorite: data.favorite ?? false,
@@ -121,6 +123,7 @@ export async function updateRecipe(id: number, formData: FormData) {
       where: { id },
       data: {
         name: data.name,
+        nameNormalized: normalizeForSearch(data.name),
         source: data.source || null,
         notesTips: data.notesTips || null,
         favorite: data.favorite ?? false,

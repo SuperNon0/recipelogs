@@ -15,10 +15,13 @@ function formatG(value: number): string {
   );
 }
 
-export function RecipeCard({ recipe }: { recipe: RecipeListItem }) {
+export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: string }) {
+  const href = from
+    ? `/recipes/${recipe.id}?from=${encodeURIComponent(from)}`
+    : `/recipes/${recipe.id}`;
   return (
     <Link
-      href={`/recipes/${recipe.id}`}
+      href={href}
       className="fl-card flex flex-col gap-3 hover:border-[color:var(--muted)] transition-colors"
     >
       <div className="flex items-start justify-between gap-2">

@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
+export function normalizeForSearch(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 export type RecipeListItem = {
   id: number;
   name: string;
@@ -25,7 +29,11 @@ export async function listRecipes(opts: {
   const where: Prisma.RecipeWhereInput = {};
 
   if (opts.q && opts.q.trim()) {
-    where.name = { contains: opts.q.trim(), mode: "insensitive" };
+    const normalized = normalizeForSearch(opts.q);
+    where.OR = [
+      { nameNormalized: { contains: normalized, mode: "insensitive" } },
+      { name: { contains: opts.q.trim(), mode: "insensitive" } },
+    ];
   }
   if (opts.favoritesOnly) where.favorite = true;
   if (opts.tag) where.tags = { some: { name: opts.tag } };
@@ -55,10 +63,13 @@ export async function listRecipes(opts: {
     photoPath: r.photoPath,
     favorite: r.favorite,
     rating: r.rating,
-    totalMassG: r.ingredients.reduce(
-      (sum, ing) => sum + (ing.unit === "g" ? Number(ing.quantityG) : 0),
-      0,
-    ),
+    totalMassG: r.ingredients.reduce((sum, ing) => {
+      const q = Number(ing.quantityG);
+      if (!ing.unit || ing.unit === "g") return sum + q;
+      if (ing.unit === "cc") return sum + q * 5;
+      if (ing.unit === "cs") return sum + q * 15;
+      return sum;
+    }, 0),
     tags: r.tags.map((t) => t.name),
     categories: r.categories.map((c) => ({
       id: c.category.id,

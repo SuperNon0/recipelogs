@@ -51,7 +51,12 @@ export function RecipeBody({
   subRecipes: SubRecipeRow[];
 }) {
   const baseTotalG = useMemo(
-    () => ingredients.reduce((s, i) => s + ((!i.unit || i.unit === "g") ? i.quantityG : 0), 0),
+    () => ingredients.reduce((s, i) => {
+      if (!i.unit || i.unit === "g") return s + i.quantityG;
+      if (i.unit === "cc") return s + i.quantityG * 5;
+      if (i.unit === "cs") return s + i.quantityG * 15;
+      return s;
+    }, 0),
     [ingredients],
   );
 
@@ -410,11 +415,19 @@ function IngredientsTable({
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: "0.9rem",
-                  width: 130,
+                  width: 150,
                 }}
               >
                 {ing.unit === "QS" ? (
                   <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                ) : (ing.unit === "cc" || ing.unit === "cs") ? (
+                  <>
+                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
+                    <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
+                      {" "}(≈{formatG((ing.quantityG * coef) * (ing.unit === "cc" ? 5 : 15))})
+                    </span>
+                  </>
                 ) : (
                   <>
                     {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
@@ -459,10 +472,12 @@ function SubRecipeAccordion({
   const [editing, setEditing] = useState(false);
   const [, startTransition] = useTransition();
 
-  const childBaseTotalG = subRecipe.childIngredients.reduce(
-    (s, i) => s + ((!i.unit || i.unit === "g") ? i.quantityG : 0),
-    0,
-  );
+  const childBaseTotalG = subRecipe.childIngredients.reduce((s, i) => {
+    if (!i.unit || i.unit === "g") return s + i.quantityG;
+    if (i.unit === "cc") return s + i.quantityG * 5;
+    if (i.unit === "cs") return s + i.quantityG * 15;
+    return s;
+  }, 0);
 
   const pivotBaseQty = subRecipe.pivotIngredientId
     ? subRecipe.childIngredients.find(
@@ -606,11 +621,19 @@ function SubRecipeAccordion({
                     style={{
                       fontFamily: "var(--font-mono)",
                       fontSize: "0.85rem",
-                      width: 120,
+                      width: 140,
                     }}
                   >
                     {ing.unit === "QS" ? (
                       <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                    ) : (ing.unit === "cc" || ing.unit === "cs") ? (
+                      <>
+                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
+                        <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
+                          {" "}(≈{formatG((ing.quantityG * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
+                        </span>
+                      </>
                     ) : (
                       <>
                         {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}

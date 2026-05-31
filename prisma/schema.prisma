@@ -24,9 +24,10 @@ model Recipe {
   notesTips  String?  @map("notes_tips") @db.Text
   favorite   Boolean  @default(false)
   rating     Int?
-  folderId   Int?     @map("folder_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  folderId       Int?     @map("folder_id")
+  nameNormalized String?  @map("name_normalized")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 

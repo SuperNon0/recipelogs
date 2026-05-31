@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { prisma } from "@/lib/prisma";
+import { normalizeForSearch } from "@/lib/recipes";
 import { parseRecipeKeeperCsv } from "@/lib/importRecipeKeeper";
 import {
   parseRecipeKeeperHtml,
@@ -303,7 +304,7 @@ export async function importRecipeKeeperHtmlOrZip(
 
 // ─── Import JSON ──────────────────────────────────────────────────────────────
 
-const VALID_UNITS = ["g", "L", "mL", "pièce", "QS"] as const;
+const VALID_UNITS = ["g", "L", "cc", "cs", "pièce", "QS"] as const;
 
 type JsonIngredient = { name: string; quantity: number; unit: string };
 type JsonRecipe = {
@@ -364,6 +365,7 @@ export async function importRecipesFromJson(
       await prisma.recipe.create({
         data: {
           name: r.name.trim(),
+          nameNormalized: normalizeForSearch(r.name.trim()),
           source: r.source?.trim() || null,
           notesTips: notesParts.length > 0 ? notesParts.join("\n\n") : null,
           stepsBlock: r.steps?.trim()

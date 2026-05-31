@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeForSearch } from "@/lib/recipes";
 
 /**
  * Liste légère des recettes pour l'autocomplétion de la modal
@@ -24,7 +25,11 @@ export async function GET(req: Request) {
 
   const where: import("@prisma/client").Prisma.RecipeWhereInput = {};
   if (q.trim()) {
-    where.name = { contains: q.trim(), mode: "insensitive" };
+    const normalized = normalizeForSearch(q.trim());
+    where.OR = [
+      { nameNormalized: { contains: normalized, mode: "insensitive" } },
+      { name: { contains: q.trim(), mode: "insensitive" } },
+    ];
   }
   if (onlyNoFolder) {
     where.folderId = null;

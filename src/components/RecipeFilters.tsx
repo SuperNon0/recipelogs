@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 export function RecipeFilters({
   allTags,
@@ -15,9 +15,10 @@ export function RecipeFilters({
   const sp = useSearchParams();
   const [, startTransition] = useTransition();
   const [q, setQ] = useState(sp.get("q") ?? "");
+  const typingRef = useRef(false);
 
   useEffect(() => {
-    setQ(sp.get("q") ?? "");
+    if (!typingRef.current) setQ(sp.get("q") ?? "");
   }, [sp]);
 
   const activeTag = sp.get("tag");
@@ -33,9 +34,11 @@ export function RecipeFilters({
   };
 
   useEffect(() => {
+    typingRef.current = true;
     const t = setTimeout(() => {
+      typingRef.current = false;
       if ((sp.get("q") ?? "") !== q) setParam("q", q || null);
-    }, 300);
+    }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
@@ -47,6 +50,10 @@ export function RecipeFilters({
         placeholder="Rechercher une recette..."
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
       />
 
       {allCategories.length > 0 && (

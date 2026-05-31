@@ -529,9 +529,15 @@ function renderIngredients(items: { name: string; quantityG: number; unit?: stri
   const list = items
     .map((i) => {
       const unit = i.unit ?? "g";
-      const qty = unit === "QS"
-        ? `<span class="ing-qty" style="color:var(--accent,#e8c547);font-weight:600">QS</span>`
-        : `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`;
+      let qty: string;
+      if (unit === "QS") {
+        qty = `<span class="ing-qty" style="color:var(--accent,#e8c547);font-weight:600">QS</span>`;
+      } else if (unit === "cc" || unit === "cs") {
+        const gEquiv = formatG(i.quantityG * (unit === "cc" ? 5 : 15));
+        qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span><span class="ing-unit-muted"> (≈${gEquiv})</span>`;
+      } else {
+        qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`;
+      }
       return `
       <div class="ing-item">
         ${qty}
