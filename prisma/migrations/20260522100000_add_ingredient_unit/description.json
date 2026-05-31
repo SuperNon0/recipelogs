@@ -1,0 +1,8 @@
+{
+  "version": "V1.3",
+  "title": "Colonne unit sur les ingrédients",
+  "changes": [
+    "Ajout de la colonne unit (TEXT, défaut \"g\") sur la table ingredients",
+    "Tous les ingrédients existants conservent l'unité g"
+  ]
+}

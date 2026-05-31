@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
+import { normalizeForSearch } from "@/lib/recipes";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -79,6 +80,7 @@ export async function createRecipe(formData: FormData) {
   const recipe = await prisma.recipe.create({
     data: {
       name: data.name,
+      nameNormalized: normalizeForSearch(data.name),
       source: data.source || null,
       notesTips: data.notesTips || null,
       favorite: data.favorite ?? false,
@@ -121,6 +123,7 @@ export async function updateRecipe(id: number, formData: FormData) {
       where: { id },
       data: {
         name: data.name,
+        nameNormalized: normalizeForSearch(data.name),
         source: data.source || null,
         notesTips: data.notesTips || null,
         favorite: data.favorite ?? false,
@@ -298,13 +301,13 @@ export async function deleteComment(id: number, recipeId: number) {
 
 async function upsertIngredientBases(names: string[]) {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  await Promise.all(
-    unique.map((name) =>
-      prisma.ingredientBase.upsert({
-        where: { name },
-        create: { name },
-        update: {},
-      }),
-    ),
-  );
+  for (const name of unique) {
+    // Chercher une correspondance insensible à la casse pour éviter les doublons
+    const existing = await prisma.ingredientBase.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+    if (!existing) {
+      await prisma.ingredientBase.create({ data: { name } }).catch(() => {});
+    }
+  }
 }

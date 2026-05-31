@@ -146,6 +146,7 @@ export default async function HomePage({
                 ? `Aucune recette dans le dossier « ${currentFolder.name} » pour le moment.`
                 : "Aucune recette sans dossier."
           }
+          from={`/?folder=${folderParam}`}
         />
       )}
 
@@ -230,7 +231,7 @@ function ExplorerView({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {uncategorizedRecipes.slice(0, 6).map((r) => (
-              <RecipeCard key={r.id} recipe={r} />
+              <RecipeCard key={r.id} recipe={r} from="/?folder=none" />
             ))}
           </div>
         </section>
@@ -247,10 +248,12 @@ function RecipeGrid({
   recipes,
   emptyTitle,
   emptyDescription,
+  from,
 }: {
   recipes: Awaited<ReturnType<typeof listRecipes>>;
   emptyTitle: string;
   emptyDescription: string;
+  from?: string;
 }) {
   if (recipes.length === 0) {
     return (
@@ -265,7 +268,7 @@ function RecipeGrid({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {recipes.map((r) => (
-        <RecipeCard key={r.id} recipe={r} />
+        <RecipeCard key={r.id} recipe={r} from={from} />
       ))}
     </div>
   );

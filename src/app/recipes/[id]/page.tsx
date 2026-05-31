@@ -17,10 +17,15 @@ export const dynamic = "force-dynamic";
 
 export default async function RecipePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const backHref = from && from.startsWith("/") ? from : "/";
+  const backLabel = from?.includes("folder=") ? "← Dossier" : "← Recettes";
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
@@ -61,8 +66,8 @@ export default async function RecipePage({
   return (
     <article className="flex flex-col gap-5 max-w-3xl mx-auto">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <Link href="/" className="fl-label hover:text-[color:var(--text)]">
-          ← Recettes
+        <Link href={backHref} className="fl-label hover:text-[color:var(--text)]">
+          {backLabel}
         </Link>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <a

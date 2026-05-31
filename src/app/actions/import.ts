@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { prisma } from "@/lib/prisma";
+import { normalizeForSearch } from "@/lib/recipes";
 import { parseRecipeKeeperCsv } from "@/lib/importRecipeKeeper";
 import {
   parseRecipeKeeperHtml,
@@ -303,8 +304,6 @@ export async function importRecipeKeeperHtmlOrZip(
 
 // ─── Import JSON ──────────────────────────────────────────────────────────────
 
-const VALID_UNITS = ["g", "L", "mL", "pièce", "QS"] as const;
-
 type JsonIngredient = { name: string; quantity: number; unit: string };
 type JsonRecipe = {
   name: string;
@@ -314,6 +313,36 @@ type JsonRecipe = {
   notes?: string | null;
   source?: string | null;
 };
+
+function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; quantityG: number } {
+  const u = (rawUnit ?? "").toLowerCase().trim();
+  const q = Number(rawQty) || 0;
+  switch (u) {
+    case "ml": case "millilitre": case "millilitres": return { unit: "g", quantityG: q };
+    case "cl": case "centilitre": case "centilitres": return { unit: "g", quantityG: q * 10 };
+    case "dl": case "décilitre": case "decilitre": case "décilitres": return { unit: "g", quantityG: q * 100 };
+    case "kg": case "kilogramme": case "kilogrammes": return { unit: "g", quantityG: q * 1000 };
+    case "g": case "gr": case "gramme": case "grammes": return { unit: "g", quantityG: q };
+    case "l": case "litre": case "litres": return { unit: "L", quantityG: q };
+    case "cc": case "cuillère à café": case "cuillere a cafe": return { unit: "cc", quantityG: q };
+    case "cs": case "cuillère à soupe": case "cuillere a soupe": return { unit: "cs", quantityG: q };
+    case "pièce": case "piece": case "pcs": case "unité": case "unite": return { unit: "pièce", quantityG: q };
+    case "qs": return { unit: "QS", quantityG: 0 };
+    default: return { unit: "g", quantityG: q };
+  }
+}
+
+async function upsertIngredientBasesInsensitive(names: string[]) {
+  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  for (const name of unique) {
+    const existing = await prisma.ingredientBase.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+    if (!existing) {
+      await prisma.ingredientBase.create({ data: { name } }).catch(() => {});
+    }
+  }
+}
 
 export async function importRecipesFromJson(
   formData: FormData,
@@ -350,12 +379,10 @@ export async function importRecipesFromJson(
 
       const ingredients = (r.ingredients ?? [])
         .filter((i) => i.name?.trim())
-        .map((i, position) => ({
-          name: i.name.trim(),
-          quantityG: Number(i.quantity) || 0,
-          unit: VALID_UNITS.includes(i.unit as (typeof VALID_UNITS)[number]) ? i.unit : "g",
-          position,
-        }));
+        .map((i, position) => {
+          const norm = normalizeImportUnit(i.unit, i.quantity);
+          return { name: i.name.trim(), quantityG: norm.quantityG, unit: norm.unit, position };
+        });
 
       const notesParts: string[] = [];
       if (r.yield?.trim()) notesParts.push(`Rendement : ${r.yield.trim()}`);
@@ -364,6 +391,7 @@ export async function importRecipesFromJson(
       await prisma.recipe.create({
         data: {
           name: r.name.trim(),
+          nameNormalized: normalizeForSearch(r.name.trim()),
           source: r.source?.trim() || null,
           notesTips: notesParts.length > 0 ? notesParts.join("\n\n") : null,
           stepsBlock: r.steps?.trim()
@@ -373,17 +401,7 @@ export async function importRecipesFromJson(
         },
       });
 
-      const names = ingredients.map((i) => i.name).filter(Boolean);
-      const unique = [...new Set(names)];
-      await Promise.all(
-        unique.map((name) =>
-          prisma.ingredientBase.upsert({
-            where: { name },
-            create: { name },
-            update: {},
-          }),
-        ),
-      );
+      await upsertIngredientBasesInsensitive(ingredients.map((i) => i.name));
 
       imported++;
     } catch (err) {

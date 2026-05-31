@@ -25,13 +25,22 @@ export default async function SettingsPage() {
 
       {/* Mise à jour */}
       <section className="fl-card flex flex-col gap-4">
-        <div>
-          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            Mise à jour du site
-          </h2>
-          <p className="fl-label mt-1">
-            Récupère les dernières évolutions depuis GitHub
-          </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+              Mise à jour du site
+            </h2>
+            <p className="fl-label mt-1">
+              Récupère les dernières évolutions depuis GitHub
+            </p>
+          </div>
+          <Link
+            href="/whats-new"
+            className="fl-btn fl-btn-secondary"
+            style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
+          >
+            📋 Nouveautés
+          </Link>
         </div>
         <DeployButton />
       </section>

@@ -7,8 +7,16 @@ import { RichTextEditor } from "./RichTextEditor";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 
-type IngredientUnit = "g" | "L" | "mL" | "pièce" | "QS";
-const UNITS: IngredientUnit[] = ["g", "L", "mL", "pièce", "QS"];
+type IngredientUnit = "g" | "L" | "cc" | "cs" | "pièce" | "QS";
+const UNITS: IngredientUnit[] = ["g", "L", "cc", "cs", "pièce", "QS"];
+const UNIT_LABELS: Record<IngredientUnit, string> = {
+  g: "g",
+  L: "L",
+  cc: "cc (~5g)",
+  cs: "cs (~15g)",
+  pièce: "pièce",
+  QS: "QS",
+};
 
 type IngredientRow = {
   name: string;
@@ -60,10 +68,13 @@ export function RecipeForm({
   const [ingredientMode, setIngredientMode] = useState<IngredientMode>("list");
   const [freeText, setFreeText] = useState("");
 
-  const totalG = ingredients.reduce(
-    (s, r) => s + (r.unit === "g" ? Number(r.quantity) || 0 : 0),
-    0,
-  );
+  const totalG = ingredients.reduce((s, r) => {
+    const q = Number(r.quantity) || 0;
+    if (r.unit === "g") return s + q;
+    if (r.unit === "cc") return s + q * 5;
+    if (r.unit === "cs") return s + q * 15;
+    return s;
+  }, 0);
 
   const addRow = () =>
     setIngredients((rows) => [...rows, { name: "", quantity: "", unit: "g" }]);
@@ -464,7 +475,7 @@ function UnitSelector({
                 cursor: "pointer",
               }}
             >
-              {u}
+              {UNIT_LABELS[u]}
             </button>
           ))}
         </div>

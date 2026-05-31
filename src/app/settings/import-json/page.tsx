@@ -53,8 +53,9 @@ export default function ImportJsonPage() {
     "yield": "Pour 3/4 de litre",
     "ingredients": [
       { "name": "café en grains", "quantity": 40, "unit": "g" },
-      { "name": "lait frais entier", "quantity": 500, "unit": "mL" },
-      { "name": "jaunes d'œufs", "quantity": 5, "unit": "pièce" }
+      { "name": "lait frais entier", "quantity": 500, "unit": "g" },
+      { "name": "jaunes d'œufs", "quantity": 5, "unit": "pièce" },
+      { "name": "extrait de vanille", "quantity": 1, "unit": "cc" }
     ],
     "steps": "Torréfiez le café 10 min à 140°C...\\n\\nFaites bouillir le lait...",
     "notes": "Vous pouvez décorer avec des macarons café.",
@@ -62,7 +63,8 @@ export default function ImportJsonPage() {
   }
 ]`}</pre>
         <p className="fl-label" style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-          Unités acceptées pour les ingrédients : <code>g</code> · <code>L</code> · <code>mL</code> · <code>pièce</code> · <code>QS</code>
+          Unités natives : <code>g</code> · <code>L</code> · <code>cc</code> · <code>cs</code> · <code>pièce</code> · <code>QS</code>
+          <span style={{ marginLeft: 8 }}>— Converties auto : <code>mL→g</code> · <code>cl→g×10</code> · <code>kg→g×1000</code></span>
         </p>
       </section>
 

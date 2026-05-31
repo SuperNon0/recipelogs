@@ -123,16 +123,67 @@ export async function renameIngredientBase(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
+  const current = await prisma.ingredientBase.findUnique({ where: { id } });
+  if (!current) return { ok: false, error: "Ingrédient introuvable." };
+
   const exists = await prisma.ingredientBase.findFirst({
     where: { name, NOT: { id } },
   });
   if (exists) return { ok: false, error: "Cet ingrédient existe déjà." };
 
-  await prisma.ingredientBase.update({
-    where: { id },
-    data: { name: name.slice(0, 200) },
+  const newName = name.slice(0, 200);
+  const oldName = current.name;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.ingredientBase.update({ where: { id }, data: { name: newName } });
+    // Mettre à jour les ingrédients liés par ID
+    await tx.ingredient.updateMany({
+      where: { ingredientBaseId: id },
+      data: { name: newName },
+    });
+    // Mettre à jour + lier les ingrédients non-liés avec le même nom (insensible à la casse)
+    await tx.$executeRaw`
+      UPDATE ingredients
+      SET name = ${newName}, ingredient_base_id = ${id}
+      WHERE LOWER(name) = LOWER(${oldName}) AND ingredient_base_id IS NULL
+    `;
   });
+
   revalidatePath("/settings/ingredients");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function mergeIngredientBases(
+  sourceId: number,
+  targetId: number,
+): Promise<ActionResult> {
+  if (sourceId === targetId) return { ok: false, error: "Impossible de fusionner un ingrédient avec lui-même." };
+
+  const [source, target] = await Promise.all([
+    prisma.ingredientBase.findUnique({ where: { id: sourceId } }),
+    prisma.ingredientBase.findUnique({ where: { id: targetId } }),
+  ]);
+  if (!source || !target) return { ok: false, error: "Ingrédient introuvable." };
+
+  await prisma.$transaction(async (tx) => {
+    // Réassigner les ingrédients liés à la source vers la cible
+    await tx.ingredient.updateMany({
+      where: { ingredientBaseId: sourceId },
+      data: { ingredientBaseId: targetId, name: target.name },
+    });
+    // Réassigner les ingrédients non-liés qui ont le nom de la source
+    await tx.$executeRaw`
+      UPDATE ingredients
+      SET name = ${target.name}, ingredient_base_id = ${targetId}
+      WHERE LOWER(name) = LOWER(${source.name}) AND ingredient_base_id IS NULL
+    `;
+    // Supprimer la source
+    await tx.ingredientBase.delete({ where: { id: sourceId } });
+  });
+
+  revalidatePath("/settings/ingredients");
+  revalidatePath("/");
   return { ok: true };
 }
 
