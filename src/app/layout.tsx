@@ -43,11 +43,15 @@ export default async function RootLayout({
       </head>
       <body>
         <header className="sticky top-0 z-40 bg-[color:var(--surface)] border-b border-[color:var(--border)]">
-          <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-[60px]">
-            <LogoLink siteUrl={siteUrl} />
-            <span className="fl-label">v0.1 · phase 1-2</span>
+          <div className="max-w-5xl mx-auto flex items-stretch px-4 h-[60px]">
+            <div className="flex items-center pr-6 flex-shrink-0">
+              <LogoLink siteUrl={siteUrl} />
+            </div>
+            <AppNav />
+            <div className="flex items-center flex-shrink-0 pl-4">
+              <span className="fl-label">v0.1 · phase 1-2</span>
+            </div>
           </div>
-          <AppNav />
         </header>
         <main className="max-w-5xl mx-auto px-4 py-6 pb-28">{children}</main>
       </body>

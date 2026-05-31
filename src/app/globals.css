@@ -230,10 +230,12 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--muted);
-  padding: 0.85rem 1rem 0.7rem;
+  padding: 0 1rem;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   transition: color 120ms ease, border-color 120ms ease;
+  display: flex;
+  align-items: center;
 }
 
 .fl-nav-item:hover {
