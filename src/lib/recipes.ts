@@ -137,7 +137,7 @@ export async function listRecipesMinimal(excludeId?: number) {
 export async function listAllIngredientBases() {
   const bases = await prisma.ingredientBase.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, createdAt: true, updatedAt: true },
+    select: { id: true, name: true, category: true, createdAt: true, updatedAt: true },
   });
 
   // Compte les recettes distinctes par base : lien direct OU correspondance de nom (insensible à la casse)

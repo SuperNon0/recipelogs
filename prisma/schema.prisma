@@ -78,6 +78,7 @@ model IngredientBase {
   id          Int      @id @default(autoincrement())
   name        String   @unique
   defaultUnit String   @default("g") @map("default_unit")
+  category    String?  // "base" | "fruit" | "preparation" | null = à classer
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
