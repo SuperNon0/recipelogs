@@ -395,5 +395,45 @@
     "steps": "Incorporer la pâte de café progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
     "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
     "source": ""
+  },
+  {
+    "name": "Crème Brûlée Classique",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "lait", "quantity": 250, "unit": "mL" }
+    ],
+    "steps": "Faire bouillir le lait. Hors du feu, ajouter la crème et le sucre, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Crème Brûlée Chocolat Noir",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "lait", "quantity": 250, "unit": "mL" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" }
+    ],
+    "steps": "Faire fondre le chocolat noir et réserver.\n\nFaire bouillir le lait. Hors du feu, ajouter la crème, le sucre et le chocolat fondu, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "20% de chocolat noir. Sucre réduit à 150 g (au lieu de 200 g) pour compenser l'apport en sucre du chocolat.",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Crème Brûlée Passion",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 175, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "purée de fruit de la passion", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Chauffer doucement la crème avec le sucre sans faire bouillir.\n\nAjouter la purée de passion et mélanger.\n\nIncorporer les jaunes d'œufs délicatement sans fouetter pour éviter les bulles.\n\nVerser dans des ramequins individuels.\n\nCuire au four au bain-marie à 160 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "La purée de passion remplace le lait. Sucre réduit à 175 g pour compenser l'apport sucrant de la purée. Cuisson à 160 °C (plutôt que 180 °C) pour préserver la texture face à l'acidité du fruit. Adaptable avec toute autre purée de fruit.",
+    "source": "marmiton.org"
   }
 ]
