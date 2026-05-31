@@ -7,8 +7,8 @@ const PROMPT = `Tu vas convertir le texte suivant (extrait d'un livre de recette
 Règles strictes :
 - Le résultat est un tableau JSON valide contenant une entrée par recette
 - Champs requis : name (string), yield (string ou null), ingredients (array), steps (string), notes (string), source (string)
-- Unités acceptées UNIQUEMENT : "g", "mL", "L", "pièce", "QS"
-- Conversions : kg→g×1000, cl→mL×10, dl→mL×100, cs→mL×15, cc→mL×5
+- Unités acceptées UNIQUEMENT : "g", "L", "cc", "cs", "pièce", "QS"
+- Conversions : kg→g×1000, mL→g×1, cl→g×10, dl→g×100, cuillère à soupe→"cs" (valeur inchangée), cuillère à café→"cc" (valeur inchangée)
 - Ingrédients décoratifs / "pour le décor" / "QS" → unit:"QS", quantity:0
 - Étapes séparées par \\n\\n dans une seule chaîne, sans numérotation
 - Fractions converties en décimal (1/2→0.5)
@@ -22,14 +22,14 @@ const UNITS_ROWS = [
   ["g, gr, grammes", '"g"', "valeur inchangée"],
   ["kg, kilogrammes", '"g"', "× 1000"],
   ["L, litre", '"L"', "valeur inchangée"],
-  ["dl, dL, décilitre", '"mL"', "× 100"],
-  ["cl, cL, centilitre", '"mL"', "× 10"],
-  ["ml, mL, millilitre", '"mL"', "valeur inchangée"],
+  ["ml, mL, millilitre", '"g"', "× 1 (1 mL ≈ 1 g)"],
+  ["cl, cL, centilitre", '"g"', "× 10"],
+  ["dl, dL, décilitre", '"g"', "× 100"],
+  ["cuillère à soupe (cs)", '"cs"', "valeur inchangée"],
+  ["cuillère à café (cc)", '"cc"', "valeur inchangée"],
   ["pièce, pcs, unité", '"pièce"', "—"],
   ["œuf(s), citron(s)…", '"pièce"', "—"],
   ["feuille(s) de gélatine…", '"pièce"', "—"],
-  ["cuillère à soupe (cs)", '"mL"', "× 15"],
-  ["cuillère à café (cc)", '"mL"', "× 5"],
 ];
 
 export function ConversionPromptSection() {
@@ -175,9 +175,10 @@ export function ConversionPromptSection() {
     "yield": "Pour 3/4 de litre",
     "ingredients": [
       { "name": "café en grains", "quantity": 40, "unit": "g" },
-      { "name": "lait frais entier", "quantity": 500, "unit": "mL" },
+      { "name": "lait frais entier", "quantity": 500, "unit": "g" },
       { "name": "jaunes d'œufs", "quantity": 5, "unit": "pièce" },
       { "name": "sucre", "quantity": 150, "unit": "g" },
+      { "name": "extrait de vanille", "quantity": 1, "unit": "cc" },
       { "name": "grains de café pour le décor", "quantity": 0, "unit": "QS" }
     ],
     "steps": "Torréfiez le café 10 min à 140°C.\\n\\nPortez le lait à ébullition avec le café.\\n\\nMélangez les jaunes avec le sucre, versez le lait chaud filtré.\\n\\nFaites épaissir à feu doux en remuant. Turbinez jusqu'à consistance crémeuse.",

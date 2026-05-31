@@ -13,8 +13,10 @@ Utilise ces instructions pour convertir n'importe quel livre de recettes scanné
     "yield": "Pour 4 personnes",
     "ingredients": [
       { "name": "farine", "quantity": 200, "unit": "g" },
-      { "name": "lait", "quantity": 500, "unit": "mL" },
+      { "name": "lait", "quantity": 500, "unit": "g" },
       { "name": "œufs", "quantity": 3, "unit": "pièce" },
+      { "name": "extrait de vanille", "quantity": 1, "unit": "cc" },
+      { "name": "beurre fondu", "quantity": 2, "unit": "cs" },
       { "name": "vanille", "quantity": 0, "unit": "QS" }
     ],
     "steps": "Étape 1 texte complet...\n\nÉtape 2 texte complet...",
@@ -43,31 +45,34 @@ Utilise ces instructions pour convertir n'importe quel livre de recettes scanné
 
 ## Règles pour les ingrédients
 
-### Unités acceptées
+### Unités natives acceptées
 
 | Unité JSON | Utiliser pour |
 |------------|--------------|
-| `"g"` | grammes (défaut pour solides) |
-| `"mL"` | millilitres (liquides en petite quantité) |
+| `"g"` | grammes (défaut pour solides et liquides) |
 | `"L"` | litres (grands volumes) |
+| `"cc"` | cuillère à café (~5 g) |
+| `"cs"` | cuillère à soupe (~15 g) |
 | `"pièce"` | items comptables (œufs, citrons, feuilles de gélatine…) |
 | `"QS"` | quantité suffisante — pas de quantité numérique |
 
-### Conversions d'unités courantes
+### Conversions d'unités
 
-| Unité dans le livre | Conversion JSON |
-|--------------------|-----------------|
-| g, gr, grammes | `"g"` — valeur inchangée |
-| kg, kilogrammes | `"g"` — multiplier par 1000 |
-| L, litre, litres | `"L"` — valeur inchangée |
-| dl, dL, décilitre | `"mL"` — multiplier par 100 |
-| cl, cL, centilitre | `"mL"` — multiplier par 10 |
-| ml, mL, millilitre | `"mL"` — valeur inchangée |
-| pièce, pcs, unité, u | `"pièce"` |
-| œuf(s), citron(s)… | `"pièce"` |
-| feuille(s) (gélatine…) | `"pièce"` |
-| cuillère(s) à soupe (cs) | `"mL"` — multiplier par 15 |
-| cuillère(s) à café (cc) | `"mL"` — multiplier par 5 |
+| Unité dans le livre | Unité JSON | Conversion de la quantité |
+|--------------------|------------|--------------------------|
+| g, gr, grammes | `"g"` | valeur inchangée |
+| kg, kilogrammes | `"g"` | × 1000 |
+| L, litre, litres | `"L"` | valeur inchangée |
+| ml, mL, millilitre | `"g"` | × 1 (1 mL ≈ 1 g) |
+| cl, cL, centilitre | `"g"` | × 10 |
+| dl, dL, décilitre | `"g"` | × 100 |
+| cuillère à soupe (cs) | `"cs"` | valeur inchangée |
+| cuillère à café (cc) | `"cc"` | valeur inchangée |
+| pièce, pcs, unité, u | `"pièce"` | — |
+| œuf(s), citron(s)… | `"pièce"` | — |
+| feuille(s) (gélatine…) | `"pièce"` | — |
+
+> **Note** : il n'y a plus d'unité `mL` dans RecipeLog. Tous les millilitres sont stockés en grammes (approximation 1:1 valable pour l'eau et la plupart des liquides de pâtisserie).
 
 ### Ingrédients QS (quantité suffisante)
 
@@ -149,6 +154,7 @@ Pour 3/4 de litre environ
 500 mL de lait frais entier
 5 jaunes d'œufs
 150 g de sucre
+1 cuillère à café d'extrait de vanille
 Quelques grains de café pour le décor
 
 Torréfiez le café pendant 10 min à 140°C.
@@ -166,9 +172,10 @@ Faites turbiner jusqu'à consistance crémeuse.
   "yield": "Pour 3/4 de litre",
   "ingredients": [
     { "name": "café en grains", "quantity": 40, "unit": "g" },
-    { "name": "lait frais entier", "quantity": 500, "unit": "mL" },
+    { "name": "lait frais entier", "quantity": 500, "unit": "g" },
     { "name": "jaunes d'œufs", "quantity": 5, "unit": "pièce" },
     { "name": "sucre", "quantity": 150, "unit": "g" },
+    { "name": "extrait de vanille", "quantity": 1, "unit": "cc" },
     { "name": "grains de café pour le décor", "quantity": 0, "unit": "QS" }
   ],
   "steps": "Torréfiez le café pendant 10 min à 140 °C.\n\nPortez le lait à ébullition avec le café. Laissez infuser 5 min hors du feu.\n\nFouettez les jaunes avec le sucre. Versez le lait chaud filtré dessus.\n\nFaites épaissir à feu doux en remuant sans arrêt.\n\nFaites turbiner jusqu'à consistance crémeuse.",
@@ -193,8 +200,8 @@ Tu vas convertir le texte suivant (extrait d'un livre de recettes scanné) en fi
 Règles strictes :
 - Le résultat est un tableau JSON valide contenant une entrée par recette
 - Champs requis : name (string), yield (string ou null), ingredients (array), steps (string), notes (string), source (string)
-- Unités acceptées UNIQUEMENT : "g", "mL", "L", "pièce", "QS"
-- Conversions : kg→g×1000, cl→mL×10, dl→mL×100, cs→mL×15, cc→mL×5
+- Unités acceptées UNIQUEMENT : "g", "L", "cc", "cs", "pièce", "QS"
+- Conversions : kg→g×1000, mL→g×1, cl→g×10, dl→g×100, cuillère à soupe→"cs" (valeur inchangée), cuillère à café→"cc" (valeur inchangée)
 - Ingrédients décoratifs / "pour le décor" / "QS" → unit:"QS", quantity:0
 - Étapes séparées par \n\n dans une seule chaîne, sans numérotation
 - Fractions converties en décimal (1/2→0.5)
@@ -212,7 +219,7 @@ Texte à convertir :
 Avant d'importer dans RecipeLog, vérifie :
 - [ ] Le fichier est un tableau JSON valide (commence par `[`, se termine par `]`)
 - [ ] Chaque recette a au minimum un champ `name`
-- [ ] Toutes les unités sont dans : `g`, `mL`, `L`, `pièce`, `QS`
+- [ ] Toutes les unités sont dans : `g`, `L`, `cc`, `cs`, `pièce`, `QS`
 - [ ] Les quantités QS ont bien `"quantity": 0`
 - [ ] Pas de virgules manquantes entre objets dans le tableau
 
