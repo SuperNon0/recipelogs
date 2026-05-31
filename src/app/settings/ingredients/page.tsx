@@ -9,7 +9,7 @@ export default async function IngredientsSettingsPage() {
   const ingredientBases = await listAllIngredientBases();
 
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <div className="flex flex-col gap-6" style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", padding: "0 1.5rem", boxSizing: "border-box", maxWidth: "1400px", alignSelf: "center" }}>
       <div className="max-w-2xl w-full mx-auto">
         <Link
           href="/settings"

@@ -44,14 +44,14 @@ export default async function RootLayout({
       <body>
         <header className="sticky top-0 z-40 bg-[color:var(--surface)]">
           <div className="border-b border-[color:var(--border)]">
-            <div className="max-w-[1400px] mx-auto flex items-center justify-between px-4 h-[44px]">
+            <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-[52px]">
               <LogoLink siteUrl={siteUrl} />
               <span className="fl-label">v0.1 · phase 1-2</span>
             </div>
           </div>
           <AppNav />
         </header>
-        <main className="max-w-[1400px] mx-auto px-4 py-6 pb-28">{children}</main>
+        <main className="max-w-5xl mx-auto px-4 py-6 pb-28">{children}</main>
       </body>
     </html>
   );
