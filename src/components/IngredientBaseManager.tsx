@@ -271,11 +271,8 @@ export function IngredientBaseManager({
                                 fontFamily: "var(--font-mono)",
                                 color: "var(--text)",
                                 textDecoration: "none",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                wordBreak: "break-word",
                               }}
-                              title={ing.name}
                             >
                               {ing.name}
                             </Link>
