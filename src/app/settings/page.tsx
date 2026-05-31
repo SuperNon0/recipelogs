@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { listAllCategories, listAllFolders, listAllIngredientBases } from "@/lib/recipes";
+import { listAllCategories, listAllFolders } from "@/lib/recipes";
+import { prisma } from "@/lib/prisma";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
 import { DeployButton } from "@/components/DeployButton";
 import { RecipePdfSettingsForm } from "@/components/RecipePdfSettingsForm";
@@ -8,11 +9,11 @@ import { getRecipePdfSettings, getSiteUrl, saveSiteUrl } from "@/app/actions/set
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [categories, folders, ingredientBases, recipePdfSettings, siteUrl] =
+  const [categories, folders, ingredientBaseCount, recipePdfSettings, siteUrl] =
     await Promise.all([
       listAllCategories(),
       listAllFolders(),
-      listAllIngredientBases(),
+      prisma.ingredientBase.count(),
       getRecipePdfSettings(),
       getSiteUrl(),
     ]);
@@ -119,7 +120,7 @@ export default async function SettingsPage() {
             🧂 Ingrédients
           </h2>
           <p className="fl-label mt-1">
-            {ingredientBases.length} ingrédient{ingredientBases.length > 1 ? "s" : ""} dans
+            {ingredientBaseCount} ingrédient{ingredientBaseCount > 1 ? "s" : ""} dans
             la base · autocomplétion à la saisie des recettes
           </p>
         </div>
