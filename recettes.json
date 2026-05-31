@@ -116,7 +116,7 @@
       { "name": "farine T45", "quantity": 125, "unit": "g" },
       { "name": "poudre de noisette", "quantity": 125, "unit": "g" },
       { "name": "sel", "quantity": 0, "unit": "QS" },
-      { "name": "cannelle", "quantity": 5, "unit": "mL" }
+      { "name": "cannelle", "quantity": 3, "unit": "g" }
     ],
     "steps": "",
     "notes": "",
