@@ -37,14 +37,18 @@ export type RecipeSnap = {
   photoPath?: string | null;
   tags?: string[];
   categories?: string[];
-  ingredients: { name: string; quantityG: number; unit?: string }[];
+  ingredients: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
   steps: string | null;
   totalMassG: number;
+  totalMassGMin?: number;
+  totalMassGMax?: number;
   subRecipes: {
     label: string | null;
     childName: string;
-    ingredients: { name: string; quantityG: number; unit?: string }[];
+    ingredients: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
     totalMassG: number;
+    totalMassGMin?: number;
+    totalMassGMax?: number;
     steps: string | null;
   }[];
   multiplier?: number;
@@ -525,13 +529,30 @@ export function buildCss(
 
 // ─── Rendu des morceaux ──────────────────────────────────────────────────────
 
-function renderIngredients(items: { name: string; quantityG: number; unit?: string }[], totalG: number, showTotal: boolean): string {
+function renderIngredients(
+  items: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[],
+  totalMinG: number,
+  totalMaxG: number,
+  showTotal: boolean,
+): string {
   const list = items
     .map((i) => {
       const unit = i.unit ?? "g";
       let qty: string;
       if (unit === "QS") {
         qty = `<span class="ing-qty" style="color:var(--accent,#e8c547);font-weight:600">QS</span>`;
+      } else if (i.quantityGMax != null) {
+        if (unit === "cc" || unit === "cs") {
+          const factor = unit === "cc" ? 5 : 15;
+          qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`
+            + `<span class="ing-unit-muted">/</span>`
+            + `<span class="ing-qty">${formatIngQty(i.quantityGMax, unit)}</span>`
+            + `<span class="ing-unit-muted"> (≈${formatG(i.quantityG * factor)}/${formatG(i.quantityGMax * factor)})</span>`;
+        } else {
+          qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`
+            + `<span class="ing-unit-muted">/</span>`
+            + `<span class="ing-qty">${formatIngQty(i.quantityGMax, unit)}</span>`;
+        }
       } else if (unit === "cc" || unit === "cs") {
         const gEquiv = formatG(i.quantityG * (unit === "cc" ? 5 : 15));
         qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span><span class="ing-unit-muted"> (≈${gEquiv})</span>`;
@@ -545,9 +566,13 @@ function renderIngredients(items: { name: string; quantityG: number; unit?: stri
       </div>`;
     })
     .join("");
-  const totalLine = showTotal && totalG > 0
-    ? `<div class="total-line">Total · ${formatG(totalG)}</div>`
-    : "";
+  let totalLine = "";
+  if (showTotal && totalMinG > 0) {
+    const totalStr = totalMinG !== totalMaxG
+      ? `${formatG(totalMinG)} / ${formatG(totalMaxG)}`
+      : formatG(totalMinG);
+    totalLine = `<div class="total-line">Total · ${totalStr}</div>`;
+  }
   return list + totalLine;
 }
 
@@ -625,7 +650,7 @@ export function renderRecipeCard(
   parentRecipeName?: string,
 ): string {
   const ingHtml = snap.ingredients.length > 0
-    ? renderIngredients(snap.ingredients, snap.totalMassG, theme.showTotalMass)
+    ? renderIngredients(snap.ingredients, snap.totalMassGMin ?? snap.totalMassG, snap.totalMassGMax ?? snap.totalMassG, theme.showTotalMass)
     : "<p class='muted'>Aucun ingrédient.</p>";
 
   const stepsHtml =
@@ -891,6 +916,8 @@ export function buildRecipesHtml(opts: {
           ingredients: sr.ingredients,
           steps: sr.steps,
           totalMassG: sr.totalMassG,
+          totalMassGMin: sr.totalMassGMin,
+          totalMassGMax: sr.totalMassGMax,
           subRecipes: [],
         }));
     for (const sub of subs) {
@@ -939,6 +966,8 @@ export function buildSingleRecipeHtml(
         ingredients: sr.ingredients,
         steps: sr.steps,
         totalMassG: sr.totalMassG,
+        totalMassGMin: sr.totalMassGMin,
+        totalMassGMax: sr.totalMassGMax,
         subRecipes: [],
       };
       return renderRecipeCard(subSnap, "single", null, "", theme, snap.name);
