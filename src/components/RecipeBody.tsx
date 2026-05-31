@@ -51,18 +51,18 @@ export function RecipeBody({
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
 }) {
-  const baseTotalG = useMemo(
-    () => ingredients.reduce((s, i) => {
-      const qty = i.quantityGMax != null
-        ? (i.quantityG + i.quantityGMax) / 2
-        : i.quantityG;
-      if (!i.unit || i.unit === "g") return s + qty;
-      if (i.unit === "cc") return s + qty * 5;
-      if (i.unit === "cs") return s + qty * 15;
-      return s;
-    }, 0),
-    [ingredients],
-  );
+  const [baseTotalMinG, baseTotalMaxG] = useMemo(() => {
+    let min = 0, max = 0;
+    for (const i of ingredients) {
+      const qMin = i.quantityG;
+      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
+      min += qMin * factor;
+      max += qMax * factor;
+    }
+    return [min, max];
+  }, [ingredients]);
+  const baseTotalG = (baseTotalMinG + baseTotalMaxG) / 2;
 
   const [mode, setMode] = useState<Mode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
@@ -105,6 +105,8 @@ export function RecipeBody({
   };
 
   const effectiveTotalG = baseTotalG * globalCoef;
+  const effectiveTotalMinG = baseTotalMinG * globalCoef;
+  const effectiveTotalMaxG = baseTotalMaxG * globalCoef;
 
   return (
     <div className="flex flex-col gap-5">
@@ -130,7 +132,8 @@ export function RecipeBody({
       <IngredientsTable
         ingredients={ingredients}
         coef={globalCoef}
-        totalG={effectiveTotalG}
+        totalMinG={effectiveTotalMinG}
+        totalMaxG={effectiveTotalMaxG}
       />
 
       {subRecipes.length > 0 && (
@@ -393,11 +396,13 @@ function Field({
 function IngredientsTable({
   ingredients,
   coef,
-  totalG,
+  totalMinG,
+  totalMaxG,
 }: {
   ingredients: IngredientRow[];
   coef: number;
-  totalG: number;
+  totalMinG: number;
+  totalMaxG: number;
 }) {
   return (
     <section className="fl-card">
@@ -461,7 +466,9 @@ function IngredientsTable({
               className="pt-3 text-right fl-value-serif"
               style={{ fontSize: "1.1rem" }}
             >
-              {formatG(totalG)}
+              {totalMinG !== totalMaxG ? (
+                <>{formatG(totalMinG)}<span style={{ color: "var(--muted)" }}>/</span>{formatG(totalMaxG)}</>
+              ) : formatG(totalMinG)}
             </td>
             <td className="pt-3 fl-label">Total</td>
           </tr>
@@ -488,15 +495,18 @@ function SubRecipeAccordion({
   const [editing, setEditing] = useState(false);
   const [, startTransition] = useTransition();
 
-  const childBaseTotalG = subRecipe.childIngredients.reduce((s, i) => {
-    const qty = i.quantityGMax != null
-      ? (i.quantityG + i.quantityGMax) / 2
-      : i.quantityG;
-    if (!i.unit || i.unit === "g") return s + qty;
-    if (i.unit === "cc") return s + qty * 5;
-    if (i.unit === "cs") return s + qty * 15;
-    return s;
-  }, 0);
+  const [childBaseTotalMinG, childBaseTotalMaxG] = useMemo(() => {
+    let min = 0, max = 0;
+    for (const i of subRecipe.childIngredients) {
+      const qMin = i.quantityG;
+      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
+      min += qMin * factor;
+      max += qMax * factor;
+    }
+    return [min, max];
+  }, [subRecipe.childIngredients]);
+  const childBaseTotalG = (childBaseTotalMinG + childBaseTotalMaxG) / 2;
 
   const pivotBaseQty = subRecipe.pivotIngredientId
     ? subRecipe.childIngredients.find(
@@ -516,6 +526,8 @@ function SubRecipeAccordion({
     : localCoef * globalCoef;
 
   const effectiveTotalG = childBaseTotalG * effectiveCoef;
+  const effectiveTotalMinG = childBaseTotalMinG * effectiveCoef;
+  const effectiveTotalMaxG = childBaseTotalMaxG * effectiveCoef;
 
   return (
     <div
@@ -557,7 +569,9 @@ function SubRecipeAccordion({
             </span>
           </div>
           <div className="flex gap-3 mt-0.5 text-[0.7rem] text-[color:var(--muted)]">
-            <span>{formatG(effectiveTotalG)}</span>
+            <span>{effectiveTotalMinG !== effectiveTotalMaxG
+              ? `${formatG(effectiveTotalMinG)}/${formatG(effectiveTotalMaxG)}`
+              : formatG(effectiveTotalMinG)}</span>
             <span>{formatCoef(effectiveCoef)}</span>
           </div>
         </div>
@@ -682,7 +696,9 @@ function SubRecipeAccordion({
                   className="pt-2 text-right fl-value-serif"
                   style={{ fontSize: "0.95rem" }}
                 >
-                  {formatG(effectiveTotalG)}
+                  {effectiveTotalMinG !== effectiveTotalMaxG
+                    ? `${formatG(effectiveTotalMinG)}/${formatG(effectiveTotalMaxG)}`
+                    : formatG(effectiveTotalMinG)}
                 </td>
                 <td className="pt-2 fl-label">Total</td>
               </tr>
