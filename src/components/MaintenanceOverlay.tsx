@@ -76,10 +76,10 @@ export function MaintenanceOverlay({
         // Server peut être en train de redémarrer → silencieux
       }
 
-      // 3. Timeout de sécurité : 5 min
-      if (Date.now() - startedAt.current > 5 * 60 * 1000) {
+      // 3. Timeout de sécurité : 12 min (next build + puppeteer peuvent prendre longtemps)
+      if (Date.now() - startedAt.current > 12 * 60 * 1000) {
         setError(
-          "Délai dépassé (5 min). La mise à jour a peut-être échoué — consulte les logs.",
+          "Délai dépassé (12 min). La mise à jour a peut-être échoué — consulte les logs.",
         );
         return;
       }
