@@ -39,7 +39,7 @@ const KNOWN_CATEGORIES = ["base", "fruit", "preparation"] as const;
 const CATEGORIES: { key: IngredientCategory; label: string; emoji: string; color: string }[] = [
   { key: null,          label: "À classer",          emoji: "📋", color: "var(--muted)" },
   { key: "base",        label: "Ingrédient de base",  emoji: "🧂", color: "var(--accent)" },
-  { key: "fruit",       label: "Fruit",               emoji: "🍎", color: "#6db86d" },
+  { key: "fruit",       label: "Arôme",               emoji: "🌿", color: "#6db86d" },
   { key: "preparation", label: "Préparation",          emoji: "🍳", color: "#6b9fd4" },
 ];
 
