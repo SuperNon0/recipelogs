@@ -349,5 +349,51 @@
     "steps": "Mélanger la crème amande et la crème pâtissière jusqu'à obtenir un appareil homogène.",
     "notes": "Ratio 3/4 crème amande — 1/4 crème pâtissière.",
     "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne",
+    "yield": null,
+    "ingredients": [
+      { "name": "sucre semoule", "quantity": 4000, "unit": "g" },
+      { "name": "eau", "quantity": 1.2, "unit": "L" },
+      { "name": "blanc d'œuf", "quantity": 2, "unit": "L" },
+      { "name": "beurre motte", "quantity": 4000, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C.\n\nMonter les blancs d'œufs en neige ferme au batteur.\n\nVerser le sirop chaud en filet sur les blancs montés tout en fouettant pour réaliser la meringue italienne.\n\nLaisser refroidir la meringue à environ 40 °C en continuant de fouetter.\n\nIncorporer le beurre motte (à température ambiante) progressivement en fouettant jusqu'à obtenir une crème lisse et homogène.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Faire fondre le chocolat noir et le laisser tiédir à environ 35 °C.\n\nIncorporer le chocolat fondu progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "10% de chocolat noir.",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Grand Marnier",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "Grand Marnier", "quantity": 75, "unit": "g" }
+    ],
+    "steps": "Incorporer le Grand Marnier progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "3% de Grand Marnier.",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "pâte de café", "quantity": 50, "unit": "g" }
+    ],
+    "steps": "Incorporer la pâte de café progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
+    "source": ""
   }
 ]
