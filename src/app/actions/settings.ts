@@ -195,6 +195,33 @@ export async function deleteIngredientBase(id: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function syncAllIngredientBases(): Promise<ActionResult & { created?: number }> {
+  const rows = await prisma.ingredient.findMany({
+    where: { name: { not: null } },
+    select: { name: true },
+  });
+
+  const unique = [...new Set(rows.map((r) => r.name!.trim()).filter(Boolean))];
+  let created = 0;
+
+  for (const name of unique) {
+    const existing = await prisma.ingredientBase.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+    if (!existing) {
+      try {
+        await prisma.ingredientBase.create({ data: { name } });
+        created++;
+      } catch {
+        // doublon concurrent, on ignore
+      }
+    }
+  }
+
+  revalidatePath("/settings/ingredients");
+  return { ok: true, created };
+}
+
 // ─── Lien externe du logo ────────────────────────────────────────────────────
 
 const SITE_URL_KEY = "siteUrl";

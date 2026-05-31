@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listAllIngredientBases } from "@/lib/recipes";
 import { IngredientBaseManager } from "@/components/IngredientBaseManager";
+import { SyncIngredientsButton } from "@/components/SyncIngredientsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,17 @@ export default async function IngredientsSettingsPage() {
           la base · ajoutés automatiquement à chaque création ou modification de recette
         </p>
       </div>
+
+      <section className="fl-card flex flex-col gap-3">
+        <div>
+          <h2 className="fl-title-serif" style={{ fontSize: "1rem" }}>🔄 Synchronisation</h2>
+          <p className="fl-label mt-1" style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
+            Parcourt toutes les recettes et ajoute les ingrédients manquants dans la base.
+            À faire une fois après un import ou si des ingrédients sont manquants.
+          </p>
+        </div>
+        <SyncIngredientsButton />
+      </section>
 
       <section className="fl-card flex flex-col gap-4">
         <IngredientBaseManager ingredientBases={ingredientBases} />

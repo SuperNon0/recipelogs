@@ -133,10 +133,26 @@ export async function listRecipesMinimal(excludeId?: number) {
 }
 
 export async function listAllIngredientBases() {
-  return prisma.ingredientBase.findMany({
+  const bases = await prisma.ingredientBase.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, name: true, createdAt: true, _count: { select: { usages: true } } },
+    select: { id: true, name: true, createdAt: true },
   });
+
+  // Compte les recettes distinctes par base : lien direct OU correspondance de nom (insensible à la casse)
+  const rows: { id: number; recipe_count: bigint }[] = await prisma.$queryRaw`
+    SELECT ib.id, COUNT(DISTINCT i.recipe_id) AS recipe_count
+    FROM ingredients_base ib
+    LEFT JOIN ingredients i
+      ON i.ingredient_base_id = ib.id
+      OR LOWER(i.name) = LOWER(ib.name)
+    GROUP BY ib.id
+  `;
+  const countMap = new Map(rows.map((r) => [r.id, Number(r.recipe_count)]));
+
+  return bases.map((b) => ({
+    ...b,
+    _count: { usages: countMap.get(b.id) ?? 0 },
+  }));
 }
 
 export async function getIngredientBaseDetail(id: number) {
