@@ -732,5 +732,69 @@
     "steps": "Chauffer le lait avec les zestes de citron jusqu'à frémissement. Laisser infuser 5 min hors du feu, filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Laisser tiédir à 35 °C puis incorporer le jus de citron froid — ne jamais ajouter le jus à chaud pour éviter la coagulation.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
     "notes": "Sucre augmenté à 140 g pour équilibrer l'acidité du citron. Gélatine augmentée à 91 g car l'acidité fragilise la prise. Le jus de citron s'ajoute obligatoirement hors du feu et tiédi pour ne pas faire cailler la crème.",
     "source": "IA"
+  },
+  {
+    "name": "Crémeux Noisette",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "pâte de noisette", "quantity": 100, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 60, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de noisette. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "L'émulsion au beurre à 45 °C est essentielle pour obtenir la texture onctueuse caractéristique du crémeux.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Praliné",
+    "yield": "Environ 950 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 50, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et le praliné. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "Sucre réduit à 50 g car le praliné est déjà sucré. Préférer un praliné 70% pour plus d'intensité.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Cacahuètes",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "pâte de cacahuètes", "quantity": 120, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 60, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de cacahuètes. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "Utiliser une pâte de cacahuètes pure (100% cacahuètes) sans sucre ajouté pour mieux maîtriser la sucrosité finale.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Vanille",
+    "yield": "Environ 850 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer le lait et la crème avec les gousses et les graines jusqu'à frémissement. Laisser infuser 10 min hors du feu puis filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution complète.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "L'infusion à froid prolongée (une nuit au réfrigérateur) intensifie davantage le parfum vanille.",
+    "source": "IA"
   }
 ]
