@@ -1,0 +1,11 @@
+{
+  "version": "V1.4",
+  "title": "Recherche sans accents + unités cc/cs",
+  "changes": [
+    "Activation de l'extension PostgreSQL unaccent",
+    "Ajout de la colonne name_normalized (TEXT) sur les recettes",
+    "Indexation de toutes les recettes existantes pour la recherche sans accents",
+    "Conversion de tous les ingrédients en mL vers g (1 mL → 1 g)",
+    "Ajout des unités cc (cuillère à café ≈ 5g) et cs (cuillère à soupe ≈ 15g)"
+  ]
+}

@@ -23,6 +23,7 @@ sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && pnpm install --frozen-lockfile"
 
 # ── Migrations ──────────────────────────────────────────
 echo "==> Migrations Prisma..."
+DEPLOY_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && pnpm exec prisma migrate deploy"
 
 # ── Build ────────────────────────────────────────────────
@@ -30,6 +31,10 @@ echo "==> Build Next.js..."
 sudo -u "${APP_USER}" bash -c "
   cd ${APP_DIR}
   pnpm exec prisma generate
+
+  # Rapport de déploiement (migrations appliquées + stats DB)
+  pnpm exec tsx scripts/post-deploy-report.ts '${DEPLOY_START}' || echo '⚠ post-deploy-report ignoré'
+
   pnpm build
   # Mode standalone : copier static/ et public/ dans .next/standalone/
   rm -rf .next/standalone/.next/static .next/standalone/public
