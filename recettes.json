@@ -150,7 +150,7 @@
       { "name": "chocolat noir", "quantity": 2042, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nIncorporer le beurre en morceaux et lisser au fouet.\n\nFilmer au contact et refroidir rapidement.",
-    "notes": "20% de chocolat noir sur la masse totale brute (~10 209 g).",
+    "notes": "20% de chocolat noir.",
     "source": "Enzo Dusfour"
   },
   {
@@ -166,7 +166,7 @@
       { "name": "praliné", "quantity": 1531, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer le praliné dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
-    "notes": "15% de praliné sur la masse totale brute (~10 209 g).",
+    "notes": "15% de praliné.",
     "source": "Enzo Dusfour"
   },
   {
@@ -182,7 +182,7 @@
       { "name": "pâte de café", "quantity": 204, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de café dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
-    "notes": "2% de pâte de café sur la masse totale brute (~10 209 g). Ajuster selon l'intensité souhaitée.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
     "source": "Enzo Dusfour"
   },
   {
@@ -198,7 +198,7 @@
       { "name": "pâte de pistaches", "quantity": 1225, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de pistaches dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
-    "notes": "12% de pâte de pistaches sur la masse totale brute (~10 209 g).",
+    "notes": "12% de pâte de pistaches.",
     "source": "Enzo Dusfour"
   },
   {
@@ -229,7 +229,7 @@
       { "name": "chocolat noir", "quantity": 384, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement jusqu'à obtenir une crème légère et homogène.",
-    "notes": "20% de chocolat noir sur la masse totale brute (~1 922 g).",
+    "notes": "20% de chocolat noir.",
     "source": ""
   },
   {
@@ -245,7 +245,7 @@
       { "name": "praliné", "quantity": 288, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis le praliné jusqu'à obtenir une crème légère et homogène.",
-    "notes": "15% de praliné sur la masse totale brute (~1 922 g).",
+    "notes": "15% de praliné.",
     "source": ""
   },
   {
@@ -261,7 +261,7 @@
       { "name": "pâte de café", "quantity": 38, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de café jusqu'à obtenir une crème légère et homogène.",
-    "notes": "2% de pâte de café sur la masse totale brute (~1 922 g). Ajuster selon l'intensité souhaitée.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
     "source": ""
   },
   {
@@ -277,7 +277,7 @@
       { "name": "pâte de pistaches", "quantity": 231, "unit": "g" }
     ],
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de pistaches jusqu'à obtenir une crème légère et homogène.",
-    "notes": "12% de pâte de pistaches sur la masse totale brute (~1 922 g).",
+    "notes": "12% de pâte de pistaches.",
     "source": ""
   }
 ]
