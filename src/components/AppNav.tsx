@@ -14,22 +14,20 @@ const NAV = [
 export function AppNav() {
   const pathname = usePathname();
   return (
-    <nav className="bg-[color:var(--surface)] border-b border-[color:var(--border)] overflow-x-auto fl-scroll-hidden">
-      <div className="max-w-5xl mx-auto flex items-stretch px-2">
-        {NAV.map((item) => {
-          const active = item.match(pathname);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className="fl-nav-item"
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
+    <nav className="flex items-stretch overflow-x-auto fl-scroll-hidden flex-1 min-w-0">
+      {NAV.map((item) => {
+        const active = item.match(pathname);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className="fl-nav-item"
+          >
+            {item.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
