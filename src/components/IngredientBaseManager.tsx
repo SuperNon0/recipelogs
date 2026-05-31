@@ -196,7 +196,7 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -220,11 +220,11 @@ export function IngredientBaseManager({
                   className="flex items-center gap-1.5 mb-2 pb-2"
                   style={{ borderBottom: "1px solid var(--border)" }}
                 >
-                  <span style={{ fontSize: "1rem" }}>{cat.emoji}</span>
+                  <span style={{ fontSize: "1.1rem" }}>{cat.emoji}</span>
                   <span
                     style={{
                       flex: 1,
-                      fontSize: "0.78rem",
+                      fontSize: "0.88rem",
                       fontFamily: "var(--font-mono)",
                       fontWeight: 600,
                       color: cat.color,
@@ -232,7 +232,7 @@ export function IngredientBaseManager({
                   >
                     {cat.label}
                   </span>
-                  <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+                  <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
                     {catItems.length}
                   </span>
                 </div>
@@ -261,7 +261,7 @@ export function IngredientBaseManager({
                               href={`/settings/ingredients/${ing.id}`}
                               className="flex-1 min-w-0 hover:opacity-75"
                               style={{
-                                fontSize: "0.82rem",
+                                fontSize: "0.9rem",
                                 fontFamily: "var(--font-mono)",
                                 color: "var(--text)",
                                 textDecoration: "none",
@@ -275,7 +275,7 @@ export function IngredientBaseManager({
                             </Link>
                             <span
                               style={{
-                                fontSize: "0.68rem",
+                                fontSize: "0.75rem",
                                 color: ing._count.usages === 0 ? "var(--danger)" : "var(--muted)",
                                 flexShrink: 0,
                                 fontFamily: "var(--font-mono)",
@@ -294,7 +294,7 @@ export function IngredientBaseManager({
                                 onClick={() => handleCapitalize(ing.id, ing.name)}
                                 disabled={pending}
                                 className="fl-btn fl-btn-secondary"
-                                style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", fontWeight: 600 }}
+                                style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", fontWeight: 600 }}
                               >
                                 Aa
                               </button>
@@ -311,7 +311,7 @@ export function IngredientBaseManager({
                               }}
                               disabled={pending}
                               className={`fl-btn ${isClassifying ? "fl-btn-primary" : "fl-btn-secondary"}`}
-                              style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem" }}
+                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
                             >
                               {isClassifying ? "✕" : "Classer"}
                             </button>
@@ -320,14 +320,14 @@ export function IngredientBaseManager({
                               onClick={() => isMerging ? cancelMerge() : openMerge(ing.id)}
                               disabled={pending}
                               className={`fl-btn ${isMerging ? "fl-btn-primary" : "fl-btn-secondary"}`}
-                              style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem" }}
+                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
                             >
                               {isMerging ? "✕" : "⇌"}
                             </button>
                             <Link
                               href={`/settings/ingredients/${ing.id}`}
                               className="fl-btn fl-btn-secondary"
-                              style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem" }}
+                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem" }}
                             >
                               →
                             </Link>
@@ -336,7 +336,7 @@ export function IngredientBaseManager({
                               onClick={() => handleDelete(ing.id, ing.name)}
                               disabled={pending}
                               className="fl-btn"
-                              style={{ fontSize: "0.65rem", padding: "0.15rem 0.4rem", color: "var(--danger)" }}
+                              style={{ fontSize: "0.75rem", padding: "0.25rem 0.55rem", color: "var(--danger)" }}
                             >
                               Supp
                             </button>
@@ -355,8 +355,8 @@ export function IngredientBaseManager({
                                       onClick={() => handleSetCategory(ing.id, c.key)}
                                       disabled={pending || isCurrentCol}
                                       style={{
-                                        fontSize: "0.63rem",
-                                        padding: "0.25rem 0.35rem",
+                                        fontSize: "0.72rem",
+                                        padding: "0.3rem 0.45rem",
                                         borderRadius: 6,
                                         border: "1px solid",
                                         borderColor: isCurrentCol ? c.color : "var(--border)",
