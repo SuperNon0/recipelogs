@@ -323,5 +323,20 @@
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer la pâte de pistaches et mélanger jusqu'à homogénéité.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème pistache refroidie à la maryse.",
     "notes": "12% de pâte de pistaches.",
     "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Amandes",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 2000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 2000, "unit": "g" },
+      { "name": "poudre amande", "quantity": 2000, "unit": "g" },
+      { "name": "farine", "quantity": 200, "unit": "g" },
+      { "name": "œufs", "quantity": 2, "unit": "L" },
+      { "name": "rhum", "quantity": 150, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
   }
 ]
