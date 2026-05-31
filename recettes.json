@@ -279,5 +279,49 @@
     "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de pistaches jusqu'à obtenir une crème légère et homogène.",
     "notes": "12% de pâte de pistaches.",
     "source": ""
+  },
+  {
+    "name": "Crème Légère",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème pâtissière refroidie à la maryse.",
+    "notes": "",
+    "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Légère Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème chocolat refroidie à la maryse.",
+    "notes": "25% de chocolat noir.",
+    "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Légère Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 120, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer la pâte de pistaches et mélanger jusqu'à homogénéité.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème pistache refroidie à la maryse.",
+    "notes": "12% de pâte de pistaches.",
+    "source": "Les Friand's"
   }
 ]
