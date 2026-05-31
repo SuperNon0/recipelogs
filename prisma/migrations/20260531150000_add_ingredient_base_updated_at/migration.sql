@@ -1,0 +1,1 @@
+ALTER TABLE "ingredients_base" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT NOW();

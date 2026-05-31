@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   capitalizeIngredientBase,
@@ -9,7 +9,26 @@ import {
   mergeIngredientBases,
 } from "@/app/actions/settings";
 
-type IngredientBase = { id: number; name: string; _count: { usages: number } };
+type IngredientBase = {
+  id: number;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  _count: { usages: number };
+};
+
+type SortKey = "az" | "za" | "most" | "least" | "none" | "nocap" | "newest" | "modified";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "az",       label: "A → Z" },
+  { key: "za",       label: "Z → A" },
+  { key: "most",     label: "+ recettes" },
+  { key: "least",    label: "− recettes" },
+  { key: "none",     label: "Aucune recette" },
+  { key: "nocap",    label: "Majuscule manquante" },
+  { key: "newest",   label: "Ajoutés récemment" },
+  { key: "modified", label: "Modifiés récemment" },
+];
 
 export function IngredientBaseManager({
   ingredientBases,
@@ -19,6 +38,7 @@ export function IngredientBaseManager({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortKey>("az");
   const [mergingId, setMergingId] = useState<number | null>(null);
   const [mergeSearch, setMergeSearch] = useState("");
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
@@ -70,9 +90,25 @@ export function IngredientBaseManager({
     });
   }
 
-  const filtered = ingredientBases.filter((i) =>
-    i.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const sorted = useMemo(() => {
+    let list = ingredientBases.filter((i) =>
+      i.name.toLowerCase().includes(search.toLowerCase()),
+    );
+    if (sort === "none")  list = list.filter((i) => i._count.usages === 0);
+    if (sort === "nocap") list = list.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase());
+    switch (sort) {
+      case "az":       list = [...list].sort((a, b) => a.name.localeCompare(b.name, "fr")); break;
+      case "za":       list = [...list].sort((a, b) => b.name.localeCompare(a.name, "fr")); break;
+      case "most":     list = [...list].sort((a, b) => b._count.usages - a._count.usages); break;
+      case "least":    list = [...list].sort((a, b) => a._count.usages - b._count.usages); break;
+      case "newest":   list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); break;
+      case "modified": list = [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()); break;
+    }
+    return list;
+  }, [ingredientBases, search, sort]);
+
+  const zeroCount  = ingredientBases.filter((i) => i._count.usages === 0).length;
+  const nocapCount = ingredientBases.filter((i) => i.name.charAt(0) !== i.name.charAt(0).toUpperCase()).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -83,22 +119,58 @@ export function IngredientBaseManager({
         </p>
       )}
 
-      {ingredientBases.length > 5 && (
-        <input
-          type="search"
-          placeholder="Filtrer…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="fl-input"
-          style={{ fontSize: "0.9rem" }}
-        />
+      {/* Barre de recherche + tri */}
+      {ingredientBases.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <input
+            type="search"
+            placeholder="Filtrer par nom…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="fl-input"
+            style={{ fontSize: "0.9rem" }}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {SORT_OPTIONS.map((opt) => {
+              const isActive = sort === opt.key;
+              const label =
+                opt.key === "none"  ? `${opt.label}${zeroCount  > 0 ? ` (${zeroCount})`  : ""}` :
+                opt.key === "nocap" ? `${opt.label}${nocapCount > 0 ? ` (${nocapCount})` : ""}` :
+                opt.label;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSort(opt.key)}
+                  style={{
+                    padding: "0.25rem 0.6rem",
+                    fontSize: "0.72rem",
+                    fontFamily: "var(--font-mono)",
+                    borderRadius: 6,
+                    border: "1px solid",
+                    borderColor: isActive ? "var(--accent)" : "var(--border)",
+                    background: isActive ? "rgba(232,197,71,0.12)" : "transparent",
+                    color: isActive ? "var(--accent)" : "var(--muted)",
+                    cursor: "pointer",
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+            {sorted.length} / {ingredientBases.length} ingrédient{ingredientBases.length > 1 ? "s" : ""}
+          </p>
+        </div>
       )}
 
       {error && (
         <p style={{ fontSize: "0.82rem", color: "var(--danger)" }}>{error}</p>
       )}
 
-      {filtered.map((ing) => {
+      {sorted.map((ing) => {
         const firstLetterLower = ing.name.charAt(0) !== ing.name.charAt(0).toUpperCase();
         const isMerging = mergingId === ing.id;
 
@@ -123,8 +195,8 @@ export function IngredientBaseManager({
                 <span style={{ fontSize: "0.9rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", flex: 1 }}>
                   {ing.name}
                 </span>
-                <span style={{ fontSize: "0.75rem", color: "var(--muted)", flexShrink: 0 }}>
-                  {ing._count.usages} recette{ing._count.usages !== 1 ? "s" : ""}
+                <span style={{ fontSize: "0.75rem", color: ing._count.usages === 0 ? "var(--danger)" : "var(--muted)", flexShrink: 0 }}>
+                  {ing._count.usages === 0 ? "0 recette" : `${ing._count.usages} recette${ing._count.usages !== 1 ? "s" : ""}`}
                 </span>
               </Link>
 
@@ -241,8 +313,12 @@ export function IngredientBaseManager({
         );
       })}
 
-      {filtered.length === 0 && ingredientBases.length > 0 && (
-        <p className="text-sm text-[color:var(--muted)]">Aucun résultat pour « {search} ».</p>
+      {sorted.length === 0 && ingredientBases.length > 0 && (
+        <p className="text-sm text-[color:var(--muted)]">
+          {sort === "none"  ? "Tous les ingrédients ont au moins une recette." :
+           sort === "nocap" ? "Toutes les premières lettres sont déjà en majuscule. 🎉" :
+           `Aucun résultat pour « ${search} ».`}
+        </p>
       )}
     </div>
   );
