@@ -202,8 +202,7 @@ export function IngredientBaseManager({
 
       {/* 4 colonnes responsives */}
       {ingredientBases.length > 0 && (
-        <div className="overflow-x-auto -mx-1 px-1">
-        <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "repeat(4, minmax(300px, 1fr))" }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
           {CATEGORIES.map((cat) => {
             const catItems = sorted.filter((ing) =>
               cat.key === null
@@ -450,7 +449,6 @@ export function IngredientBaseManager({
               </div>
             );
           })}
-        </div>
         </div>
       )}
 
