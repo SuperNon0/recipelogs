@@ -435,5 +435,54 @@
     "steps": "Chauffer doucement la crème avec le sucre sans faire bouillir.\n\nAjouter la purée de passion et mélanger.\n\nIncorporer les jaunes d'œufs délicatement sans fouetter pour éviter les bulles.\n\nVerser dans des ramequins individuels.\n\nCuire au four au bain-marie à 160 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
     "notes": "La purée de passion remplace le lait. Sucre réduit à 175 g pour compenser l'apport sucrant de la purée. Cuisson à 160 °C (plutôt que 180 °C) pour préserver la texture face à l'acidité du fruit. Adaptable avec toute autre purée de fruit.",
     "source": "marmiton.org"
+  },
+  {
+    "name": "Mousse Chocolat (Noir & Lait)",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 3, "unit": "L" },
+      { "name": "chocolat noir", "quantity": 3000, "unit": "g" },
+      { "name": "chocolat lait", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 6, "unit": "L" }
+    ],
+    "steps": "Chauffer la première crème et la verser sur les deux chocolats. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 1.5, "unit": "L" },
+      { "name": "chocolat noir", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 3, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat noir. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 0,5 L par kg. Crème froide = 2× crème chaude.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat au Lait",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 1.5, "unit": "L" },
+      { "name": "chocolat lait", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 3, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat au lait. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 0,5 L par kg. Crème froide = 2× crème chaude.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Blanc",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 3, "unit": "L" },
+      { "name": "chocolat blanc", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 6, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat blanc. Mélanger délicatement jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 30 °C (le chocolat blanc est plus sensible à la chaleur).\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 1:1 (le chocolat blanc émulsionne moins facilement). Crème froide = 2× crème chaude.",
+    "source": ""
   }
 ]
