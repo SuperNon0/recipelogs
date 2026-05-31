@@ -553,5 +553,20 @@
     "steps": "Chauffer 1,3 L de purée framboise à 70 °C minimum et réduire à feu doux jusqu'à obtenir 1 L concentré. Cette étape désactive les enzymes qui bloquent la gélatine et concentre les arômes.\n\nAjouter le sucre et le jus de citron à la purée chaude, mélanger.\n\nAjouter la masse gélatine et mélanger jusqu'à fonte complète.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en soulevant la masse, sans trop mélanger pour préserver les arômes volatils de la framboise.\n\nCouler en moules et réserver au froid minimum 4 heures.",
     "notes": "La purée est réduite depuis 1,3 L pour concentrer les arômes. Le citron (12 g) rehausse naturellement la perception fruitée sans se sentir. Sucre réduit à 50 g car la purée concentrée est plus sucrée.",
     "source": ""
+  },
+  {
+    "name": "Mousse au Caramel",
+    "yield": null,
+    "ingredients": [
+      { "name": "sucre", "quantity": 100, "unit": "g" },
+      { "name": "sucre (appareil jaunes)", "quantity": 25, "unit": "g" },
+      { "name": "crème fleurette (caramel)", "quantity": 180, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 3, "unit": "pièce" },
+      { "name": "gélatine", "quantity": 3, "unit": "pièce" },
+      { "name": "crème fleurette (montée)", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "Faire cuire 100 g de sucre à sec jusqu'à caramélisation.\n\nFaire bouillir les 180 g de crème fleurette et la verser sur le caramel pour le décuire et le rendre souple.\n\nBattre les jaunes d'œufs avec les 25 g de sucre jusqu'à blanchiment, puis les incorporer à la crème caramel. Faire cuire doucement à 82 °C sans bouillir (à la nappe).\n\nRamollir les feuilles de gélatine dans de l'eau froide, les égoutter et les ajouter à la préparation chaude. Bien mélanger jusqu'à dissolution.\n\nLaisser refroidir à environ 25 °C.\n\nMonter les 350 g de crème fleurette en crème fouettée ferme.\n\nIncorporer délicatement la crème fouettée à la préparation au caramel à la maryse.\n\nVerser dans des verrines ou moules et laisser prendre au réfrigérateur minimum 3 heures.",
+    "notes": "",
+    "source": "marmiton.org"
   }
 ]
