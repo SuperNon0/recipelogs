@@ -43,17 +43,24 @@ export function IngredientNameInput({
     }, 200);
   };
 
+  const closeDropdown = () => setShow(false);
+
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    // mousedown : desktop, touchstart : mobile
+    function handleOutside(e: Event) {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        setShow(false);
+        closeDropdown();
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   }, []);
 
   return (
@@ -70,7 +77,11 @@ export function IngredientNameInput({
           fetchSuggestions(e.target.value);
         }}
         onFocus={() => {
-          if (suggestions.length > 0) setShow(true);
+          if (suggestions.length > 0 || noMatch) setShow(true);
+        }}
+        onBlur={() => {
+          // Fermeture différée pour laisser le onMouseDown/onTouchEnd des items s'exécuter
+          setTimeout(closeDropdown, 150);
         }}
       />
       {show && (
@@ -93,6 +104,11 @@ export function IngredientNameInput({
               key={s.id}
               type="button"
               onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(s.name);
+                setShow(false);
+              }}
+              onTouchEnd={(e) => {
                 e.preventDefault();
                 onChange(s.name);
                 setShow(false);
@@ -123,36 +139,17 @@ export function IngredientNameInput({
             </button>
           ))}
           {noMatch && value.trim().length >= 2 && (
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setShow(false);
-                setNoMatch(false);
-              }}
+            <div
               style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
                 padding: "0.45rem 0.75rem",
-                fontSize: "0.875rem",
+                fontSize: "0.82rem",
                 fontFamily: "var(--font-mono)",
                 color: "var(--accent)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "var(--border)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "transparent";
+                borderTop: suggestions.length > 0 ? "1px solid var(--border)" : "none",
               }}
             >
-              + Ajouter « {value.trim()} »
-            </button>
+              ✦ Nouvel ingrédient — sera ajouté à la base à l&apos;enregistrement
+            </div>
           )}
         </div>
       )}
