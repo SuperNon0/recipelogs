@@ -972,5 +972,92 @@
     "steps": "Chauffer la purée de passion, la crème et le glucose jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober de chocolat blanc ou lait.",
     "notes": "La passion est naturellement acide — bien vérifier la cristallisation avant d'enrober. Le chocolat blanc équilibre l'acidité du fruit.",
     "source": "IA"
+  },
+  {
+    "name": "Pâtes de Fruits",
+    "yield": "Environ 900 g — cadre 20×20 cm, 2 cm d'épaisseur",
+    "ingredients": [
+      { "name": "purée de fruit (framboise, fraise, passion, mangue, abricot ou griotte)", "quantity": 500, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 450, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" },
+      { "name": "pectine NH", "quantity": 10, "unit": "g" },
+      { "name": "acide citrique", "quantity": 5, "unit": "g" },
+      { "name": "eau", "quantity": 5, "unit": "g" },
+      { "name": "sucre cristal (pour enrobage)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Dissoudre l'acide citrique dans les 5 g d'eau pour préparer la solution. Réserver.\n\nMélanger la pectine NH avec 50 g du sucre semoule. Réserver.\n\nDans une casserole, mélanger la purée de fruit avec les 400 g de sucre semoule restants et le glucose. Chauffer jusqu'à 50 °C en remuant.\n\nVerser le mélange pectine-sucre en pluie fine sur la purée chaude en fouettant énergiquement pour éviter les grumeaux.\n\nPorter à ébullition, puis cuire en remuant constamment jusqu'à 107 °C (thermomètre à sucre indispensable).\n\nHors du feu, ajouter immédiatement la solution d'acide citrique et mélanger rapidement — la masse prend en quelques secondes.\n\nCouler sans attendre dans un cadre légèrement huilé posé sur un tapis silicone. Lisser à la palette.\n\nLaisser refroidir à température ambiante 12 à 24 h sans couvrir.\n\nDémouler, détailler en cubes ou losanges. Rouler chaque pièce dans le sucre cristal et laisser sécher 1 h.",
+    "notes": "Adaptations par fruit :\n— Fraise : même recette, cuire à 107 °C.\n— Passion : purée très acide — réduire l'acide citrique à 3 g (+ 3 g eau). Cuire à 108 °C.\n— Mangue : même recette, cuire à 108 °C.\n— Abricot : même recette, cuire à 107 °C.\n— Griotte : ajouter 15 g de kirsch hors du feu avant la solution acide citrique.\n\nConservation : 3 à 4 semaines dans une boîte hermétique à 17 °C, entre feuilles de papier sulfurisé.",
+    "source": "IA"
+  },
+  {
+    "name": "Caramels Mous",
+    "yield": "Environ 600 g — cadre 20×20 cm, 1,5 cm d'épaisseur",
+    "ingredients": [
+      { "name": "crème liquide entière", "quantity": 200, "unit": "g" },
+      { "name": "beurre", "quantity": 60, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 1, "unit": "pièce" },
+      { "name": "sucre semoule", "quantity": 300, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter la gousse de vanille. Chauffer la crème avec la vanille jusqu'à frémissement. Laisser infuser 10 min hors du feu. Retirer la gousse.\n\nDans une casserole à fond épais, cuire le sucre semoule et le glucose à sec jusqu'à caramel brun doré (175–180 °C).\n\nHors du feu, décuire avec la crème chaude en trois fois, en mélangeant énergiquement entre chaque ajout (attention aux projections).\n\nRemettre sur feu moyen et cuire en remuant jusqu'à 121 °C (stade du caramel mou au boulé).\n\nHors du feu, incorporer le beurre en morceaux en mélangeant jusqu'à homogénéité complète.\n\nCouler dans un cadre légèrement huilé. Laisser refroidir 12 h à température ambiante.\n\nDétailler en cubes ou rectangles. Emballer dans des carrés de cellophane.",
+    "notes": "Variantes :\n— Chocolat : ajouter 80 g de chocolat noir 70 % haché hors du feu, après le beurre, en mélangeant jusqu'à fusion complète.\n— Caramel beurre salé : remplacer le beurre par 80 g de beurre demi-sel, supprimer la vanille, et ajouter 3 g de fleur de sel hors du feu avec le beurre.\n\nConservation : 3 semaines à température ambiante (< 20 °C) dans une boîte hermétique.",
+    "source": "IA"
+  },
+  {
+    "name": "Pâtes d'Amandes Confiserie",
+    "yield": "Environ 1 000 g (recette confiseur 50 %)",
+    "ingredients": [
+      { "name": "amandes mondées", "quantity": 500, "unit": "g" },
+      { "name": "sucre glace", "quantity": 400, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" },
+      { "name": "eau de fleur d'oranger", "quantity": 0, "unit": "QS" },
+      { "name": "arôme amande amère", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Torréfier légèrement les amandes mondées à 150 °C pendant 8 min. Laisser refroidir complètement — ne pas broyer à chaud.\n\nMixer les amandes seules dans un robot-coupe en pulsant jusqu'à poudre très fine. Ne pas dépasser ce stade pour éviter de faire rendre l'huile.\n\nAjouter le sucre glace tamisé et mixer par impulsions brèves jusqu'à mélange homogène.\n\nIncorporer le glucose, puis quelques gouttes d'eau de fleur d'oranger ou d'arôme amande amère si souhaité. Mixer jusqu'à pâte souple et homogène.\n\nAjuster la texture si besoin : quelques gouttes d'eau si trop sèche, un peu de sucre glace si trop collante.\n\nFilmer au contact et laisser reposer 1 h au réfrigérateur avant utilisation.",
+    "notes": "Ratios selon la qualité :\n— Confiseur 50 % : 500 g amandes / 400 g sucre glace / 100 g glucose (recette ci-dessus)\n— Supérieure 60 % : 600 g amandes / 320 g sucre glace / 80 g glucose\n— Extra 66 % : 660 g amandes / 280 g sucre glace / 60 g glucose\n\nConservation : jusqu'à 1 mois au réfrigérateur filmée, ou 3 mois au congélateur.",
+    "source": "IA"
+  },
+  {
+    "name": "Fruits Déguisés",
+    "yield": "Environ 40 à 50 pièces",
+    "ingredients": [
+      { "name": "pâte d'amandes confiserie 60 %", "quantity": 500, "unit": "g" },
+      { "name": "colorants alimentaires gel", "quantity": 0, "unit": "QS" },
+      { "name": "sucre cristal (pour enrobage)", "quantity": 0, "unit": "QS" },
+      { "name": "glucose (pour lustrer)", "quantity": 0, "unit": "QS" },
+      { "name": "clous de girofle (tiges décoratives)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Diviser la pâte d'amandes en portions selon les couleurs souhaitées : rouge (fraise, griotte), orange (orange, abricot), jaune (citron, banane), vert (citron vert, poire).\n\nIncorporer le colorant gel à chaque portion en pétrissant jusqu'à couleur uniforme. Porter des gants pour éviter de teindre les mains.\n\nFaçonner chaque portion : boules légèrement aplaties pour orange, forme pointue en cœur pour fraise, cylindre courbé pour banane, ovale pour abricot. Travailler avec les paumes pour rouler et affiner les formes.\n\nPiquer un clou de girofle en tête de chaque fruit pour figurer le pédoncule.\n\nPour un aspect givré : rouler chaque pièce dans le sucre cristal. Pour un aspect brillant : badigeonner au pinceau de glucose légèrement dilué à l'eau chaude.\n\nDisposer sur papier sulfurisé et laisser sécher 12 à 24 h à l'air libre avant de conditionner.",
+    "notes": "Préférer la pâte d'amandes supérieure (60 %) ou extra (66 %) pour un meilleur goût et une pâte plus souple à façonner.\n\nConservation : 3 à 4 semaines dans une boîte hermétique à 12–16 °C, à l'abri de l'humidité.",
+    "source": "IA"
+  },
+  {
+    "name": "Intérieurs Liqueur (Sucre Candi)",
+    "yield": "Environ 40 à 50 bonbons",
+    "ingredients": [
+      { "name": "fondant pâtissier", "quantity": 400, "unit": "g" },
+      { "name": "glucose", "quantity": 40, "unit": "g" },
+      { "name": "liqueur (rhum, kirsch, Grand Marnier…)", "quantity": 60, "unit": "g" },
+      { "name": "colorant alimentaire gel", "quantity": 0, "unit": "QS" },
+      { "name": "sucre semoule (pour sirop candi)", "quantity": 500, "unit": "g" },
+      { "name": "eau (pour sirop candi)", "quantity": 200, "unit": "g" }
+    ],
+    "steps": "Préparer les intérieurs : chauffer le fondant et le glucose à 55–60 °C en mélangeant jusqu'à consistance souple et lisse. Hors du feu, incorporer la liqueur rapidement en remuant. Ajouter le colorant si souhaité.\n\nCouler la masse dans des moules en silicone demi-sphères ou façonner à la poche en dômes sur papier sulfurisé. Laisser figer 1 h au réfrigérateur.\n\nPréparer le sirop candi : chauffer l'eau et le sucre sans remuer jusqu'à 115–120 °C. Verser délicatement dans un plat profond légèrement humide. Laisser tiédir jusqu'à 80 °C.\n\nImmerger les intérieurs (piqués sur cure-dents ou posés sur grille) dans le sirop à 80 °C pendant 2 à 3 secondes. Déposer sur une grille.\n\nLaisser cristalliser à température ambiante (18–20 °C) pendant 24 à 48 h, à l'abri des courants d'air. Une croûte de sucre candi se forme progressivement autour de l'intérieur liquide.\n\nEnrober optionnellement en chocolat noir tempéré pour une finition classique.",
+    "notes": "La liqueur doit titrer au minimum 30° d'alcool pour que l'intérieur reste liquide sur la durée.\n\nCristallisation : minimum 24 h à 18–20 °C. Une croûte trop fine s'écrase à l'enrobage — attendre 48 h pour plus de résistance.\n\nConservation : 3 semaines à 16–18 °C dans une boîte hermétique.",
+    "source": "IA"
+  },
+  {
+    "name": "Truffes Chocolat",
+    "yield": "Environ 40 truffes",
+    "ingredients": [
+      { "name": "chocolat noir 70 %", "quantity": 300, "unit": "g" },
+      { "name": "crème liquide entière", "quantity": 150, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "cacao en poudre non sucré", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Hacher finement le chocolat noir. Réserver dans un cul-de-poule.\n\nChauffer la crème avec le glucose jusqu'à frémissement. Verser sur le chocolat haché en trois fois, en émulsionnant depuis le centre avec une spatule jusqu'à ganache lisse et brillante.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer 1 min au mixeur plongeant pour parfaire l'émulsion.\n\nFilmer au contact. Laisser cristalliser au réfrigérateur 4 h minimum (idéalement une nuit).\n\nFaçonner des boules à l'aide d'une cuillère parisienne ou d'une poche à douille. Rouler rapidement entre les paumes légèrement farinées de cacao.\n\nPour truffes nature : rouler immédiatement dans le cacao en poudre. Pour truffes enrobées : tremper dans du chocolat noir tempéré, laisser prendre 30 secondes sur grille, puis rouler dans le cacao.",
+    "notes": "Variantes :\n— Rhum : incorporer 20 g de rhum brun hors du feu, avant le beurre.\n— Praliné : remplacer 80 g de chocolat noir par 80 g de praliné noisette.\n— Framboise : remplacer 50 g de crème par 50 g de purée de framboise.\n\nConservation : 2 semaines au réfrigérateur dans une boîte hermétique. Sortir 30 min avant dégustation.",
+    "source": "IA"
   }
 ]
