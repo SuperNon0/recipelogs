@@ -116,6 +116,32 @@ export async function deleteFolder(id: number): Promise<ActionResult> {
 
 // ─── Base d'ingrédients ──────────────────────────────────────────────────────
 
+export async function capitalizeIngredientBase(id: number): Promise<ActionResult> {
+  const current = await prisma.ingredientBase.findUnique({ where: { id } });
+  if (!current) return { ok: false, error: "Ingrédient introuvable." };
+
+  const newName = current.name.charAt(0).toUpperCase() + current.name.slice(1);
+  if (newName === current.name) return { ok: true };
+
+  const exists = await prisma.ingredientBase.findFirst({ where: { name: newName, NOT: { id } } });
+  if (exists) return { ok: false, error: "Cet ingrédient existe déjà avec cette casse." };
+
+  const oldName = current.name;
+  await prisma.$transaction(async (tx) => {
+    await tx.ingredientBase.update({ where: { id }, data: { name: newName } });
+    await tx.ingredient.updateMany({ where: { ingredientBaseId: id }, data: { name: newName } });
+    await tx.$executeRaw`
+      UPDATE ingredients
+      SET name = ${newName}, ingredient_base_id = ${id}
+      WHERE LOWER(name) = LOWER(${oldName}) AND ingredient_base_id IS NULL
+    `;
+  });
+
+  revalidatePath("/settings/ingredients");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 export async function renameIngredientBase(
   id: number,
   formData: FormData,
