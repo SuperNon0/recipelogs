@@ -9,8 +9,8 @@ export default async function IngredientsSettingsPage() {
   const ingredientBases = await listAllIngredientBases();
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
+    <div className="flex flex-col gap-6">
+      <div className="max-w-2xl">
         <Link
           href="/settings"
           className="fl-label hover:text-[color:var(--text)]"
@@ -27,7 +27,7 @@ export default async function IngredientsSettingsPage() {
         </p>
       </div>
 
-      <section className="fl-card flex flex-col gap-3">
+      <section className="fl-card flex flex-col gap-3 max-w-2xl">
         <div>
           <h2 className="fl-title-serif" style={{ fontSize: "1rem" }}>🔄 Synchronisation</h2>
           <p className="fl-label mt-1" style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
