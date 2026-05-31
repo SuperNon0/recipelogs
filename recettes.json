@@ -338,5 +338,16 @@
     "steps": "",
     "notes": "",
     "source": ""
+  },
+  {
+    "name": "Frangipane",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème amande", "quantity": 900, "unit": "g" },
+      { "name": "crème pâtissière Friand's", "quantity": 300, "unit": "g" }
+    ],
+    "steps": "Mélanger la crème amande et la crème pâtissière jusqu'à obtenir un appareil homogène.",
+    "notes": "Ratio 3/4 crème amande — 1/4 crème pâtissière.",
+    "source": ""
   }
 ]
