@@ -50,6 +50,7 @@ model Recipe {
   @@index([updatedAt(sort: Desc)])
   @@index([favorite])
   @@index([folderId])
+  @@index([nameNormalized])
   @@map("recipes")
 }
 
@@ -169,6 +170,7 @@ model RecipeCategory {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@id([recipeId, categoryId])
+  @@index([categoryId])
   @@map("recipes_categories")
 }
 

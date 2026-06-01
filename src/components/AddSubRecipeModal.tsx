@@ -3,31 +3,39 @@
 import { useState } from "react";
 import { ModalOverlay } from "./RecipeBody";
 import { addSubRecipe } from "@/app/actions/subRecipes";
+import { fetchAvailableRecipes } from "@/app/actions/modals";
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 
-export function AddSubRecipeButton({
-  parentId,
-  availableRecipes,
-}: {
-  parentId: number;
-  availableRecipes: { id: number; name: string }[];
-}) {
+export function AddSubRecipeButton({ parentId }: { parentId: number }) {
   const [open, setOpen] = useState(false);
+  const [recipes, setRecipes] = useState<{ id: number; name: string }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleOpen = async () => {
+    if (!recipes) {
+      setLoading(true);
+      const data = await fetchAvailableRecipes(parentId);
+      setRecipes(data);
+      setLoading(false);
+    }
+    setOpen(true);
+  };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
+        disabled={loading}
         className="fl-btn fl-btn-edit"
       >
-        + Ajouter une sous-recette
+        {loading ? "Chargement…" : "+ Ajouter une sous-recette"}
       </button>
-      {open && (
+      {open && recipes && (
         <AddSubRecipeModal
           parentId={parentId}
-          availableRecipes={availableRecipes}
+          availableRecipes={recipes}
           onClose={() => setOpen(false)}
         />
       )}

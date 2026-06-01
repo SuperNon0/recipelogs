@@ -1,14 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getRecipeDetail, listRecipesMinimal } from "@/lib/recipes";
-import { listCookbooks } from "@/lib/cookbooks";
+import { getRecipeDetail } from "@/lib/recipes";
 import { RecipeActions } from "@/components/RecipeActions";
 import { CommentsSection } from "@/components/CommentsSection";
 import { RecipeBody, type SubRecipeRow } from "@/components/RecipeBody";
 import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
 import { AddToCookbookButton } from "@/components/AddToCookbookModal";
 import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
-import { listShoppingLists } from "@/lib/shopping";
 import { ShareButton } from "@/components/ShareButton";
 import { getActiveToken } from "@/lib/share";
 import { sanitizeRichText, looksLikeHtml } from "@/lib/sanitizeRichText";
@@ -29,11 +27,8 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();
 
-  const [recipe, available, cookbooks, shoppingLists, shareToken] = await Promise.all([
+  const [recipe, shareToken] = await Promise.all([
     getRecipeDetail(recipeId),
-    listRecipesMinimal(recipeId),
-    listCookbooks(),
-    listShoppingLists(),
     getActiveToken("recipe", recipeId),
   ]);
   if (!recipe) notFound();
@@ -79,10 +74,7 @@ export default async function RecipePage({
           >
             ⬇ PDF
           </a>
-          <AddToShoppingListButton
-            recipeId={recipe.id}
-            lists={shoppingLists.map((l) => ({ id: l.id, name: l.name }))}
-          />
+          <AddToShoppingListButton recipeId={recipe.id} />
           <ShareButton
             entityType="recipe"
             entityId={recipe.id}
@@ -90,9 +82,8 @@ export default async function RecipePage({
           />
           <AddToCookbookButton
             recipeId={recipe.id}
-            cookbooks={cookbooks.map((c) => ({ id: c.id, name: c.name }))}
             totalMassG={ingredients.reduce((s, i) => s + (i.unit === "g" ? i.quantityG : 0), 0)}
-            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG, quantityGMax: i.quantityGMax, unit: i.unit }))}
+            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG }))}
           />
           <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
         </div>
@@ -157,10 +148,7 @@ export default async function RecipePage({
       />
 
       <div className="flex">
-        <AddSubRecipeButton
-          parentId={recipe.id}
-          availableRecipes={available}
-        />
+        <AddSubRecipeButton parentId={recipe.id} />
       </div>
 
       {recipe.stepsBlock?.content && (
