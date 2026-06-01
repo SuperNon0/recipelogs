@@ -16,9 +16,11 @@ const DEBOUNCE_MS = 200;
 
 export function AddRecipesToCookbookModal({
   cookbookId,
+  existingRecipeIds = [],
   onClose,
 }: {
   cookbookId: number;
+  existingRecipeIds?: number[];
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -51,7 +53,7 @@ export function AddRecipesToCookbookModal({
       const myId = ++reqIdRef.current;
       setLoading(true);
       try {
-        const params = new URLSearchParams({ limit: "100" });
+        const params = new URLSearchParams({ limit: "0" });
         if (query.trim()) params.set("q", query.trim());
         const res = await fetch(`/api/recipes?${params.toString()}`);
         if (myId !== reqIdRef.current) return;
@@ -99,7 +101,8 @@ export function AddRecipesToCookbookModal({
     });
   }
 
-  const visibleOptions = options.filter((o) => !selected.has(o.id));
+  const existingSet = new Set(existingRecipeIds);
+  const visibleOptions = options.filter((o) => !selected.has(o.id) && !existingSet.has(o.id));
 
   return (
     <div

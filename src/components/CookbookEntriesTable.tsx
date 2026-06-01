@@ -132,6 +132,7 @@ export function CookbookEntriesTable({
       {showAddModal && (
         <AddRecipesToCookbookModal
           cookbookId={cookbookId}
+          existingRecipeIds={entries.filter((e): e is RecipeEntry => e.type === "recipe").map((e) => e.recipeId)}
           onClose={() => setShowAddModal(false)}
         />
       )}
