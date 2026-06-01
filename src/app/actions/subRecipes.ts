@@ -81,6 +81,7 @@ export async function updateSubRecipe(
   const pivotIngredientId = pivotIngredientIdRaw
     ? Number(pivotIngredientIdRaw)
     : null;
+  const isExact = formData.get("isExact") === "true";
 
   if (!label) return { ok: false, error: "Le label est obligatoire." };
   if (!Number.isFinite(calcValueRaw) || calcValueRaw <= 0) {
@@ -97,6 +98,7 @@ export async function updateSubRecipe(
       calcMode,
       calcValue: calcValueRaw,
       pivotIngredientId,
+      isExact: calcMode === "mass_target" ? isExact : false,
     },
   });
   revalidatePath(`/recipes/${parentId}`);
@@ -118,5 +120,4 @@ export async function toggleSubRecipeLock(id: number, parentId: number) {
     where: { id },
     data: { isLocked: !current.isLocked },
   });
-  revalidatePath(`/recipes/${parentId}`);
 }

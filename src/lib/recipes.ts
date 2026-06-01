@@ -54,7 +54,6 @@ export async function listRecipes(opts: {
       ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } },
     },
     orderBy: { updatedAt: "desc" },
-    take: 200,
   });
 
   return recipes.map((r) => ({

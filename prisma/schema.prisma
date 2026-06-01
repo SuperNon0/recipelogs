@@ -124,6 +124,7 @@ model SubRecipe {
   calcValue  Decimal  @default(1) @map("calc_value") @db.Decimal(12, 4)
   pivotIngredientId Int? @map("pivot_ingredient_id")
   isLocked   Boolean  @default(false) @map("is_locked")
+  isExact    Boolean  @default(false) @map("is_exact")
   position   Int      @default(0)
 
   parent Recipe @relation("SubRecipeParent", fields: [parentId], references: [id], onDelete: Cascade)

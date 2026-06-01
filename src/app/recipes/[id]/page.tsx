@@ -50,6 +50,7 @@ export default async function RecipePage({
     calcValue: Number(link.calcValue),
     pivotIngredientId: link.pivotIngredientId,
     isLocked: link.isLocked,
+    isExact: link.isExact,
     childIngredients: link.child.ingredients.map((i) => ({
       id: i.id,
       name: i.name ?? i.ingredientBase?.name ?? "—",

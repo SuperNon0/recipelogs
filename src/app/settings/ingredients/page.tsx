@@ -40,7 +40,7 @@ export default async function IngredientsSettingsPage() {
 
       <section
         className="fl-card flex flex-col gap-4"
-        style={{ width: "100vw", marginLeft: "calc(-50vw + 50%)", padding: "1.3rem 1.5rem", boxSizing: "border-box", maxWidth: "1400px", alignSelf: "center" }}
+        style={{ marginLeft: "-1rem", marginRight: "-1rem", width: "calc(100% + 2rem)", boxSizing: "border-box", padding: "1.3rem 1.5rem" }}
       >
         <IngredientBaseManager ingredientBases={ingredientBases} />
       </section>

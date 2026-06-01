@@ -233,17 +233,28 @@ export function AddRecipesToCookbookModal({
                   style={{ width: 110 }}
                 />
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={forceExact}
-                  onChange={(e) => setForceExact(e.target.checked)}
-                  style={{ width: 15, height: 15, cursor: "pointer", accentColor: "var(--accent)" }}
-                />
-                <span className="fl-label" style={{ fontWeight: forceExact ? 600 : 400, color: forceExact ? "var(--accent)" : "var(--muted)" }}>
-                  Masse exacte (ajuste ±1 g sur les plus gros ingrédients)
-                </span>
-              </label>
+              <button
+                type="button"
+                onClick={() => setForceExact((v) => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                  padding: "0.45rem 0.75rem",
+                  borderRadius: 8,
+                  border: "1px solid",
+                  borderColor: forceExact ? "var(--accent)" : "var(--border)",
+                  background: forceExact ? "rgba(232,197,71,0.15)" : "transparent",
+                  color: forceExact ? "var(--accent)" : "var(--muted)",
+                  fontSize: "0.78rem",
+                  fontFamily: "var(--font-mono)",
+                  cursor: "pointer",
+                  fontWeight: forceExact ? 600 : 400,
+                  width: "100%",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: "1rem" }}>{forceExact ? "⚖️" : "≈"}</span>
+                Masse exacte — ajuste ±1 g sur les plus gros ingrédients
+              </button>
               {!forceExact && (
                 <p className="fl-label" style={{ fontWeight: 400, color: "var(--muted)", fontSize: "0.72rem" }}>
                   La masse réelle peut être légèrement supérieure (arrondi au gramme supérieur).
