@@ -54,11 +54,13 @@ export function RecipeBody({
   const [baseTotalMinG, baseTotalMaxG] = useMemo(() => {
     let min = 0, max = 0;
     for (const i of ingredients) {
-      const qMin = i.quantityG;
-      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
-      min += qMin * factor;
-      max += qMax * factor;
+      const qMin = i.unit === "L" ? i.quantityG * 1000
+        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const qMax = i.unit === "L" ? rawMax * 1000
+        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      min += qMin;
+      max += qMax;
     }
     return [min, max];
   }, [ingredients]);
@@ -108,11 +110,17 @@ export function RecipeBody({
   const [roundedTotalMin, roundedTotalMax] = useMemo(() => {
     let min = 0, max = 0;
     for (const ing of ingredients) {
-      const factor = (!ing.unit || ing.unit === "g") ? 1
-        : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-      min += Math.ceil(ing.quantityG * globalCoef) * factor;
-      const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-      max += Math.ceil(qMax * globalCoef) * factor;
+      if (ing.unit === "L") {
+        min += Math.ceil(ing.quantityG * globalCoef * 1000);
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * globalCoef * 1000);
+      } else {
+        const factor = (!ing.unit || ing.unit === "g") ? 1
+          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+        min += Math.ceil(ing.quantityG * globalCoef) * factor;
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * globalCoef) * factor;
+      }
     }
     return [min, max];
   }, [ingredients, globalCoef]);
@@ -408,7 +416,7 @@ function scaledQty(qty: number, unit: string | undefined | null, coef: number): 
   return Math.ceil(qty * coef).toLocaleString("fr-FR");
 }
 function scaledUnit(unit: string | undefined | null): string {
-  if (unit === "L") return "mL";
+  if (unit === "L") return "g";
   return unit ?? "g";
 }
 
@@ -521,11 +529,13 @@ function SubRecipeAccordion({
   const [childBaseTotalMinG, childBaseTotalMaxG] = useMemo(() => {
     let min = 0, max = 0;
     for (const i of subRecipe.childIngredients) {
-      const qMin = i.quantityG;
-      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
-      min += qMin * factor;
-      max += qMax * factor;
+      const qMin = i.unit === "L" ? i.quantityG * 1000
+        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const qMax = i.unit === "L" ? rawMax * 1000
+        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      min += qMin;
+      max += qMax;
     }
     return [min, max];
   }, [subRecipe.childIngredients]);
@@ -551,11 +561,17 @@ function SubRecipeAccordion({
   const [roundedChildMin, roundedChildMax] = useMemo(() => {
     let min = 0, max = 0;
     for (const ing of subRecipe.childIngredients) {
-      const factor = (!ing.unit || ing.unit === "g") ? 1
-        : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-      min += Math.ceil(ing.quantityG * effectiveCoef) * factor;
-      const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-      max += Math.ceil(qMax * effectiveCoef) * factor;
+      if (ing.unit === "L") {
+        min += Math.ceil(ing.quantityG * effectiveCoef * 1000);
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * effectiveCoef * 1000);
+      } else {
+        const factor = (!ing.unit || ing.unit === "g") ? 1
+          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+        min += Math.ceil(ing.quantityG * effectiveCoef) * factor;
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * effectiveCoef) * factor;
+      }
     }
     return [min, max];
   }, [subRecipe.childIngredients, effectiveCoef]);
