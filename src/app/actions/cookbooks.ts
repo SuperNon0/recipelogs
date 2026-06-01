@@ -473,7 +473,7 @@ export async function convertToLinked(entryId: number, cookbookId: number) {
 
 // ─── Modification de la masse d'une recette figée ────────────────────────────
 
-type SnapIngredient = { name: string; quantityG: number };
+type SnapIngredient = { name: string; quantityG: number; unit?: string; quantityGMax?: number | null };
 type SnapData = {
   ingredients: SnapIngredient[];
   totalMassG: number;
