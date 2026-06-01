@@ -128,7 +128,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     // Si verrouillée : le coefficient parent ne s'applique pas
     const effectiveCoef = link.isLocked ? localCoef : localCoef * k;
 
-    const childIngredients = rawIngredients.map((i) => {
+    let childIngredients = rawIngredients.map((i) => {
       const unit = i.unit ?? "g";
       const scaled = scaleQty(Number(i.quantityG), unit, effectiveCoef);
       const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, effectiveCoef) : null;
@@ -139,6 +139,10 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
         unit: scaled.unit,
       };
     });
+    if (link.isExact && link.calcMode === "mass_target") {
+      const effectiveTargetG = link.isLocked ? Number(link.calcValue) : Number(link.calcValue) * k;
+      childIngredients = adjustToTarget(childIngredients, effectiveTargetG).ingredients;
+    }
     const childTotalGMin = childIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
     const childTotalGMax = childIngredients.reduce(
       (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
@@ -149,6 +153,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       calcMode: link.calcMode,
       calcValue: Number(link.calcValue),
       isLocked: link.isLocked,
+      isExact: link.isExact,
       ingredients: childIngredients,
       totalMassG: (childTotalGMin + childTotalGMax) / 2,
       totalMassGMin: childTotalGMin,
