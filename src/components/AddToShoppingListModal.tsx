@@ -3,36 +3,55 @@
 import { useState, useTransition } from "react";
 import { addRecipeToList } from "@/app/actions/shopping";
 import { ModalOverlay } from "./RecipeBody";
+import { fetchShoppingListsForModal } from "@/app/actions/modals";
 
 type ShoppingList = { id: number; name: string };
 
-export function AddToShoppingListButton({
-  recipeId,
-  lists,
-}: {
-  recipeId: number;
-  lists: ShoppingList[];
-}) {
+export function AddToShoppingListButton({ recipeId }: { recipeId: number }) {
   const [open, setOpen] = useState(false);
+  const [lists, setLists] = useState<ShoppingList[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (lists.length === 0) return null;
+  const handleOpen = async () => {
+    if (!lists) {
+      setLoading(true);
+      const data = await fetchShoppingListsForModal();
+      setLists(data);
+      setLoading(false);
+    }
+    setOpen(true);
+  };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
+        disabled={loading}
         className="fl-btn fl-btn-secondary"
         style={{ fontSize: "0.8rem" }}
       >
-        🛒 Ajouter à la liste
+        {loading ? "…" : "🛒 Ajouter à la liste"}
       </button>
-      {open && (
+      {open && lists && lists.length > 0 && (
         <AddToShoppingListModal
           recipeId={recipeId}
           lists={lists}
           onClose={() => setOpen(false)}
         />
+      )}
+      {open && lists && lists.length === 0 && (
+        <ModalOverlay onClose={() => setOpen(false)}>
+          <div className="flex flex-col gap-4" style={{ minWidth: 280 }}>
+            <h2 className="fl-title-serif" style={{ fontSize: "1.2rem" }}>Ajouter à la liste</h2>
+            <p className="fl-label" style={{ fontWeight: 400 }}>
+              Aucune liste de courses disponible. Créez-en une dans la section Courses.
+            </p>
+            <button type="button" onClick={() => setOpen(false)} className="fl-btn fl-btn-secondary">
+              Fermer
+            </button>
+          </div>
+        </ModalOverlay>
       )}
     </>
   );

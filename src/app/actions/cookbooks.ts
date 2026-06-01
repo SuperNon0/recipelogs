@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { buildRecipeSnapshot, adjustSnapshotToTarget } from "@/lib/cookbooks";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -146,6 +146,88 @@ export async function addMultipleRecipesToCookbook(
 
   revalidatePath(`/cookbooks/${cookbookId}`);
   return { ok: true, added: toAdd.length, skipped };
+}
+
+export async function addMultipleRecipesWithMassTarget(
+  cookbookId: number,
+  recipeIds: number[],
+  targetMassG: number,
+  forceExact = false,
+): Promise<ActionResult & { added?: number; skipped?: number }> {
+  if (!recipeIds.length) return { ok: false, error: "Aucune recette sélectionnée." };
+  if (!Number.isFinite(targetMassG) || targetMassG <= 0)
+    return { ok: false, error: "Masse cible invalide." };
+
+  const cookbook = await prisma.cookbook.findUnique({ where: { id: cookbookId }, select: { id: true } });
+  if (!cookbook) return { ok: false, error: "Cahier introuvable." };
+
+  const existing = await prisma.cookbookRecipe.findMany({
+    where: { cookbookId },
+    select: { recipeId: true, position: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.recipeId));
+  const maxPos = existing.reduce((m, e) => Math.max(m, e.position), -1);
+
+  const toAdd = recipeIds.filter((id) => !existingIds.has(id));
+  const skipped = recipeIds.length - toAdd.length;
+  if (toAdd.length === 0) return { ok: true, added: 0, skipped };
+
+  let added = 0;
+  for (let i = 0; i < toAdd.length; i++) {
+    const r = await prisma.recipe.findUnique({
+      where: { id: toAdd[i] },
+      select: { ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } } },
+    });
+    if (!r) continue;
+
+    // Masse totale de base de la recette
+    const baseTotalG = r.ingredients.reduce((sum, ing) => {
+      const q = ing.quantityGMax != null
+        ? (Number(ing.quantityG) + Number(ing.quantityGMax)) / 2
+        : Number(ing.quantityG);
+      const u = ing.unit ?? "g";
+      if (!u || u === "g") return sum + q;
+      if (u === "cc") return sum + q * 5;
+      if (u === "cs") return sum + q * 15;
+      if (u === "L") return sum + q * 1000;
+      return sum;
+    }, 0);
+
+    const multiplier = baseTotalG > 0 ? targetMassG / baseTotalG : 1;
+    let snap = await buildRecipeSnapshot(toAdd[i], multiplier);
+    if (!snap) continue;
+
+    // Si forceExact : ajuster les ingrédients pour atteindre exactement la cible
+    if (forceExact) {
+      const { ingredients, totalMassGMin, totalMassGMax } = adjustSnapshotToTarget(
+        snap.ingredients,
+        targetMassG,
+      );
+      snap = {
+        ...snap,
+        ingredients,
+        totalMassGMin,
+        totalMassGMax,
+        totalMassG: (totalMassGMin + totalMassGMax) / 2,
+      };
+    }
+
+    await prisma.cookbookRecipe.create({
+      data: {
+        cookbookId,
+        recipeId: toAdd[i],
+        position: maxPos + 1 + i,
+        linkMode: "snapshot",
+        subrecipeMode: "single",
+        snapshotData: snap as unknown as Prisma.InputJsonValue,
+        snapshotDate: new Date(),
+      },
+    });
+    added++;
+  }
+
+  revalidatePath(`/cookbooks/${cookbookId}`);
+  return { ok: true, added, skipped };
 }
 
 export async function addRecipeToCookbook(

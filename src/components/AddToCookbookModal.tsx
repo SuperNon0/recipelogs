@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { addRecipeToCookbook } from "@/app/actions/cookbooks";
 import { ModalOverlay } from "./RecipeBody";
+import { fetchCookbooksForModal } from "@/app/actions/modals";
 
 type Cookbook = { id: number; name: string };
 type Ingredient = { name: string; quantityG: number };
@@ -10,30 +11,39 @@ type CalcMode = "coefficient" | "mass" | "pivot";
 
 export function AddToCookbookButton({
   recipeId,
-  cookbooks,
   totalMassG,
   ingredients,
 }: {
   recipeId: number;
-  cookbooks: Cookbook[];
   totalMassG: number;
   ingredients: Ingredient[];
 }) {
   const [open, setOpen] = useState(false);
+  const [cookbooks, setCookbooks] = useState<Cookbook[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (cookbooks.length === 0) return null;
+  const handleOpen = async () => {
+    if (!cookbooks) {
+      setLoading(true);
+      const data = await fetchCookbooksForModal();
+      setCookbooks(data);
+      setLoading(false);
+    }
+    setOpen(true);
+  };
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
+        disabled={loading}
         className="fl-btn fl-btn-secondary"
         style={{ fontSize: "0.8rem" }}
       >
-        📒 Ajouter au cahier
+        {loading ? "…" : "📒 Ajouter au cahier"}
       </button>
-      {open && (
+      {open && cookbooks && cookbooks.length > 0 && (
         <AddToCookbookModal
           recipeId={recipeId}
           cookbooks={cookbooks}
@@ -41,6 +51,19 @@ export function AddToCookbookButton({
           ingredients={ingredients}
           onClose={() => setOpen(false)}
         />
+      )}
+      {open && cookbooks && cookbooks.length === 0 && (
+        <ModalOverlay onClose={() => setOpen(false)}>
+          <div className="flex flex-col gap-4" style={{ minWidth: 280 }}>
+            <h2 className="fl-title-serif" style={{ fontSize: "1.2rem" }}>Ajouter au cahier</h2>
+            <p className="fl-label" style={{ fontWeight: 400 }}>
+              Aucun cahier disponible. Créez-en un dans la section Cahiers.
+            </p>
+            <button type="button" onClick={() => setOpen(false)} className="fl-btn fl-btn-secondary">
+              Fermer
+            </button>
+          </div>
+        </ModalOverlay>
       )}
     </>
   );

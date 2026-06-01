@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { computeLocalCoef } from "./subRecipes";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -52,7 +53,60 @@ function ingMass(q: number, unit: string): number {
   if (!unit || unit === "g") return q;
   if (unit === "cc") return q * 5;
   if (unit === "cs") return q * 15;
+  if (unit === "L") return q * 1000;
   return 0;
+}
+
+type SnapIngredient = { name: string; quantityG: number; quantityGMax: number | null; unit: string };
+
+/** Applique un coefficient à une quantité — arrondi au supérieur, L converti en g entier. */
+function scaleQty(qty: number, unit: string, coef: number): { quantityG: number; unit: string } {
+  if (unit === "L") return { quantityG: Math.ceil(qty * coef * 1000), unit: "g" };
+  return { quantityG: Math.ceil(qty * coef), unit };
+}
+
+/**
+ * Après arrondi au supérieur, répartit l'écart ±N grammes sur les ingrédients
+ * en grammes (les plus gros en premier) pour obtenir exactement targetMassG.
+ */
+export function adjustSnapshotToTarget(
+  ingredients: SnapIngredient[],
+  targetMassG: number,
+): { ingredients: SnapIngredient[]; totalMassGMin: number; totalMassGMax: number } {
+  const result = ingredients.map((i) => ({ ...i }));
+
+  const total = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
+  let diff = Math.round(total - targetMassG);
+
+  if (diff !== 0) {
+    // Uniquement les ingrédients en grammes, triés par quantité décroissante
+    const gIdx = result
+      .map((ing, idx) => ({ idx, qty: ing.quantityG, unit: ing.unit ?? "g" }))
+      .filter(({ unit }) => !unit || unit === "g")
+      .sort((a, b) => b.qty - a.qty);
+
+    if (gIdx.length > 0) {
+      let i = 0;
+      const maxIter = Math.abs(diff) * gIdx.length + gIdx.length;
+      while (diff !== 0 && i < maxIter) {
+        const { idx } = gIdx[i % gIdx.length];
+        if (diff > 0 && result[idx].quantityG > 1) {
+          result[idx] = { ...result[idx], quantityG: result[idx].quantityG - 1 };
+          diff--;
+        } else if (diff < 0) {
+          result[idx] = { ...result[idx], quantityG: result[idx].quantityG + 1 };
+          diff++;
+        }
+        i++;
+      }
+    }
+  }
+
+  const totalMassGMin = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
+  const totalMassGMax = result.reduce(
+    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
+  );
+  return { ingredients: result, totalMassGMin, totalMassGMax };
 }
 
 export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
@@ -86,12 +140,17 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
 
   const k = multiplier > 0 ? multiplier : 1;
 
-  const ingredients = r.ingredients.map((i) => ({
-    name: i.name ?? i.ingredientBase?.name ?? "—",
-    quantityG: Number(i.quantityG) * k,
-    quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) * k : null,
-    unit: i.unit ?? "g",
-  }));
+  const ingredients = r.ingredients.map((i) => {
+    const unit = i.unit ?? "g";
+    const scaled = scaleQty(Number(i.quantityG), unit, k);
+    const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, k) : null;
+    return {
+      name: i.name ?? i.ingredientBase?.name ?? "—",
+      quantityG: scaled.quantityG,
+      quantityGMax: scaledMax?.quantityG ?? null,
+      unit: scaled.unit,
+    };
+  });
   const totalMassGMin = ingredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
   const totalMassGMax = ingredients.reduce(
     (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
@@ -99,12 +158,36 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   const totalMassG = (totalMassGMin + totalMassGMax) / 2;
 
   const subRecipes = r.parentLinks.map((link) => {
-    const childIngredients = link.child.ingredients.map((i) => ({
-      name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Number(i.quantityG) * k,
-      quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) * k : null,
-      unit: i.unit ?? "g",
-    }));
+    // Masse de base de la sous-recette (quantités brutes non scalées)
+    const rawIngredients = link.child.ingredients;
+    const childBaseTotalG = rawIngredients.reduce(
+      (s, i) => s + ingMass(Number(i.quantityG), i.unit ?? "g"), 0,
+    );
+    // Ingrédient pivot (pour le mode pivot_ingredient)
+    const pivotBaseQtyG = link.pivotIngredientId
+      ? Number(rawIngredients.find((i) => i.id === link.pivotIngredientId)?.quantityG ?? 0) || null
+      : null;
+    // Coefficient propre à la sous-recette (calcMode + calcValue définis lors de l'ajout)
+    const localCoef = computeLocalCoef(
+      link.calcMode,
+      Number(link.calcValue),
+      childBaseTotalG,
+      pivotBaseQtyG,
+    );
+    // Si verrouillée : le coefficient parent ne s'applique pas
+    const effectiveCoef = link.isLocked ? localCoef : localCoef * k;
+
+    const childIngredients = rawIngredients.map((i) => {
+      const unit = i.unit ?? "g";
+      const scaled = scaleQty(Number(i.quantityG), unit, effectiveCoef);
+      const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, effectiveCoef) : null;
+      return {
+        name: i.name ?? i.ingredientBase?.name ?? "—",
+        quantityG: scaled.quantityG,
+        quantityGMax: scaledMax?.quantityG ?? null,
+        unit: scaled.unit,
+      };
+    });
     const childTotalGMin = childIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
     const childTotalGMax = childIngredients.reduce(
       (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,

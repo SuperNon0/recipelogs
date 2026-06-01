@@ -54,11 +54,13 @@ export function RecipeBody({
   const [baseTotalMinG, baseTotalMaxG] = useMemo(() => {
     let min = 0, max = 0;
     for (const i of ingredients) {
-      const qMin = i.quantityG;
-      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
-      min += qMin * factor;
-      max += qMax * factor;
+      const qMin = i.unit === "L" ? i.quantityG * 1000
+        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const qMax = i.unit === "L" ? rawMax * 1000
+        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      min += qMin;
+      max += qMax;
     }
     return [min, max];
   }, [ingredients]);
@@ -104,9 +106,25 @@ export function RecipeBody({
     }
   };
 
-  const effectiveTotalG = baseTotalG * globalCoef;
-  const effectiveTotalMinG = baseTotalMinG * globalCoef;
-  const effectiveTotalMaxG = baseTotalMaxG * globalCoef;
+  // Total recalculé depuis les quantités arrondies (jamais de virgule)
+  const [roundedTotalMin, roundedTotalMax] = useMemo(() => {
+    let min = 0, max = 0;
+    for (const ing of ingredients) {
+      if (ing.unit === "L") {
+        min += Math.ceil(ing.quantityG * globalCoef * 1000);
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * globalCoef * 1000);
+      } else {
+        const factor = (!ing.unit || ing.unit === "g") ? 1
+          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+        min += Math.ceil(ing.quantityG * globalCoef) * factor;
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * globalCoef) * factor;
+      }
+    }
+    return [min, max];
+  }, [ingredients, globalCoef]);
+  const roundedTotalG = (roundedTotalMin + roundedTotalMax) / 2;
 
   return (
     <div className="flex flex-col gap-5">
@@ -125,15 +143,15 @@ export function RecipeBody({
         setPivotInput={setPivotInput}
         ingredients={ingredients}
         globalCoef={globalCoef}
-        effectiveTotalG={effectiveTotalG}
+        effectiveTotalG={roundedTotalG}
         onReset={reset}
       />
 
       <IngredientsTable
         ingredients={ingredients}
         coef={globalCoef}
-        totalMinG={effectiveTotalMinG}
-        totalMaxG={effectiveTotalMaxG}
+        totalMinG={roundedTotalMin}
+        totalMaxG={roundedTotalMax}
       />
 
       {subRecipes.length > 0 && (
@@ -390,6 +408,19 @@ function Field({
 }
 
 // ─────────────────────────────────────────────
+// Helpers — arrondi supérieur, jamais de virgule
+// ─────────────────────────────────────────────
+
+function scaledQty(qty: number, unit: string | undefined | null, coef: number): string {
+  if (unit === "L") return Math.ceil(qty * coef * 1000).toLocaleString("fr-FR");
+  return Math.ceil(qty * coef).toLocaleString("fr-FR");
+}
+function scaledUnit(unit: string | undefined | null): string {
+  if (unit === "L") return "g";
+  return unit ?? "g";
+}
+
+// ─────────────────────────────────────────────
 // Ingredient table
 // ─────────────────────────────────────────────
 
@@ -431,28 +462,28 @@ function IngredientsTable({
                   <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
                 ) : ing.quantityGMax != null ? (
                   <span>
-                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    {scaledQty(ing.quantityG, ing.unit, coef)}
                     <span style={{ color: "var(--muted)" }}>/</span>
-                    {(ing.quantityGMax * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
-                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                    {scaledQty(ing.quantityGMax, ing.unit, coef)}
+                    {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                     {(ing.unit === "cc" || ing.unit === "cs") && (
                       <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                        {" "}(≈{formatG(((ing.quantityG + ing.quantityGMax) / 2 * coef) * (ing.unit === "cc" ? 5 : 15))})
+                        {" "}(≈{formatG(((Math.ceil(ing.quantityG * coef) + Math.ceil(ing.quantityGMax * coef)) / 2) * (ing.unit === "cc" ? 5 : 15))})
                       </span>
                     )}
                   </span>
                 ) : (ing.unit === "cc" || ing.unit === "cs") ? (
                   <>
-                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                    {scaledQty(ing.quantityG, ing.unit, coef)}
                     {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
                     <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                      {" "}(≈{formatG((ing.quantityG * coef) * (ing.unit === "cc" ? 5 : 15))})
+                      {" "}(≈{formatG(Math.ceil(ing.quantityG * coef) * (ing.unit === "cc" ? 5 : 15))})
                     </span>
                   </>
                 ) : (
                   <>
-                    {(ing.quantityG * coef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
-                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                    {scaledQty(ing.quantityG, ing.unit, coef)}
+                    {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                   </>
                 )}
               </td>
@@ -498,11 +529,13 @@ function SubRecipeAccordion({
   const [childBaseTotalMinG, childBaseTotalMaxG] = useMemo(() => {
     let min = 0, max = 0;
     for (const i of subRecipe.childIngredients) {
-      const qMin = i.quantityG;
-      const qMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const factor = (!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0;
-      min += qMin * factor;
-      max += qMax * factor;
+      const qMin = i.unit === "L" ? i.quantityG * 1000
+        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
+      const qMax = i.unit === "L" ? rawMax * 1000
+        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
+      min += qMin;
+      max += qMax;
     }
     return [min, max];
   }, [subRecipe.childIngredients]);
@@ -525,9 +558,23 @@ function SubRecipeAccordion({
     ? localCoef
     : localCoef * globalCoef;
 
-  const effectiveTotalG = childBaseTotalG * effectiveCoef;
-  const effectiveTotalMinG = childBaseTotalMinG * effectiveCoef;
-  const effectiveTotalMaxG = childBaseTotalMaxG * effectiveCoef;
+  const [roundedChildMin, roundedChildMax] = useMemo(() => {
+    let min = 0, max = 0;
+    for (const ing of subRecipe.childIngredients) {
+      if (ing.unit === "L") {
+        min += Math.ceil(ing.quantityG * effectiveCoef * 1000);
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * effectiveCoef * 1000);
+      } else {
+        const factor = (!ing.unit || ing.unit === "g") ? 1
+          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+        min += Math.ceil(ing.quantityG * effectiveCoef) * factor;
+        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
+        max += Math.ceil(qMax * effectiveCoef) * factor;
+      }
+    }
+    return [min, max];
+  }, [subRecipe.childIngredients, effectiveCoef]);
 
   return (
     <div
@@ -569,9 +616,9 @@ function SubRecipeAccordion({
             </span>
           </div>
           <div className="flex gap-3 mt-0.5 text-[0.7rem] text-[color:var(--muted)]">
-            <span>{effectiveTotalMinG !== effectiveTotalMaxG
-              ? `${formatG(effectiveTotalMinG)}/${formatG(effectiveTotalMaxG)}`
-              : formatG(effectiveTotalMinG)}</span>
+            <span>{roundedChildMin !== roundedChildMax
+              ? `${formatG(roundedChildMin)}/${formatG(roundedChildMax)}`
+              : formatG(roundedChildMin)}</span>
             <span>{formatCoef(effectiveCoef)}</span>
           </div>
         </div>
@@ -661,28 +708,28 @@ function SubRecipeAccordion({
                       <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
                     ) : ing.quantityGMax != null ? (
                       <span>
-                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
                         <span style={{ color: "var(--muted)" }}>/</span>
-                        {(ing.quantityGMax * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
-                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                        {scaledQty(ing.quantityGMax, ing.unit, effectiveCoef)}
+                        {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                         {(ing.unit === "cc" || ing.unit === "cs") && (
                           <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                            {" "}(≈{formatG(((ing.quantityG + ing.quantityGMax) / 2 * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
+                            {" "}(≈{formatG(((Math.ceil(ing.quantityG * effectiveCoef) + Math.ceil(ing.quantityGMax * effectiveCoef)) / 2) * (ing.unit === "cc" ? 5 : 15))})
                           </span>
                         )}
                       </span>
                     ) : (ing.unit === "cc" || ing.unit === "cs") ? (
                       <>
-                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
+                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
                         {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
                         <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                          {" "}(≈{formatG((ing.quantityG * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
+                          {" "}(≈{formatG(Math.ceil(ing.quantityG * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
                         </span>
                       </>
                     ) : (
                       <>
-                        {(ing.quantityG * effectiveCoef).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}
-                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit ?? "g"}</span>
+                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
+                        {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                       </>
                     )}
                   </td>
@@ -696,9 +743,9 @@ function SubRecipeAccordion({
                   className="pt-2 text-right fl-value-serif"
                   style={{ fontSize: "0.95rem" }}
                 >
-                  {effectiveTotalMinG !== effectiveTotalMaxG
-                    ? `${formatG(effectiveTotalMinG)}/${formatG(effectiveTotalMaxG)}`
-                    : formatG(effectiveTotalMinG)}
+                  {roundedChildMin !== roundedChildMax
+                    ? `${formatG(roundedChildMin)}/${formatG(roundedChildMax)}`
+                    : formatG(roundedChildMin)}
                 </td>
                 <td className="pt-2 fl-label">Total</td>
               </tr>
