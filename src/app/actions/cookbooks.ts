@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { buildRecipeSnapshot, adjustSnapshotToTarget } from "@/lib/cookbooks";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -152,6 +152,7 @@ export async function addMultipleRecipesWithMassTarget(
   cookbookId: number,
   recipeIds: number[],
   targetMassG: number,
+  forceExact = false,
 ): Promise<ActionResult & { added?: number; skipped?: number }> {
   if (!recipeIds.length) return { ok: false, error: "Aucune recette sélectionnée." };
   if (!Number.isFinite(targetMassG) || targetMassG <= 0)
@@ -193,8 +194,23 @@ export async function addMultipleRecipesWithMassTarget(
     }, 0);
 
     const multiplier = baseTotalG > 0 ? targetMassG / baseTotalG : 1;
-    const snap = await buildRecipeSnapshot(toAdd[i], multiplier);
+    let snap = await buildRecipeSnapshot(toAdd[i], multiplier);
     if (!snap) continue;
+
+    // Si forceExact : ajuster les ingrédients pour atteindre exactement la cible
+    if (forceExact) {
+      const { ingredients, totalMassGMin, totalMassGMax } = adjustSnapshotToTarget(
+        snap.ingredients,
+        targetMassG,
+      );
+      snap = {
+        ...snap,
+        ingredients,
+        totalMassGMin,
+        totalMassGMax,
+        totalMassG: (totalMassGMin + totalMassGMax) / 2,
+      };
+    }
 
     await prisma.cookbookRecipe.create({
       data: {

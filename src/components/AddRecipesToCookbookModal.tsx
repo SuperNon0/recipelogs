@@ -28,6 +28,7 @@ export function AddRecipesToCookbookModal({
   const [selected, setSelected] = useState<Map<number, RecipeOption>>(new Map());
   const [linkMode, setLinkMode] = useState<LinkMode>("linked");
   const [targetMass, setTargetMass] = useState("1000");
+  const [forceExact, setForceExact] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ added: number; skipped: number } | null>(null);
   const reqIdRef = useRef(0);
@@ -88,7 +89,7 @@ export function AddRecipesToCookbookModal({
           setError("Masse cible invalide.");
           return;
         }
-        r = await addMultipleRecipesWithMassTarget(cookbookId, ids, mass);
+        r = await addMultipleRecipesWithMassTarget(cookbookId, ids, mass, forceExact);
       } else {
         r = await addMultipleRecipesToCookbook(cookbookId, ids, linkMode);
       }
@@ -229,10 +230,22 @@ export function AddRecipesToCookbookModal({
                   style={{ width: 110 }}
                 />
               </label>
-              <p className="fl-label" style={{ fontWeight: 400, color: "var(--muted)", fontSize: "0.72rem" }}>
-                Chaque recette sera figée et mise à l&apos;échelle pour atteindre cette masse. La masse réelle
-                peut être légèrement supérieure (arrondi au gramme supérieur).
-              </p>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={forceExact}
+                  onChange={(e) => setForceExact(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: "pointer", accentColor: "var(--accent)" }}
+                />
+                <span className="fl-label" style={{ fontWeight: forceExact ? 600 : 400, color: forceExact ? "var(--accent)" : "var(--muted)" }}>
+                  Masse exacte (ajuste ±1 g sur les plus gros ingrédients)
+                </span>
+              </label>
+              {!forceExact && (
+                <p className="fl-label" style={{ fontWeight: 400, color: "var(--muted)", fontSize: "0.72rem" }}>
+                  La masse réelle peut être légèrement supérieure (arrondi au gramme supérieur).
+                </p>
+              )}
             </div>
           )}
 
