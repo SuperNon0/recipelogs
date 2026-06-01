@@ -223,7 +223,7 @@ export async function applyMultiplierToRecipe(
       prisma.ingredient.update({
         where: { id: ing.id },
         data: {
-          quantityG: Math.round(Number(ing.quantityG) * multiplier * 1000) / 1000,
+          quantityG: Math.ceil(Number(ing.quantityG) * multiplier),
         },
       }),
     ),
