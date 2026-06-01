@@ -217,7 +217,7 @@ function MultiplierPanel({
   const [savePending, startSaveTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [forceExact, setForceExact] = useState(false);
-  const dirty = Math.abs(globalCoef - 1) > 1e-4;
+  const dirty = Math.abs(globalCoef - 1) > 1e-4 || (forceExact && mode === "mass_target");
 
   const handleApply = () => {
     if (!dirty) return;

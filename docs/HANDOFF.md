@@ -1,7 +1,7 @@
 # RecipeLog — Document de transmission
 
 > Document destiné à un développeur reprenant le projet.
-> Dernière mise à jour : 2026-04-28.
+> Dernière mise à jour : 2026-06-01.
 
 ---
 
@@ -47,6 +47,8 @@
 | 7. Scripts Proxmox (create/setup/deploy/backup/collect-logs) | ✅ |
 | 8. Tests & import (39 tests, 5 suites, import CSV Recipe Keeper) | ✅ |
 | 9. Mise en production | ✅ (déployé sur Proxmox `192.168.0.99`) |
+| 10. V1.2–V1.4 (dossiers, PDF multi-passes, fourchettes, gestion ingrédients, import amélioré) | ✅ |
+| 11. V1.5 (masse exacte, massAdjust.ts, arrondi systématique PDFs, cadenas optimiste, filtre cahier, index perf) | ✅ |
 
 ---
 
@@ -158,6 +160,7 @@ src/
     ├── cookbooks.ts      # Queries + buildRecipeSnapshot (figée)
     ├── shopping.ts       # Agrégation ingrédients
     ├── subRecipes.ts     # Multiplication cascade + détection cycle
+    ├── massAdjust.ts     # Fonctions pures calcul masse (ingMass, scaleQty, adjustToTarget) — sans import Prisma
     ├── share.ts          # Tokens publics
     ├── importRecipeKeeper.ts    # Parser CSV
     ├── parseIngredientsText.ts  # Parser texte libre (NEW)
@@ -183,6 +186,10 @@ src/
 
 7. **Saisie d'ingrédients : 2 modes** (`📋 Liste` / `📝 Texte libre`) avec import dans la liste structurée. Le parser texte libre est dans `src/lib/parseIngredientsText.ts` et accepte plusieurs formats (`200g farine`, `Farine\n- 200g`, `1kg sucre`, `500ml lait`).
 
+8. **Utilitaires de calcul partagés (`massAdjust.ts`)** : les fonctions `ingMass`, `scaleQty` et `adjustToTarget` sont dans `src/lib/massAdjust.ts`, sans aucun import Prisma ni Server Action. Ce fichier est délibérément "pur" pour être importable côté client (composants React) ET côté serveur (Server Actions, `buildRecipeSnapshot`). Ne pas y ajouter de dépendances serveur. Toute logique touchant la BDD doit rester dans les fichiers dédiés (`recipes.ts`, `cookbooks.ts`, etc.).
+
+9. **Cadenas sous-recettes — ne pas remettre `revalidatePath`** : `toggleSubRecipeLock` ne déclenche pas `revalidatePath` volontairement. Le rechargement Next.js côté serveur réinitialise l'état local du `MultiplierPanel` (coefficient saisi, mode choisi), ce qui est une régression UX. Le rendu immédiat du cadenas est géré par l'état optimiste `lockedOptimistic` dans `SubRecipeAccordion`.
+
 ---
 
 ## 7. Bugs corrigés pendant le déploiement (gotchas)
@@ -196,6 +203,9 @@ src/
 | `Cannot find module '.next/standalone/server.js'` | `next.config.ts` lu avant que NODE_ENV soit "production" → mode standalone jamais activé | `output: "standalone"` inconditionnel | `fix(next.config): output standalone inconditionnel` |
 | Page web sans CSS (404 sur `/_next/static/css/*.css`) | Mode standalone : `static/` et `public/` ne sont pas auto-copiés dans `.next/standalone/` | `cp -r .next/static .next/standalone/.next/static` après chaque build | `fix(proxmox): copier static/ et public/ dans .next/standalone/` |
 | Page web sans CSS (403 Forbidden) | nginx `www-data` ne pouvait pas traverser `/opt/recipelog` (perms restrictives) | `chmod 755 /opt/recipelog` + `chmod -R o+rX .next` | `fix(setup.sh): permissions pour que nginx serve les statiques` |
+| `parseInt("0") \|\| 50` retournait 50 au lieu de tout charger | `parseInt("0")` est falsy → fallback `|| 50` s'appliquait même pour `limit=0` | `parsedLimit === 0 ? undefined : parsedLimit` dans `api/recipes/route.ts` + suppression du `take: 200` hardcodé dans `listRecipes` | `fix(api): limit=0 charge toutes les recettes` |
+| Cadenas réinitialisait le panel multiplicateur | `toggleSubRecipeLock` appelait `revalidatePath` → Next.js rechargait la page → état local du `MultiplierPanel` perdu | Suppression de `revalidatePath` + état optimiste `lockedOptimistic` dans `SubRecipeAccordion` | `fix(ui): cadenas optimiste sans revalidatePath` |
+| Breakout CSS cassé sur page ingrédients | `width: 100vw` + `calc(-50vw + 50%)` ne fonctionne pas dans les conteneurs imbriqués (décalage de la scrollbar) | Remplacé par `marginLeft: "-1rem"` + `width: calc(100% + 2rem)` | `fix(ui): breakout ingrédients dans conteneur imbriqué` |
 
 Tous ces fixes sont déjà dans `setup.sh` et `deploy.sh` actuels.
 

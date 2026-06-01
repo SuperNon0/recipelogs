@@ -195,6 +195,86 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 
 ---
 
+## 📝 Changelog V1.4 → V1.5 (masse exacte · corrections UI · optimisations)
+
+### 🆕 Nouvelles fonctionnalités
+
+- **⚖️ Masse exacte** (`src/lib/massAdjust.ts`, `MultiplierPanel`, `EditSubRecipeModal`, `EditSnapshotMassModal`) : toggle disponible dans les 3 panneaux de modification. Quand activé en mode « masse totale cible », applique `adjustToTarget()` qui ajuste ±1g sur les plus gros ingrédients en grammes pour atteindre la masse cible EXACTE (compense le Math.ceil systématique).
+- **`isExact` en BDD** (`prisma/schema.prisma`) : champ `is_exact: Boolean` sur le modèle `SubRecipe`, colonne `is_exact` en base, migration `20260601000001_subrecipe_is_exact`. `buildRecipeSnapshot` applique `adjustToTarget` quand `link.isExact && link.calcMode === "mass_target"`.
+- **Filtre recettes déjà dans le cahier** (`AddRecipesToCookbookModal`, `CookbookEntriesTable`) : la modal d'ajout accepte une prop `existingRecipeIds?: number[]` — les recettes déjà présentes dans le cahier n'apparaissent plus dans la liste de sélection.
+
+### 🛠️ Correctifs
+
+- **Cadenas sous-recettes — état optimiste** (`SubRecipeAccordion`) : `toggleSubRecipeLock` ne fait plus de `revalidatePath` (évitait un rechargement qui réinitialisait le panel multiplicateur). `SubRecipeAccordion` utilise un état optimiste `lockedOptimistic` pour le rendu immédiat du cadenas.
+- **Limite recettes** (`src/app/api/recipes/route.ts`, `src/lib/recipes.ts`) : bug `parseInt("0") || 50 === 50` — `limit=0` retournait 50 résultats au lieu de tout charger. Fix : `parsedLimit === 0 ? undefined : parsedLimit`. Suppression du `take: 200` hardcodé dans `listRecipes`.
+- **Logo réduit** (`LogoLink.tsx`) : `fontSize` réduit de 1.8rem à 1.4rem.
+- **Page ingrédients — breakout CSS** : remplacé `width: 100vw` + `calc(-50vw + 50%)` par `marginLeft: "-1rem"` + `width: calc(100% + 2rem)` (l'approche `100vw` ne fonctionnait pas dans les conteneurs imbriqués).
+- **Sous-recettes dans les PDFs — arrondi supérieur systématique** : `buildRecipeSnapshot` utilise désormais `scaleQty()` (Math.ceil) sur tous les ingrédients — plus jamais de décimales dans les PDFs/snapshots. Conversion L → grammes entiers (×1000, Math.ceil).
+
+### 🏗️ Refactoring
+
+- **`src/lib/massAdjust.ts`** — nouveau fichier de fonctions pures partagées entre client et serveur : `ingMass(q, unit)` (convertit une quantité en masse g), `scaleQty(qty, unit, coef)` (applique un coefficient avec Math.ceil, L→g retourne unit "g"), `adjustToTarget(ingredients, targetMassG)` (ajuste ±1g sur les gros ingrédients), type `AdjIngredient` exporté.
+- **`buildRecipeSnapshot` — coefficients propres par sous-recette** (`src/lib/cookbooks.ts`) : chaque sous-recette est scalée avec `computeLocalCoef(calcMode, calcValue, childBaseTotalG, pivotBaseQtyG)` au lieu du coefficient global du parent. Sous-recette verrouillée : `effectiveCoef = localCoef`. Sous-recette non verrouillée : `effectiveCoef = localCoef * k`.
+- **`applyMultiplierToRecipe`** (`src/app/actions/recipes.ts`) : accepte un paramètre optionnel `targetMassG` pour l'ajustement exact.
+
+### 🗃️ Schéma BDD — modifications
+
+- ➕ Nouvelle colonne `sub_recipes.is_exact` (`BOOLEAN NOT NULL DEFAULT false`) — migration `20260601000001_subrecipe_is_exact`
+- ➕ Migration `20260601000000_add_perf_indexes` : index sur `name_normalized`, `ingredients(recipe_id)`, et index GIN `pg_trgm` sur `name` pour la recherche fuzzy
+
+### 📌 Notes pour le prochain développeur
+
+- **`src/lib/massAdjust.ts` est intentionnellement sans import Prisma** : fonctions pures uniquement, utilisables côté client ET serveur (le panneau multiplicateur est un composant client ; `buildRecipeSnapshot` est côté serveur). Ne pas y importer Prisma.
+- **Ne pas remettre `revalidatePath` dans `toggleSubRecipeLock`** : le rechargement de route qu'il déclenchait réinitialisait l'état du panel multiplicateur (`MultiplierPanel`) en cours d'utilisation. L'état optimiste dans `SubRecipeAccordion` est la bonne approche.
+- **Pattern `adjustToTarget`** : la fonction ajuste seulement les ingrédients dont la masse calculée est > 0g (exclut pièce/QS/L non convertis) et ne modifie qu'à ±1g par itération pour rester proche de la valeur Math.ceil. Elle est idempotente si `targetMassG` est déjà atteint.
+- **Les 3 endroits du toggle masse exacte** : `MultiplierPanel` (recette principale, côté client), `EditSubRecipeModal` (sous-recettes de la fiche recette), `EditSnapshotMassModal` (recettes figées dans les cahiers). Les trois doivent rester synchronisés si on change la logique d'affichage ou le nom du champ.
+
+---
+
+## 📝 Changelog V1.4 → V1.5 (masse exacte · corrections UI · optimisations)
+
+### 🆕 Nouvelles fonctionnalités
+
+- **⚖️ Masse exacte** : nouveau toggle « Masse exacte » disponible dans les 3 panneaux de modification :
+  - `MultiplierPanel` (recette principale)
+  - `EditSubRecipeModal` (sous-recettes)
+  - `EditSnapshotMassModal` (recettes figées dans les cahiers)
+  Quand activé avec le mode « masse totale cible » : applique `adjustToTarget()` pour ajuster ±1g sur les plus gros ingrédients en grammes et atteindre la masse cible EXACTE (compense le Math.ceil systématique).
+- **`isExact` en BDD** : colonne `is_exact BOOLEAN` ajoutée sur la table `sub_recipes` (migration `20260601000001_subrecipe_is_exact`). `buildRecipeSnapshot` dans `src/lib/cookbooks.ts` applique `adjustToTarget` quand `link.isExact && link.calcMode === "mass_target"`.
+- **Filtre recettes déjà dans le cahier** : `AddRecipesToCookbookModal` accepte une prop `existingRecipeIds?: number[]`. Les recettes déjà présentes dans le cahier n'apparaissent plus dans la liste de sélection. `CookbookEntriesTable` passe la liste des `recipeId` au modal.
+
+### 🛠️ Correctifs
+
+- **Cadenas sous-recettes — mise à jour optimiste** : `toggleSubRecipeLock` ne fait plus de `revalidatePath` (évitait un rechargement qui réinitialisait l'état du panel multiplicateur). `SubRecipeAccordion` utilise un état optimiste `lockedOptimistic` pour le rendu immédiat du cadenas sans attendre le serveur.
+- **Limite recettes — bug `parseInt("0") || 50`** : `limit=0` retournait 50 résultats au lieu de tout charger. Fix dans `src/app/api/recipes/route.ts` : `parsedLimit === 0 ? undefined : parsedLimit`. Suppression du `take: 200` hardcodé dans `listRecipes` (`src/lib/recipes.ts`).
+- **Logo réduit** : `LogoLink.tsx` passe de `fontSize: "1.8rem"` à `fontSize: "1.4rem"`.
+- **Page ingrédients — breakout CSS** : remplacement de `width: 100vw` + `calc(-50vw + 50%)` par `marginLeft: "-1rem"` + `width: calc(100% + 2rem)` (la technique `100vw` ne fonctionnait pas dans les conteneurs imbriqués).
+- **Sous-recettes dans les PDFs — arrondi supérieur** : `buildRecipeSnapshot` utilise désormais `scaleQty()` (Math.ceil) sur tous les ingrédients. Plus jamais de décimales dans les PDFs/snapshots. Conversion L → grammes entiers (×1000, Math.ceil).
+
+### 🏗️ Refactoring
+
+- **`src/lib/massAdjust.ts` — utilitaire partagé** : nouveau fichier de fonctions pures sans import Prisma, utilisables côté client et côté serveur.
+  - `ingMass(q, unit)` — convertit une quantité en masse g (L→×1000, cc→×5, cs→×15, pièce/QS→0)
+  - `scaleQty(qty, unit, coef)` — applique un coefficient avec Math.ceil ; L→g retourne l'unité `"g"`
+  - `adjustToTarget(ingredients, targetMassG)` — ajuste ±1g sur les gros ingrédients pour atteindre exactement `targetMassG`
+  - Type `AdjIngredient` exporté
+- **`buildRecipeSnapshot` — coefficients propres par sous-recette** : chaque sous-recette est maintenant scalée avec `computeLocalCoef(calcMode, calcValue, childBaseTotalG, pivotBaseQtyG)` au lieu d'utiliser le coefficient global du parent. Sous-recette verrouillée : `effectiveCoef = localCoef` ; sous-recette non verrouillée : `effectiveCoef = localCoef * k`.
+- **`applyMultiplierToRecipe`** (`src/app/actions/recipes.ts`) : accepte un paramètre optionnel `targetMassG` pour l'ajustement exact.
+
+### 🗃️ Schéma BDD — modifications
+
+- ➕ Nouvelle colonne `sub_recipes.is_exact` (`BOOLEAN NOT NULL DEFAULT false`) — migration `20260601000001_subrecipe_is_exact`
+- ➕ Migration `20260601000000_add_perf_indexes` : index sur `name_normalized`, `ingredients(recipe_id)`, et index GIN `pg_trgm` sur `name` pour la recherche fuzzy
+
+### 📌 Notes pour le prochain développeur
+
+- **`src/lib/massAdjust.ts`** est partagé entre client et serveur : ne pas y ajouter d'import Prisma ou de Server Action. Toute fonction qui touche la BDD doit rester dans `recipes.ts`, `cookbooks.ts`, etc.
+- **Ne pas remettre `revalidatePath` dans `toggleSubRecipeLock`** : le rechargement côté serveur réinitialise l'état du `MultiplierPanel` côté client. L'état optimiste dans `SubRecipeAccordion` suffit pour l'UX.
+- **Pattern `adjustToTarget`** : la fonction s'applique en post-traitement sur le tableau d'ingrédients déjà scalés (après `scaleQty`). Elle ajuste ±1g par itération sur les ingrédients en grammes triés par masse décroissante jusqu'à atteindre la cible exacte.
+- **3 endroits du toggle « Masse exacte »** : `MultiplierPanel`, `EditSubRecipeModal`, `EditSnapshotMassModal`. Si un 4ᵉ point d'entrée est ajouté, il faut y brancher le même toggle + la même logique d'appel à `adjustToTarget`.
+
+---
+
 ## Sommaire
 
 1. [Contexte & objectifs](#1-contexte--objectifs)
