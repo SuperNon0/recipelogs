@@ -44,7 +44,7 @@ export type RKHtmlRecipe = {
   source: string | null;
   notesTips: string | null;
   steps: string | null;
-  ingredients: { name: string; quantityG: number }[];
+  ingredients: { name: string; quantityG: number; quantityGMax?: number; unit: string }[];
   /** Toutes les "Catégories" Recipe Keeper + le "Plats" */
   categories: string[];
   /** "Les collections" Recipe Keeper → traités comme tags */

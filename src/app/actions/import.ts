@@ -74,6 +74,8 @@ export async function importRecipeKeeperCsv(
             create: rk.ingredients.map((ing, position) => ({
               name: ing.name,
               quantityG: ing.quantityG || 0,
+              quantityGMax: ing.quantityGMax ?? undefined,
+              unit: ing.unit || "g",
               position,
             })),
           },
@@ -279,6 +281,8 @@ export async function importRecipeKeeperHtmlOrZip(
                 ? rk.ingredients.map((ing, position) => ({
                     name: ing.name,
                     quantityG: ing.quantityG || 0,
+                    quantityGMax: ing.quantityGMax ?? undefined,
+                    unit: ing.unit || "g",
                     position,
                   }))
                 : [],

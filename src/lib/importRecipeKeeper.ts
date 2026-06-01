@@ -11,12 +11,14 @@
  * — on extrait le nombre en grammes si possible, sinon on crée un ingrédient libre.
  */
 
+import { extractQuantityAndUnit, cleanIngredientName } from "./parseIngredientsText";
+
 export type RKRecipe = {
   name: string;
   source: string | null;
   notesTips: string | null;
   steps: string | null;
-  ingredients: { name: string; quantityG: number }[];
+  ingredients: { name: string; quantityG: number; quantityGMax?: number; unit: string }[];
   tags: string[];
 };
 
@@ -73,7 +75,7 @@ export function parseRecipeKeeperCsv(csvText: string): RKRecipe[] {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function parseIngredients(raw: string): { name: string; quantityG: number }[] {
+function parseIngredients(raw: string): { name: string; quantityG: number; quantityGMax?: number; unit: string }[] {
   if (!raw) return [];
 
   return raw
@@ -81,43 +83,10 @@ function parseIngredients(raw: string): { name: string; quantityG: number }[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const qty = extractGrams(line);
+      const { quantityG, quantityGMax, unit } = extractQuantityAndUnit(line);
       const name = cleanIngredientName(line);
-      return { name: name || line, quantityG: qty };
+      return { name: name || line, quantityG, quantityGMax, unit };
     });
-}
-
-/**
- * Tente d'extraire une quantité en grammes depuis un texte libre.
- * Exemples : "200g farine", "200 g", "0.5kg", "500 ml" (eau ≈ 1g/ml)
- */
-function extractGrams(text: string): number {
-  // kg → g
-  const kgMatch = text.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
-  if (kgMatch) return parseFloat(kgMatch[1].replace(",", ".")) * 1000;
-
-  // g direct
-  const gMatch = text.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
-  if (gMatch) return parseFloat(gMatch[1].replace(",", "."));
-
-  // ml (eau = 1g/ml approximation)
-  const mlMatch = text.match(/(\d+(?:[.,]\d+)?)\s*ml\b/i);
-  if (mlMatch) return parseFloat(mlMatch[1].replace(",", "."));
-
-  // cl
-  const clMatch = text.match(/(\d+(?:[.,]\d+)?)\s*cl\b/i);
-  if (clMatch) return parseFloat(clMatch[1].replace(",", ".")) * 10;
-
-  return 0;
-}
-
-/** Enlève la quantité en début de ligne pour ne garder que le nom. */
-function cleanIngredientName(text: string): string {
-  return text
-    .replace(/^\d+(?:[.,]\d+)?\s*(kg|g|ml|cl|l|oz|lb|tsp|tbsp|cup|pcs?|unit[eé]?s?)\.?\s*/i, "")
-    .replace(/^\d+\s*\/\s*\d+\s*/i, "")
-    .replace(/^\d+\s+/i, "")
-    .trim();
 }
 
 // ─── CSV parser minimal ───────────────────────────────────────────────────────
