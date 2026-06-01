@@ -118,5 +118,4 @@ export async function toggleSubRecipeLock(id: number, parentId: number) {
     where: { id },
     data: { isLocked: !current.isLocked },
   });
-  revalidatePath(`/recipes/${parentId}`);
 }

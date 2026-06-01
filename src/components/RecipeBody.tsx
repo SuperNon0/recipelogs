@@ -525,6 +525,7 @@ function SubRecipeAccordion({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [, startTransition] = useTransition();
+  const [lockedOptimistic, setLockedOptimistic] = useState(subRecipe.isLocked);
 
   const [childBaseTotalMinG, childBaseTotalMaxG] = useMemo(() => {
     let min = 0, max = 0;
@@ -554,7 +555,7 @@ function SubRecipeAccordion({
     pivotBaseQty,
   );
 
-  const effectiveCoef = subRecipe.isLocked
+  const effectiveCoef = lockedOptimistic
     ? localCoef
     : localCoef * globalCoef;
 
@@ -582,7 +583,7 @@ function SubRecipeAccordion({
       style={{
         padding: 0,
         overflow: "hidden",
-        borderColor: subRecipe.isLocked
+        borderColor: lockedOptimistic
           ? "rgba(167, 139, 250, 0.5)"
           : "var(--border)",
       }}
@@ -622,7 +623,7 @@ function SubRecipeAccordion({
             <span>{formatCoef(effectiveCoef)}</span>
           </div>
         </div>
-        {subRecipe.isLocked && (
+        {lockedOptimistic && (
           <span
             className="fl-tag"
             style={{
@@ -648,17 +649,17 @@ function SubRecipeAccordion({
             </Link>
             <button
               type="button"
-              onClick={() =>
-                startTransition(() =>
-                  toggleSubRecipeLock(subRecipe.id, parentId),
-                )
-              }
+              onClick={() => {
+                const next = !lockedOptimistic;
+                setLockedOptimistic(next);
+                startTransition(() => toggleSubRecipeLock(subRecipe.id, parentId));
+              }}
               className={
-                subRecipe.isLocked ? "fl-btn fl-btn-pending" : "fl-btn fl-btn-secondary"
+                lockedOptimistic ? "fl-btn fl-btn-pending" : "fl-btn fl-btn-secondary"
               }
               style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
             >
-              {subRecipe.isLocked ? "🔓 Déverrouiller" : "🔒 Verrouiller"}
+              {lockedOptimistic ? "🔓 Déverrouiller" : "🔒 Verrouiller"}
             </button>
             <button
               type="button"
