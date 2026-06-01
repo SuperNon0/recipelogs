@@ -4,13 +4,13 @@
 
 Outil personnel de gestion de recettes conçu pour un usage en pâtisserie professionnelle (BTM). Auto-hébergé sur Proxmox LXC, intégré à l'écosystème [`super-nono.cc`](https://super-nono.cc).
 
-**Version actuelle : V1.3** · En production sur [`recipe.super-nono.cc`](https://recipe.super-nono.cc)
+**Version actuelle : V1.5** · En production sur [`recipe.super-nono.cc`](https://recipe.super-nono.cc)
 
 ---
 
 ## 📋 Documentation
 
-- **[Cahier des charges V1.3](./CDC.md)** — Spécifications complètes + changelog détaillé
+- **[Cahier des charges V1.5](./CDC.md)** — Spécifications complètes + changelog détaillé
 - **[Guide d'installation dev](./docs/INSTALL.md)** — Environnement local (Node, Docker, pnpm)
 - **[Guide de déploiement prod](./docs/DEPLOYMENT.md)** — Proxmox LXC + Cloudflare Zero Trust
 
@@ -43,11 +43,13 @@ Outil personnel de gestion de recettes conçu pour un usage en pâtisserie profe
 - **Sous-recettes** imbriquées pour composer des entremets complexes
 - Propagation en cascade du coefficient global
 - **Verrouillage individuel** 🔒 des sous-recettes pour un contrôle fin
+- **Masse exacte ⚖️** : ajuste ±1g sur les plus gros ingrédients pour atteindre la masse cible exacte (disponible dans les 3 panneaux de modification)
 - **Mettre à jour la recette** : applique le coefficient affiché comme nouvelle base en BDD
 
 ### 📖 Cahiers PDF
 - Création de cahiers multi-recettes
 - **Mode liée** 🔗 (recalcul dynamique) ou **figée** 📌 (snapshot au moment de l'ajout)
+- Auto-filtre des recettes déjà dans le cahier lors de l'ajout
 - Drag & drop pour réordonner les entrées
 - Pages chapitres avec titre, intro, image
 - Titres de section entre les recettes
