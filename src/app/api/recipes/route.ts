@@ -18,10 +18,8 @@ export async function GET(req: Request) {
   const onlyNoFolder = url.searchParams.get("onlyNoFolder") === "1";
   const excludeFolderRaw = url.searchParams.get("excludeFolder");
   const limitRaw = url.searchParams.get("limit");
-  const limit = Math.min(
-    Math.max(parseInt(limitRaw ?? "50", 10) || 50, 1),
-    200,
-  );
+  const parsedLimit = parseInt(limitRaw ?? "50", 10) || 50;
+  const limit = parsedLimit <= 0 ? undefined : Math.max(parsedLimit, 1);
 
   const where: import("@prisma/client").Prisma.RecipeWhereInput = {};
   if (q.trim()) {
@@ -47,7 +45,7 @@ export async function GET(req: Request) {
       folder: { select: { name: true, color: true } },
     },
     orderBy: { name: "asc" },
-    take: limit,
+    ...(limit !== undefined ? { take: limit } : {}),
   });
 
   return NextResponse.json({ recipes });

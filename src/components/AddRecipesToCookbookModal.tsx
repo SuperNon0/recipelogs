@@ -53,7 +53,7 @@ export function AddRecipesToCookbookModal({
       const myId = ++reqIdRef.current;
       setLoading(true);
       try {
-        const params = new URLSearchParams({ limit: "100" });
+        const params = new URLSearchParams({ limit: "0" });
         if (query.trim()) params.set("q", query.trim());
         const res = await fetch(`/api/recipes?${params.toString()}`);
         if (myId !== reqIdRef.current) return;
