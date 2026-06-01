@@ -59,6 +59,12 @@ function ingMass(q: number, unit: string): number {
 
 type SnapIngredient = { name: string; quantityG: number; quantityGMax: number | null; unit: string };
 
+/** Applique un coefficient à une quantité — arrondi au supérieur, L converti en g entier. */
+function scaleQty(qty: number, unit: string, coef: number): { quantityG: number; unit: string } {
+  if (unit === "L") return { quantityG: Math.ceil(qty * coef * 1000), unit: "g" };
+  return { quantityG: Math.ceil(qty * coef), unit };
+}
+
 /**
  * Après arrondi au supérieur, répartit l'écart ±N grammes sur les ingrédients
  * en grammes (les plus gros en premier) pour obtenir exactement targetMassG.
@@ -134,12 +140,17 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
 
   const k = multiplier > 0 ? multiplier : 1;
 
-  const ingredients = r.ingredients.map((i) => ({
-    name: i.name ?? i.ingredientBase?.name ?? "—",
-    quantityG: Number(i.quantityG) * k,
-    quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) * k : null,
-    unit: i.unit ?? "g",
-  }));
+  const ingredients = r.ingredients.map((i) => {
+    const unit = i.unit ?? "g";
+    const scaled = scaleQty(Number(i.quantityG), unit, k);
+    const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, k) : null;
+    return {
+      name: i.name ?? i.ingredientBase?.name ?? "—",
+      quantityG: scaled.quantityG,
+      quantityGMax: scaledMax?.quantityG ?? null,
+      unit: scaled.unit,
+    };
+  });
   const totalMassGMin = ingredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
   const totalMassGMax = ingredients.reduce(
     (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
@@ -166,12 +177,17 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     // Si verrouillée : le coefficient parent ne s'applique pas
     const effectiveCoef = link.isLocked ? localCoef : localCoef * k;
 
-    const childIngredients = rawIngredients.map((i) => ({
-      name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Math.ceil(Number(i.quantityG) * effectiveCoef),
-      quantityGMax: i.quantityGMax != null ? Math.ceil(Number(i.quantityGMax) * effectiveCoef) : null,
-      unit: i.unit ?? "g",
-    }));
+    const childIngredients = rawIngredients.map((i) => {
+      const unit = i.unit ?? "g";
+      const scaled = scaleQty(Number(i.quantityG), unit, effectiveCoef);
+      const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, effectiveCoef) : null;
+      return {
+        name: i.name ?? i.ingredientBase?.name ?? "—",
+        quantityG: scaled.quantityG,
+        quantityGMax: scaledMax?.quantityG ?? null,
+        unit: scaled.unit,
+      };
+    });
     const childTotalGMin = childIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
     const childTotalGMax = childIngredients.reduce(
       (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
