@@ -7,7 +7,7 @@
       { "name": "sucre semoule", "quantity": 3600, "unit": "g" },
       { "name": "farine", "quantity": 7600, "unit": "g" },
       { "name": "poudre à lever", "quantity": 450, "unit": "g" },
-      { "name": "jaune d'œuf", "quantity": 1900, "unit": "mL" },
+      { "name": "jaune d'œuf", "quantity": 1900, "unit": "g" },
       { "name": "sel", "quantity": 40, "unit": "g" }
     ],
     "steps": "",
@@ -402,7 +402,7 @@
     "ingredients": [
       { "name": "sucre", "quantity": 200, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
-      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
       { "name": "lait", "quantity": 250, "unit": "g" }
     ],
     "steps": "Faire bouillir le lait. Hors du feu, ajouter la crème et le sucre, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
@@ -415,7 +415,7 @@
     "ingredients": [
       { "name": "sucre", "quantity": 150, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
-      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
       { "name": "lait", "quantity": 250, "unit": "g" },
       { "name": "chocolat noir", "quantity": 200, "unit": "g" }
     ],
@@ -429,7 +429,7 @@
     "ingredients": [
       { "name": "sucre", "quantity": 175, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
-      { "name": "crème liquide", "quantity": 400, "unit": "mL" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
       { "name": "purée de fruit de la passion", "quantity": 250, "unit": "g" }
     ],
     "steps": "Chauffer doucement la crème avec le sucre sans faire bouillir.\n\nAjouter la purée de passion et mélanger.\n\nIncorporer les jaunes d'œufs délicatement sans fouetter pour éviter les bulles.\n\nVerser dans des ramequins individuels.\n\nCuire au four au bain-marie à 160 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
@@ -575,7 +575,7 @@
     "ingredients": [
       { "name": "pâte de noisette (ou praliné noisette 50%)", "quantity": 250, "unit": "g" },
       { "name": "lait entier", "quantity": 125, "unit": "g" },
-      { "name": "crème liquide (anglaise)", "quantity": 125, "unit": "mL" },
+      { "name": "crème liquide (anglaise)", "quantity": 125, "unit": "g" },
       { "name": "jaune d'œuf", "quantity": 60, "unit": "g" },
       { "name": "sucre", "quantity": 50, "unit": "g" },
       { "name": "masse gélatine", "quantity": 70, "unit": "g" },
