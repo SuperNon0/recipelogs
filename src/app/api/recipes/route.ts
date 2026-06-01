@@ -18,8 +18,8 @@ export async function GET(req: Request) {
   const onlyNoFolder = url.searchParams.get("onlyNoFolder") === "1";
   const excludeFolderRaw = url.searchParams.get("excludeFolder");
   const limitRaw = url.searchParams.get("limit");
-  const parsedLimit = parseInt(limitRaw ?? "50", 10) || 50;
-  const limit = parsedLimit <= 0 ? undefined : Math.max(parsedLimit, 1);
+  const parsedLimit = limitRaw !== null ? parseInt(limitRaw, 10) : 50;
+  const limit = isNaN(parsedLimit) || parsedLimit < 0 ? 50 : parsedLimit === 0 ? undefined : parsedLimit;
 
   const where: import("@prisma/client").Prisma.RecipeWhereInput = {};
   if (q.trim()) {
