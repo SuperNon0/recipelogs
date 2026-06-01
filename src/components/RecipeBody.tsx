@@ -79,6 +79,7 @@ export function RecipeBody({
   const [pivotInput, setPivotInput] = useState(
     ingredients[0]?.quantityG ? String(ingredients[0].quantityG) : "0",
   );
+  const [forceExact, setForceExact] = useState(false);
 
   const globalCoef = useMemo(() => {
     if (mode === "coefficient") {
@@ -101,6 +102,7 @@ export function RecipeBody({
   const reset = () => {
     setMode("coefficient");
     setCoefInput("1");
+    setForceExact(false);
     setMassInput(String(Math.round(baseTotalG)));
     if (ingredients[0]) {
       setPivotId(ingredients[0].id);
@@ -108,24 +110,46 @@ export function RecipeBody({
     }
   };
 
-  // Total recalculé depuis les quantités arrondies (jamais de virgule)
-  const [roundedTotalMin, roundedTotalMax] = useMemo(() => {
-    let min = 0, max = 0;
-    for (const ing of ingredients) {
-      if (ing.unit === "L") {
-        min += Math.ceil(ing.quantityG * globalCoef * 1000);
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * globalCoef * 1000);
-      } else {
-        const factor = (!ing.unit || ing.unit === "g") ? 1
-          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-        min += Math.ceil(ing.quantityG * globalCoef) * factor;
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * globalCoef) * factor;
+  // Ingrédients scalés (Math.ceil, L→g)
+  const scaledIngredients = useMemo<IngredientRow[]>(() => {
+    return ingredients.map((ing) => {
+      const unit = ing.unit ?? "g";
+      if (unit === "L") {
+        return {
+          ...ing,
+          quantityG: Math.ceil(ing.quantityG * globalCoef * 1000),
+          quantityGMax: ing.quantityGMax != null ? Math.ceil(ing.quantityGMax * globalCoef * 1000) : null,
+          unit: "g",
+        };
       }
+      return {
+        ...ing,
+        quantityG: Math.ceil(ing.quantityG * globalCoef),
+        quantityGMax: ing.quantityGMax != null ? Math.ceil(ing.quantityGMax * globalCoef) : null,
+      };
+    });
+  }, [ingredients, globalCoef]);
+
+  // Quand forceExact est actif en mode masse totale : ajuste ±1g pour atteindre la masse exacte
+  const displayIngredients = useMemo<IngredientRow[]>(() => {
+    if (forceExact && mode === "mass_target") {
+      const targetG = Number(massInput);
+      if (targetG > 0) return adjustToTarget(scaledIngredients, targetG).ingredients;
+    }
+    return scaledIngredients;
+  }, [scaledIngredients, forceExact, mode, massInput]);
+
+  const [roundedTotalMin, roundedTotalMax] = useMemo(() => {
+    const factor = (unit: string | undefined | null) =>
+      (!unit || unit === "g") ? 1 : unit === "cc" ? 5 : unit === "cs" ? 15 : 0;
+    let min = 0, max = 0;
+    for (const ing of displayIngredients) {
+      const f = factor(ing.unit);
+      min += ing.quantityG * f;
+      max += (ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG) * f;
     }
     return [min, max];
-  }, [ingredients, globalCoef]);
+  }, [displayIngredients]);
   const roundedTotalG = (roundedTotalMin + roundedTotalMax) / 2;
 
   return (
@@ -146,12 +170,14 @@ export function RecipeBody({
         ingredients={ingredients}
         globalCoef={globalCoef}
         effectiveTotalG={roundedTotalG}
+        forceExact={forceExact}
+        setForceExact={setForceExact}
         onReset={reset}
       />
 
       <IngredientsTable
-        ingredients={ingredients}
-        coef={globalCoef}
+        ingredients={displayIngredients}
+        coef={1}
         totalMinG={roundedTotalMin}
         totalMaxG={roundedTotalMax}
       />
@@ -195,6 +221,8 @@ function MultiplierPanel({
   ingredients,
   globalCoef,
   effectiveTotalG,
+  forceExact,
+  setForceExact,
   onReset,
 }: {
   recipeId: number;
@@ -212,11 +240,12 @@ function MultiplierPanel({
   ingredients: IngredientRow[];
   globalCoef: number;
   effectiveTotalG: number;
+  forceExact: boolean;
+  setForceExact: (v: boolean | ((prev: boolean) => boolean)) => void;
   onReset: () => void;
 }) {
   const [savePending, startSaveTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [forceExact, setForceExact] = useState(false);
   const dirty = Math.abs(globalCoef - 1) > 1e-4 || (forceExact && mode === "mass_target");
 
   const handleApply = () => {
