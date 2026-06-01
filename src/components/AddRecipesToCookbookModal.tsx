@@ -16,9 +16,11 @@ const DEBOUNCE_MS = 200;
 
 export function AddRecipesToCookbookModal({
   cookbookId,
+  existingRecipeIds = [],
   onClose,
 }: {
   cookbookId: number;
+  existingRecipeIds?: number[];
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -99,7 +101,8 @@ export function AddRecipesToCookbookModal({
     });
   }
 
-  const visibleOptions = options.filter((o) => !selected.has(o.id));
+  const existingSet = new Set(existingRecipeIds);
+  const visibleOptions = options.filter((o) => !selected.has(o.id) && !existingSet.has(o.id));
 
   return (
     <div
