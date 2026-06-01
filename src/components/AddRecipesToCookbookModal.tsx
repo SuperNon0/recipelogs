@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { addMultipleRecipesToCookbook } from "@/app/actions/cookbooks";
+import { addMultipleRecipesToCookbook, addMultipleRecipesWithMassTarget } from "@/app/actions/cookbooks";
 
 type RecipeOption = {
   id: number;
@@ -9,6 +9,8 @@ type RecipeOption = {
   folderId: number | null;
   folder: { name: string; color: string } | null;
 };
+
+type LinkMode = "linked" | "snapshot" | "mass_target";
 
 const DEBOUNCE_MS = 200;
 
@@ -24,7 +26,8 @@ export function AddRecipesToCookbookModal({
   const [options, setOptions] = useState<RecipeOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Map<number, RecipeOption>>(new Map());
-  const [linkMode, setLinkMode] = useState<"linked" | "snapshot">("linked");
+  const [linkMode, setLinkMode] = useState<LinkMode>("linked");
+  const [targetMass, setTargetMass] = useState("1000");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ added: number; skipped: number } | null>(null);
   const reqIdRef = useRef(0);
@@ -76,12 +79,19 @@ export function AddRecipesToCookbookModal({
   function handleSubmit() {
     setError(null);
     setResult(null);
+    const ids = Array.from(selected.keys());
     startTransition(async () => {
-      const r = await addMultipleRecipesToCookbook(
-        cookbookId,
-        Array.from(selected.keys()),
-        linkMode,
-      );
+      let r;
+      if (linkMode === "mass_target") {
+        const mass = Number(targetMass);
+        if (!Number.isFinite(mass) || mass <= 0) {
+          setError("Masse cible invalide.");
+          return;
+        }
+        r = await addMultipleRecipesWithMassTarget(cookbookId, ids, mass);
+      } else {
+        r = await addMultipleRecipesToCookbook(cookbookId, ids, linkMode);
+      }
       if (!r.ok) { setError(r.error); return; }
       setResult({ added: r.added ?? 0, skipped: r.skipped ?? 0 });
       setSelected(new Map());
@@ -176,29 +186,55 @@ export function AddRecipesToCookbookModal({
 
           {/* Mode de liaison */}
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            {(["linked", "snapshot"] as const).map((m) => (
+            {([
+              { key: "linked", label: "🔗 Liée" },
+              { key: "snapshot", label: "📌 Figée" },
+              { key: "mass_target", label: "⚖ Masse cible" },
+            ] as { key: LinkMode; label: string }[]).map(({ key, label }) => (
               <button
-                key={m}
+                key={key}
                 type="button"
-                onClick={() => setLinkMode(m)}
+                onClick={() => setLinkMode(key)}
                 style={{
                   flex: 1,
-                  padding: "0.45rem",
+                  padding: "0.45rem 0.3rem",
                   borderRadius: 8,
                   border: "1px solid",
-                  borderColor: linkMode === m ? "var(--accent)" : "var(--border)",
-                  background: linkMode === m ? "rgba(232,197,71,0.1)" : "transparent",
-                  color: linkMode === m ? "var(--accent)" : "var(--muted)",
-                  fontSize: "0.8rem",
+                  borderColor: linkMode === key ? "var(--accent)" : "var(--border)",
+                  background: linkMode === key ? "rgba(232,197,71,0.1)" : "transparent",
+                  color: linkMode === key ? "var(--accent)" : "var(--muted)",
+                  fontSize: "0.75rem",
                   fontFamily: "var(--font-mono)",
                   cursor: "pointer",
                   textAlign: "center",
                 }}
               >
-                {m === "linked" ? "🔗 Liée (toujours à jour)" : "📌 Figée (snapshot)"}
+                {label}
               </button>
             ))}
           </div>
+
+          {/* Champ masse cible */}
+          {linkMode === "mass_target" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span className="fl-label" style={{ whiteSpace: "nowrap" }}>Masse cible (g)</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={targetMass}
+                  onChange={(e) => setTargetMass(e.target.value)}
+                  className="fl-input"
+                  style={{ width: 110 }}
+                />
+              </label>
+              <p className="fl-label" style={{ fontWeight: 400, color: "var(--muted)", fontSize: "0.72rem" }}>
+                Chaque recette sera figée et mise à l&apos;échelle pour atteindre cette masse. La masse réelle
+                peut être légèrement supérieure (arrondi au gramme supérieur).
+              </p>
+            </div>
+          )}
 
           {/* Liste des recettes */}
           {loading && (
@@ -282,7 +318,9 @@ export function AddRecipesToCookbookModal({
                 ? "Ajout en cours…"
                 : selected.size === 0
                   ? "Sélectionner des recettes"
-                  : `Ajouter ${selected.size} recette${selected.size > 1 ? "s" : ""} →`}
+                  : linkMode === "mass_target"
+                    ? `Ajouter ${selected.size} recette${selected.size > 1 ? "s" : ""} à ${targetMass} g →`
+                    : `Ajouter ${selected.size} recette${selected.size > 1 ? "s" : ""} →`}
             </button>
             <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary" style={{ fontSize: "0.9rem" }}>
               Fermer
