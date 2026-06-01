@@ -203,28 +203,58 @@ export async function deleteRecipe(id: number) {
 export async function applyMultiplierToRecipe(
   id: number,
   multiplier: number,
+  targetMassG?: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!Number.isFinite(multiplier) || multiplier <= 0) {
     return { ok: false, error: "Multiplicateur invalide." };
   }
-  // No-op si on est très proche de 1 (à 0.1 ‰ près).
-  if (Math.abs(multiplier - 1) < 1e-4) return { ok: true };
+  if (Math.abs(multiplier - 1) < 1e-4 && !targetMassG) return { ok: true };
 
   const ingredients = await prisma.ingredient.findMany({
     where: { recipeId: id },
-    select: { id: true, quantityG: true },
+    orderBy: { quantityG: "desc" },
+    select: { id: true, quantityG: true, unit: true },
   });
   if (ingredients.length === 0) {
     return { ok: false, error: "Aucun ingrédient à mettre à jour." };
   }
 
+  let scaled = ingredients.map((ing) => ({
+    id: ing.id,
+    quantityG: Math.ceil(Number(ing.quantityG) * multiplier),
+    unit: ing.unit ?? "g",
+  }));
+
+  if (targetMassG && targetMassG > 0) {
+    const total = scaled.reduce((s, i) => {
+      if (!i.unit || i.unit === "g") return s + i.quantityG;
+      if (i.unit === "cc") return s + i.quantityG * 5;
+      if (i.unit === "cs") return s + i.quantityG * 15;
+      if (i.unit === "L") return s + i.quantityG * 1000;
+      return s;
+    }, 0);
+    let diff = Math.round(total - targetMassG);
+    const gIdx = scaled
+      .map((ing, idx) => ({ idx, qty: ing.quantityG, unit: ing.unit }))
+      .filter(({ unit }) => !unit || unit === "g")
+      .sort((a, b) => b.qty - a.qty);
+    if (gIdx.length > 0) {
+      let i = 0;
+      const maxIter = Math.abs(diff) * gIdx.length + gIdx.length;
+      while (diff !== 0 && i < maxIter) {
+        const { idx } = gIdx[i % gIdx.length];
+        if (diff > 0 && scaled[idx].quantityG > 1) { scaled[idx] = { ...scaled[idx], quantityG: scaled[idx].quantityG - 1 }; diff--; }
+        else if (diff < 0) { scaled[idx] = { ...scaled[idx], quantityG: scaled[idx].quantityG + 1 }; diff++; }
+        i++;
+      }
+    }
+  }
+
   await prisma.$transaction(
-    ingredients.map((ing) =>
+    scaled.map((ing) =>
       prisma.ingredient.update({
         where: { id: ing.id },
-        data: {
-          quantityG: Math.ceil(Number(ing.quantityG) * multiplier),
-        },
+        data: { quantityG: ing.quantityG },
       }),
     ),
   );

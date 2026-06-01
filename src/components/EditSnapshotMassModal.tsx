@@ -36,6 +36,7 @@ export function EditSnapshotMassModal({
   const [targetMassG, setTargetMassG] = useState("");
   const [pivotIndex, setPivotIndex] = useState<number>(0);
   const [pivotTargetG, setPivotTargetG] = useState("");
+  const [forceExact, setForceExact] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -84,7 +85,7 @@ export function EditSnapshotMassModal({
         setError("Masse cible invalide.");
         return null;
       }
-      return { mode: "mass_target", targetMassG: m };
+      return { mode: "mass_target", targetMassG: m, forceExact };
     }
     const t = parseFloat(pivotTargetG.replace(",", "."));
     if (!Number.isFinite(t) || t <= 0) {
@@ -245,18 +246,42 @@ export function EditSnapshotMassModal({
             )}
 
             {mode === "mass_target" && (
-              <label className="flex flex-col gap-1.5">
-                <span className="fl-label">Masse totale cible (g)</span>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={targetMassG}
-                  onChange={(e) => setTargetMassG(e.target.value)}
-                  className="fl-input"
-                  autoFocus
-                />
-              </label>
+              <>
+                <label className="flex flex-col gap-1.5">
+                  <span className="fl-label">Masse totale cible (g)</span>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={targetMassG}
+                    onChange={(e) => setTargetMassG(e.target.value)}
+                    className="fl-input"
+                    autoFocus
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setForceExact((v) => !v)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.4rem 0.75rem",
+                    borderRadius: 8,
+                    border: "1px solid",
+                    borderColor: forceExact ? "var(--accent)" : "var(--border)",
+                    background: forceExact ? "rgba(232,197,71,0.12)" : "transparent",
+                    color: forceExact ? "var(--accent)" : "var(--muted)",
+                    fontSize: "0.75rem",
+                    fontFamily: "var(--font-mono)",
+                    cursor: "pointer",
+                    fontWeight: forceExact ? 600 : 400,
+                  }}
+                >
+                  <span>{forceExact ? "⚖️" : "≈"}</span>
+                  Masse exacte — ajuste ±1 g sur les plus gros ingrédients
+                </button>
+              </>
             )}
 
             {mode === "pivot_ingredient" && (

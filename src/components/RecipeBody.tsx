@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCoef, formatG } from "@/lib/format";
 import { computeLocalCoef } from "@/lib/subRecipes";
+import { adjustToTarget, ingMass } from "@/lib/massAdjust";
 import {
   removeSubRecipe,
   toggleSubRecipeLock,
@@ -32,6 +33,7 @@ export type SubRecipeRow = {
   calcValue: number;
   pivotIngredientId: number | null;
   isLocked: boolean;
+  isExact: boolean;
   childIngredients: IngredientRow[];
   childSteps: string | null;
 };
@@ -214,6 +216,7 @@ function MultiplierPanel({
 }) {
   const [savePending, startSaveTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [forceExact, setForceExact] = useState(false);
   const dirty = Math.abs(globalCoef - 1) > 1e-4;
 
   const handleApply = () => {
@@ -223,8 +226,9 @@ function MultiplierPanel({
       : `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?`;
     if (!confirm(msg)) return;
     setSaveError(null);
+    const targetG = forceExact && mode === "mass_target" ? Number(massInput) : undefined;
     startSaveTransition(async () => {
-      const r = await applyMultiplierToRecipe(recipeId, globalCoef);
+      const r = await applyMultiplierToRecipe(recipeId, globalCoef, targetG);
       if (!r.ok) {
         setSaveError(r.error);
         return;
@@ -287,16 +291,35 @@ function MultiplierPanel({
       )}
 
       {mode === "mass_target" && (
-        <Field label="Masse totale cible (g)">
-          <input
-            type="number"
-            step="1"
-            min="0"
-            className="fl-input"
-            value={massInput}
-            onChange={(e) => setMassInput(e.target.value)}
-          />
-        </Field>
+        <>
+          <Field label="Masse totale cible (g)">
+            <input
+              type="number"
+              step="1"
+              min="0"
+              className="fl-input"
+              value={massInput}
+              onChange={(e) => setMassInput(e.target.value)}
+            />
+          </Field>
+          <button
+            type="button"
+            onClick={() => setForceExact((v) => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: "0.5rem",
+              padding: "0.4rem 0.75rem", borderRadius: 8,
+              border: "1px solid",
+              borderColor: forceExact ? "var(--accent)" : "var(--border)",
+              background: forceExact ? "rgba(232,197,71,0.12)" : "transparent",
+              color: forceExact ? "var(--accent)" : "var(--muted)",
+              fontSize: "0.75rem", fontFamily: "var(--font-mono)",
+              cursor: "pointer", fontWeight: forceExact ? 600 : 400,
+            }}
+          >
+            <span>{forceExact ? "⚖️" : "≈"}</span>
+            Masse exacte — ajuste ±1 g sur les plus gros ingrédients
+          </button>
+        </>
       )}
 
       {mode === "pivot_ingredient" && (
@@ -559,23 +582,33 @@ function SubRecipeAccordion({
     ? localCoef
     : localCoef * globalCoef;
 
-  const [roundedChildMin, roundedChildMax] = useMemo(() => {
-    let min = 0, max = 0;
-    for (const ing of subRecipe.childIngredients) {
-      if (ing.unit === "L") {
-        min += Math.ceil(ing.quantityG * effectiveCoef * 1000);
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * effectiveCoef * 1000);
-      } else {
-        const factor = (!ing.unit || ing.unit === "g") ? 1
-          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-        min += Math.ceil(ing.quantityG * effectiveCoef) * factor;
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * effectiveCoef) * factor;
-      }
+  const adjustedIngredients = useMemo(() => {
+    const scaled = subRecipe.childIngredients.map((ing) => {
+      const unit = ing.unit === "L" ? "g" : (ing.unit ?? "g");
+      const qg = ing.unit === "L"
+        ? Math.ceil(ing.quantityG * effectiveCoef * 1000)
+        : Math.ceil(ing.quantityG * effectiveCoef);
+      const qgMax = ing.quantityGMax != null
+        ? (ing.unit === "L"
+          ? Math.ceil(ing.quantityGMax * effectiveCoef * 1000)
+          : Math.ceil(ing.quantityGMax * effectiveCoef))
+        : null;
+      return { name: ing.name, quantityG: qg, quantityGMax: qgMax, unit };
+    });
+    if (subRecipe.isExact && subRecipe.calcMode === "mass_target") {
+      const target = Math.round(subRecipe.calcValue * (lockedOptimistic ? 1 : globalCoef));
+      return adjustToTarget(scaled, target).ingredients;
     }
+    return scaled;
+  }, [subRecipe.childIngredients, subRecipe.isExact, subRecipe.calcMode, subRecipe.calcValue, effectiveCoef, lockedOptimistic, globalCoef]);
+
+  const [roundedChildMin, roundedChildMax] = useMemo(() => {
+    const min = adjustedIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
+    const max = adjustedIngredients.reduce(
+      (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
+    );
     return [min, max];
-  }, [subRecipe.childIngredients, effectiveCoef]);
+  }, [adjustedIngredients]);
 
   return (
     <div
@@ -687,9 +720,9 @@ function SubRecipeAccordion({
 
           <table className="w-full">
             <tbody>
-              {subRecipe.childIngredients.map((ing, idx) => (
+              {adjustedIngredients.map((ing, idx) => (
                 <tr
-                  key={ing.id}
+                  key={idx}
                   style={{
                     background:
                       idx % 2 === 0
@@ -705,32 +738,17 @@ function SubRecipeAccordion({
                       width: 140,
                     }}
                   >
-                    {ing.unit === "QS" ? (
-                      <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
-                    ) : ing.quantityGMax != null ? (
+                    {ing.quantityGMax != null ? (
                       <span>
-                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
+                        {ing.quantityG}
                         <span style={{ color: "var(--muted)" }}>/</span>
-                        {scaledQty(ing.quantityGMax, ing.unit, effectiveCoef)}
-                        {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
-                        {(ing.unit === "cc" || ing.unit === "cs") && (
-                          <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                            {" "}(≈{formatG(((Math.ceil(ing.quantityG * effectiveCoef) + Math.ceil(ing.quantityGMax * effectiveCoef)) / 2) * (ing.unit === "cc" ? 5 : 15))})
-                          </span>
-                        )}
-                      </span>
-                    ) : (ing.unit === "cc" || ing.unit === "cs") ? (
-                      <>
-                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
+                        {ing.quantityGMax}
                         {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
-                        <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                          {" "}(≈{formatG(Math.ceil(ing.quantityG * effectiveCoef) * (ing.unit === "cc" ? 5 : 15))})
-                        </span>
-                      </>
+                      </span>
                     ) : (
                       <>
-                        {scaledQty(ing.quantityG, ing.unit, effectiveCoef)}
-                        {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
+                        {ing.quantityG}
+                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
                       </>
                     )}
                   </td>
@@ -807,6 +825,7 @@ function EditSubRecipeModal({
   const [pivotId, setPivotId] = useState<number | null>(
     subRecipe.pivotIngredientId,
   );
+  const [isExact, setIsExact] = useState(subRecipe.isExact);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -818,6 +837,7 @@ function EditSubRecipeModal({
     fd.set("label", label);
     fd.set("calcMode", calcMode);
     fd.set("calcValue", calcValue);
+    fd.set("isExact", String(isExact));
     if (calcMode === "pivot_ingredient" && pivotId) {
       fd.set("pivotIngredientId", String(pivotId));
     }
@@ -866,6 +886,31 @@ function EditSubRecipeModal({
             required
           />
         </Field>
+
+        {calcMode === "mass_target" && (
+          <button
+            type="button"
+            onClick={() => setIsExact((v) => !v)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.4rem 0.75rem",
+              borderRadius: 8,
+              border: "1px solid",
+              borderColor: isExact ? "var(--accent)" : "var(--border)",
+              background: isExact ? "rgba(232,197,71,0.12)" : "transparent",
+              color: isExact ? "var(--accent)" : "var(--muted)",
+              fontSize: "0.75rem",
+              fontFamily: "var(--font-mono)",
+              cursor: "pointer",
+              fontWeight: isExact ? 600 : 400,
+            }}
+          >
+            <span>{isExact ? "⚖️" : "≈"}</span>
+            Masse exacte — ajuste ±1 g sur les plus gros ingrédients
+          </button>
+        )}
 
         {calcMode === "pivot_ingredient" && (
           <Field label="Ingrédient pivot">

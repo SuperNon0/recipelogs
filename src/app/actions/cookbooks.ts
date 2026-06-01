@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot, adjustSnapshotToTarget } from "@/lib/cookbooks";
+import { adjustToTarget, ingMass } from "@/lib/massAdjust";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -487,7 +488,7 @@ type SnapData = {
 
 export type UpdateSnapshotMassPayload =
   | { mode: "coefficient"; coefficient: number }
-  | { mode: "mass_target"; targetMassG: number }
+  | { mode: "mass_target"; targetMassG: number; forceExact?: boolean }
   | { mode: "pivot_ingredient"; pivotIndex: number; targetMassG: number };
 
 /**
@@ -543,13 +544,24 @@ export async function updateSnapshotMass(
     ratio = payload.targetMassG / pivot.quantityG;
   }
 
+  const forceExact = payload.mode === "mass_target" && payload.forceExact === true;
+  const scaledIngredients = snap.ingredients.map((i) => ({
+    ...i,
+    quantityG: Math.ceil(i.quantityG * ratio),
+    quantityGMax: null,
+    unit: i.unit ?? "g",
+  }));
+  const finalIngredients = forceExact
+    ? adjustToTarget(scaledIngredients, payload.targetMassG).ingredients
+    : scaledIngredients.map((i) => ({ ...i, quantityG: round3(i.quantityG) }));
+  const newTotalMassG = finalIngredients.reduce(
+    (s, i) => s + ingMass(i.quantityG, i.unit), 0,
+  );
+
   const newSnap: SnapData = {
     ...snap,
-    ingredients: snap.ingredients.map((i) => ({
-      ...i,
-      quantityG: round3(i.quantityG * ratio),
-    })),
-    totalMassG: round3(snap.totalMassG * ratio),
+    ingredients: finalIngredients,
+    totalMassG: round3(newTotalMassG),
     subRecipes: (snap.subRecipes ?? []).map((sr) => ({
       ...sr,
       ingredients: sr.ingredients.map((i) => ({

@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { computeLocalCoef } from "./subRecipes";
+import { ingMass, scaleQty, adjustToTarget, type AdjIngredient } from "./massAdjust";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -49,64 +50,14 @@ export async function listPdfTemplates() {
  * @param multiplier coefficient appliqué à toutes les quantités (1 = inchangé).
  *                   Permet de figer une version multipliée de la recette.
  */
-function ingMass(q: number, unit: string): number {
-  if (!unit || unit === "g") return q;
-  if (unit === "cc") return q * 5;
-  if (unit === "cs") return q * 15;
-  if (unit === "L") return q * 1000;
-  return 0;
-}
+type SnapIngredient = AdjIngredient;
 
-type SnapIngredient = { name: string; quantityG: number; quantityGMax: number | null; unit: string };
-
-/** Applique un coefficient à une quantité — arrondi au supérieur, L converti en g entier. */
-function scaleQty(qty: number, unit: string, coef: number): { quantityG: number; unit: string } {
-  if (unit === "L") return { quantityG: Math.ceil(qty * coef * 1000), unit: "g" };
-  return { quantityG: Math.ceil(qty * coef), unit };
-}
-
-/**
- * Après arrondi au supérieur, répartit l'écart ±N grammes sur les ingrédients
- * en grammes (les plus gros en premier) pour obtenir exactement targetMassG.
- */
+/** @deprecated Use adjustToTarget from massAdjust */
 export function adjustSnapshotToTarget(
   ingredients: SnapIngredient[],
   targetMassG: number,
-): { ingredients: SnapIngredient[]; totalMassGMin: number; totalMassGMax: number } {
-  const result = ingredients.map((i) => ({ ...i }));
-
-  const total = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  let diff = Math.round(total - targetMassG);
-
-  if (diff !== 0) {
-    // Uniquement les ingrédients en grammes, triés par quantité décroissante
-    const gIdx = result
-      .map((ing, idx) => ({ idx, qty: ing.quantityG, unit: ing.unit ?? "g" }))
-      .filter(({ unit }) => !unit || unit === "g")
-      .sort((a, b) => b.qty - a.qty);
-
-    if (gIdx.length > 0) {
-      let i = 0;
-      const maxIter = Math.abs(diff) * gIdx.length + gIdx.length;
-      while (diff !== 0 && i < maxIter) {
-        const { idx } = gIdx[i % gIdx.length];
-        if (diff > 0 && result[idx].quantityG > 1) {
-          result[idx] = { ...result[idx], quantityG: result[idx].quantityG - 1 };
-          diff--;
-        } else if (diff < 0) {
-          result[idx] = { ...result[idx], quantityG: result[idx].quantityG + 1 };
-          diff++;
-        }
-        i++;
-      }
-    }
-  }
-
-  const totalMassGMin = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  const totalMassGMax = result.reduce(
-    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
-  );
-  return { ingredients: result, totalMassGMin, totalMassGMax };
+) {
+  return adjustToTarget(ingredients, targetMassG);
 }
 
 export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
