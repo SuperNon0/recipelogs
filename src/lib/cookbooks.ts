@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { computeLocalCoef } from "./subRecipes";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -52,6 +53,7 @@ function ingMass(q: number, unit: string): number {
   if (!unit || unit === "g") return q;
   if (unit === "cc") return q * 5;
   if (unit === "cs") return q * 15;
+  if (unit === "L") return q * 1000;
   return 0;
 }
 
@@ -99,10 +101,29 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   const totalMassG = (totalMassGMin + totalMassGMax) / 2;
 
   const subRecipes = r.parentLinks.map((link) => {
-    const childIngredients = link.child.ingredients.map((i) => ({
+    // Masse de base de la sous-recette (quantités brutes non scalées)
+    const rawIngredients = link.child.ingredients;
+    const childBaseTotalG = rawIngredients.reduce(
+      (s, i) => s + ingMass(Number(i.quantityG), i.unit ?? "g"), 0,
+    );
+    // Ingrédient pivot (pour le mode pivot_ingredient)
+    const pivotBaseQtyG = link.pivotIngredientId
+      ? Number(rawIngredients.find((i) => i.id === link.pivotIngredientId)?.quantityG ?? 0) || null
+      : null;
+    // Coefficient propre à la sous-recette (calcMode + calcValue définis lors de l'ajout)
+    const localCoef = computeLocalCoef(
+      link.calcMode,
+      Number(link.calcValue),
+      childBaseTotalG,
+      pivotBaseQtyG,
+    );
+    // Si verrouillée : le coefficient parent ne s'applique pas
+    const effectiveCoef = link.isLocked ? localCoef : localCoef * k;
+
+    const childIngredients = rawIngredients.map((i) => ({
       name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Number(i.quantityG) * k,
-      quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) * k : null,
+      quantityG: Math.ceil(Number(i.quantityG) * effectiveCoef),
+      quantityGMax: i.quantityGMax != null ? Math.ceil(Number(i.quantityGMax) * effectiveCoef) : null,
       unit: i.unit ?? "g",
     }));
     const childTotalGMin = childIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
