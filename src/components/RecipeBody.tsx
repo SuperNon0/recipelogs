@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { formatCoef, formatG } from "@/lib/format";
+import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
 import { computeLocalCoef } from "@/lib/subRecipes";
-import { adjustToTarget, ingMass } from "@/lib/massAdjust";
+import { adjustToTarget, ingMass, scaledUnit } from "@/lib/massAdjust";
 import {
   removeSubRecipe,
   toggleSubRecipeLock,
@@ -79,6 +79,7 @@ export function RecipeBody({
   const [pivotInput, setPivotInput] = useState(
     ingredients[0]?.quantityG ? String(ingredients[0].quantityG) : "0",
   );
+  const [decimals, setDecimals] = useState(true);
 
   const globalCoef = useMemo(() => {
     if (mode === "coefficient") {
@@ -108,25 +109,25 @@ export function RecipeBody({
     }
   };
 
-  // Total recalculé depuis les quantités arrondies (jamais de virgule)
-  const [roundedTotalMin, roundedTotalMax] = useMemo(() => {
+  const [displayTotalMin, displayTotalMax] = useMemo(() => {
     let min = 0, max = 0;
+    const r = decimals ? (x: number) => x : Math.ceil;
     for (const ing of ingredients) {
       if (ing.unit === "L") {
-        min += Math.ceil(ing.quantityG * globalCoef * 1000);
+        min += r(ing.quantityG * globalCoef * 1000);
         const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * globalCoef * 1000);
+        max += r(qMax * globalCoef * 1000);
       } else {
         const factor = (!ing.unit || ing.unit === "g") ? 1
           : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-        min += Math.ceil(ing.quantityG * globalCoef) * factor;
+        min += r(ing.quantityG * globalCoef) * factor;
         const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += Math.ceil(qMax * globalCoef) * factor;
+        max += r(qMax * globalCoef) * factor;
       }
     }
     return [min, max];
-  }, [ingredients, globalCoef]);
-  const roundedTotalG = (roundedTotalMin + roundedTotalMax) / 2;
+  }, [ingredients, globalCoef, decimals]);
+  const displayTotalG = (displayTotalMin + displayTotalMax) / 2;
 
   return (
     <div className="flex flex-col gap-5">
@@ -145,15 +146,18 @@ export function RecipeBody({
         setPivotInput={setPivotInput}
         ingredients={ingredients}
         globalCoef={globalCoef}
-        effectiveTotalG={roundedTotalG}
+        effectiveTotalG={displayTotalG}
         onReset={reset}
+        decimals={decimals}
+        setDecimals={setDecimals}
       />
 
       <IngredientsTable
         ingredients={ingredients}
         coef={globalCoef}
-        totalMinG={roundedTotalMin}
-        totalMaxG={roundedTotalMax}
+        totalMinG={displayTotalMin}
+        totalMaxG={displayTotalMax}
+        decimals={decimals}
       />
 
       {subRecipes.length > 0 && (
@@ -196,6 +200,8 @@ function MultiplierPanel({
   globalCoef,
   effectiveTotalG,
   onReset,
+  decimals,
+  setDecimals,
 }: {
   recipeId: number;
   hasSubRecipes: boolean;
@@ -213,6 +219,8 @@ function MultiplierPanel({
   globalCoef: number;
   effectiveTotalG: number;
   onReset: () => void;
+  decimals: boolean;
+  setDecimals: (v: boolean) => void;
 }) {
   const [savePending, startSaveTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -350,6 +358,31 @@ function MultiplierPanel({
         </div>
       )}
 
+      <div className="flex items-center gap-2 pt-2">
+        <button
+          type="button"
+          onClick={() => setDecimals(!decimals)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.4rem 0.75rem",
+            borderRadius: 8,
+            border: "1px solid",
+            borderColor: decimals ? "var(--accent-2)" : "var(--border)",
+            background: decimals ? "rgba(79,195,161,0.12)" : "transparent",
+            color: decimals ? "var(--accent-2)" : "var(--muted)",
+            fontSize: "0.75rem",
+            fontFamily: "var(--font-mono)",
+            cursor: "pointer",
+            fontWeight: decimals ? 600 : 400,
+          }}
+        >
+          <span>{decimals ? "0,00" : "0"}</span>
+          {decimals ? "Décimales — valeurs exactes" : "Entiers — arrondis au supérieur"}
+        </button>
+      </div>
+
       <div className="flex items-end justify-between pt-2 border-t border-[color:var(--border)]">
         <div>
           <div className="fl-label">Coefficient effectif</div>
@@ -363,7 +396,7 @@ function MultiplierPanel({
         <div className="text-right">
           <div className="fl-label">Masse totale</div>
           <div className="fl-value-serif" style={{ fontSize: "2rem" }}>
-            {formatG(effectiveTotalG)}
+            {decimals ? formatGDecimal(effectiveTotalG) : formatG(effectiveTotalG)}
           </div>
         </div>
       </div>
@@ -431,16 +464,15 @@ function Field({
 }
 
 // ─────────────────────────────────────────────
-// Helpers — arrondi supérieur, jamais de virgule
+// Helpers — arrondi ou décimales selon le mode
 // ─────────────────────────────────────────────
 
-function scaledQty(qty: number, unit: string | undefined | null, coef: number): string {
-  if (unit === "L") return Math.ceil(qty * coef * 1000).toLocaleString("fr-FR");
-  return Math.ceil(qty * coef).toLocaleString("fr-FR");
-}
-function scaledUnit(unit: string | undefined | null): string {
-  if (unit === "L") return "g";
-  return unit ?? "g";
+function displayQty(qty: number, unit: string | undefined | null, coef: number, useDecimals: boolean): string {
+  const raw = unit === "L" ? qty * coef * 1000 : qty * coef;
+  if (useDecimals) {
+    return raw.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+  return Math.ceil(raw).toLocaleString("fr-FR");
 }
 
 // ─────────────────────────────────────────────
@@ -452,12 +484,15 @@ function IngredientsTable({
   coef,
   totalMinG,
   totalMaxG,
+  decimals,
 }: {
   ingredients: IngredientRow[];
   coef: number;
   totalMinG: number;
   totalMaxG: number;
+  decimals: boolean;
 }) {
+  const fmt = decimals ? formatGDecimal : formatG;
   return (
     <section className="fl-card">
       <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
@@ -485,27 +520,27 @@ function IngredientsTable({
                   <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
                 ) : ing.quantityGMax != null ? (
                   <span>
-                    {scaledQty(ing.quantityG, ing.unit, coef)}
+                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
                     <span style={{ color: "var(--muted)" }}>/</span>
-                    {scaledQty(ing.quantityGMax, ing.unit, coef)}
+                    {displayQty(ing.quantityGMax, ing.unit, coef, decimals)}
                     {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                     {(ing.unit === "cc" || ing.unit === "cs") && (
                       <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                        {" "}(≈{formatG(((Math.ceil(ing.quantityG * coef) + Math.ceil(ing.quantityGMax * coef)) / 2) * (ing.unit === "cc" ? 5 : 15))})
+                        {" "}(≈{fmt(((ing.quantityG * coef + ing.quantityGMax * coef) / 2) * (ing.unit === "cc" ? 5 : 15))})
                       </span>
                     )}
                   </span>
                 ) : (ing.unit === "cc" || ing.unit === "cs") ? (
                   <>
-                    {scaledQty(ing.quantityG, ing.unit, coef)}
+                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
                     {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
                     <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                      {" "}(≈{formatG(Math.ceil(ing.quantityG * coef) * (ing.unit === "cc" ? 5 : 15))})
+                      {" "}(≈{fmt(ing.quantityG * coef * (ing.unit === "cc" ? 5 : 15))})
                     </span>
                   </>
                 ) : (
                   <>
-                    {scaledQty(ing.quantityG, ing.unit, coef)}
+                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
                     {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
                   </>
                 )}
@@ -521,8 +556,8 @@ function IngredientsTable({
               style={{ fontSize: "1.1rem" }}
             >
               {totalMinG !== totalMaxG ? (
-                <>{formatG(totalMinG)}<span style={{ color: "var(--muted)" }}>/</span>{formatG(totalMaxG)}</>
-              ) : formatG(totalMinG)}
+                <>{fmt(totalMinG)}<span style={{ color: "var(--muted)" }}>/</span>{fmt(totalMaxG)}</>
+              ) : fmt(totalMinG)}
             </td>
             <td className="pt-3 fl-label">Total</td>
           </tr>
