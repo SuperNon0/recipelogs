@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppNav } from "@/components/AppNav";
-import { LogoLink } from "@/components/LogoLink";
 import { getSiteUrl } from "@/app/actions/settings";
 
 export const metadata: Metadata = {
@@ -42,14 +41,8 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        <header className="sticky top-0 z-40 bg-[color:var(--surface)]">
-          <div className="border-b border-[color:var(--border)]">
-            <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-[52px]">
-              <LogoLink siteUrl={siteUrl} />
-              <span className="fl-label">v0.1 · phase 1-2</span>
-            </div>
-          </div>
-          <AppNav />
+        <header className="sticky top-0 z-40" style={{ background: "var(--surface)" }}>
+          <AppNav siteUrl={siteUrl} />
         </header>
         <main className="max-w-5xl mx-auto px-4 py-6 pb-28">{children}</main>
       </body>
