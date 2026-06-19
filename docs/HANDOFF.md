@@ -1,7 +1,7 @@
 # RecipeLog — Document de transmission
 
 > Document destiné à un développeur reprenant le projet.
-> Dernière mise à jour : 2026-06-01.
+> Dernière mise à jour : 2026-06-19.
 
 ---
 
@@ -49,6 +49,7 @@
 | 9. Mise en production | ✅ (déployé sur Proxmox `192.168.0.99`) |
 | 10. V1.2–V1.4 (dossiers, PDF multi-passes, fourchettes, gestion ingrédients, import amélioré) | ✅ |
 | 11. V1.5 (masse exacte, massAdjust.ts, arrondi systématique PDFs, cadenas optimiste, filtre cahier, index perf) | ✅ |
+| 12. V1.6 (toggle décimales, navigation pill, masse cible exacte en affichage, refonte ingrédients, suppression Nouveautés) | ✅ |
 
 ---
 

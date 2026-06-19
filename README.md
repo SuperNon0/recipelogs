@@ -4,13 +4,13 @@
 
 Outil personnel de gestion de recettes conçu pour un usage en pâtisserie professionnelle (BTM). Auto-hébergé sur Proxmox LXC, intégré à l'écosystème [`super-nono.cc`](https://super-nono.cc).
 
-**Version actuelle : V1.5** · En production sur [`recipe.super-nono.cc`](https://recipe.super-nono.cc)
+**Version actuelle : V1.6** · En production sur [`recipe.super-nono.cc`](https://recipe.super-nono.cc)
 
 ---
 
 ## 📋 Documentation
 
-- **[Cahier des charges V1.5](./CDC.md)** — Spécifications complètes + changelog détaillé
+- **[Cahier des charges V1.6](./CDC.md)** — Spécifications complètes + changelog détaillé
 - **[Guide d'installation dev](./docs/INSTALL.md)** — Environnement local (Node, Docker, pnpm)
 - **[Guide de déploiement prod](./docs/DEPLOYMENT.md)** — Proxmox LXC + Cloudflare Zero Trust
 
@@ -43,7 +43,8 @@ Outil personnel de gestion de recettes conçu pour un usage en pâtisserie profe
 - **Sous-recettes** imbriquées pour composer des entremets complexes
 - Propagation en cascade du coefficient global
 - **Verrouillage individuel** 🔒 des sous-recettes pour un contrôle fin
-- **Masse exacte ⚖️** : ajuste ±1g sur les plus gros ingrédients pour atteindre la masse cible exacte (disponible dans les 3 panneaux de modification)
+- **Masse exacte ⚖️** : ajuste ±1g sur les plus gros ingrédients pour atteindre la masse cible exacte (appliqué automatiquement en affichage et sauvegarde)
+- **Toggle décimales / arrondi** : affiche les quantités en décimales exactes ou en arrondi supérieur
 - **Mettre à jour la recette** : applique le coefficient affiché comme nouvelle base en BDD
 
 ### 📖 Cahiers PDF
@@ -84,7 +85,7 @@ Outil personnel de gestion de recettes conçu pour un usage en pâtisserie profe
 - **Lien du logo** : URL externe ouverte au clic depuis l'accueil (configurable)
 - **Réglages PDF** : format, couleurs, polices pour les PDF individuels
 - **Import Recipe Keeper** : import CSV ou HTML/ZIP avec extraction des photos
-- **Mise à jour du site** : bouton qui déclenche `deploy.sh` sur le serveur
+- **Mise à jour du site** : bouton qui déclenche `deploy.sh` sur le serveur (redirection vers l'accueil après le redémarrage)
 
 ---
 

@@ -109,25 +109,6 @@ export function AppNav({ siteUrl }: { siteUrl: string | null }) {
           })}
         </div>
 
-        {/* What's new */}
-        <Link
-          href="/whats-new"
-          style={{
-            fontSize: "0.6rem",
-            fontFamily: "var(--font-mono)",
-            color: pathname === "/whats-new" ? "var(--accent)" : "var(--muted)",
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-            padding: "0.35rem 0.5rem",
-            borderRadius: 6,
-            background: pathname === "/whats-new" ? "rgba(232,197,71,0.1)" : "transparent",
-            transition: "color 150ms ease",
-            letterSpacing: "0.03em",
-          }}
-          className="shrink-0 hidden md:block"
-        >
-          Nouveautés
-        </Link>
       </div>
     </nav>
   );

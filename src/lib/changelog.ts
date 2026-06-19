@@ -9,6 +9,37 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.6",
+    date: "2026-06-19",
+    title: "Toggle décimales, navigation pill, masse cible exacte",
+    features: [
+      "Toggle décimales / arrondi dans le panneau de multiplication",
+      "Masse cible exacte en affichage (adjustToTarget appliqué au rendu)",
+      "Navigation pill Apple-style avec icônes et badge version",
+      "Refonte responsive de la page ingrédients (grille auto-fill)",
+    ],
+    fixes: [
+      "Correction de la précision masse cible (393g demandé → affichait 396g)",
+      "Correction du ModeSwitcher sur mobile (hauteur et styles inadaptés)",
+      "Suppression de la page Nouveautés (non fonctionnelle)",
+    ],
+  },
+  {
+    version: "V1.5",
+    date: "2026-06-01",
+    title: "Masse exacte, optimisations performances, cadenas optimiste",
+    features: [
+      "Toggle « Masse exacte » dans les 3 panneaux de modification (recette, sous-recettes, cahiers)",
+      "Filtre des recettes déjà présentes dans un cahier lors de l'ajout",
+      "Index GIN trigram (pg_trgm) pour la recherche fuzzy sur les noms de recettes",
+    ],
+    fixes: [
+      "Cadenas sous-recettes : état optimiste sans revalidatePath (plus de perte du panel multiplicateur)",
+      "Correction du bug limit=0 retournant 50 résultats au lieu de tout charger",
+      "Arrondi supérieur systématique dans les PDFs/snapshots",
+    ],
+  },
+  {
     version: "V1.4",
     date: "2026-05-31",
     title: "Unités cc/cs, recherche sans accents, navigation dossier",
