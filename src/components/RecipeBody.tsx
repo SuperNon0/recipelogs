@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
 import { computeLocalCoef } from "@/lib/subRecipes";
-import { adjustToTarget, ingMass, scaledUnit } from "@/lib/massAdjust";
+import { adjustToTarget, ingMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
   removeSubRecipe,
   toggleSubRecipeLock,
@@ -109,24 +109,29 @@ export function RecipeBody({
     }
   };
 
-  const [displayTotalMin, displayTotalMax] = useMemo(() => {
-    let min = 0, max = 0;
+  const { displayTotalMin, displayTotalMax, adjustedQties } = useMemo(() => {
     const r = decimals ? (x: number) => x : Math.ceil;
-    for (const ing of ingredients) {
-      if (ing.unit === "L") {
-        min += r(ing.quantityG * globalCoef * 1000);
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += r(qMax * globalCoef * 1000);
-      } else {
-        const factor = (!ing.unit || ing.unit === "g") ? 1
-          : ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
-        min += r(ing.quantityG * globalCoef) * factor;
-        const qMax = ing.quantityGMax != null ? ing.quantityGMax : ing.quantityG;
-        max += r(qMax * globalCoef) * factor;
+    const scaled: AdjIngredient[] = ingredients.map((ing) => {
+      const unit = scaledUnit(ing.unit);
+      const qty = ing.unit === "L" ? r(ing.quantityG * globalCoef * 1000) : r(ing.quantityG * globalCoef);
+      const qtyMax = ing.quantityGMax != null
+        ? (ing.unit === "L" ? r(ing.quantityGMax * globalCoef * 1000) : r(ing.quantityGMax * globalCoef))
+        : null;
+      return { name: ing.name, quantityG: qty, quantityGMax: qtyMax, unit };
+    });
+
+    if (mode === "mass_target" && !decimals) {
+      const target = Number(massInput);
+      if (Number.isFinite(target) && target > 0) {
+        const { ingredients: adj, totalMassGMin, totalMassGMax } = adjustToTarget(scaled, target);
+        return { displayTotalMin: totalMassGMin, displayTotalMax: totalMassGMax, adjustedQties: adj };
       }
     }
-    return [min, max];
-  }, [ingredients, globalCoef, decimals]);
+
+    const tMin = scaled.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
+    const tMax = scaled.reduce((s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0);
+    return { displayTotalMin: tMin, displayTotalMax: tMax, adjustedQties: null as AdjIngredient[] | null };
+  }, [ingredients, globalCoef, decimals, mode, massInput]);
   const displayTotalG = (displayTotalMin + displayTotalMax) / 2;
 
   return (
@@ -158,6 +163,7 @@ export function RecipeBody({
         totalMinG={displayTotalMin}
         totalMaxG={displayTotalMax}
         decimals={decimals}
+        adjustedQties={adjustedQties}
       />
 
       {subRecipes.length > 0 && (
@@ -224,8 +230,7 @@ function MultiplierPanel({
 }) {
   const [savePending, startSaveTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [forceExact, setForceExact] = useState(false);
-  const dirty = Math.abs(globalCoef - 1) > 1e-4 || (forceExact && mode === "mass_target");
+  const dirty = Math.abs(globalCoef - 1) > 1e-4;
 
   const handleApply = () => {
     if (!dirty) return;
@@ -234,7 +239,7 @@ function MultiplierPanel({
       : `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?`;
     if (!confirm(msg)) return;
     setSaveError(null);
-    const targetG = forceExact && mode === "mass_target" ? Number(massInput) : undefined;
+    const targetG = mode === "mass_target" ? Number(massInput) : undefined;
     startSaveTransition(async () => {
       const r = await applyMultiplierToRecipe(recipeId, globalCoef, targetG);
       if (!r.ok) {
@@ -310,23 +315,12 @@ function MultiplierPanel({
               onChange={(e) => setMassInput(e.target.value)}
             />
           </Field>
-          <button
-            type="button"
-            onClick={() => setForceExact((v) => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.4rem 0.75rem", borderRadius: 8,
-              border: "1px solid",
-              borderColor: forceExact ? "var(--accent)" : "var(--border)",
-              background: forceExact ? "rgba(232,197,71,0.12)" : "transparent",
-              color: forceExact ? "var(--accent)" : "var(--muted)",
-              fontSize: "0.75rem", fontFamily: "var(--font-mono)",
-              cursor: "pointer", fontWeight: forceExact ? 600 : 400,
-            }}
-          >
-            <span>{forceExact ? "⚖️" : "≈"}</span>
+          <p style={{
+            fontSize: "0.72rem", fontFamily: "var(--font-mono)",
+            color: "var(--muted)", margin: 0, paddingLeft: "0.25rem",
+          }}>
             Masse exacte — ajuste ±1 g sur les plus gros ingrédients
-          </button>
+          </p>
         </>
       )}
 
@@ -428,16 +422,21 @@ function ModeSwitcher({
             key={i.key}
             type="button"
             onClick={() => setMode(i.key)}
-            className="fl-nav-item"
             style={{
               textAlign: "center",
               padding: "0.55rem 0.5rem",
               borderRadius: 6,
-              borderBottom: "none",
+              fontSize: "0.72rem",
+              fontFamily: "var(--font-mono)",
+              fontWeight: active ? 600 : 400,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
               background: active
                 ? "rgba(232, 197, 71, 0.1)"
                 : "transparent",
               color: active ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer",
+              transition: "background 150ms ease, color 150ms ease",
             }}
           >
             {i.label}
@@ -485,12 +484,14 @@ function IngredientsTable({
   totalMinG,
   totalMaxG,
   decimals,
+  adjustedQties,
 }: {
   ingredients: IngredientRow[];
   coef: number;
   totalMinG: number;
   totalMaxG: number;
   decimals: boolean;
+  adjustedQties: AdjIngredient[] | null;
 }) {
   const fmt = decimals ? formatGDecimal : formatG;
   return (
@@ -500,54 +501,57 @@ function IngredientsTable({
       </h2>
       <table className="w-full">
         <tbody>
-          {ingredients.map((ing, idx) => (
-            <tr
-              key={ing.id}
-              style={{
-                background:
-                  idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
-              }}
-            >
-              <td
-                className="py-1.5 pr-3 text-right"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.9rem",
-                  width: 150,
-                }}
-              >
-                {ing.unit === "QS" ? (
-                  <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
-                ) : ing.quantityGMax != null ? (
-                  <span>
-                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
-                    <span style={{ color: "var(--muted)" }}>/</span>
-                    {displayQty(ing.quantityGMax, ing.unit, coef, decimals)}
-                    {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
-                    {(ing.unit === "cc" || ing.unit === "cs") && (
-                      <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                        {" "}(≈{fmt(((ing.quantityG * coef + ing.quantityGMax * coef) / 2) * (ing.unit === "cc" ? 5 : 15))})
-                      </span>
-                    )}
-                  </span>
-                ) : (ing.unit === "cc" || ing.unit === "cs") ? (
-                  <>
-                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
-                    {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
-                    <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                      {" "}(≈{fmt(ing.quantityG * coef * (ing.unit === "cc" ? 5 : 15))})
+          {ingredients.map((ing, idx) => {
+            if (ing.unit === "QS") {
+              return (
+                <tr key={ing.id} style={{ background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                  <td className="py-1.5 pr-3 text-right" style={{ fontFamily: "var(--font-mono)", fontSize: "0.9rem", width: 150 }}>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
+                  </td>
+                  <td className="py-1.5">{ing.name}</td>
+                </tr>
+              );
+            }
+
+            const adj = adjustedQties?.[idx];
+            const q = adj ? adj.quantityG : (ing.unit === "L" ? ing.quantityG * coef * 1000 : ing.quantityG * coef);
+            const qMax = adj
+              ? adj.quantityGMax
+              : (ing.quantityGMax != null ? (ing.unit === "L" ? ing.quantityGMax * coef * 1000 : ing.quantityGMax * coef) : null);
+            const u = adj ? adj.unit : scaledUnit(ing.unit);
+            const fq = adj ? adj.quantityG.toLocaleString("fr-FR") : displayQty(ing.quantityG, ing.unit, coef, decimals);
+            const fqMax = adj
+              ? (adj.quantityGMax?.toLocaleString("fr-FR") ?? null)
+              : (ing.quantityGMax != null ? displayQty(ing.quantityGMax, ing.unit, coef, decimals) : null);
+
+            return (
+              <tr key={ing.id} style={{ background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
+                <td className="py-1.5 pr-3 text-right" style={{ fontFamily: "var(--font-mono)", fontSize: "0.9rem", width: 150 }}>
+                  {ing.quantityGMax != null ? (
+                    <span>
+                      {fq}<span style={{ color: "var(--muted)" }}>/</span>{fqMax}
+                      {" "}<span style={{ color: "var(--muted)" }}>{u}</span>
+                      {(ing.unit === "cc" || ing.unit === "cs") && (
+                        <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
+                          {" "}(≈{fmt(((q + (qMax ?? q)) / 2) * (ing.unit === "cc" ? 5 : 15))})
+                        </span>
+                      )}
                     </span>
-                  </>
-                ) : (
-                  <>
-                    {displayQty(ing.quantityG, ing.unit, coef, decimals)}
-                    {" "}<span style={{ color: "var(--muted)" }}>{scaledUnit(ing.unit)}</span>
-                  </>
-                )}
-              </td>
-              <td className="py-1.5">{ing.name}</td>
-            </tr>
-          ))}
+                  ) : (ing.unit === "cc" || ing.unit === "cs") ? (
+                    <>
+                      {fq}{" "}<span style={{ color: "var(--muted)" }}>{u}</span>
+                      <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
+                        {" "}(≈{fmt(q * (ing.unit === "cc" ? 5 : 15))})
+                      </span>
+                    </>
+                  ) : (
+                    <>{fq}{" "}<span style={{ color: "var(--muted)" }}>{u}</span></>
+                  )}
+                </td>
+                <td className="py-1.5">{ing.name}</td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr>
