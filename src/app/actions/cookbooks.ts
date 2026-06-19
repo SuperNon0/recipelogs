@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { buildRecipeSnapshot, adjustSnapshotToTarget } from "@/lib/cookbooks";
+import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { adjustToTarget, ingMass } from "@/lib/massAdjust";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
@@ -200,7 +200,7 @@ export async function addMultipleRecipesWithMassTarget(
 
     // Si forceExact : ajuster les ingrédients pour atteindre exactement la cible
     if (forceExact) {
-      const { ingredients, totalMassGMin, totalMassGMax } = adjustSnapshotToTarget(
+      const { ingredients, totalMassGMin, totalMassGMax } = adjustToTarget(
         snap.ingredients,
         targetMassG,
       );
@@ -548,12 +548,12 @@ export async function updateSnapshotMass(
   const scaledIngredients = snap.ingredients.map((i) => ({
     ...i,
     quantityG: Math.ceil(i.quantityG * ratio),
-    quantityGMax: null,
+    quantityGMax: i.quantityGMax != null ? Math.ceil(i.quantityGMax * ratio) : null,
     unit: i.unit ?? "g",
   }));
   const finalIngredients = forceExact
     ? adjustToTarget(scaledIngredients, payload.targetMassG).ingredients
-    : scaledIngredients.map((i) => ({ ...i, quantityG: round3(i.quantityG) }));
+    : scaledIngredients;
   const newTotalMassG = finalIngredients.reduce(
     (s, i) => s + ingMass(i.quantityG, i.unit), 0,
   );
@@ -567,6 +567,7 @@ export async function updateSnapshotMass(
       ingredients: sr.ingredients.map((i) => ({
         ...i,
         quantityG: round3(i.quantityG * ratio),
+        quantityGMax: i.quantityGMax != null ? round3(i.quantityGMax * ratio) : null,
       })),
       totalMassG: round3(sr.totalMassG * ratio),
     })),

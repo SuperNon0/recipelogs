@@ -50,16 +50,6 @@ export async function listPdfTemplates() {
  * @param multiplier coefficient appliqué à toutes les quantités (1 = inchangé).
  *                   Permet de figer une version multipliée de la recette.
  */
-type SnapIngredient = AdjIngredient;
-
-/** @deprecated Use adjustToTarget from massAdjust */
-export function adjustSnapshotToTarget(
-  ingredients: SnapIngredient[],
-  targetMassG: number,
-) {
-  return adjustToTarget(ingredients, targetMassG);
-}
-
 export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   const r = await prisma.recipe.findUnique({
     where: { id: recipeId },

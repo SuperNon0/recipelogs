@@ -17,6 +17,26 @@ export function scaleQty(
   return { quantityG: Math.ceil(qty * coef), unit };
 }
 
+/** Applique un coefficient sans arrondir — conserve les décimales. L converti en g. */
+export function scaleQtyExact(
+  qty: number,
+  unit: string,
+  coef: number,
+): { quantityG: number; unit: string } {
+  if (unit === "L") return { quantityG: round3(qty * coef * 1000), unit: "g" };
+  return { quantityG: round3(qty * coef), unit };
+}
+
+function round3(x: number): number {
+  return Math.round(x * 1000) / 1000;
+}
+
+/** Unité affichée après scaling (L → g, le reste inchangé). */
+export function scaledUnit(unit: string | undefined | null): string {
+  if (unit === "L") return "g";
+  return unit ?? "g";
+}
+
 export type AdjIngredient = {
   name: string;
   quantityG: number;

@@ -5,6 +5,7 @@ import {
   updateSnapshotMass,
   type UpdateSnapshotMassPayload,
 } from "@/app/actions/cookbooks";
+import { formatG, formatGDecimal } from "@/lib/format";
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 
@@ -12,11 +13,6 @@ type SnapInfo = {
   ingredients: { name: string; quantityG: number }[];
   totalMassG: number;
 };
-
-function formatG(g: number): string {
-  if (g >= 1000) return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
-  return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
 
 export function EditSnapshotMassModal({
   cookbookId,

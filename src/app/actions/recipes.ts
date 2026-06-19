@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
 import { normalizeForSearch } from "@/lib/recipes";
+import { scaleQty, ingMass, adjustToTarget } from "@/lib/massAdjust";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -219,35 +220,20 @@ export async function applyMultiplierToRecipe(
     return { ok: false, error: "Aucun ingrédient à mettre à jour." };
   }
 
-  let scaled = ingredients.map((ing) => ({
-    id: ing.id,
-    quantityG: Math.ceil(Number(ing.quantityG) * multiplier),
-    unit: ing.unit ?? "g",
-  }));
+  let scaled = ingredients.map((ing) => {
+    const s = scaleQty(Number(ing.quantityG), ing.unit ?? "g", multiplier);
+    return { id: ing.id, quantityG: s.quantityG, unit: s.unit };
+  });
 
   if (targetMassG && targetMassG > 0) {
-    const total = scaled.reduce((s, i) => {
-      if (!i.unit || i.unit === "g") return s + i.quantityG;
-      if (i.unit === "cc") return s + i.quantityG * 5;
-      if (i.unit === "cs") return s + i.quantityG * 15;
-      if (i.unit === "L") return s + i.quantityG * 1000;
-      return s;
-    }, 0);
-    let diff = Math.round(total - targetMassG);
-    const gIdx = scaled
-      .map((ing, idx) => ({ idx, qty: ing.quantityG, unit: ing.unit }))
-      .filter(({ unit }) => !unit || unit === "g")
-      .sort((a, b) => b.qty - a.qty);
-    if (gIdx.length > 0) {
-      let i = 0;
-      const maxIter = Math.abs(diff) * gIdx.length + gIdx.length;
-      while (diff !== 0 && i < maxIter) {
-        const { idx } = gIdx[i % gIdx.length];
-        if (diff > 0 && scaled[idx].quantityG > 1) { scaled[idx] = { ...scaled[idx], quantityG: scaled[idx].quantityG - 1 }; diff--; }
-        else if (diff < 0) { scaled[idx] = { ...scaled[idx], quantityG: scaled[idx].quantityG + 1 }; diff++; }
-        i++;
-      }
-    }
+    const adjInput = scaled.map((s) => ({
+      name: "",
+      quantityG: s.quantityG,
+      quantityGMax: null,
+      unit: s.unit,
+    }));
+    const { ingredients: adjusted } = adjustToTarget(adjInput, targetMassG);
+    scaled = scaled.map((s, i) => ({ ...s, quantityG: adjusted[i].quantityG }));
   }
 
   await prisma.$transaction(
@@ -338,13 +324,19 @@ export async function deleteComment(id: number, recipeId: number) {
 
 async function upsertIngredientBases(names: string[]) {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  for (const name of unique) {
-    // Chercher une correspondance insensible à la casse pour éviter les doublons
-    const existing = await prisma.ingredientBase.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
+  if (unique.length === 0) return;
+
+  const existing = await prisma.ingredientBase.findMany({
+    where: { name: { in: unique, mode: "insensitive" } },
+    select: { name: true },
+  });
+  const existingLower = new Set(existing.map((e) => e.name.toLowerCase()));
+  const toCreate = unique.filter((n) => !existingLower.has(n.toLowerCase()));
+
+  if (toCreate.length > 0) {
+    await prisma.ingredientBase.createMany({
+      data: toCreate.map((name) => ({ name })),
+      skipDuplicates: true,
     });
-    if (!existing) {
-      await prisma.ingredientBase.create({ data: { name } }).catch(() => {});
-    }
   }
 }
