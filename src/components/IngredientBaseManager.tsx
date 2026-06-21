@@ -339,13 +339,13 @@ function CategoryColumn({
         </span>
       </div>
 
-      {/* Liste scrollable */}
+      {/* Liste scrollable — colonne « À classer » plus haute (gros volume à trier) */}
       <div
         className="fl-scroll"
         style={{
           flex: 1,
           overflowY: "auto",
-          maxHeight: 420,
+          maxHeight: cat.key === null ? "72vh" : 420,
           padding: "0.25rem 0",
         }}
       >
@@ -537,11 +537,13 @@ function IngredientRow({
                   disabled={pending}
                 />
               )}
-              <MenuButton
-                label="Fusionner"
-                onClick={() => { setMenuOpen(false); onOpenMerge(ing.id); }}
-                disabled={pending}
-              />
+              {!quickClassify && (
+                <MenuButton
+                  label="Fusionner"
+                  onClick={() => { setMenuOpen(false); onOpenMerge(ing.id); }}
+                  disabled={pending}
+                />
+              )}
               <MenuButton
                 label="Voir la fiche"
                 onClick={() => {}}
@@ -593,6 +595,33 @@ function IngredientRow({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Fusion en accès direct (colonne « À classer ») */}
+      {quickClassify && !isMerging && (
+        <button
+          type="button"
+          onClick={() => onOpenMerge(ing.id)}
+          disabled={pending}
+          title="Fusionner dans un autre ingrédient"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.3rem",
+            fontSize: "0.68rem",
+            padding: "0.3rem 0.4rem",
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "transparent",
+            color: "var(--muted)",
+            cursor: pending ? "default" : "pointer",
+            fontFamily: "var(--font-mono)",
+            opacity: pending ? 0.5 : 1,
+          }}
+        >
+          ⇄ Fusionner
+        </button>
       )}
 
       {/* Picker de catégorie */}
