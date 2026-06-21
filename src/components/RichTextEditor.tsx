@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useRef } from "react";
+import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -14,11 +14,13 @@ import Placeholder from "@tiptap/extension-placeholder";
  * Le placeholder utilise l'extension officielle Tiptap pour s'afficher
  * correctement en haut de la zone d'édition.
  *
- * IMPORTANT : on force un re-render React à chaque transaction de l'éditeur
- * Tiptap (frappe, sélection, format) via `setTick`. Sans ça :
- *   - les boutons G / I / S ne mettent pas à jour leur état actif
- *   - le <input hidden> qui contient le HTML reste avec l'ancienne valeur,
- *     et au moment du submit du formulaire les étapes ne sont pas envoyées.
+ * IMPORTANT (Tiptap v3) : on ne force PLUS de re-render React à chaque
+ * transaction (l'ancien pattern `setTick` perturbait la saisie clavier sur
+ * ordinateur — frappe perdue / format qui s'activait au clic). À la place :
+ *   - l'état actif des boutons G / I / S vient de `useEditorState` (re-render
+ *     uniquement quand un de ces états change) ;
+ *   - le HTML est écrit dans le <input hidden> via `onUpdate` (ref, sans
+ *     re-render), pour que le submit du formulaire envoie bien les étapes.
  */
 export function RichTextEditor({
   name,
@@ -29,8 +31,9 @@ export function RichTextEditor({
   initialHtml?: string;
   placeholder?: string;
 }) {
-  // Compteur incrémenté à chaque transaction pour forcer un re-render.
-  const [, setTick] = useState(0);
+  // Champ caché non contrôlé : sa valeur est mise à jour impérativement
+  // dans onUpdate, ce qui évite tout re-render pendant la frappe.
+  const hiddenRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -61,18 +64,23 @@ export function RichTextEditor({
         class: "rte-content",
       },
     },
-    // Toute transaction (frappe, mise en forme, sélection) → re-render React.
-    onTransaction: () => setTick((t) => t + 1),
+    // Contenu modifié → on synchronise le champ caché (sans re-render React).
+    onUpdate: ({ editor }) => {
+      if (hiddenRef.current) hiddenRef.current.value = editor.getHTML();
+    },
   });
 
-  useEffect(() => {
-    if (!editor) return;
-    return () => {
-      editor.destroy();
-    };
-  }, [editor]);
-
-  const html = editor?.getHTML() ?? initialHtml ?? "";
+  // Re-render uniquement quand l'état actif des boutons change.
+  const toolbar = useEditorState({
+    editor,
+    selector: (ctx) => ({
+      isBold: ctx.editor?.isActive("bold") ?? false,
+      isItalic: ctx.editor?.isActive("italic") ?? false,
+      isUnderline: ctx.editor?.isActive("underline") ?? false,
+      canUndo: ctx.editor?.can().undo() ?? false,
+      canRedo: ctx.editor?.can().redo() ?? false,
+    }),
+  });
 
   if (!editor) {
     return (
@@ -112,28 +120,28 @@ export function RichTextEditor({
       >
         <button
           type="button"
-          style={btn(editor.isActive("bold"))}
+          style={btn(toolbar?.isBold ?? false)}
           onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
           aria-label="Gras"
-          aria-pressed={editor.isActive("bold")}
+          aria-pressed={toolbar?.isBold ?? false}
         >
           <b>G</b>
         </button>
         <button
           type="button"
-          style={btn(editor.isActive("italic"))}
+          style={btn(toolbar?.isItalic ?? false)}
           onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
           aria-label="Italique"
-          aria-pressed={editor.isActive("italic")}
+          aria-pressed={toolbar?.isItalic ?? false}
         >
           <i>I</i>
         </button>
         <button
           type="button"
-          style={btn(editor.isActive("underline"))}
+          style={btn(toolbar?.isUnderline ?? false)}
           onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
           aria-label="Souligné"
-          aria-pressed={editor.isActive("underline")}
+          aria-pressed={toolbar?.isUnderline ?? false}
         >
           <u>S</u>
         </button>
@@ -151,7 +159,7 @@ export function RichTextEditor({
           type="button"
           style={btn(false)}
           onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().undo().run(); }}
-          disabled={!editor.can().undo()}
+          disabled={!(toolbar?.canUndo ?? false)}
           aria-label="Annuler"
           title="Annuler"
         >
@@ -161,7 +169,7 @@ export function RichTextEditor({
           type="button"
           style={btn(false)}
           onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().redo().run(); }}
-          disabled={!editor.can().redo()}
+          disabled={!(toolbar?.canRedo ?? false)}
           aria-label="Rétablir"
           title="Rétablir"
         >
@@ -173,7 +181,7 @@ export function RichTextEditor({
         <EditorContent editor={editor} />
       </div>
 
-      <input type="hidden" name={name} value={html} readOnly />
+      <input type="hidden" name={name} ref={hiddenRef} defaultValue={initialHtml ?? ""} />
 
       <style jsx global>{`
         .rte-content {
