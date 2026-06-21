@@ -2,11 +2,15 @@ import Link from "next/link";
 import { listAllIngredientBases } from "@/lib/recipes";
 import { IngredientBaseManager } from "@/components/IngredientBaseManager";
 import { SyncIngredientsButton } from "@/components/SyncIngredientsButton";
+import { DeleteOrphanIngredientsButton } from "@/components/DeleteOrphanIngredientsButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function IngredientsSettingsPage() {
   const ingredientBases = await listAllIngredientBases();
+  const orphans = ingredientBases
+    .filter((i) => i._count.usages === 0)
+    .map((i) => ({ id: i.id, name: i.name }));
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto">
@@ -36,6 +40,14 @@ export default async function IngredientsSettingsPage() {
           </p>
         </div>
         <SyncIngredientsButton />
+
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.85rem" }} className="flex flex-col gap-2">
+          <p className="fl-label" style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
+            Nettoie la base en retirant les ingrédients qui ne sont plus présents
+            dans aucune recette. Un aperçu de la liste s&apos;affiche avant suppression.
+          </p>
+          <DeleteOrphanIngredientsButton orphans={orphans} />
+        </div>
       </section>
 
       <section className="fl-card flex flex-col gap-4 w-full">
