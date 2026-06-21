@@ -1,4 +1,8 @@
 import { RecipeCard } from "@/components/RecipeCard";
+import {
+  RecipeSelectionProvider,
+  RecipeSelectionToggle,
+} from "@/components/RecipeSelection";
 import { EmptyState } from "@/components/EmptyState";
 import { Fab } from "@/components/Fab";
 import { listRecipes } from "@/lib/recipes";
@@ -9,14 +13,17 @@ export default async function FavoritesPage() {
   const recipes = await listRecipes({ favoritesOnly: true });
 
   return (
-    <>
-      <div className="flex items-baseline justify-between mb-5">
+    <RecipeSelectionProvider>
+      <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
         <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
           Favoris
         </h1>
-        <span className="fl-label">
-          {recipes.length} {recipes.length > 1 ? "recettes" : "recette"}
-        </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="fl-label">
+            {recipes.length} {recipes.length > 1 ? "recettes" : "recette"}
+          </span>
+          {recipes.length > 0 && <RecipeSelectionToggle />}
+        </div>
       </div>
 
       {recipes.length === 0 ? (
@@ -33,6 +40,6 @@ export default async function FavoritesPage() {
       )}
 
       <Fab href="/recipes/new" label="Créer une recette" />
-    </>
+    </RecipeSelectionProvider>
   );
 }
