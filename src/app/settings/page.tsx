@@ -35,13 +35,6 @@ export default async function SettingsPage() {
               Récupère les dernières évolutions depuis GitHub
             </p>
           </div>
-          <Link
-            href="/whats-new"
-            className="fl-btn fl-btn-secondary"
-            style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
-          >
-            📋 Nouveautés
-          </Link>
         </div>
         <DeployButton />
       </section>

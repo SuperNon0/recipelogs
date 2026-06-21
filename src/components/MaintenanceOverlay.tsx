@@ -67,7 +67,7 @@ export function MaintenanceOverlay({
             // Le serveur a redémarré avec une nouvelle instance !
             setPhase("done");
             setTimeout(() => {
-              window.location.href = "/whats-new";
+              window.location.href = "/";
             }, 1200);
             return;
           }
@@ -254,7 +254,7 @@ export function MaintenanceOverlay({
           }}
         >
           {phase === "done"
-            ? "Redirection vers les nouveautés…"
+            ? "Redirection vers l'accueil…"
             : "Ne ferme pas cette fenêtre. Le site se rechargera automatiquement."}
         </p>
 

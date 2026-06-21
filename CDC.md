@@ -1,4 +1,4 @@
-# RecipeLog — Cahier des charges V1.4
+# RecipeLog — Cahier des charges V1.6
 
 > **Gestion de recettes de pâtisserie — Application web auto-hébergée**
 
@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Projet** | RecipeLog |
-| **Version** | 1.4 — Quantités en fourchette · Gestion ingrédients avancée · Import amélioré |
+| **Version** | 1.6 — Toggle décimales · Navigation pill · Masse cible exacte · Optimisations |
 | **Domaine** | `recipe.super-nono.cc` |
 | **Écosystème** | `super-nono.cc` |
 | **Hébergement** | Proxmox LXC · Cloudflare Zero Trust |
@@ -175,7 +175,7 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 
 - **📱 Autocomplétion ingrédients sur mobile** (`src/components/IngredientNameInput.tsx`) : le dropdown se fermait correctement sur desktop (mousedown) mais restait ouvert sur mobile (aucun listener touch). Fix : ajout d'un listener `touchstart` + `onBlur` avec délai 150 ms pour laisser les events `onMouseDown`/`onTouchEnd` s'exécuter avant la fermeture. Le bouton « + Ajouter » est remplacé par un message informatif (plus de soumission accidentelle sur mobile).
 
-- **⏱ Timeout d'overlay de déploiement** (`src/components/MaintenanceOverlay.tsx`) : porté de 5 min à **12 min** pour accommoder la durée réelle du build Next.js + Puppeteer sur le LXC. Redirection vers `/whats-new` à la fin.
+- **⏱ Timeout d'overlay de déploiement** (`src/components/MaintenanceOverlay.tsx`) : porté de 5 min à **12 min** pour accommoder la durée réelle du build Next.js + Puppeteer sur le LXC. Redirection vers l'accueil (`/`) à la fin (anciennement `/whats-new`, supprimé en V1.6).
 
 - **📦 pnpm — suppression des warnings de build scripts** (`package.json`) : ajout de `"pnpm": { "onlyBuiltDependencies": [...] }` listant explicitement les paquets autorisés à exécuter des scripts de build (Prisma, esbuild, sharp, puppeteer). Supprime les avertissements `Ignored build scripts` sur `pnpm install`.
 
@@ -231,47 +231,36 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 
 ---
 
-## 📝 Changelog V1.4 → V1.5 (masse exacte · corrections UI · optimisations)
+## 📝 Changelog V1.5 → V1.6 (toggle décimales · navigation pill · masse cible exacte · suppression Nouveautés)
 
 ### 🆕 Nouvelles fonctionnalités
 
-- **⚖️ Masse exacte** : nouveau toggle « Masse exacte » disponible dans les 3 panneaux de modification :
-  - `MultiplierPanel` (recette principale)
-  - `EditSubRecipeModal` (sous-recettes)
-  - `EditSnapshotMassModal` (recettes figées dans les cahiers)
-  Quand activé avec le mode « masse totale cible » : applique `adjustToTarget()` pour ajuster ±1g sur les plus gros ingrédients en grammes et atteindre la masse cible EXACTE (compense le Math.ceil systématique).
-- **`isExact` en BDD** : colonne `is_exact BOOLEAN` ajoutée sur la table `sub_recipes` (migration `20260601000001_subrecipe_is_exact`). `buildRecipeSnapshot` dans `src/lib/cookbooks.ts` applique `adjustToTarget` quand `link.isExact && link.calcMode === "mass_target"`.
-- **Filtre recettes déjà dans le cahier** : `AddRecipesToCookbookModal` accepte une prop `existingRecipeIds?: number[]`. Les recettes déjà présentes dans le cahier n'apparaissent plus dans la liste de sélection. `CookbookEntriesTable` passe la liste des `recipeId` au modal.
+- **🔢 Toggle décimales / arrondi** (`src/components/RecipeBody.tsx`) : nouveau toggle dans le panneau de multiplication. Quand activé, les quantités affichent les décimales exactes au lieu de l'arrondi Math.ceil. Utilise `scaleQtyExact()` / `formatGDecimal()` pour l'affichage précis.
+- **⚖️ Masse cible exacte en affichage** (`src/components/RecipeBody.tsx`) : en mode « masse totale cible » sans décimales, `adjustToTarget()` est désormais appliqué côté **affichage** (plus seulement côté sauvegarde). Le total affiché correspond exactement à la masse demandée. Les quantités pré-calculées sont passées à `IngredientsTable` via la prop `adjustedQties`.
+- **🧮 Refonte de la page ingrédients** (`src/app/settings/ingredients/page.tsx`) : grille CSS `auto-fill` responsive remplaçant le layout fixe. Recherche intégrée avec compteur de résultats.
 
 ### 🛠️ Correctifs
 
-- **Cadenas sous-recettes — mise à jour optimiste** : `toggleSubRecipeLock` ne fait plus de `revalidatePath` (évitait un rechargement qui réinitialisait l'état du panel multiplicateur). `SubRecipeAccordion` utilise un état optimiste `lockedOptimistic` pour le rendu immédiat du cadenas sans attendre le serveur.
-- **Limite recettes — bug `parseInt("0") || 50`** : `limit=0` retournait 50 résultats au lieu de tout charger. Fix dans `src/app/api/recipes/route.ts` : `parsedLimit === 0 ? undefined : parsedLimit`. Suppression du `take: 200` hardcodé dans `listRecipes` (`src/lib/recipes.ts`).
-- **Logo réduit** : `LogoLink.tsx` passe de `fontSize: "1.8rem"` à `fontSize: "1.4rem"`.
-- **Page ingrédients — breakout CSS** : remplacement de `width: 100vw` + `calc(-50vw + 50%)` par `marginLeft: "-1rem"` + `width: calc(100% + 2rem)` (la technique `100vw` ne fonctionnait pas dans les conteneurs imbriqués).
-- **Sous-recettes dans les PDFs — arrondi supérieur** : `buildRecipeSnapshot` utilise désormais `scaleQty()` (Math.ceil) sur tous les ingrédients. Plus jamais de décimales dans les PDFs/snapshots. Conversion L → grammes entiers (×1000, Math.ceil).
+- **⚖️ Précision masse cible** (`src/components/RecipeBody.tsx`) : le total affiché en mode « masse totale » pouvait dépasser la cible (ex : 393g demandé → 396g affiché) à cause du Math.ceil individuel sur chaque ingrédient. Fix : `adjustToTarget()` redistribue ±1g sur les plus gros ingrédients en grammes pour atteindre la cible exacte dans le rendu.
+- **📱 ModeSwitcher responsive** (`src/components/RecipeBody.tsx`) : les tabs COEFFICIENT / MASSE TOTALE / PIVOT utilisaient la classe `.fl-nav-item` (conçue pour la barre de navigation principale, avec `height: 54px` et styles inadaptés). Remplacé par des styles inline compacts (`fontSize: 0.72rem`, pas de hauteur fixe).
+- **🔧 Suppression du toggle `forceExact`** : devenu redondant puisque `adjustToTarget` est appliqué automatiquement en mode masse cible. Remplacé par un texte informatif statique.
 
-### 🏗️ Refactoring
+### 🎨 Refonte UX
 
-- **`src/lib/massAdjust.ts` — utilitaire partagé** : nouveau fichier de fonctions pures sans import Prisma, utilisables côté client et côté serveur.
-  - `ingMass(q, unit)` — convertit une quantité en masse g (L→×1000, cc→×5, cs→×15, pièce/QS→0)
-  - `scaleQty(qty, unit, coef)` — applique un coefficient avec Math.ceil ; L→g retourne l'unité `"g"`
-  - `adjustToTarget(ingredients, targetMassG)` — ajuste ±1g sur les gros ingrédients pour atteindre exactement `targetMassG`
-  - Type `AdjIngredient` exporté
-- **`buildRecipeSnapshot` — coefficients propres par sous-recette** : chaque sous-recette est maintenant scalée avec `computeLocalCoef(calcMode, calcValue, childBaseTotalG, pivotBaseQtyG)` au lieu d'utiliser le coefficient global du parent. Sous-recette verrouillée : `effectiveCoef = localCoef` ; sous-recette non verrouillée : `effectiveCoef = localCoef * k`.
-- **`applyMultiplierToRecipe`** (`src/app/actions/recipes.ts`) : accepte un paramètre optionnel `targetMassG` pour l'ajustement exact.
+- **🧭 Navigation pill Apple-style** (`src/components/AppNav.tsx`, `src/app/globals.css`) : refonte complète du header. Logo + version inline avec une barre de navigation arrondie (pilules). Icônes (📖, ★, 📚, 🛒, ⚙) avec labels masqués sur mobile. Styles `.fl-nav-pill` ajoutés au CSS global. Suppression du composant `LogoLink.tsx` (logique intégrée dans `AppNav`).
+- **🗑️ Suppression de la fonctionnalité « Nouveautés »** : page `/whats-new` supprimée, lien retiré de la navigation et des paramètres, redirection post-déploiement changée vers `/` (accueil). Le fichier `src/lib/changelog.ts` est conservé (utilisé par `AppNav` pour le badge de version).
 
-### 🗃️ Schéma BDD — modifications
+### 🏗️ Optimisations
 
-- ➕ Nouvelle colonne `sub_recipes.is_exact` (`BOOLEAN NOT NULL DEFAULT false`) — migration `20260601000001_subrecipe_is_exact`
-- ➕ Migration `20260601000000_add_perf_indexes` : index sur `name_normalized`, `ingredients(recipe_id)`, et index GIN `pg_trgm` sur `name` pour la recherche fuzzy
+- **⚡ Batch `upsertIngredientBases`** (`src/app/actions/recipes.ts`) : les upserts d'ingrédients dans la base sont regroupés en une seule transaction au lieu d'un upsert par ingrédient.
+- **📊 Index GIN trigram** (`pg_trgm`) : index GIN sur `recipes.name` pour accélérer les recherches `ILIKE`. Migration `20260601000000_add_perf_indexes`.
+- **🔧 Fix `quantityGMax`** : correction du bug où `quantityGMax` n'était pas correctement pris en compte dans certains calculs de fourchette.
 
 ### 📌 Notes pour le prochain développeur
 
-- **`src/lib/massAdjust.ts`** est partagé entre client et serveur : ne pas y ajouter d'import Prisma ou de Server Action. Toute fonction qui touche la BDD doit rester dans `recipes.ts`, `cookbooks.ts`, etc.
-- **Ne pas remettre `revalidatePath` dans `toggleSubRecipeLock`** : le rechargement côté serveur réinitialise l'état du `MultiplierPanel` côté client. L'état optimiste dans `SubRecipeAccordion` suffit pour l'UX.
-- **Pattern `adjustToTarget`** : la fonction s'applique en post-traitement sur le tableau d'ingrédients déjà scalés (après `scaleQty`). Elle ajuste ±1g par itération sur les ingrédients en grammes triés par masse décroissante jusqu'à atteindre la cible exacte.
-- **3 endroits du toggle « Masse exacte »** : `MultiplierPanel`, `EditSubRecipeModal`, `EditSnapshotMassModal`. Si un 4ᵉ point d'entrée est ajouté, il faut y brancher le même toggle + la même logique d'appel à `adjustToTarget`.
+- **`adjustToTarget` appliqué en affichage** : en mode `mass_target` sans décimales, `RecipeBody` calcule `adjustedQties` via `useMemo` et le passe à `IngredientsTable`. Si `adjustedQties` est non-null, chaque ligne utilise les valeurs pré-calculées au lieu de recalculer individuellement.
+- **Page `/whats-new` supprimée** : ne pas recréer cette route. Si une fonctionnalité similaire est souhaitée, utiliser le `CHANGELOG` dans `src/lib/changelog.ts` qui contient l'historique des versions.
+- **`AppNav` est un composant client** : il importe `CHANGELOG[0].version` pour le badge. Si le changelog est vidé, le badge affichera `"v1"` par défaut.
 
 ---
 
@@ -1196,6 +1185,7 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 | **10. Itérations V1.2** | Dossiers, vue explorateur, combobox catégories, refonte PDF (1 page par recette, numérotation logique, sommaire avec sous-recettes), réglages PDF d'une recette, « Mettre à jour la recette », fix éditeur Tiptap, etc. | ✅ Livré |
 | **11. Correctifs + fonctionnalités V1.3** | Fix recherche globale · FolderManager/CategoryManager responsive mobile · FolderCard réduite · Paramètres allégés (sous-pages dossiers/catégories/ingrédients) · Autocomplétion ingrédients (IngredientBase activée) · Logo lien externe paramétrable | ✅ Livré |
 | **12. Fonctionnalités V1.4** | Quantités en fourchette (mode « entre » min/max sur toutes les unités) · Gestion avancée ingrédients (renommage cascade, fusion, page détail, sync automatique, badge compteur) · Import JSON amélioré (normalisation unités mL/cl/dl/kg, dedup insensible à la casse) · Fix autocomplétion mobile (touchstart) · Timeout overlay déploiement 12 min | ✅ Livré |
+| **13. V1.5 → V1.6** | Toggle décimales/arrondi · Navigation pill Apple-style · Masse cible exacte en affichage · Batch upsert ingrédients · Index GIN trigram · Refonte page ingrédients · Fix ModeSwitcher mobile · Suppression page Nouveautés | ✅ Livré |
 
 ### 10.2 Évolutions à venir (priorité indicative)
 
@@ -1214,4 +1204,4 @@ Le projet sera considéré comme livré lorsque **tous** les critères suivants 
 
 **Fin du document**
 
-*RecipeLog — Cahier des charges V1.4 — super-nono.cc*
+*RecipeLog — Cahier des charges V1.6 — super-nono.cc*

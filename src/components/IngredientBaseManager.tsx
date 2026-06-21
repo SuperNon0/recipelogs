@@ -339,13 +339,13 @@ function CategoryColumn({
         </span>
       </div>
 
-      {/* Liste scrollable */}
+      {/* Liste scrollable — colonne « À classer » plus haute (gros volume à trier) */}
       <div
         className="fl-scroll"
         style={{
           flex: 1,
           overflowY: "auto",
-          maxHeight: 420,
+          maxHeight: cat.key === null ? "72vh" : 420,
           padding: "0.25rem 0",
         }}
       >
@@ -359,6 +359,7 @@ function CategoryColumn({
               key={ing.id}
               ing={ing}
               catKey={cat.key}
+              quickClassify={cat.key === null}
               pending={pending}
               isMenuOpen={activeMenuId === ing.id}
               setMenuOpen={(open) => setActiveMenuId(open ? ing.id : null)}
@@ -391,6 +392,7 @@ function CategoryColumn({
 function IngredientRow({
   ing,
   catKey,
+  quickClassify,
   pending,
   isMenuOpen,
   setMenuOpen,
@@ -411,6 +413,7 @@ function IngredientRow({
 }: {
   ing: IngredientBase;
   catKey: IngredientCategory;
+  quickClassify: boolean;
   pending: boolean;
   isMenuOpen: boolean;
   setMenuOpen: (open: boolean) => void;
@@ -527,16 +530,20 @@ function IngredientRow({
                   disabled={pending}
                 />
               )}
-              <MenuButton
-                label="Classer"
-                onClick={() => { setMenuOpen(false); onToggleClassify(); }}
-                disabled={pending}
-              />
-              <MenuButton
-                label="Fusionner"
-                onClick={() => { setMenuOpen(false); onOpenMerge(ing.id); }}
-                disabled={pending}
-              />
+              {!quickClassify && (
+                <MenuButton
+                  label="Classer"
+                  onClick={() => { setMenuOpen(false); onToggleClassify(); }}
+                  disabled={pending}
+                />
+              )}
+              {!quickClassify && (
+                <MenuButton
+                  label="Fusionner"
+                  onClick={() => { setMenuOpen(false); onOpenMerge(ing.id); }}
+                  disabled={pending}
+                />
+              )}
               <MenuButton
                 label="Voir la fiche"
                 onClick={() => {}}
@@ -552,6 +559,70 @@ function IngredientRow({
           )}
         </div>
       </div>
+
+      {/* Classement rapide : 1 tap vers une catégorie (colonne « À classer ») */}
+      {quickClassify && (
+        <div className="grid grid-cols-3 gap-1 pt-0.5">
+          {CATEGORIES.filter((c) => c.key !== null).map((c) => (
+            <button
+              key={String(c.key)}
+              type="button"
+              onClick={() => onSetCategory(ing.id, c.key)}
+              disabled={pending}
+              title={`Classer dans « ${c.label} »`}
+              aria-label={`Classer dans ${c.label}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.25rem",
+                fontSize: "0.72rem",
+                padding: "0.4rem 0.3rem",
+                borderRadius: 6,
+                border: `1px solid ${c.color}`,
+                background: `${c.color}1a`,
+                color: c.color,
+                cursor: pending ? "default" : "pointer",
+                fontFamily: "var(--font-mono)",
+                opacity: pending ? 0.5 : 1,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              <span style={{ fontSize: "0.95rem", lineHeight: 1 }}>{c.emoji}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Fusion en accès direct (colonne « À classer ») */}
+      {quickClassify && !isMerging && (
+        <button
+          type="button"
+          onClick={() => onOpenMerge(ing.id)}
+          disabled={pending}
+          title="Fusionner dans un autre ingrédient"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.3rem",
+            fontSize: "0.68rem",
+            padding: "0.3rem 0.4rem",
+            borderRadius: 6,
+            border: "1px solid var(--border)",
+            background: "transparent",
+            color: "var(--muted)",
+            cursor: pending ? "default" : "pointer",
+            fontFamily: "var(--font-mono)",
+            opacity: pending ? 0.5 : 1,
+          }}
+        >
+          ⇄ Fusionner
+        </button>
+      )}
 
       {/* Picker de catégorie */}
       {isClassifying && (
