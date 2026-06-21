@@ -224,6 +224,19 @@ export async function setIngredientCategory(
   return { ok: true };
 }
 
+export async function setIngredientCategoryBulk(
+  ids: number[],
+  category: "base" | "fruit" | "preparation" | null,
+): Promise<ActionResult & { count?: number }> {
+  if (ids.length === 0) return { ok: false, error: "Aucun ingrédient sélectionné." };
+  const { count } = await prisma.ingredientBase.updateMany({
+    where: { id: { in: ids } },
+    data: { category },
+  });
+  revalidatePath("/settings/ingredients");
+  return { ok: true, count };
+}
+
 export async function deleteIngredientBase(id: number): Promise<ActionResult> {
   // ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
   // seul le lien vers la base est supprimé.
