@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { RecipeListItem } from "@/lib/recipes";
+import { useRecipeSelection } from "@/components/RecipeSelection";
 
 function formatG(value: number): string {
   if (!value) return "0 g";
@@ -16,18 +19,41 @@ function formatG(value: number): string {
 }
 
 export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: string }) {
+  const { selectionMode, isSelected, toggle } = useRecipeSelection();
   const href = from
     ? `/recipes/${recipe.id}?from=${encodeURIComponent(from)}`
     : `/recipes/${recipe.id}`;
-  return (
-    <Link
-      href={href}
-      className="fl-card flex flex-col gap-3 hover:border-[color:var(--muted)] transition-colors"
-    >
+
+  const selected = selectionMode && isSelected(recipe.id);
+
+  // Contenu commun (titre, catégories, masse, note, tags)
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-2">
+        {selectionMode && (
+          <span
+            aria-hidden
+            style={{
+              flexShrink: 0,
+              width: 22,
+              height: 22,
+              borderRadius: 5,
+              border: selected ? "2px solid var(--accent)" : "2px solid var(--border)",
+              background: selected ? "var(--accent)" : "transparent",
+              color: selected ? "var(--bg)" : "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.75rem",
+              marginTop: 2,
+            }}
+          >
+            {selected ? "✓" : ""}
+          </span>
+        )}
         <h3
           className="fl-title-serif"
-          style={{ fontSize: "1.15rem" }}
+          style={{ fontSize: "1.15rem", flex: 1 }}
         >
           {recipe.name}
         </h3>
@@ -97,6 +123,34 @@ export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: st
           )}
         </div>
       )}
+    </>
+  );
+
+  // En mode sélection : la carte coche/décoche au lieu de naviguer.
+  if (selectionMode) {
+    return (
+      <button
+        type="button"
+        onClick={() => toggle(recipe.id)}
+        className="fl-card flex flex-col gap-3 text-left transition-colors"
+        style={{
+          borderColor: selected ? "var(--accent)" : undefined,
+          background: selected ? "rgba(232,197,71,0.08)" : undefined,
+          cursor: "pointer",
+        }}
+        aria-pressed={selected}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="fl-card flex flex-col gap-3 hover:border-[color:var(--muted)] transition-colors"
+    >
+      {inner}
     </Link>
   );
 }

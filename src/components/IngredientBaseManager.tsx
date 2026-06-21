@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   capitalizeIngredientBase,
   deleteIngredientBase,
+  deleteIngredientBasesBulk,
   mergeIngredientBases,
+  mergeIngredientBasesBulk,
   setIngredientCategory,
+  setIngredientCategoryBulk,
 } from "@/app/actions/settings";
 
 type IngredientCategory = "base" | "fruit" | "preparation" | null;
@@ -63,6 +66,12 @@ export function IngredientBaseManager({
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
   const [classifyingId, setClassifyingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set<number>());
+  // Fusion en lot : panneau « fusionner les sélectionnés dans… »
+  const [bulkMerging, setBulkMerging] = useState(false);
+  const [bulkMergeSearch, setBulkMergeSearch] = useState("");
+  const [bulkMergeTargetId, setBulkMergeTargetId] = useState<number | null>(null);
 
   function handleDelete(id: number, name: string) {
     if (!confirm(`Supprimer « ${name} » de la base ?\n\nLes recettes qui utilisent cet ingrédient ne sont pas modifiées.`)) return;
@@ -94,6 +103,64 @@ export function IngredientBaseManager({
       const r = await setIngredientCategory(id, category);
       if (!r.ok) { setError(r.error); return; }
       router.refresh();
+    });
+  }
+
+  function exitSelection() {
+    setSelectionMode(false);
+    setSelectedIds(new Set<number>());
+    setBulkMerging(false);
+    setBulkMergeSearch("");
+    setBulkMergeTargetId(null);
+  }
+
+  function handleBulkSetCategory(category: IngredientCategory) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setError(null);
+    void startTransition(async (): Promise<void> => {
+      for (const id of ids) addOptimistic({ id, category });
+      const r = await setIngredientCategoryBulk(ids, category);
+      if (!r.ok) { setError(r.error); return; }
+      exitSelection();
+      router.refresh();
+    });
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Supprimer ${ids.length} ingrédient${ids.length > 1 ? "s" : ""} de la base ?\n\nLes recettes qui les utilisent ne sont pas modifiées. Cette action est irréversible.`)) return;
+    setError(null);
+    void startTransition(async (): Promise<void> => {
+      const r = await deleteIngredientBasesBulk(ids);
+      if (!r.ok) { setError(r.error); return; }
+      exitSelection();
+      router.refresh();
+    });
+  }
+
+  function handleBulkMerge() {
+    const ids = Array.from(selectedIds).filter((id) => id !== bulkMergeTargetId);
+    if (!bulkMergeTargetId || ids.length === 0) return;
+    const target = ingredientBases.find((i) => i.id === bulkMergeTargetId);
+    if (!target) return;
+    if (!confirm(`Fusionner ${ids.length} ingrédient${ids.length > 1 ? "s" : ""} dans « ${target.name} » ?\n\nToutes les recettes concernées seront mises à jour avec « ${target.name} ». Cette action est irréversible.`)) return;
+    setError(null);
+    void startTransition(async (): Promise<void> => {
+      const r = await mergeIngredientBasesBulk(ids, bulkMergeTargetId);
+      if (!r.ok) { setError(r.error); return; }
+      exitSelection();
+      router.refresh();
+    });
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 
@@ -195,9 +262,30 @@ export function IngredientBaseManager({
               );
             })}
           </div>
-          <p style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-            {sorted.length} / {optimisticBases.length} ingrédient{optimisticBases.length > 1 ? "s" : ""}
-          </p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+              {sorted.length} / {optimisticBases.length} ingrédient{optimisticBases.length > 1 ? "s" : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+              style={{
+                padding: "0.3rem 0.7rem",
+                fontSize: "0.75rem",
+                fontFamily: "var(--font-mono)",
+                borderRadius: 6,
+                border: "1px solid",
+                borderColor: selectionMode ? "var(--accent)" : "var(--border)",
+                background: selectionMode ? "rgba(232,197,71,0.12)" : "transparent",
+                color: selectionMode ? "var(--accent)" : "var(--muted)",
+                cursor: "pointer",
+                fontWeight: selectionMode ? 600 : 400,
+              }}
+              title="Sélectionner plusieurs ingrédients (classer, fusionner, supprimer)"
+            >
+              {selectionMode ? "✕ Annuler la sélection" : "☑ Sélectionner"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -242,6 +330,23 @@ export function IngredientBaseManager({
                 onOpenMerge={openMerge}
                 onCancelMerge={cancelMerge}
                 onMerge={handleMerge}
+                selectionMode={selectionMode}
+                selectedIds={selectedIds}
+                onToggleSelected={toggleSelected}
+                onSelectAllInColumn={(ids) =>
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    for (const id of ids) next.add(id);
+                    return next;
+                  })
+                }
+                onDeselectAllInColumn={(ids) =>
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    for (const id of ids) next.delete(id);
+                    return next;
+                  })
+                }
               />
             );
           })}
@@ -254,6 +359,231 @@ export function IngredientBaseManager({
            sort === "nocap" ? "Toutes les premières lettres sont déjà en majuscule." :
            `Aucun résultat pour « ${search} ».`}
         </p>
+      )}
+
+      {/* Barre d'action flottante (mode sélection global) */}
+      {selectionMode && (
+        <BulkActionBar
+          count={selectedIds.size}
+          pending={pending}
+          bulkMerging={bulkMerging}
+          bulkMergeSearch={bulkMergeSearch}
+          setBulkMergeSearch={setBulkMergeSearch}
+          bulkMergeTargetId={bulkMergeTargetId}
+          setBulkMergeTargetId={setBulkMergeTargetId}
+          mergeOptions={
+            bulkMerging
+              ? ingredientBases
+                  .filter(
+                    (i) =>
+                      !selectedIds.has(i.id) &&
+                      i.name.toLowerCase().includes(bulkMergeSearch.toLowerCase()),
+                  )
+                  .slice(0, 8)
+              : []
+          }
+          onSetCategory={handleBulkSetCategory}
+          onOpenMerge={() => { setBulkMerging(true); setBulkMergeSearch(""); setBulkMergeTargetId(null); }}
+          onCancelMerge={() => { setBulkMerging(false); setBulkMergeSearch(""); setBulkMergeTargetId(null); }}
+          onConfirmMerge={handleBulkMerge}
+          onDelete={handleBulkDelete}
+          onCancel={exitSelection}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Barre d'action flottante (sélection multiple)
+// ─────────────────────────────────────────────
+
+function BulkActionBar({
+  count,
+  pending,
+  bulkMerging,
+  bulkMergeSearch,
+  setBulkMergeSearch,
+  bulkMergeTargetId,
+  setBulkMergeTargetId,
+  mergeOptions,
+  onSetCategory,
+  onOpenMerge,
+  onCancelMerge,
+  onConfirmMerge,
+  onDelete,
+  onCancel,
+}: {
+  count: number;
+  pending: boolean;
+  bulkMerging: boolean;
+  bulkMergeSearch: string;
+  setBulkMergeSearch: (v: string) => void;
+  bulkMergeTargetId: number | null;
+  setBulkMergeTargetId: (v: number | null) => void;
+  mergeOptions: IngredientBase[];
+  onSetCategory: (category: IngredientCategory) => void;
+  onOpenMerge: () => void;
+  onCancelMerge: () => void;
+  onConfirmMerge: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const disabled = pending || count === 0;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: "50%",
+        transform: "translateX(-50%)",
+        bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+        zIndex: 90,
+        width: "calc(100% - 2rem)",
+        maxWidth: 560,
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        borderRadius: 14,
+        boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
+        padding: "0.75rem 0.9rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <span
+          style={{
+            flex: 1,
+            fontSize: "0.85rem",
+            fontFamily: "var(--font-mono)",
+            color: "var(--text)",
+          }}
+        >
+          {count} sélectionné{count > 1 ? "s" : ""}
+        </span>
+        <button type="button" onClick={onCancel} disabled={pending} className="fl-btn" style={{ fontSize: "0.78rem" }}>
+          Fermer
+        </button>
+      </div>
+
+      {bulkMerging ? (
+        <div className="flex flex-col gap-1.5">
+          <p style={{ fontSize: "0.72rem", color: "var(--muted)", margin: 0 }}>
+            Fusionner les {count} sélectionnés dans…
+          </p>
+          <input
+            type="search"
+            placeholder="Rechercher l'ingrédient cible…"
+            value={bulkMergeSearch}
+            onChange={(e) => { setBulkMergeSearch(e.target.value); setBulkMergeTargetId(null); }}
+            className="fl-input"
+            style={{ fontSize: "0.78rem", padding: "0.4rem 0.6rem" }}
+            autoFocus
+          />
+          {mergeOptions.length > 0 && (
+            <div className="flex flex-col gap-0.5" style={{ maxHeight: 160, overflowY: "auto" }}>
+              {mergeOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setBulkMergeTargetId(opt.id === bulkMergeTargetId ? null : opt.id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "0.3rem 0.5rem",
+                    borderRadius: 5,
+                    border: "1px solid",
+                    borderColor: bulkMergeTargetId === opt.id ? "var(--accent)" : "var(--border)",
+                    background: bulkMergeTargetId === opt.id ? "rgba(232,197,71,0.1)" : "transparent",
+                    color: "var(--text)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  {opt.name}
+                  <span style={{ color: "var(--muted)", fontSize: "0.65rem", marginLeft: "0.3rem" }}>
+                    {opt._count.usages}r
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={onConfirmMerge}
+              disabled={pending || !bulkMergeTargetId}
+              className="fl-btn fl-btn-primary"
+              style={{ fontSize: "0.78rem", opacity: !bulkMergeTargetId ? 0.5 : 1 }}
+            >
+              {pending ? "Fusion…" : "Fusionner"}
+            </button>
+            <button type="button" onClick={onCancelMerge} disabled={pending} className="fl-btn" style={{ fontSize: "0.78rem" }}>
+              Retour
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Classer dans une catégorie */}
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map((c) => (
+              <button
+                key={String(c.key)}
+                type="button"
+                onClick={() => onSetCategory(c.key)}
+                disabled={disabled}
+                title={`Classer les sélectionnés dans « ${c.label} »`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  fontSize: "0.74rem",
+                  padding: "0.35rem 0.55rem",
+                  borderRadius: 6,
+                  border: `1px solid ${c.color}`,
+                  background: `${c.color}1a`,
+                  color: c.color,
+                  cursor: disabled ? "default" : "pointer",
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 600,
+                  opacity: disabled ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>{c.emoji}</span>
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Fusionner / Supprimer */}
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenMerge}
+              disabled={disabled}
+              className="fl-btn"
+              style={{ fontSize: "0.78rem", opacity: disabled ? 0.5 : 1 }}
+            >
+              ⇄ Fusionner
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={disabled}
+              className="fl-btn"
+              style={{
+                fontSize: "0.78rem",
+                background: disabled ? "transparent" : "var(--danger)",
+                color: disabled ? "var(--muted)" : "#fff",
+                borderColor: "var(--danger)",
+                opacity: disabled ? 0.5 : 1,
+              }}
+            >
+              🗑 Supprimer
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -284,6 +614,11 @@ function CategoryColumn({
   onOpenMerge,
   onCancelMerge,
   onMerge,
+  selectionMode,
+  selectedIds,
+  onToggleSelected,
+  onSelectAllInColumn,
+  onDeselectAllInColumn,
 }: {
   cat: { key: IngredientCategory; label: string; emoji: string; color: string };
   items: IngredientBase[];
@@ -305,7 +640,14 @@ function CategoryColumn({
   onOpenMerge: (id: number) => void;
   onCancelMerge: () => void;
   onMerge: (sourceId: number, sourceName: string) => void;
+  selectionMode: boolean;
+  selectedIds: Set<number>;
+  onToggleSelected: (id: number) => void;
+  onSelectAllInColumn: (ids: number[]) => void;
+  onDeselectAllInColumn: (ids: number[]) => void;
 }) {
+  const selectedCount = selectionMode ? items.filter((i) => selectedIds.has(i.id)).length : 0;
+  const allSelected = items.length > 0 && selectedCount === items.length;
   return (
     <div
       style={{
@@ -334,8 +676,32 @@ function CategoryColumn({
         >
           {cat.label}
         </span>
+        {selectionMode && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              allSelected
+                ? onDeselectAllInColumn(items.map((i) => i.id))
+                : onSelectAllInColumn(items.map((i) => i.id))
+            }
+            title={allSelected ? "Tout désélectionner dans cette colonne" : "Tout sélectionner dans cette colonne"}
+            style={{
+              fontSize: "0.68rem",
+              fontFamily: "var(--font-mono)",
+              padding: "0.2rem 0.5rem",
+              borderRadius: 5,
+              border: "1px solid",
+              borderColor: allSelected ? "var(--accent)" : "var(--border)",
+              background: allSelected ? "rgba(232,197,71,0.12)" : "transparent",
+              color: allSelected ? "var(--accent)" : "var(--muted)",
+              cursor: "pointer",
+            }}
+          >
+            {allSelected ? "✓ Tout" : "Tout"}
+          </button>
+        )}
         <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
-          {items.length}
+          {selectionMode && selectedCount > 0 ? `${selectedCount}/${items.length}` : items.length}
         </span>
       </div>
 
@@ -359,7 +725,7 @@ function CategoryColumn({
               key={ing.id}
               ing={ing}
               catKey={cat.key}
-              quickClassify={cat.key === null}
+              quickClassify={cat.key === null && !selectionMode}
               pending={pending}
               isMenuOpen={activeMenuId === ing.id}
               setMenuOpen={(open) => setActiveMenuId(open ? ing.id : null)}
@@ -377,6 +743,9 @@ function CategoryColumn({
               onCancelMerge={onCancelMerge}
               onMerge={onMerge}
               onToggleClassify={() => setClassifyingId(classifyingId === ing.id ? null : ing.id)}
+              selectionMode={selectionMode}
+              isSelected={selectedIds.has(ing.id)}
+              onToggleSelected={onToggleSelected}
             />
           ))
         )}
@@ -410,6 +779,9 @@ function IngredientRow({
   onCancelMerge,
   onMerge,
   onToggleClassify,
+  selectionMode,
+  isSelected,
+  onToggleSelected,
 }: {
   ing: IngredientBase;
   catKey: IngredientCategory;
@@ -431,6 +803,9 @@ function IngredientRow({
   onCancelMerge: () => void;
   onMerge: (sourceId: number, sourceName: string) => void;
   onToggleClassify: () => void;
+  selectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelected: (id: number) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const firstLetterLower = ing.name.charAt(0) !== ing.name.charAt(0).toUpperCase();
@@ -459,26 +834,71 @@ function IngredientRow({
   return (
     <div
       className="flex flex-col gap-1.5 px-3 py-2"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+      style={{
+        borderBottom: "1px solid rgba(255,255,255,0.03)",
+        background: selectionMode && isSelected ? "rgba(232,197,71,0.08)" : undefined,
+        cursor: selectionMode ? "pointer" : undefined,
+      }}
+      onClick={selectionMode ? () => onToggleSelected(ing.id) : undefined}
     >
       {/* Nom + count + menu */}
       <div className="flex items-center gap-2 min-w-0">
-        <Link
-          href={`/settings/ingredients/${ing.id}`}
-          className="flex-1 min-w-0"
-          style={{
-            fontSize: "0.9rem",
-            fontFamily: "var(--font-mono)",
-            color: "var(--text)",
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={ing.name}
-        >
-          {ing.name}
-        </Link>
+        {selectionMode && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleSelected(ing.id); }}
+            style={{
+              width: 22,
+              height: 22,
+              flexShrink: 0,
+              borderRadius: 5,
+              border: isSelected ? "2px solid var(--accent)" : "2px solid var(--border)",
+              background: isSelected ? "var(--accent)" : "transparent",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.7rem",
+              color: isSelected ? "var(--bg)" : "transparent",
+              transition: "all 100ms ease",
+            }}
+            aria-label={isSelected ? "Désélectionner" : "Sélectionner"}
+          >
+            {isSelected ? "✓" : ""}
+          </button>
+        )}
+        {selectionMode ? (
+          <span
+            className="flex-1 min-w-0"
+            style={{
+              fontSize: "0.9rem",
+              fontFamily: "var(--font-mono)",
+              color: "var(--text)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {ing.name}
+          </span>
+        ) : (
+          <Link
+            href={`/settings/ingredients/${ing.id}`}
+            className="flex-1 min-w-0"
+            style={{
+              fontSize: "0.9rem",
+              fontFamily: "var(--font-mono)",
+              color: "var(--text)",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={ing.name}
+          >
+            {ing.name}
+          </Link>
+        )}
         <span
           style={{
             fontSize: "0.75rem",
@@ -490,7 +910,8 @@ function IngredientRow({
           {ing._count.usages}r
         </span>
 
-        {/* Menu contextuel ··· */}
+        {/* Menu contextuel ··· (masqué en mode sélection) */}
+        {!selectionMode && (
         <div ref={menuRef} style={{ position: "relative" }}>
           <button
             type="button"
@@ -558,6 +979,7 @@ function IngredientRow({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Classement rapide : 1 tap vers une catégorie (colonne « À classer ») */}

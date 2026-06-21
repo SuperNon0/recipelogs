@@ -194,6 +194,26 @@ export async function deleteRecipe(id: number) {
 }
 
 /**
+ * Suppression en lot de plusieurs recettes (sélection multiple).
+ * Ne redirige pas : on reste sur la vue courante, les compteurs de
+ * dossiers sont rafraîchis via revalidatePath.
+ */
+export async function deleteRecipes(
+  ids: number[],
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const cleanIds = [...new Set(ids)].filter((n) => Number.isFinite(n) && n > 0);
+  if (cleanIds.length === 0) {
+    return { ok: false, error: "Aucune recette sélectionnée." };
+  }
+  const { count } = await prisma.recipe.deleteMany({
+    where: { id: { in: cleanIds } },
+  });
+  revalidatePath("/");
+  revalidatePath("/favorites");
+  return { ok: true, count };
+}
+
+/**
  * Applique un multiplicateur global aux quantités de la recette parente
  * et écrit ces nouvelles quantités EN BASE comme nouvelle référence.
  *

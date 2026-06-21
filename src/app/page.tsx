@@ -3,6 +3,10 @@ import { RecipeCard } from "@/components/RecipeCard";
 import { RecipeFilters } from "@/components/RecipeFilters";
 import { FolderCard } from "@/components/FolderCard";
 import { AddRecipesToFolderButton } from "@/components/AddRecipesToFolderButton";
+import {
+  RecipeSelectionProvider,
+  RecipeSelectionToggle,
+} from "@/components/RecipeSelection";
 import { Fab } from "@/components/Fab";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -69,7 +73,7 @@ export default async function HomePage({
           : "Recettes";
 
   return (
-    <>
+    <RecipeSelectionProvider>
       {/* Header + breadcrumb */}
       <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
         <div>
@@ -94,6 +98,7 @@ export default async function HomePage({
           <span className="fl-label">
             {recipes.length} {recipes.length > 1 ? "recettes" : "recette"}
           </span>
+          <RecipeSelectionToggle />
           {currentFolder && (
             <AddRecipesToFolderButton
               folder={{
@@ -165,7 +170,7 @@ export default async function HomePage({
       )}
 
       <Fab href="/recipes/new" label="Créer une recette" />
-    </>
+    </RecipeSelectionProvider>
   );
 }
 

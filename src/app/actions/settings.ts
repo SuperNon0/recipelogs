@@ -224,6 +224,81 @@ export async function setIngredientCategory(
   return { ok: true };
 }
 
+export async function setIngredientCategoryBulk(
+  ids: number[],
+  category: "base" | "fruit" | "preparation" | null,
+): Promise<ActionResult & { count?: number }> {
+  if (ids.length === 0) return { ok: false, error: "Aucun ingrédient sélectionné." };
+  const { count } = await prisma.ingredientBase.updateMany({
+    where: { id: { in: ids } },
+    data: { category },
+  });
+  revalidatePath("/settings/ingredients");
+  return { ok: true, count };
+}
+
+/**
+ * Suppression en lot d'ingrédients de la base (sélection multiple).
+ * ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
+ * seul le lien vers la base est retiré.
+ */
+export async function deleteIngredientBasesBulk(
+  ids: number[],
+): Promise<ActionResult & { count?: number }> {
+  const cleanIds = [...new Set(ids)].filter((n) => Number.isFinite(n) && n > 0);
+  if (cleanIds.length === 0) return { ok: false, error: "Aucun ingrédient sélectionné." };
+  const { count } = await prisma.ingredientBase.deleteMany({
+    where: { id: { in: cleanIds } },
+  });
+  revalidatePath("/settings/ingredients");
+  revalidatePath("/");
+  return { ok: true, count };
+}
+
+/**
+ * Fusion en lot : réassigne plusieurs ingrédients sources vers une seule
+ * cible, puis supprime les sources. La cible est ignorée si elle figure
+ * dans la liste des sources.
+ */
+export async function mergeIngredientBasesBulk(
+  sourceIds: number[],
+  targetId: number,
+): Promise<ActionResult & { count?: number }> {
+  const sources = [...new Set(sourceIds)].filter(
+    (n) => Number.isFinite(n) && n > 0 && n !== targetId,
+  );
+  if (sources.length === 0) return { ok: false, error: "Aucun ingrédient à fusionner." };
+
+  const target = await prisma.ingredientBase.findUnique({ where: { id: targetId } });
+  if (!target) return { ok: false, error: "Ingrédient cible introuvable." };
+
+  const sourceRows = await prisma.ingredientBase.findMany({
+    where: { id: { in: sources } },
+    select: { id: true, name: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    for (const src of sourceRows) {
+      // Réassigner les ingrédients liés à la source vers la cible
+      await tx.ingredient.updateMany({
+        where: { ingredientBaseId: src.id },
+        data: { ingredientBaseId: targetId, name: target.name },
+      });
+      // Réassigner les ingrédients non-liés qui ont le nom de la source
+      await tx.$executeRaw`
+        UPDATE ingredients
+        SET name = ${target.name}, ingredient_base_id = ${targetId}
+        WHERE LOWER(name) = LOWER(${src.name}) AND ingredient_base_id IS NULL
+      `;
+    }
+    await tx.ingredientBase.deleteMany({ where: { id: { in: sourceRows.map((s) => s.id) } } });
+  });
+
+  revalidatePath("/settings/ingredients");
+  revalidatePath("/");
+  return { ok: true, count: sourceRows.length };
+}
+
 export async function deleteIngredientBase(id: number): Promise<ActionResult> {
   // ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
   // seul le lien vers la base est supprimé.
