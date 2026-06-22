@@ -53,6 +53,13 @@ export default async function ShoppingListDetailPage({
             {list.name}
           </h1>
         </div>
+        <a
+          href={`/shopping/${listId}/pdf`}
+          className="fl-btn fl-btn-secondary"
+          style={{ fontSize: "0.8rem", flexShrink: 0 }}
+        >
+          ⬇ PDF
+        </a>
       </div>
 
       {/* Recettes liées */}
