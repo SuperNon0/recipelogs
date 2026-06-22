@@ -118,6 +118,51 @@ export async function removeChecked(listId: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function addCookbookRecipesToList(
+  cookbookId: number,
+  targetListId: number | null,
+  newListName: string | null,
+): Promise<{ ok: true; listId: number } | { ok: false; error: string }> {
+  const entries = await prisma.cookbookRecipe.findMany({
+    where: { cookbookId },
+    select: { recipeId: true },
+  });
+
+  if (entries.length === 0) {
+    return { ok: false, error: "Ce cahier ne contient aucune recette." };
+  }
+
+  let listId: number;
+
+  if (targetListId) {
+    const existing = await prisma.shoppingList.findUnique({ where: { id: targetListId } });
+    if (!existing) return { ok: false, error: "Liste introuvable." };
+    listId = targetListId;
+  } else {
+    const name = (newListName ?? "").trim();
+    if (!name) return { ok: false, error: "Le nom de la liste est obligatoire." };
+    const list = await prisma.shoppingList.create({
+      data: { name: name.slice(0, 200) },
+    });
+    listId = list.id;
+  }
+
+  const recipeIds = [...new Set(entries.map((e) => e.recipeId))];
+
+  for (const recipeId of recipeIds) {
+    await prisma.shoppingListRecipe.upsert({
+      where: { shoppingListId_recipeId: { shoppingListId: listId, recipeId } },
+      create: { shoppingListId: listId, recipeId, coefficient: 1 },
+      update: {},
+    });
+  }
+
+  await regenerateItems(listId);
+  revalidatePath(`/shopping/${listId}`);
+  revalidatePath("/shopping");
+  return { ok: true, listId };
+}
+
 // ─── Interne ─────────────────────────────────────────────────────────────────
 
 async function regenerateItems(listId: number) {

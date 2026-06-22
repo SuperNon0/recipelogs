@@ -9,6 +9,7 @@ import { CookbookConfigForm } from "@/components/CookbookConfigForm";
 import { CookbookTabs } from "@/components/CookbookTabs";
 import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
 import { ShareButton } from "@/components/ShareButton";
+import { AddCookbookToShoppingListButton } from "@/components/AddCookbookToShoppingListButton";
 import { getActiveToken } from "@/lib/share";
 import { parseTheme } from "@/lib/pdf/theme";
 
@@ -29,6 +30,8 @@ export default async function CookbookDetailPage({
   ]);
 
   if (!cookbook) notFound();
+
+  const recipeCount = cookbook.entries.length;
 
   // Fusion des recettes et chapitres dans une liste ordonnée par position
   const entries: Entry[] = [
@@ -81,6 +84,11 @@ export default async function CookbookDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          <AddCookbookToShoppingListButton
+            cookbookId={cookbookId}
+            cookbookName={cookbook.name}
+            recipeCount={recipeCount}
+          />
           <ShareButton
             entityType="cookbook"
             entityId={cookbookId}
