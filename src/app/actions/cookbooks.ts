@@ -477,9 +477,13 @@ type SnapIngredient = { name: string; quantityG: number; unit?: string; quantity
 type SnapData = {
   ingredients: SnapIngredient[];
   totalMassG: number;
+  totalMassGMin?: number;
+  totalMassGMax?: number;
   subRecipes?: {
     ingredients: SnapIngredient[];
     totalMassG: number;
+    totalMassGMin?: number;
+    totalMassGMax?: number;
     [k: string]: unknown;
   }[];
   multiplier?: number;
@@ -554,23 +558,42 @@ export async function updateSnapshotMass(
   const finalIngredients = forceExact
     ? adjustToTarget(scaledIngredients, payload.targetMassG).ingredients
     : scaledIngredients;
-  const newTotalMassG = finalIngredients.reduce(
+  // On recalcule l'ENSEMBLE des totaux (min/max + valeur unique) à partir des
+  // quantités finales, sinon totalMassGMin/Max resteraient figés sur l'ancienne
+  // masse et le « Total » du PDF deviendrait incohérent avec les ingrédients.
+  const newTotalMinG = finalIngredients.reduce(
     (s, i) => s + ingMass(i.quantityG, i.unit), 0,
+  );
+  const newTotalMaxG = finalIngredients.reduce(
+    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
   );
 
   const newSnap: SnapData = {
     ...snap,
     ingredients: finalIngredients,
-    totalMassG: round3(newTotalMassG),
-    subRecipes: (snap.subRecipes ?? []).map((sr) => ({
-      ...sr,
-      ingredients: sr.ingredients.map((i) => ({
+    totalMassGMin: round3(newTotalMinG),
+    totalMassGMax: round3(newTotalMaxG),
+    totalMassG: round3((newTotalMinG + newTotalMaxG) / 2),
+    subRecipes: (snap.subRecipes ?? []).map((sr) => {
+      const subIngredients = sr.ingredients.map((i) => ({
         ...i,
         quantityG: round3(i.quantityG * ratio),
         quantityGMax: i.quantityGMax != null ? round3(i.quantityGMax * ratio) : null,
-      })),
-      totalMassG: round3(sr.totalMassG * ratio),
-    })),
+      }));
+      const subMinG = subIngredients.reduce(
+        (s, i) => s + ingMass(i.quantityG, i.unit ?? "g"), 0,
+      );
+      const subMaxG = subIngredients.reduce(
+        (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit ?? "g"), 0,
+      );
+      return {
+        ...sr,
+        ingredients: subIngredients,
+        totalMassGMin: round3(subMinG),
+        totalMassGMax: round3(subMaxG),
+        totalMassG: round3((subMinG + subMaxG) / 2),
+      };
+    }),
     multiplier: round3((snap.multiplier ?? 1) * ratio),
   };
 
