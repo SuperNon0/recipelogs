@@ -7,6 +7,7 @@ import {
   googleFontsHref,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
+import { ingMass } from "../massAdjust";
 
 /** Slug historique conservé pour compatibilité descendante. */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
@@ -649,8 +650,21 @@ export function renderRecipeCard(
   /** Si défini, affiche « Sous-recette de · [nom] » sous le titre. */
   parentRecipeName?: string,
 ): string {
+  // Le total est TOUJOURS recalculé à partir des ingrédients réellement
+  // affichés, et non lu depuis le snapshot. Cela garantit que « Total · X »
+  // = la somme des lignes ci-dessus, même pour des recettes figées dont la
+  // masse a été modifiée après coup (les champs totalMassGMin/Max stockés
+  // pouvaient être périmés → cf. ancien bug de masse totale incohérente).
+  const totalMinG = snap.ingredients.reduce(
+    (s, i) => s + ingMass(i.quantityG, i.unit ?? "g"),
+    0,
+  );
+  const totalMaxG = snap.ingredients.reduce(
+    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit ?? "g"),
+    0,
+  );
   const ingHtml = snap.ingredients.length > 0
-    ? renderIngredients(snap.ingredients, snap.totalMassGMin ?? snap.totalMassG, snap.totalMassGMax ?? snap.totalMassG, theme.showTotalMass)
+    ? renderIngredients(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass)
     : "<p class='muted'>Aucun ingrédient.</p>";
 
   const stepsHtml =
