@@ -99,7 +99,7 @@ Le projet a été livré conformément à la V1.1, puis a fait l'objet d'**itér
 7. [Modèle de données](#7-modèle-de-données)
 8. [Arborescence & navigation](#8-arborescence--navigation)
 9. [Livrables & critères d'acceptation](#9-livrables--critères-dacceptation)
-10. [Planning indicatif](#10-planning-indicatif)
+10. [Planning et avancement](#10-planning-et-avancement)
 
 ---
 
@@ -312,29 +312,66 @@ Les fonctionnalités suivantes ne seront **pas développées**, ni en V1 ni en V
 
 ## 4. Spécifications fonctionnelles
 
-### 4.1 Écran d'accueil
+### 4.1 Écran d'accueil — vue explorateur
 
-Page d'entrée de l'application. Présente la bibliothèque de recettes et les points d'accès aux fonctionnalités principales.
+Page d'entrée de l'application (route `/`). Présente la bibliothèque organisée par dossiers, style **explorateur de fichiers** (inspiration Apple Files / Finder).
 
-#### Structure
+#### Structure (vue par défaut)
 
-- **Header sticky** : logo « recipelog » à gauche, compteur recettes à droite en accent jaune
-- **Navigation (onglets)** scrollable horizontalement : `Recettes` · `Favoris` · `Cahiers` · `Listes de courses` · `Ingrédients` (si mode B) · `Paramètres`
-- **Barre de recherche** plein largeur avec icône loupe
-- **Filtres rapides** : chips horizontaux scrollables (tags + catégories)
-- **Liste de recettes** : grille responsive (1 col mobile, 2 tablette, 3 desktop). Chaque carte : photo, nom, tags colorés, masse totale, note étoiles, favori
+- **Header sticky** : logo « recipelog », navigation (`Recettes` · `Favoris` · `Cahiers` · `Courses` · `Paramètres`)
+- **En-tête de page** : titre « Recettes », compteur, bouton **« 📋 Tout afficher »** pour basculer en liste plate
+- **Barre de recherche + filtres** (chips catégories + tags scrollables)
+- **Section « 📁 Dossiers »** : grille de cards de dossiers (3 cols desktop, 2 cols mobile). Chaque card : émoji 📁 dans la couleur du dossier, nom, compteur de recettes
+- **Section « 📂 Sans dossier »** (en bas, max 6 recettes prévisualisées + lien « Voir tout → »)
 - **Bouton FAB violet (+)** en bas à droite pour créer une nouvelle recette
 
 #### Comportement
 
-- Au chargement : toutes les recettes, triées par date de modification décroissante
-- Clic sur une carte → ouverture de la fiche recette
-- Clic sur le FAB + → modal de création de recette
-- Recherche : filtrage en temps réel (debounce 300ms) sur nom uniquement
-- Filtres combinables (ET logique). Clic sur un chip actif le désactive
-- État vide : message centré en muted + CTA jaune « Créer ma première recette »
+- **Au chargement** : vue explorateur (dossiers en haut, sans dossier en bas)
+- **Clic sur une card de dossier** → `/?folder=ID` → vue filtrée avec fil d'Ariane `← Toutes les recettes / 📁 [nom]` et bouton **« + Ranger des recettes ici »**
+- **Clic sur « 📋 Tout afficher »** → `/?view=all` → liste plate groupée par dossier (titres + grilles)
+- **Recherche / filtre actif** en vue explorateur → bascule automatique sur une grille plate des résultats (pour ne pas cacher les résultats derrière les cards de dossiers)
+- **Recherche** : filtrage en temps réel (debounce 300ms) sur le nom
+- **État vide** : message centré + CTA « Créer ma première recette »
 
-### 4.2 Fiche recette
+> **Pourquoi cette vue plutôt qu'une liste plate**
+>
+> Le commanditaire range entre 50 et 200+ recettes. Une liste plate serait illisible. La vue explorateur permet de voir immédiatement la structure (combien de dossiers, combien dans chacun) puis de plonger dans un dossier en un clic.
+
+### 4.2 Concept — Dossier vs Catégorie vs Tag
+
+RecipeLog distingue **3 niveaux d'organisation** des recettes. Comprendre la différence est essentiel.
+
+| Niveau | Quoi | Combien par recette | Sert à quoi |
+|---|---|---|---|
+| **📁 Dossier** | Le grand type (Tartes, Entremets, Glaces, Viennoiserie…) | **0 ou 1 max** | Rangement principal, navigation |
+| **🏷️ Catégorie** | Tags secondaires descriptifs (Chocolat, Framboise, 6 personnes, Sans gluten…) | 0 à N | Filtrage / recherche transverse |
+| **# Tag** | Mots-clés libres au feeling | 0 à N | Notes personnelles, regroupements ad hoc |
+
+#### Comportement détaillé des dossiers
+
+- **CRUD** depuis `/settings → 📁 Dossiers` : créer, renommer, changer la couleur, supprimer. Compte de recettes affiché à côté de chaque dossier.
+- **Suppression d'un dossier** ne supprime **jamais** les recettes qu'il contenait (`ON DELETE SET NULL` en BDD). Les recettes passent en « Sans dossier ».
+- **Sélection sur une recette** : dropdown dans le formulaire de création/édition, avec option « — Aucun dossier — » qui correspond à `folder_id = NULL`.
+- **Rangement en masse** sans éditer chaque fiche : modal `AddRecipesToFolderModal` accessible depuis :
+  - `/settings` → bouton **« + Ajouter »** sur chaque ligne de dossier
+  - Vue d'un dossier → bouton **« + Ranger des recettes ici »**
+  - Toggle « N'afficher que les recettes sans dossier » activé par défaut
+  - Autocomplétion débouncée 200ms via `GET /api/recipes?q=…&onlyNoFolder=1`
+  - Multi-sélection avec chips ×, assignation en un seul `updateMany` SQL
+- **Seed initial** : 8 dossiers de pâtisserie au premier déploiement (Tartes, Entremets, Glaces & sorbets, Viennoiserie, Pains, Confiserie, Crèmes & garnitures, Pâtes de base). Modifiables / supprimables librement. Idempotent grâce à `upsert`.
+- **Couleur** : chaque dossier a une couleur configurable, utilisée sur la card d'accueil (fond translucide + bordure) et la pastille dans `/settings`.
+
+#### Pourquoi pas de sous-dossiers
+
+L'architecture supporte une **liste plate** de dossiers, pas d'arborescence. Justification :
+- Pour ~200 recettes max, une hiérarchie est inutilement complexe
+- Le rangement secondaire est déjà géré par les catégories
+- Évite les problèmes UX classiques (où je le mets ? drag entre branches, breadcrumb, dossier vide…)
+
+Si le besoin se confirmait, on pourrait ajouter un champ `parent_id` sur `folders` sans casser l'existant.
+
+### 4.3 Fiche recette
 
 Écran central de l'application. Affiche toutes les informations d'une recette et permet les actions principales : édition, multiplication, impression, partage, ajout au cahier, création de sous-recette.
 
@@ -367,7 +404,12 @@ Bloc dédié sous l'en-tête, en carte. Switch entre 3 modes via sélecteur pill
 - **Masse totale** : input en grammes, calcule le coefficient correspondant
 - **Ingrédient pivot** : sélecteur d'ingrédient + input en grammes
 
-Le recalcul est **instantané** : toutes les quantités et la masse totale sont mises à jour visuellement sans recharger la page. Un bouton **Réinitialiser** permet de revenir à la recette d'origine.
+Le recalcul est **instantané** : toutes les quantités et la masse totale sont mises à jour visuellement sans recharger la page.
+
+Deux boutons en haut du panneau :
+
+- **Réinitialiser** : ramène coef/masse/pivot à leur valeur d'origine (aucune persistance).
+- **⚖️ Mettre à jour la recette** (dispo uniquement si le coefficient effectif ≠ 1) : écrit en BDD les quantités actuellement affichées comme **nouvelle base** de la recette. Confirmation demandée avant. Les sous-recettes liées ne sont **pas** touchées (leur `calcMode`/`calcValue`/`isLocked` restent intacts). Sert notamment quand on ajuste une recette à un pivot puis qu'on veut sauver ces nouvelles quantités.
 
 #### Zone ingrédients
 
@@ -400,34 +442,41 @@ Affichée si la recette contient au moins une sous-recette. Chaque sous-recette 
 - Catégorie(s) assignée(s)
 - Date de création, date de dernière modification (en muted)
 
-### 4.3 Création / édition d'une recette
+### 4.4 Création / édition d'une recette
 
-Formulaire affiché dans une **modal iOS-sheet** (ouverture depuis le bas sur mobile, centrée sur desktop). Champs dans cet ordre :
+Formulaire (`/recipes/new` ou `/recipes/:id/edit`). Champs dans cet ordre :
 
 | Champ | Description |
 |---|---|
-| **Photo principale** | Upload optionnel, drag & drop ou bouton |
 | **Nom** | Texte, obligatoire |
-| **Catégories** | Multi-sélection depuis la base (créable à la volée) |
-| **Tags** | Saisie libre avec autocomplétion, séparés par virgule ou Entrée |
-| **Ingrédients** | Liste dynamique, ajout/suppression, réordonnancement. Texte libre (mode A) ou sélection base (mode B) |
-| **Étapes** | Textarea plein écran, hauteur extensible |
+| **📁 Dossier** | **Dropdown** avec option « — Aucun dossier — ». 0 ou 1 max. Créable/renommable depuis `/settings`. |
+| **🏷️ Catégories** | **Combobox** (autocomplétion) : on tape pour filtrer les catégories existantes, bouton ▾ pour voir toute la liste, Enter ajoute le 1er suggéré. Sélectionnées affichées en chips × au-dessus. Backspace sur input vide retire la dernière chip. |
+| **Tags** | Saisie libre séparés par virgule |
+| **Ingrédients** | Deux modes au choix (toggle en haut) : *📋 Liste* (lignes qty + nom, réordonnancement flèches, ajout/suppression) ou *📝 Texte libre* (colle une liste brute, bouton « Importer dans la liste » qui parse via `parseIngredientsText`) |
+| **Étapes** | Éditeur riche **Tiptap** simplifié : toolbar réduite à **Gras / Italique / Souligné** (+ undo/redo). Placeholder via extension officielle Tiptap. Re-render forcé à chaque transaction pour que les boutons reflètent l'état actif et que le champ caché reçoive bien le HTML au submit. |
 | **Source** | Texte libre optionnel |
 | **Notes / astuces** | Textarea optionnelle |
+| **Favori** | Checkbox |
+| **Note** | Select 1-5 étoiles |
+
+> **URL avec préselection dossier**
+>
+> La route `/recipes/new?folder=:id` pré-sélectionne un dossier dans le dropdown. Utilisé notamment quand on créera une recette depuis la vue d'un dossier (futur bouton).
 
 #### Validation
 
 - Nom obligatoire, 1 caractère minimum, 200 max
-- Au moins 1 ingrédient obligatoire
-- Étapes non obligatoires mais recommandées
-- Sauvegarde : bouton primaire jaune « Enregistrer » en bas
-- Annulation : lien secondaire muted, avec confirmation si modifications
+- Au moins 1 ingrédient avec quantité > 0 obligatoire
+- Étapes non obligatoires (si laissées vides, le PDF affiche `—`)
+- Champ `folderId` optionnel (null = « Sans dossier »)
+- Sauvegarde : bouton primaire « Enregistrer » en bas
+- Annulation : lien vers la fiche (ou l'accueil pour nouvelle recette)
 
-### 4.4 Sous-recettes — comportement détaillé
+### 4.5 Sous-recettes — comportement détaillé
 
 Les sous-recettes permettent de composer une recette complexe (ex : entremets) à partir de recettes existantes qui restent autonomes.
 
-#### 4.4.1 Ajout d'une sous-recette
+#### 4.5.1 Ajout d'une sous-recette
 
 Modal dédiée, accessible depuis le menu 3 points d'une recette.
 
@@ -441,7 +490,7 @@ Modal dédiée, accessible depuis le menu 3 points d'une recette.
 > **Référence vs copie**
 > Une sous-recette n'est pas une copie figée : elle référence la recette source. Si la recette source est modifiée, les sous-recettes qui y font référence sont automatiquement mises à jour (avec recalcul selon le mode de calcul stocké).
 
-#### 4.4.2 Propagation du coefficient global
+#### 4.5.2 Propagation du coefficient global
 
 Lorsqu'un coefficient est appliqué sur la **recette principale**, il se propage **automatiquement** à toutes les sous-recettes non verrouillées.
 
@@ -454,7 +503,7 @@ Lorsqu'un coefficient est appliqué sur la **recette principale**, il se propage
 >
 > Le recalcul est instantané et cascade à tous les niveaux (sous-recette d'une sous-recette si applicable).
 
-#### 4.4.3 Modification indépendante d'une sous-recette
+#### 4.5.3 Modification indépendante d'une sous-recette
 
 Chaque accordéon de sous-recette contient une **icône éditer** permettant d'ajuster la sous-recette individuellement :
 
@@ -463,7 +512,7 @@ Chaque accordéon de sous-recette contient une **icône éditer** permettant d'a
 - La nouvelle valeur s'applique uniquement à cette sous-recette
 - Bouton « Réinitialiser » pour revenir à la valeur par défaut (liée au coef global)
 
-#### 4.4.4 Verrouillage 🔒 d'une sous-recette
+#### 4.5.4 Verrouillage 🔒 d'une sous-recette
 
 Chaque accordéon de sous-recette affiche une **icône cadenas** dans son en-tête. Deux états possibles :
 
@@ -479,15 +528,15 @@ Chaque accordéon de sous-recette affiche une **icône cadenas** dans son en-tê
 > Application d'un coefficient × 2 sur la recette principale :
 > → Biscuit 400g · Mousse 600g 🔒 (figée) · Glaçage 300g · **Total 1300g**
 
-### 4.5 Cahiers de recettes
+### 4.6 Cahiers de recettes
 
-#### 4.5.1 Création d'un cahier
+#### 4.6.1 Création d'un cahier
 
 - Onglet **Cahiers** → FAB violet « + » pour créer un cahier vide
 - Formulaire : nom, description optionnelle, format par défaut (A4/A5)
 - Le cahier est créé vide, prêt à recevoir des recettes
 
-#### 4.5.2 Ajout d'une recette à un cahier
+#### 4.6.2 Ajout d'une recette à un cahier
 
 Depuis la fiche recette : menu 3 points → « Ajouter au cahier... » → modal listant tous les cahiers existants avec recherche. La modal propose également **2 choix à faire au moment de l'ajout**.
 
@@ -519,7 +568,7 @@ Si la recette ajoutée contient des sous-recettes, la modal demande également c
 > **Combinaison des 2 choix**
 > Les deux choix se combinent librement. Exemple : ajouter un entremets en mode « 🔗 Liée dynamique » + « 📚 Recettes séparées » signifie que chaque recette (principale + sous-recettes) est ajoutée comme fiche distincte, et chacune reflétera automatiquement ses modifications futures.
 
-#### 4.5.3 Paramètres d'un cahier
+#### 4.6.3 Paramètres d'un cahier
 
 - Réordonnancement des recettes par drag & drop
 - Choix du **format papier** (A4 ou A5)
@@ -536,7 +585,7 @@ Si la recette ajoutée contient des sous-recettes, la modal demande également c
 > **Templates PDF**
 > Les templates V1 doivent couvrir : un style classique éditorial, un style moderne minimaliste, un style fiche technique dense, et un style magazine (photo pleine page). L'ajout d'un 4ᵉ ou 5ᵉ template en V2 doit être prévu dans l'architecture.
 
-### 4.6 Listes de courses
+### 4.7 Listes de courses
 
 - Onglet **Listes de courses** avec les listes existantes
 - Création d'une liste : nom, type (« Recettes » ou « Libre »)
@@ -548,7 +597,7 @@ Si la recette ajoutée contient des sous-recettes, la modal demande également c
 - Bouton « Vider les cochés » pour nettoyer la liste
 - Export PDF (mise en page simple : titre + lignes avec cases imprimables)
 
-### 4.7 Partage public
+### 4.8 Partage public
 
 Toute recette ou cahier peut être partagé via un lien public non indexé. Le visiteur accède à une vue minimaliste en lecture seule, avec possibilité de télécharger le PDF. Aucune auth côté visiteur.
 
