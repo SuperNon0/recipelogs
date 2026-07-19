@@ -190,6 +190,7 @@ const hex = z
 
 export const cookbookThemeSchema = z.object({
   // Recette : couleurs (le fond est TOUJOURS blanc — feuille d'imprimante)
+  titleColor: hex.default("#A52A2A"),
   accentColor: hex.default("#A52A2A"),
   textColor: hex.default("#111111"),
 
@@ -210,6 +211,9 @@ export const cookbookThemeSchema = z.object({
   showTotalMass: z.boolean().default(true),
   showPortion: z.boolean().default(true),
   showPageNumbers: z.boolean().default(true),
+
+  // Pied de page
+  footerAlign: z.enum(["left", "center", "right", "justify"]).default("center"),
 
   // Sommaire
   tocMode: z.enum(["hidden", "flat", "by-section"]).default("flat"),
@@ -238,6 +242,15 @@ export function parseTheme(raw: unknown): CookbookTheme {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(cookbookThemeSchema.shape) as (keyof CookbookTheme)[]) {
     if (key in partial) out[key] = partial[key];
+  }
+
+  // Migration : ancien `accentColor` → utilisé pour titleColor + accentColor
+  if (
+    !("titleColor" in out) &&
+    "accentColor" in partial &&
+    typeof partial.accentColor === "string"
+  ) {
+    out.titleColor = partial.accentColor;
   }
 
   // Migration douce : `coverGradient: true` (ancien schéma) → coverBgPattern: gradient-diagonal

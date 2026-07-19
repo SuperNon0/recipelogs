@@ -144,7 +144,7 @@ export function CookbookConfigForm({
             />
           </label>
 
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className="fl-label">Pied de page (sur chaque page)</span>
             <input
               value={footer}
@@ -153,7 +153,14 @@ export function CookbookConfigForm({
               className="fl-input"
               placeholder="Ex : © Ma Pâtisserie 2025"
             />
-          </label>
+            <span className="fl-label" style={{ fontSize: "0.7rem" }}>
+              Alignement
+            </span>
+            <FooterAlignControl
+              value={theme.footerAlign}
+              onChange={(v) => setT("footerAlign", v)}
+            />
+          </div>
         </Section>
 
         {/* Couleurs des recettes */}
@@ -162,9 +169,10 @@ export function CookbookConfigForm({
             Le fond des pages de recettes est toujours blanc (impression sur feuille blanche).
           </p>
           <ColorRow
-            label="Couleur d'accent (titres, traits)"
-            value={theme.accentColor}
-            onChange={(v) => setT("accentColor", v)}
+            label="Titre"
+            hint="titres de recettes, sommaire, chapitres, sous-recettes"
+            value={theme.titleColor}
+            onChange={(v) => setT("titleColor", v)}
           />
           <ColorRow
             label="Couleur du texte"
@@ -198,6 +206,12 @@ export function CookbookConfigForm({
 
         {/* Mise en page recette */}
         <Section title="Mise en page de la recette">
+          <ColorRow
+            label="Point d'accent"
+            hint="quantités d'ingrédients, filets, étoiles, tags, ligne du total"
+            value={theme.accentColor}
+            onChange={(v) => setT("accentColor", v)}
+          />
           <label className="flex flex-col gap-1.5">
             <span className="fl-label">Position des ingrédients</span>
             <SegmentedControl
@@ -407,10 +421,14 @@ export function CookbookConfigForm({
             </a>
           </div>
           <CookbookPreview
+            cookbookId={cookbookId}
             cookbookName={name}
             description={description}
-            theme={theme}
+            format={format}
             hasCover={hasCover}
+            hasToc={hasToc}
+            footer={footer}
+            theme={theme}
           />
         </div>
       </aside>
@@ -433,10 +451,14 @@ export function CookbookConfigForm({
             </a>
           </div>
           <CookbookPreview
+            cookbookId={cookbookId}
             cookbookName={name}
             description={description}
-            theme={theme}
+            format={format}
             hasCover={hasCover}
+            hasToc={hasToc}
+            footer={footer}
+            theme={theme}
           />
         </div>
       </aside>
@@ -462,17 +484,29 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ColorRow({
   label,
+  hint,
   value,
   onChange,
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChange: (v: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="fl-label">{label}</span>
+        <div className="flex flex-col">
+          <span className="fl-label">{label}</span>
+          {hint && (
+            <span
+              className="text-[0.65rem] italic"
+              style={{ color: "var(--muted)", lineHeight: 1.3 }}
+            >
+              [{hint}]
+            </span>
+          )}
+        </div>
         <span className="text-xs text-[color:var(--muted)] font-mono">{value}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -1016,6 +1050,78 @@ function ImageUploadRow({
         step={0.05}
         onChange={onOpacityChange}
       />
+    </div>
+  );
+}
+
+function FooterAlignControl({
+  value,
+  onChange,
+}: {
+  value: "left" | "center" | "right" | "justify";
+  onChange: (v: "left" | "center" | "right" | "justify") => void;
+}) {
+  const options: { value: "left" | "center" | "right" | "justify"; icon: string; label: string }[] = [
+    { value: "left", icon: "≡", label: "Gauche" },
+    { value: "center", icon: "≡", label: "Centre" },
+    { value: "right", icon: "≡", label: "Droite" },
+    { value: "justify", icon: "≡", label: "Justifié" },
+  ];
+  const icons = {
+    left: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <rect x="3" y="5" width="18" height="2" /><rect x="3" y="10" width="12" height="2" />
+        <rect x="3" y="15" width="18" height="2" /><rect x="3" y="20" width="10" height="2" />
+      </svg>
+    ),
+    center: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <rect x="3" y="5" width="18" height="2" /><rect x="6" y="10" width="12" height="2" />
+        <rect x="3" y="15" width="18" height="2" /><rect x="7" y="20" width="10" height="2" />
+      </svg>
+    ),
+    right: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <rect x="3" y="5" width="18" height="2" /><rect x="9" y="10" width="12" height="2" />
+        <rect x="3" y="15" width="18" height="2" /><rect x="11" y="20" width="10" height="2" />
+      </svg>
+    ),
+    justify: (
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <rect x="3" y="5" width="18" height="2" /><rect x="3" y="10" width="18" height="2" />
+        <rect x="3" y="15" width="18" height="2" /><rect x="3" y="20" width="18" height="2" />
+      </svg>
+    ),
+  } as const;
+  return (
+    <div
+      className="inline-flex rounded-md overflow-hidden border"
+      style={{ borderColor: "var(--border)" }}
+      role="tablist"
+    >
+      {options.map((o) => {
+        const selected = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            role="tab"
+            aria-selected={selected}
+            title={o.label}
+            className="px-3 py-1.5 text-sm transition-colors flex items-center gap-1"
+            style={{
+              background: selected ? "var(--accent)" : "transparent",
+              color: selected ? "var(--bg)" : "var(--text)",
+              fontWeight: selected ? 600 : 400,
+              borderRight: "1px solid var(--border)",
+            }}
+          >
+            {icons[o.value]}
+            <span className="hidden sm:inline text-xs">{o.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
