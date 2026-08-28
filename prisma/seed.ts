@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -69,6 +70,56 @@ async function main() {
     update: {},
     create: { key: "logo_enabled", value: false },
   });
+
+  // ─── Super-admin amorcé depuis l'environnement ─────────────────
+  // Modèle « login local + email super-admin en UN SEUL compte » :
+  // un compte unique qui matche l'email CF ET possède un mot de passe local.
+  const adminEmail = (process.env.SUPERADMIN_EMAIL ?? "").trim().toLowerCase();
+  const adminPassword = process.env.SUPERADMIN_PASSWORD ?? "";
+  const forcePassword = String(process.env.SEED_FORCE_ADMIN_PASSWORD ?? "").toLowerCase() === "true";
+
+  if (adminEmail && adminPassword) {
+    const existing = await prisma.account.findUnique({ where: { email: adminEmail } });
+    const hash = await bcrypt.hash(adminPassword, 12);
+
+    if (!existing) {
+      await prisma.account.create({
+        data: {
+          email: adminEmail,
+          role: "super_admin",
+          state: "active",
+          passwordHash: hash,
+          validatedAt: new Date(),
+        },
+      });
+      console.log(`Seed auth : super-admin créé (${adminEmail}).`);
+    } else {
+      const patch: {
+        role: "super_admin";
+        state: "active";
+        validatedAt: Date | null;
+        passwordHash?: string;
+      } = {
+        role: "super_admin",
+        state: "active",
+        validatedAt: existing.validatedAt ?? new Date(),
+      };
+      // Idempotence : on ne réécrit pas le hash sauf demande explicite.
+      if (!existing.passwordHash || forcePassword) {
+        patch.passwordHash = hash;
+      }
+      await prisma.account.update({ where: { id: existing.id }, data: patch });
+      console.log(
+        forcePassword
+          ? `Seed auth : super-admin ${adminEmail} MAJ (mot de passe réécrit).`
+          : `Seed auth : super-admin ${adminEmail} déjà présent (mot de passe préservé).`,
+      );
+    }
+  } else {
+    console.log(
+      "Seed auth : SUPERADMIN_EMAIL et/ou SUPERADMIN_PASSWORD non définis, super-admin non amorcé.",
+    );
+  }
 
   console.log("Seed terminé : templates, catégories, paramètres initiaux.");
 }

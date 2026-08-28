@@ -370,3 +370,77 @@ model Setting {
 
   @@map("settings")
 }
+
+// ─────────────────────────────────────────────────────────────
+// Auth v2 — Comptes, journal d'audit, réglages système
+// ─────────────────────────────────────────────────────────────
+
+enum AccountRole {
+  super_admin
+  member
+}
+
+enum AccountState {
+  pending
+  active
+  refused
+  blocked
+}
+
+enum AuditAction {
+  login_local
+  login_cf
+  logout
+  request_access
+  validate
+  refuse
+  block
+  unblock
+  delete
+  add_super_admin
+  remove_super_admin
+  password_change
+  settings_change
+  denied_access
+}
+
+model Account {
+  id           Int          @id @default(autoincrement())
+  email        String?      @unique
+  role         AccountRole  @default(member)
+  state        AccountState @default(pending)
+  passwordHash String?      @map("password_hash")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  validatedAt  DateTime?    @map("validated_at")
+  lastLoginAt  DateTime?    @map("last_login_at")
+
+  auditsAsActor  AuditLog[] @relation("AuditActor")
+  auditsAsTarget AuditLog[] @relation("AuditTarget")
+
+  @@index([email])
+  @@index([state])
+  @@map("accounts")
+}
+
+model AuditLog {
+  id              Int         @id @default(autoincrement())
+  accountId       Int?        @map("account_id")
+  action          AuditAction
+  targetAccountId Int?        @map("target_account_id")
+  metadata        Json?
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  actor  Account? @relation("AuditActor", fields: [accountId], references: [id], onDelete: SetNull)
+  target Account? @relation("AuditTarget", fields: [targetAccountId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([action])
+  @@map("audit_log")
+}
+
+model AppSetting {
+  key   String @id
+  value Json
+
+  @@map("app_settings")
+}

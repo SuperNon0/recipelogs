@@ -31,6 +31,9 @@
     "@tiptap/extension-underline": "^3.22.5",
     "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^3.22.5",
+    "bcryptjs": "^3.0.3",
+    "iron-session": "^8.0.4",
+    "jose": "^6.2.10",
     "jszip": "^3.10.1",
     "linkedom": "^0.18.12",
     "next": "15.1.4",
@@ -42,6 +45,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.3",
