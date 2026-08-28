@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { roundQty } from "@/lib/format";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -410,18 +411,18 @@ export async function updateSnapshotMass(
     ...snap,
     ingredients: snap.ingredients.map((i) => ({
       ...i,
-      quantityG: round3(i.quantityG * ratio),
+      quantityG: roundQty(i.quantityG * ratio),
     })),
-    totalMassG: round3(snap.totalMassG * ratio),
+    totalMassG: roundQty(snap.totalMassG * ratio),
     subRecipes: (snap.subRecipes ?? []).map((sr) => ({
       ...sr,
       ingredients: sr.ingredients.map((i) => ({
         ...i,
-        quantityG: round3(i.quantityG * ratio),
+        quantityG: roundQty(i.quantityG * ratio),
       })),
-      totalMassG: round3(sr.totalMassG * ratio),
+      totalMassG: roundQty(sr.totalMassG * ratio),
     })),
-    multiplier: round3((snap.multiplier ?? 1) * ratio),
+    multiplier: roundQty((snap.multiplier ?? 1) * ratio),
   };
 
   await prisma.cookbookRecipe.update({
@@ -436,6 +437,3 @@ export async function updateSnapshotMass(
   return { ok: true };
 }
 
-function round3(x: number): number {
-  return Math.round(x * 1000) / 1000;
-}

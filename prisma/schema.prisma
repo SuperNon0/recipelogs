@@ -116,7 +116,11 @@ model SubRecipe {
   label      String
   calcMode   CalcMode @default(coefficient) @map("calc_mode")
   calcValue  Decimal  @default(1) @map("calc_value") @db.Decimal(12, 4)
-  pivotIngredientId Int? @map("pivot_ingredient_id")
+  // Pivot conservé côté DB comme LEGACY : les IDs deviennent orphelins dès qu'on
+  // édite la recette enfant (les ingrédients sont supprimés/recréés). Le pivot
+  // effectif est maintenant `pivotIngredientName`.
+  pivotIngredientId   Int?    @map("pivot_ingredient_id")
+  pivotIngredientName String? @map("pivot_ingredient_name")
   isLocked   Boolean  @default(false) @map("is_locked")
   position   Int      @default(0)
 

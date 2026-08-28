@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
+import { roundQty } from "@/lib/format";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -175,23 +177,54 @@ export async function deleteRecipe(id: number) {
   redirect("/");
 }
 
+export type ApplyMultiplierResult =
+  | { ok: true }
+  | { ok: false; error: string; usedInPivotOf?: { id: number; name: string }[] };
+
 /**
  * Applique un multiplicateur global aux quantités de la recette parente
  * et écrit ces nouvelles quantités EN BASE comme nouvelle référence.
  *
  * - Ne touche PAS aux sous-recettes liées : leur configuration (calcMode,
  *   calcValue, isLocked) reste inchangée.
+ * - Si la recette est utilisée comme pivot d'une autre (mode `pivot_ingredient`),
+ *   on renvoie `usedInPivotOf` et on demande une confirmation explicite via
+ *   `confirmed=true` : le pivot est un point d'ancrage, le multiplier va
+ *   décaler le calcul dans les recettes parentes.
+ * - UPDATE SQL unique batché pour éviter N round-trips en transaction.
  * - Si le multiplicateur est ~1 (pas de changement utile), on no-op.
  */
 export async function applyMultiplierToRecipe(
   id: number,
   multiplier: number,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  confirmed = false,
+): Promise<ApplyMultiplierResult> {
   if (!Number.isFinite(multiplier) || multiplier <= 0) {
     return { ok: false, error: "Multiplicateur invalide." };
   }
   // No-op si on est très proche de 1 (à 0.1 ‰ près).
   if (Math.abs(multiplier - 1) < 1e-4) return { ok: true };
+
+  // Garde-fou : si la recette est utilisée comme pivot d'un parent, on avertit
+  // avant de modifier ses quantités (sinon les calculs pivots dérivent).
+  if (!confirmed) {
+    const pivotUsages = await prisma.subRecipe.findMany({
+      where: { childId: id, calcMode: "pivot_ingredient" },
+      select: { parent: { select: { id: true, name: true } } },
+    });
+    if (pivotUsages.length > 0) {
+      const seen = new Map<number, string>();
+      for (const u of pivotUsages) {
+        if (!seen.has(u.parent.id)) seen.set(u.parent.id, u.parent.name);
+      }
+      return {
+        ok: false,
+        error:
+          "Cette recette est utilisée comme pivot dans d'autres recettes. Confirmez pour continuer.",
+        usedInPivotOf: [...seen.entries()].map(([id, name]) => ({ id, name })),
+      };
+    }
+  }
 
   const ingredients = await prisma.ingredient.findMany({
     where: { recipeId: id },
@@ -201,16 +234,20 @@ export async function applyMultiplierToRecipe(
     return { ok: false, error: "Aucun ingrédient à mettre à jour." };
   }
 
-  await prisma.$transaction(
-    ingredients.map((ing) =>
-      prisma.ingredient.update({
-        where: { id: ing.id },
-        data: {
-          quantityG: Math.round(Number(ing.quantityG) * multiplier * 1000) / 1000,
-        },
-      }),
-    ),
+  // Batch : un seul UPDATE SQL, arrondi côté application via une expression CASE.
+  // On construit `CASE id WHEN … THEN … END` avec des bindings paramétrés
+  // (pas d'interpolation directe → pas d'injection).
+  const cases: Prisma.Sql[] = ingredients.map(
+    (ing) =>
+      Prisma.sql`WHEN ${ing.id} THEN ${roundQty(Number(ing.quantityG) * multiplier)}`,
   );
+  const ids = ingredients.map((i) => i.id);
+
+  await prisma.$executeRaw`
+    UPDATE "ingredients"
+    SET "quantity_g" = CASE "id" ${Prisma.join(cases, " ")} END
+    WHERE "id" IN (${Prisma.join(ids)})
+  `;
 
   revalidatePath("/");
   revalidatePath("/favorites");

@@ -8,6 +8,8 @@
  *   "1kg sucre"              → { name: "sucre", quantityG: 1000 }
  *   "500 ml lait"            → { name: "lait", quantityG: 500 } (1ml ≈ 1g)
  *   "591g lait"              → { name: "lait", quantityG: 591 }
+ *   "1 kg 200 g farine"      → { name: "farine", quantityG: 1200 } (additif)
+ *   "100 gr / 200 grammes"   → forme longue reconnue
  *
  * Format multi-lignes (style fiche pâtissier) :
  *   "Farine\n- 200g\nBeurre\n- 100g"
@@ -15,6 +17,30 @@
  */
 
 export type ParsedIngredient = { name: string; quantityG: number };
+
+// Ordre = du plus long au plus court pour éviter que "g" mange "gr"/"gramme".
+// Chaque unité renvoie sa masse équivalente en grammes (1 ml ≈ 1 g pour l'eau).
+const UNITS: { pattern: string; toG: number }[] = [
+  { pattern: "kilogrammes?", toG: 1000 },
+  { pattern: "kilos?", toG: 1000 },
+  { pattern: "kg", toG: 1000 },
+  { pattern: "grammes?", toG: 1 },
+  { pattern: "gr", toG: 1 },
+  { pattern: "g", toG: 1 },
+  { pattern: "ml", toG: 1 },
+  { pattern: "cl", toG: 10 },
+  { pattern: "litres?", toG: 1000 },
+  { pattern: "l", toG: 1000 },
+];
+
+const UNIT_UNION = UNITS.map((u) => u.pattern).join("|");
+// Une occurrence "nombre + unité". `\b` en amont pour ne pas manger un chiffre
+// collé à un mot précédent. En aval : lookahead qui refuse un caractère mot
+// (évite que "l" matche "lait", "g" matche "gramme" déjà couvert par l'ordre).
+const PAIR_RE = new RegExp(
+  `(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_UNION})(?![a-zA-Zàâäéèêëïîôöùûüç])`,
+  "gi",
+);
 
 export function parseIngredientsText(raw: string): ParsedIngredient[] {
   if (!raw.trim()) return [];
@@ -53,33 +79,52 @@ export function parseIngredientsText(raw: string): ParsedIngredient[] {
 
 /**
  * Tente d'extraire une quantité en grammes depuis un texte libre.
- * Exemples : "200g farine", "200 g", "0.5kg", "500 ml" (eau ≈ 1g/ml)
+ * ADDITIF : `"1 kg 200 g"` = 1200 g. Accepte g / gr / gramme(s) / kg /
+ * kilo(s) / ml / cl / l / litre(s). Les volumes sont convertis 1:1 en g
+ * (approximation eau/lait).
  */
 function extractGrams(text: string): number {
-  const kgMatch = text.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
-  if (kgMatch) return parseFloat(kgMatch[1].replace(",", ".")) * 1000;
-
-  const gMatch = text.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
-  if (gMatch) return parseFloat(gMatch[1].replace(",", "."));
-
-  const mlMatch = text.match(/(\d+(?:[.,]\d+)?)\s*ml\b/i);
-  if (mlMatch) return parseFloat(mlMatch[1].replace(",", "."));
-
-  const clMatch = text.match(/(\d+(?:[.,]\d+)?)\s*cl\b/i);
-  if (clMatch) return parseFloat(clMatch[1].replace(",", ".")) * 10;
-
-  const lMatch = text.match(/(\d+(?:[.,]\d+)?)\s*l\b/i);
-  if (lMatch) return parseFloat(lMatch[1].replace(",", ".")) * 1000;
-
-  return 0;
+  let total = 0;
+  let matched = false;
+  const rx = new RegExp(PAIR_RE.source, PAIR_RE.flags);
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(text)) !== null) {
+    const value = parseFloat(m[1].replace(",", "."));
+    if (!Number.isFinite(value)) continue;
+    const unit = m[2].toLowerCase();
+    const spec = UNITS.find((u) => new RegExp(`^${u.pattern}$`, "i").test(unit));
+    if (!spec) continue;
+    total += value * spec.toG;
+    matched = true;
+  }
+  return matched ? total : 0;
 }
 
 /** Enlève la quantité en début/fin de ligne pour ne garder que le nom. */
 function cleanIngredientName(text: string): string {
+  const UNIT_LONG = UNITS.map((u) => u.pattern).join("|");
   return text
-    .replace(/^\d+(?:[.,]\d+)?\s*(kg|g|ml|cl|l|oz|lb|tsp|tbsp|cup|pcs?|unit[eé]?s?)\.?\s*/i, "")
-    .replace(/[-–·•]\s*\d+(?:[.,]\d+)?\s*(kg|g|ml|cl|l)\.?$/i, "")
-    .replace(/\s+\d+(?:[.,]\d+)?\s*(kg|g|ml|cl|l)$/i, "")
+    .replace(
+      new RegExp(
+        `^(?:\\d+(?:[.,]\\d+)?\\s*(?:${UNIT_LONG})\\.?\\s*)+`,
+        "i",
+      ),
+      "",
+    )
+    .replace(
+      new RegExp(
+        `[-–·•]\\s*(?:\\d+(?:[.,]\\d+)?\\s*(?:${UNIT_LONG})\\.?\\s*)+$`,
+        "i",
+      ),
+      "",
+    )
+    .replace(
+      new RegExp(
+        `\\s+(?:\\d+(?:[.,]\\d+)?\\s*(?:${UNIT_LONG})\\s*)+$`,
+        "i",
+      ),
+      "",
+    )
     .replace(/^\d+\s*\/\s*\d+\s*/, "")
     .replace(/^\d+\s+/, "")
     .trim();

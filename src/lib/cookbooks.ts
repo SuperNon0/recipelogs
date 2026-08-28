@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { roundQty } from "./format";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -81,24 +82,26 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
 
   const ingredients = r.ingredients.map((i) => ({
     name: i.name ?? i.ingredientBase?.name ?? "—",
-    quantityG: Number(i.quantityG) * k,
+    quantityG: roundQty(Number(i.quantityG) * k),
   }));
-  const totalMassG = ingredients.reduce((s, i) => s + i.quantityG, 0);
+  const totalMassG = roundQty(
+    ingredients.reduce((s, i) => s + i.quantityG, 0),
+  );
 
   const subRecipes = r.parentLinks.map((link) => {
     const childIngredients = link.child.ingredients.map((i) => ({
       name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Number(i.quantityG) * k,
+      quantityG: roundQty(Number(i.quantityG) * k),
     }));
-    const childTotalG = childIngredients.reduce(
-      (s, i) => s + i.quantityG,
-      0,
+    const childTotalG = roundQty(
+      childIngredients.reduce((s, i) => s + i.quantityG, 0),
     );
     return {
       label: link.label,
       childName: link.child.name,
       calcMode: link.calcMode,
       calcValue: Number(link.calcValue),
+      pivotIngredientName: link.pivotIngredientName,
       isLocked: link.isLocked,
       ingredients: childIngredients,
       totalMassG: childTotalG,

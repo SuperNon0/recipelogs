@@ -28,7 +28,7 @@ export type SubRecipeRow = {
   label: string;
   calcMode: "coefficient" | "mass_target" | "pivot_ingredient";
   calcValue: number;
-  pivotIngredientId: number | null;
+  pivotIngredientName: string | null;
   isLocked: boolean;
   childIngredients: IngredientRow[];
   childSteps: string | null;
@@ -194,11 +194,26 @@ function MultiplierPanel({
     setSaveError(null);
     startSaveTransition(async () => {
       const r = await applyMultiplierToRecipe(recipeId, globalCoef);
-      if (!r.ok) {
-        setSaveError(r.error);
+      if (r.ok) {
+        onReset();
         return;
       }
-      onReset();
+      // Cas particulier : la recette est pivot d'un parent → seconde confirmation.
+      if (r.usedInPivotOf && r.usedInPivotOf.length > 0) {
+        const parents = r.usedInPivotOf.map((p) => `• ${p.name}`).join("\n");
+        const ok = confirm(
+          `Cette recette est utilisée comme pivot dans :\n${parents}\n\nModifier ses quantités va décaler ces calculs. Continuer ?`,
+        );
+        if (!ok) return;
+        const r2 = await applyMultiplierToRecipe(recipeId, globalCoef, true);
+        if (!r2.ok) {
+          setSaveError(r2.error);
+          return;
+        }
+        onReset();
+        return;
+      }
+      setSaveError(r.error);
     });
   };
 
@@ -459,9 +474,10 @@ function SubRecipeAccordion({
     0,
   );
 
-  const pivotBaseQty = subRecipe.pivotIngredientId
+  // Pivot résolu par NOM (les IDs deviennent orphelins dès que l'enfant est édité).
+  const pivotBaseQty = subRecipe.pivotIngredientName
     ? subRecipe.childIngredients.find(
-        (i) => i.id === subRecipe.pivotIngredientId,
+        (i) => i.name === subRecipe.pivotIngredientName,
       )?.quantityG ?? null
     : null;
 
@@ -677,8 +693,8 @@ function EditSubRecipeModal({
   const [label, setLabel] = useState(subRecipe.label);
   const [calcMode, setCalcMode] = useState<Mode>(subRecipe.calcMode);
   const [calcValue, setCalcValue] = useState(String(subRecipe.calcValue));
-  const [pivotId, setPivotId] = useState<number | null>(
-    subRecipe.pivotIngredientId,
+  const [pivotName, setPivotName] = useState<string | null>(
+    subRecipe.pivotIngredientName,
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -691,8 +707,8 @@ function EditSubRecipeModal({
     fd.set("label", label);
     fd.set("calcMode", calcMode);
     fd.set("calcValue", calcValue);
-    if (calcMode === "pivot_ingredient" && pivotId) {
-      fd.set("pivotIngredientId", String(pivotId));
+    if (calcMode === "pivot_ingredient" && pivotName) {
+      fd.set("pivotIngredientName", pivotName);
     }
     const res = await updateSubRecipe(subRecipe.id, parentId, fd);
     setSubmitting(false);
@@ -744,12 +760,12 @@ function EditSubRecipeModal({
           <Field label="Ingrédient pivot">
             <select
               className="fl-input"
-              value={pivotId ?? ""}
-              onChange={(e) => setPivotId(Number(e.target.value))}
+              value={pivotName ?? ""}
+              onChange={(e) => setPivotName(e.target.value || null)}
             >
               <option value="">—</option>
               {subRecipe.childIngredients.map((i) => (
-                <option key={i.id} value={i.id}>
+                <option key={i.id} value={i.name}>
                   {i.name}
                 </option>
               ))}
