@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import "./globals.css";
-import { AppNav } from "@/components/AppNav";
+import { AppChrome } from "@/components/AppChrome";
 
 export const metadata: Metadata = {
   title: "RecipeLog",
@@ -39,22 +38,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <header className="sticky top-0 z-40 bg-[color:var(--surface)] border-b border-[color:var(--border)]">
-          <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-[60px]">
-            <Link
-              href="/"
-              className="font-serif text-2xl leading-none"
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
-              <span style={{ color: "var(--accent)" }}>recipe</span>
-              <span style={{ color: "var(--text)", fontStyle: "italic" }}>
-                log
-              </span>
-            </Link>
-            <span className="fl-label">v0.1 · phase 1-2</span>
-          </div>
-          <AppNav />
-        </header>
+        <AppChrome />
         <main className="max-w-5xl mx-auto px-4 py-6 pb-28">{children}</main>
       </body>
     </html>
