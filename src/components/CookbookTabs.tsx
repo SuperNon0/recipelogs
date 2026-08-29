@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { Icon } from "./Icon";
 
 type TabKey = "recipes" | "apparence";
 
@@ -21,10 +22,14 @@ export function CookbookTabs({
         role="tablist"
       >
         <TabButton current={tab} value="recipes" onClick={setTab}>
-          📋 Recettes
+          <span className="inline-flex items-center gap-2">
+            <Icon name="List" size={14} /> Recettes
+          </span>
         </TabButton>
         <TabButton current={tab} value="apparence" onClick={setTab}>
-          🎨 Apparence
+          <span className="inline-flex items-center gap-2">
+            <Icon name="Palette" size={14} /> Apparence
+          </span>
         </TabButton>
       </div>
 

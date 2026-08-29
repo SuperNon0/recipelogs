@@ -5,6 +5,7 @@ import {
   updateSnapshotMass,
   type UpdateSnapshotMassPayload,
 } from "@/app/actions/cookbooks";
+import { Icon } from "./Icon";
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 
@@ -160,22 +161,26 @@ export function EditSnapshotMassModal({
         }}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            ⚖️ Modifier la masse
+          <h3
+            className="fl-title-serif inline-flex items-center gap-2"
+            style={{ fontSize: "1.1rem" }}
+          >
+            <Icon name="Scale" size={16} tone="accent" /> Modifier la masse
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="fl-label hover:text-[color:var(--text)]"
+            className="fl-label hover:text-[color:var(--text)] inline-flex items-center"
             style={{ fontSize: "0.8rem" }}
+            aria-label="Fermer"
           >
-            ✕
+            <Icon name="X" size={14} />
           </button>
         </div>
 
-        <div className="text-sm text-[color:var(--muted)]">
+        <div className="text-sm text-[color:var(--muted)] inline-flex items-center gap-1">
           <strong style={{ color: "var(--text)" }}>{recipeName}</strong> · recette
-          figée 📌
+          figée <Icon name="Pin" size={12} tone="pending" />
         </div>
 
         {loadError && (

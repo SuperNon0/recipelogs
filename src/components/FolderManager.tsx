@@ -91,7 +91,7 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
               className="fl-btn fl-btn-primary"
               style={{ fontSize: "0.8rem" }}
             >
-              ✓
+              Enregistrer
             </button>
             <button
               type="button"
@@ -99,7 +99,7 @@ export function FolderManager({ folders }: { folders: Folder[] }) {
               className="fl-btn fl-btn-secondary"
               style={{ fontSize: "0.8rem" }}
             >
-              ✕
+              Annuler
             </button>
           </form>
         ) : (

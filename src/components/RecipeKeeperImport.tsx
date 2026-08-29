@@ -122,7 +122,7 @@ export function RecipeKeeperImport() {
                 className="text-sm font-medium"
                 style={{ color: "var(--accent-2)" }}
               >
-                ✓ Import terminé
+                Import terminé
               </p>
               <p className="text-sm">
                 {result.imported} recette{result.imported > 1 ? "s" : ""}{" "}

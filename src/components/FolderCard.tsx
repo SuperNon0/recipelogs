@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "./Icon";
 
 /**
  * Carte cliquable représentant un dossier de recettes — affichée dans la vue
@@ -25,7 +26,7 @@ export function FolderCard({
         borderColor: `${color}55`,
       }}
     >
-      <span style={{ fontSize: "2.4rem", color }}>📁</span>
+      <Icon name="Folder" size={40} strokeWidth={1.5} style={{ color }} />
       <span
         className="fl-title-serif"
         style={{ fontSize: "1rem", color: "var(--text)", lineHeight: 1.15 }}

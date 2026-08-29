@@ -74,7 +74,7 @@ export function AdminPasswordForm() {
       )}
       {ok && (
         <p className="text-sm" style={{ color: "var(--accent-2)" }}>
-          ✓ Mot de passe changé.
+          Mot de passe changé.
         </p>
       )}
 

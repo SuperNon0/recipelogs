@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "./Icon";
 
 type Phase = "starting" | "deploying" | "restarting" | "done" | "failed";
 
@@ -8,7 +9,7 @@ const PHASES: { key: Phase; label: string }[] = [
   { key: "starting", label: "Démarrage du déploiement…" },
   { key: "deploying", label: "Mise à jour en cours (git, build)…" },
   { key: "restarting", label: "Redémarrage du service…" },
-  { key: "done", label: "Mise à jour terminée ✓" },
+  { key: "done", label: "Mise à jour terminée" },
 ];
 
 export function MaintenanceOverlay({
@@ -127,8 +128,12 @@ export function MaintenanceOverlay({
         }}
       >
         <div className="flex items-center justify-between">
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-            🔧 Mise à jour en cours
+          <h2
+            className="inline-flex items-center gap-2"
+            style={{ fontSize: "1.2rem", fontWeight: 700 }}
+          >
+            <Icon name="Wrench" size={18} tone="accent" />
+            Mise à jour en cours
           </h2>
           <span
             style={{
@@ -208,9 +213,13 @@ export function MaintenanceOverlay({
               border: "1px solid var(--danger)",
               color: "var(--danger)",
               fontSize: "0.85rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            ⚠️ {error}
+            <Icon name="AlertTriangle" size={16} tone="danger" />
+            {error}
           </div>
         )}
 
@@ -218,13 +227,14 @@ export function MaintenanceOverlay({
         {log && (
           <details>
             <summary
+              className="inline-flex items-center gap-2"
               style={{
                 cursor: "pointer",
                 fontSize: "0.8rem",
                 color: "var(--muted)",
               }}
             >
-              📋 Voir les logs
+              <Icon name="ScrollText" size={12} /> Voir les logs
             </summary>
             <pre
               style={{

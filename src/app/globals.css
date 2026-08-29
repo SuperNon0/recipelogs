@@ -64,6 +64,10 @@ body {
   line-height: 1.5;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+  /* Comportement « app native » sur mobile : empêche le double-tap-zoom
+     et supprime le petit délai de 300ms sur les clics tactiles. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -76,6 +80,18 @@ textarea,
 select {
   font-family: inherit;
   color: inherit;
+  /* iOS zoome automatiquement quand un input a une font-size < 16px.
+     On force 16px minimum uniquement sur mobile pour ne pas casser
+     la densité visuelle du desktop. */
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select,
+  .fl-input {
+    font-size: 16px !important;
+  }
 }
 
 a {

@@ -63,10 +63,10 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
               style={{ fontSize: "0.9rem" }}
             />
             <button type="submit" disabled={pending} className="fl-btn fl-btn-primary" style={{ fontSize: "0.8rem" }}>
-              ✓
+              Enregistrer
             </button>
             <button type="button" onClick={() => setEditingId(null)} className="fl-btn fl-btn-secondary" style={{ fontSize: "0.8rem" }}>
-              ✕
+              Annuler
             </button>
           </form>
         ) : (

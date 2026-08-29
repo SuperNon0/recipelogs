@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { assignRecipesToFolder } from "@/app/actions/settings";
+import { Icon } from "./Icon";
 
 type RecipeOption = {
   id: number;
@@ -149,17 +150,24 @@ export function AddRecipesToFolderModal({
         }}
       >
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
+          <h3 className="fl-title-serif inline-flex items-center gap-2" style={{ fontSize: "1.1rem" }}>
             Ajouter des recettes à{" "}
-            <span style={{ color: folder.color }}>📁 {folder.name}</span>
+            <span
+              className="inline-flex items-center gap-1"
+              style={{ color: folder.color }}
+            >
+              <Icon name="Folder" size={16} style={{ color: folder.color }} />{" "}
+              {folder.name}
+            </span>
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="fl-label hover:text-[color:var(--text)]"
+            className="fl-label hover:text-[color:var(--text)] inline-flex items-center"
             style={{ fontSize: "0.8rem" }}
+            aria-label="Fermer"
           >
-            ✕
+            <Icon name="X" size={14} />
           </button>
         </div>
 
@@ -260,7 +268,7 @@ export function AddRecipesToFolderModal({
                 <span style={{ color: "var(--text)" }}>{opt.name}</span>
                 {opt.folder && (
                   <span
-                    className="fl-tag"
+                    className="fl-tag inline-flex items-center gap-1"
                     style={{
                       background: `${opt.folder.color}1f`,
                       color: opt.folder.color,
@@ -268,7 +276,8 @@ export function AddRecipesToFolderModal({
                       fontSize: "0.55rem",
                     }}
                   >
-                    📁 {opt.folder.name}
+                    <Icon name="Folder" size={10} style={{ color: opt.folder.color }} />{" "}
+                    {opt.folder.name}
                   </span>
                 )}
               </button>
@@ -297,11 +306,23 @@ export function AddRecipesToFolderModal({
             disabled={pending || selected.size === 0}
             className="fl-btn fl-btn-primary"
           >
-            {pending
-              ? "Rangement…"
-              : selected.size === 0
-                ? "Choisis au moins une recette"
-                : `Ranger ${selected.size} recette${selected.size > 1 ? "s" : ""} → 📁`}
+            <span className="inline-flex items-center gap-2">
+              {pending
+                ? "Rangement…"
+                : selected.size === 0
+                  ? "Choisis au moins une recette"
+                  : `Ranger ${selected.size} recette${selected.size > 1 ? "s" : ""}`}
+              {!pending && selected.size > 0 && (
+                <>
+                  <Icon name="ArrowRight" size={14} />
+                  <Icon
+                    name="Folder"
+                    size={14}
+                    style={{ color: folder.color }}
+                  />
+                </>
+              )}
+            </span>
           </button>
         </div>
       </div>

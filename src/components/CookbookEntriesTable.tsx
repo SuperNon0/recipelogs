@@ -30,6 +30,7 @@ import {
   addChapter,
 } from "@/app/actions/cookbooks";
 import { EditSnapshotMassModal } from "./EditSnapshotMassModal";
+import { Icon, type IconName } from "./Icon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -216,10 +217,10 @@ function RecipeRow({
   const [sectionDraft, setSectionDraft] = useState(entry.sectionTitle ?? "");
   const [massModalOpen, setMassModalOpen] = useState(false);
 
-  const linkBadge =
+  const linkBadge: { icon: IconName; title: string; color: string } =
     entry.linkMode === "linked"
-      ? { emoji: "🔗", title: "Liée", color: "var(--accent-2)" }
-      : { emoji: "📌", title: "Figée", color: "var(--pending)" };
+      ? { icon: "Link2", title: "Liée", color: "var(--accent-2)" }
+      : { icon: "Pin", title: "Figée", color: "var(--pending)" };
   function handleSaveSection() {
     const v = sectionDraft.trim();
     startTransition(async () => {
@@ -361,13 +362,10 @@ function RecipeRow({
         <div className="flex items-center gap-1 flex-shrink-0">
           <span
             title={linkBadge.title}
-            style={{
-              fontSize: "0.85rem",
-              padding: "0 4px",
-              color: linkBadge.color,
-            }}
+            className="inline-flex items-center"
+            style={{ padding: "0 4px", color: linkBadge.color }}
           >
-            {linkBadge.emoji}
+            <Icon name={linkBadge.icon} size={14} style={{ color: linkBadge.color }} />
           </span>
         </div>
 
@@ -416,7 +414,9 @@ function RecipeRow({
                       })
                     }
                   >
-                    📌 Figer à cette date
+                    <span className="inline-flex items-center gap-2">
+                      <Icon name="Pin" size={14} tone="pending" /> Figer à cette date
+                    </span>
                   </MenuButton>
                 ) : (
                   <>
@@ -426,7 +426,9 @@ function RecipeRow({
                         setMassModalOpen(true);
                       }}
                     >
-                      ⚖️ Modifier la masse
+                      <span className="inline-flex items-center gap-2">
+                        <Icon name="Scale" size={14} tone="accent" /> Modifier la masse
+                      </span>
                     </MenuButton>
                     <MenuButton
                       onClick={() =>
@@ -436,7 +438,9 @@ function RecipeRow({
                         })
                       }
                     >
-                      🔄 Mettre à jour le snapshot
+                      <span className="inline-flex items-center gap-2">
+                        <Icon name="RefreshCw" size={14} /> Mettre à jour le snapshot
+                      </span>
                     </MenuButton>
                     <MenuButton
                       onClick={() =>
@@ -446,7 +450,9 @@ function RecipeRow({
                         })
                       }
                     >
-                      🔗 Reconvertir en liée
+                      <span className="inline-flex items-center gap-2">
+                        <Icon name="Link2" size={14} tone="accent2" /> Reconvertir en liée
+                      </span>
                     </MenuButton>
                   </>
                 )}
@@ -590,14 +596,15 @@ function ChapterRow({
                 startTransition(() => deleteChapter(entry.id, cookbookId));
               }
             }}
-            className="fl-btn fl-btn-secondary flex-shrink-0"
+            className="fl-btn fl-btn-secondary flex-shrink-0 inline-flex items-center justify-center"
             style={{
               padding: "0.25rem 0.5rem",
               fontSize: "0.75rem",
               color: "var(--danger)",
             }}
+            aria-label="Supprimer le chapitre"
           >
-            ✕
+            <Icon name="X" size={14} />
           </button>
         </>
       ) : (

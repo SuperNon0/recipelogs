@@ -5,6 +5,7 @@ import { useState } from "react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { RichTextEditor } from "./RichTextEditor";
 import { CategoryCombobox } from "./CategoryCombobox";
+import { Icon } from "./Icon";
 
 type IngredientRow = {
   name: string;
@@ -125,7 +126,7 @@ export function RecipeForm({
       </Field>
 
       {folders.length > 0 && (
-        <Field label="📁 Dossier">
+        <Field label="Dossier">
           <select
             name="folderId"
             value={folderId}
@@ -168,18 +169,18 @@ export function RecipeForm({
             <button
               type="button"
               onClick={() => setIngredientMode("list")}
-              className={`fl-btn ${ingredientMode === "list" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+              className={`fl-btn inline-flex items-center gap-1.5 ${ingredientMode === "list" ? "fl-btn-primary" : "fl-btn-secondary"}`}
               style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
             >
-              📋 Liste
+              <Icon name="List" size={14} /> Liste
             </button>
             <button
               type="button"
               onClick={() => setIngredientMode("text")}
-              className={`fl-btn ${ingredientMode === "text" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+              className={`fl-btn inline-flex items-center gap-1.5 ${ingredientMode === "text" ? "fl-btn-primary" : "fl-btn-secondary"}`}
               style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
             >
-              📝 Texte libre
+              <Icon name="FileText" size={14} /> Texte libre
             </button>
           </div>
 
@@ -272,11 +273,11 @@ export function RecipeForm({
                     type="button"
                     onClick={() => removeRow(idx)}
                     disabled={ingredients.length === 1}
-                    className="fl-btn fl-btn-danger"
+                    className="fl-btn fl-btn-danger inline-flex items-center justify-center"
                     style={{ padding: "0.4rem 0.6rem" }}
                     aria-label="Supprimer"
                   >
-                    ✕
+                    <Icon name="X" size={14} />
                   </button>
                 </div>
               ))}

@@ -153,7 +153,7 @@ export function RecipePdfSettingsForm({
         </button>
         {saved && (
           <span className="fl-label" style={{ color: "var(--accent-2)" }}>
-            ✓ Enregistré
+            Enregistré
           </span>
         )}
       </div>

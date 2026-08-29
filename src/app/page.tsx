@@ -5,6 +5,7 @@ import { FolderCard } from "@/components/FolderCard";
 import { AddRecipesToFolderButton } from "@/components/AddRecipesToFolderButton";
 import { Fab } from "@/components/Fab";
 import { EmptyState } from "@/components/EmptyState";
+import { Icon } from "@/components/Icon";
 import {
   listAllCategories,
   listAllFolders,
@@ -76,17 +77,24 @@ export default async function HomePage({
           {(isFilteringByFolder || isAllView) && (
             <Link
               href="/"
-              className="fl-label hover:text-[color:var(--text)]"
+              className="fl-label hover:text-[color:var(--text)] inline-flex items-center gap-1"
               style={{ fontSize: "0.75rem" }}
             >
-              ← Toutes les recettes
+              <Icon name="ArrowLeft" size={12} /> Toutes les recettes
             </Link>
           )}
           <h1
-            className="fl-title-serif mt-1"
+            className="fl-title-serif mt-1 inline-flex items-center gap-2"
             style={{ fontSize: "1.6rem" }}
           >
-            {currentFolder ? `📁 ${currentFolder.name}` : title}
+            {currentFolder && (
+              <Icon
+                name="Folder"
+                size={22}
+                style={{ color: currentFolder.color }}
+              />
+            )}
+            {currentFolder ? currentFolder.name : title}
           </h1>
         </div>
 
@@ -106,19 +114,19 @@ export default async function HomePage({
           {isExplorerView ? (
             <Link
               href="/?view=all"
-              className="fl-btn fl-btn-secondary"
+              className="fl-btn fl-btn-secondary inline-flex items-center gap-1.5"
               style={{ fontSize: "0.8rem" }}
               title="Voir toutes les recettes en liste plate"
             >
-              📋 Tout afficher
+              <Icon name="List" size={14} /> Tout afficher
             </Link>
           ) : isAllView ? (
             <Link
               href="/"
-              className="fl-btn fl-btn-secondary"
+              className="fl-btn fl-btn-secondary inline-flex items-center gap-1.5"
               style={{ fontSize: "0.8rem" }}
             >
-              📁 Vue par dossiers
+              <Icon name="LayoutGrid" size={14} /> Vue par dossiers
             </Link>
           ) : null}
         </div>
@@ -197,8 +205,11 @@ function ExplorerView({
     <div className="flex flex-col gap-6">
       {hasFolders && (
         <section className="flex flex-col gap-3">
-          <h2 className="fl-label" style={{ fontSize: "0.85rem" }}>
-            📁 Dossiers
+          <h2
+            className="fl-label inline-flex items-center gap-2"
+            style={{ fontSize: "0.85rem" }}
+          >
+            <Icon name="Folder" size={14} tone="accent" /> Dossiers
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {folders.map((f) => (
@@ -217,15 +228,18 @@ function ExplorerView({
       {hasUncategorized && (
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="fl-label" style={{ fontSize: "0.85rem" }}>
-              📂 Sans dossier ({uncategorizedRecipes.length})
+            <h2
+              className="fl-label inline-flex items-center gap-2"
+              style={{ fontSize: "0.85rem" }}
+            >
+              <Icon name="FolderOpen" size={14} tone="muted" /> Sans dossier ({uncategorizedRecipes.length})
             </h2>
             <Link
               href="/?folder=none"
-              className="fl-label hover:text-[color:var(--text)]"
+              className="fl-label hover:text-[color:var(--text)] inline-flex items-center gap-1"
               style={{ fontSize: "0.75rem" }}
             >
-              Voir tout →
+              Voir tout <Icon name="ArrowRight" size={12} />
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -325,7 +339,7 @@ async function AllRecipesView({
                 className="fl-title-serif flex items-center gap-2"
                 style={{ fontSize: "1.05rem", color: f.color }}
               >
-                <span>📁</span>
+                <Icon name="Folder" size={18} style={{ color: f.color }} />
                 {f.name}
                 <span className="fl-label" style={{ color: "var(--muted)" }}>
                   ({list.length})
@@ -333,10 +347,10 @@ async function AllRecipesView({
               </h2>
               <Link
                 href={`/?folder=${f.id}`}
-                className="fl-label hover:text-[color:var(--text)]"
+                className="fl-label hover:text-[color:var(--text)] inline-flex items-center gap-1"
                 style={{ fontSize: "0.75rem" }}
               >
-                Ouvrir le dossier →
+                Ouvrir le dossier <Icon name="ArrowRight" size={12} />
               </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -352,16 +366,16 @@ async function AllRecipesView({
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="fl-title-serif flex items-center gap-2" style={{ fontSize: "1.05rem" }}>
-              <span>📂</span>
+              <Icon name="FolderOpen" size={18} tone="muted" />
               Sans dossier
               <span className="fl-label">({byFolder.get("none")!.length})</span>
             </h2>
             <Link
               href="/?folder=none"
-              className="fl-label hover:text-[color:var(--text)]"
+              className="fl-label hover:text-[color:var(--text)] inline-flex items-center gap-1"
               style={{ fontSize: "0.75rem" }}
             >
-              Ouvrir →
+              Ouvrir <Icon name="ArrowRight" size={12} />
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

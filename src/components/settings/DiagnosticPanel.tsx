@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Icon } from "@/components/Icon";
 
 type CheckResult = { ok: boolean; message?: string };
 type Diag = {
@@ -36,11 +37,15 @@ function StatusRow({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "0.75rem",
-          fontWeight: 700,
+          flexShrink: 0,
         }}
       >
-        {ok ? "✓" : "✕"}
+        <Icon
+          name={ok ? "Check" : "X"}
+          size={14}
+          style={{ color: "var(--bg)" }}
+          strokeWidth={2.5}
+        />
       </span>
       <div className="flex-1 min-w-0">
         <div style={{ color: "var(--text)" }}>{label}</div>

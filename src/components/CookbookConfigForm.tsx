@@ -21,6 +21,7 @@ import {
   TEXT_SIZE_STEP,
 } from "@/lib/pdf/theme";
 import { CookbookPreview } from "./CookbookPreview";
+import { Icon } from "./Icon";
 
 const FONT_GROUPS: { label: string; cat: "sans" | "serif" | "display" | "mono" }[] = [
   { label: "Sans-serif", cat: "sans" },
@@ -359,7 +360,7 @@ export function CookbookConfigForm({
           )}
           {saved && (
             <span className="fl-label" style={{ color: "var(--accent-2)" }}>
-              ✓ Enregistré
+              Enregistré
             </span>
           )}
         </div>
@@ -885,7 +886,7 @@ function CoverBgPatternThumb({
             fontSize: "0.65rem",
           }}
         >
-          📷
+          <Icon name="Image" size={22} tone="muted" />
         </div>
       );
       break;
@@ -953,19 +954,19 @@ function ImageUploadRow({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            className="fl-btn"
+            className="fl-btn inline-flex items-center gap-2"
             onClick={() => fileRef.current?.click()}
           >
-            📁 Choisir un fichier…
+            <Icon name="Upload" size={14} /> Choisir un fichier…
           </button>
           {value && (
             <button
               type="button"
-              className="fl-btn"
+              className="fl-btn inline-flex items-center gap-1.5"
               onClick={() => onChange("")}
               style={{ color: "var(--danger)" }}
             >
-              ✕ Retirer
+              <Icon name="X" size={14} /> Retirer
             </button>
           )}
           <input

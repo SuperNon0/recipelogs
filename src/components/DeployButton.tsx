@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { triggerDeploy, clearDeployLock } from "@/app/actions/admin";
 import { MaintenanceOverlay } from "./MaintenanceOverlay";
+import { Icon } from "./Icon";
 
 type DeployError = { message: string; hint?: string };
 
@@ -58,16 +59,19 @@ export function DeployButton() {
         <button
           type="button"
           onClick={() => setConfirm(true)}
-          className="fl-btn fl-btn-primary self-start"
+          className="fl-btn fl-btn-primary self-start inline-flex items-center gap-2"
           style={{ fontSize: "0.85rem" }}
         >
-          🚀 Mettre à jour le site
+          <Icon name="Rocket" size={16} /> Mettre à jour le site
         </button>
       ) : (
         <div className="flex flex-col gap-2 fl-card" style={{ borderColor: "var(--accent)" }}>
-          <p className="text-sm">
-            <strong>⚠️ Confirmation</strong> — Le site sera indisponible ~30-90 secondes
-            pendant le redémarrage. Continuer ?
+          <p className="text-sm inline-flex items-start gap-2">
+            <Icon name="AlertTriangle" size={16} tone="accent" />
+            <span>
+              <strong>Confirmation</strong> — Le site sera indisponible ~30-90 secondes
+              pendant le redémarrage. Continuer ?
+            </span>
           </p>
           <div className="flex gap-2">
             <button
@@ -103,7 +107,10 @@ export function DeployButton() {
             borderRadius: 8,
           }}
         >
-          <div>⚠️ {error.message}</div>
+          <div className="inline-flex items-center gap-2">
+            <Icon name="AlertTriangle" size={16} tone="danger" />
+            {error.message}
+          </div>
           {error.hint && (
             <pre
               style={{
@@ -126,10 +133,11 @@ export function DeployButton() {
               type="button"
               onClick={handleUnlock}
               disabled={unlocking}
-              className="fl-btn fl-btn-secondary self-start"
+              className="fl-btn fl-btn-secondary self-start inline-flex items-center gap-2"
               style={{ fontSize: "0.75rem" }}
             >
-              {unlocking ? "Déblocage…" : "🔓 Forcer le déblocage du lock"}
+              <Icon name="Unlock" size={14} />{" "}
+              {unlocking ? "Déblocage…" : "Forcer le déblocage du lock"}
             </button>
           )}
         </div>

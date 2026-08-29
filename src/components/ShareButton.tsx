@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { generateShareToken, revokeToken } from "@/app/actions/share";
+import { Icon } from "./Icon";
 
 export function ShareButton({
   entityType,
@@ -49,10 +50,10 @@ export function ShareButton({
         type="button"
         onClick={handleGenerate}
         disabled={pending}
-        className="fl-btn fl-btn-secondary"
+        className="fl-btn fl-btn-secondary inline-flex items-center gap-2"
         style={{ fontSize: "0.8rem" }}
       >
-        {pending ? "…" : "🔗 Partager"}
+        <Icon name="Share2" size={14} /> {pending ? "…" : "Partager"}
       </button>
     );
   }
@@ -70,10 +71,11 @@ export function ShareButton({
         <button
           type="button"
           onClick={handleCopy}
-          className="fl-btn fl-btn-secondary"
+          className="fl-btn fl-btn-secondary inline-flex items-center gap-1.5"
           style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
         >
-          {copied ? "✓ Copié" : "Copier"}
+          <Icon name={copied ? "Check" : "Copy"} size={12} />{" "}
+          {copied ? "Copié" : "Copier"}
         </button>
         <button
           type="button"

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { addRecipeToCookbook } from "@/app/actions/cookbooks";
 import { ModalOverlay } from "./RecipeBody";
+import { Icon } from "./Icon";
 
 type Cookbook = { id: number; name: string };
 type Ingredient = { name: string; quantityG: number };
@@ -28,10 +29,10 @@ export function AddToCookbookButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fl-btn fl-btn-secondary"
+        className="fl-btn fl-btn-secondary inline-flex items-center gap-2"
         style={{ fontSize: "0.8rem" }}
       >
-        📒 Ajouter au cahier
+        <Icon name="BookOpen" size={14} /> Ajouter au cahier
       </button>
       {open && (
         <AddToCookbookModal
@@ -146,7 +147,9 @@ function AddToCookbookModal({
                 className="mt-0.5"
               />
               <div>
-                <div className="text-sm">🔗 Liée</div>
+                <div className="text-sm inline-flex items-center gap-1.5">
+                  <Icon name="Link2" size={14} tone="accent2" /> Liée
+                </div>
                 <div className="fl-label" style={{ fontWeight: 400 }}>
                   Toujours à jour avec la recette courante
                 </div>
@@ -162,7 +165,9 @@ function AddToCookbookModal({
                 className="mt-0.5"
               />
               <div>
-                <div className="text-sm">📌 Figée</div>
+                <div className="text-sm inline-flex items-center gap-1.5">
+                  <Icon name="Pin" size={14} tone="pending" /> Figée
+                </div>
                 <div className="fl-label" style={{ fontWeight: 400 }}>
                   Capture la recette (avec multiplication possible)
                 </div>
@@ -195,19 +200,19 @@ function AddToCookbookModal({
               <button
                 type="button"
                 onClick={() => setCalcMode("mass")}
-                className={`fl-btn ${calcMode === "mass" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+                className={`fl-btn inline-flex items-center gap-1.5 ${calcMode === "mass" ? "fl-btn-primary" : "fl-btn-secondary"}`}
                 style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
               >
-                ⚖ Masse cible
+                <Icon name="Scale" size={12} /> Masse cible
               </button>
               <button
                 type="button"
                 onClick={() => setCalcMode("pivot")}
-                className={`fl-btn ${calcMode === "pivot" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+                className={`fl-btn inline-flex items-center gap-1.5 ${calcMode === "pivot" ? "fl-btn-primary" : "fl-btn-secondary"}`}
                 style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
                 disabled={ingredients.length === 0}
               >
-                🎯 Pivot
+                <Icon name="Target" size={12} /> Pivot
               </button>
             </div>
 

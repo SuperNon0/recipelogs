@@ -67,7 +67,7 @@ export function CfConfigForm({ initial }: { initial: CfConfig }) {
       )}
       {ok && (
         <p className="text-sm" style={{ color: "var(--accent-2)" }}>
-          ✓ Enregistré.
+          Enregistré.
         </p>
       )}
 

@@ -10,6 +10,7 @@ import {
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
 import { applyMultiplierToRecipe } from "@/app/actions/recipes";
+import { Icon } from "./Icon";
 
 // ─────────────────────────────────────────────
 // Types
@@ -547,7 +548,9 @@ function SubRecipeAccordion({
               borderColor: "rgba(167, 139, 250, 0.4)",
             }}
           >
-            🔒 Verrouillé
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="Lock" size={12} tone="pending" /> Verrouillé
+            </span>
           </span>
         )}
       </button>
@@ -557,10 +560,10 @@ function SubRecipeAccordion({
           <div className="flex flex-wrap gap-2 pt-3">
             <Link
               href={`/recipes/${subRecipe.childId}`}
-              className="fl-btn fl-btn-secondary"
+              className="fl-btn fl-btn-secondary inline-flex items-center gap-1.5"
               style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
             >
-              🔗 Voir la fiche
+              <Icon name="ExternalLink" size={12} /> Voir la fiche
             </Link>
             <button
               type="button"
@@ -569,20 +572,21 @@ function SubRecipeAccordion({
                   toggleSubRecipeLock(subRecipe.id, parentId),
                 )
               }
-              className={
+              className={`inline-flex items-center gap-1.5 ${
                 subRecipe.isLocked ? "fl-btn fl-btn-pending" : "fl-btn fl-btn-secondary"
-              }
+              }`}
               style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
             >
-              {subRecipe.isLocked ? "🔓 Déverrouiller" : "🔒 Verrouiller"}
+              <Icon name={subRecipe.isLocked ? "Unlock" : "Lock"} size={12} />{" "}
+              {subRecipe.isLocked ? "Déverrouiller" : "Verrouiller"}
             </button>
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="fl-btn fl-btn-edit"
+              className="fl-btn fl-btn-edit inline-flex items-center gap-1.5"
               style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
             >
-              ✎ Ajuster
+              <Icon name="Pencil" size={12} /> Ajuster
             </button>
             <button
               type="button"

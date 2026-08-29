@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { type CookbookTheme } from "@/lib/pdf/theme";
+import { Icon } from "./Icon";
 
 const ZOOM_PRESETS = [
   { key: "S", label: "Petit", height: 420 },
@@ -113,10 +114,10 @@ export function CookbookPreview({
   const currentZoom = ZOOM_PRESETS.find((z) => z.key === zoom) ?? ZOOM_PRESETS[1];
   const iframeSrc = pdfUrl ? `${pdfUrl}#toolbar=0&navpanes=0` : "";
   const refreshLabel = !pdfUrl
-    ? "🔄 Générer l'aperçu PDF"
+    ? "Générer l'aperçu PDF"
     : stale
-      ? "🔄 Mettre à jour l'aperçu PDF"
-      : "🔄 Régénérer l'aperçu";
+      ? "Mettre à jour l'aperçu PDF"
+      : "Régénérer l'aperçu";
 
   if (fullscreen) {
     return (
@@ -146,18 +147,18 @@ export function CookbookPreview({
               type="button"
               onClick={generatePreview}
               disabled={loading}
-              className="fl-btn fl-btn-primary"
+              className="fl-btn fl-btn-primary inline-flex items-center gap-2"
               style={{ fontSize: "0.8rem" }}
             >
-              {loading ? "…" : refreshLabel}
+              <Icon name="RefreshCw" size={14} /> {loading ? "…" : refreshLabel}
             </button>
             <button
               type="button"
               onClick={() => setFullscreen(false)}
-              className="fl-btn fl-btn-secondary"
+              className="fl-btn fl-btn-secondary inline-flex items-center gap-2"
               style={{ fontSize: "0.8rem" }}
             >
-              ✕ Fermer
+              <Icon name="X" size={14} /> Fermer
             </button>
           </div>
         </div>
@@ -199,18 +200,22 @@ export function CookbookPreview({
           type="button"
           onClick={generatePreview}
           disabled={loading}
-          className={stale || !pdfUrl ? "fl-btn fl-btn-primary" : "fl-btn"}
+          className={
+            (stale || !pdfUrl ? "fl-btn fl-btn-primary" : "fl-btn") +
+            " inline-flex items-center gap-2"
+          }
           style={{ fontSize: "0.78rem" }}
           title="Génère un PDF d'aperçu fidèle (sans avoir à enregistrer)"
         >
+          <Icon name="RefreshCw" size={14} />{" "}
           {loading ? "Génération…" : refreshLabel}
         </button>
         {stale && !loading && pdfUrl && (
           <span
-            className="fl-label"
+            className="fl-label inline-flex items-center gap-1"
             style={{ fontSize: "0.7rem", color: "var(--accent)" }}
           >
-            ⚠️ Aperçu obsolète
+            <Icon name="AlertTriangle" size={12} tone="accent" /> Aperçu obsolète
           </span>
         )}
       </div>
@@ -227,11 +232,11 @@ export function CookbookPreview({
                 key={p.key}
                 type="button"
                 onClick={() => setFullscreen(true)}
-                className="fl-btn"
+                className="fl-btn inline-flex items-center gap-1.5"
                 style={{ fontSize: "0.75rem", padding: "0.3rem 0.55rem" }}
                 title="Plein écran"
               >
-                ⛶ {p.label}
+                <Icon name="Maximize2" size={12} /> {p.label}
               </button>
             );
           }
@@ -321,9 +326,11 @@ function LoadingOverlay() {
         fontSize: "0.85rem",
         background: "rgba(0,0,0,0.35)",
         pointerEvents: "none",
+        gap: 8,
       }}
     >
-      ⏳ Génération de l&apos;aperçu PDF…
+      <Icon name="Loader2" size={16} className="animate-spin" />
+      Génération de l&apos;aperçu PDF…
     </div>
   );
 }

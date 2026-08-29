@@ -14,6 +14,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Empêche le zoom iOS au focus des inputs → indispensable pour un rendu
+  // « app native » sur téléphone. Combiné à font-size ≥ 16px sur les
+  // inputs (cf. globals.css) et à touch-action: manipulation sur body.
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#0e0f11",
 };
