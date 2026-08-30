@@ -16,6 +16,7 @@
     "db:generate": "prisma generate",
     "setup": "tsx scripts/setup.ts",
     "reset-admin": "tsx scripts/reset-admin.ts",
+    "set-admin": "tsx scripts/set-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

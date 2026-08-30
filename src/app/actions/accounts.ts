@@ -14,7 +14,7 @@ import {
 } from "@/lib/auth/account";
 import { getSession, setSession, clearSession, getCurrentAccount } from "@/lib/auth/session";
 import { AuthError, requireBaseAdmin, requireRole } from "@/lib/auth/guard";
-import { saveCfConfig as saveCfSetting } from "@/lib/auth/cloudflare";
+import { saveCfConfig as saveCfSetting, cfTestConfig, type CfTestResult } from "@/lib/auth/cloudflare";
 import { hasCapability } from "@/lib/auth/capabilities";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -382,6 +382,31 @@ export async function saveCfConfig(formData: FormData): Promise<ActionResult> {
     return { ok: true };
   } catch (e) {
     return toActionError(e);
+  }
+}
+
+/**
+ * Teste une config CF NON-ENREGISTRÉE (valeurs saisies dans le formulaire).
+ * Ping /cdn-cgi/access/certs, vérifie format AUD, retourne un rapport structuré
+ * pour affichage inline dans `CfConfigForm`.
+ */
+export type TestCfConfigResult =
+  | { ok: true; result: CfTestResult }
+  | { ok: false; error: string };
+
+export async function testCfConfig(formData: FormData): Promise<TestCfConfigResult> {
+  try {
+    await requireRole("super_admin");
+    const teamDomain = String(formData.get("teamDomain") ?? "").trim();
+    const aud = String(formData.get("aud") ?? "").trim();
+    const result = await cfTestConfig({ teamDomain, aud });
+    return { ok: true, result };
+  } catch (e) {
+    if (e instanceof AuthError) return { ok: false, error: e.message };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Erreur inconnue.",
+    };
   }
 }
 

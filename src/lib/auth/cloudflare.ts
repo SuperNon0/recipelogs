@@ -134,39 +134,128 @@ export async function getCfEmail(request: Request): Promise<string | null> {
   return res?.email ?? null;
 }
 
+export type CfTestResult = {
+  ok: boolean;
+  teamDomainOk: boolean;
+  jwksReachable: boolean;
+  jwksKeyCount: number;
+  audValid: boolean;
+  error: string | null;
+};
+
 /**
- * Diagnostic pour /settings. Tente juste de télécharger les clés publiques
- * et ne fait pas planter la page si CF n'est pas configuré.
+ * Teste une configuration CF DONNÉE (pas celle en base) — utilisé par le
+ * bouton « Tester » du formulaire /settings pour valider les valeurs avant
+ * enregistrement.
+ *
+ * Vérifie :
+ *  1. Format du team domain (host valide)
+ *  2. Téléchargement des clés publiques (/cdn-cgi/access/certs)
+ *  3. Présence de clés dans le JWKS
+ *  4. Format basique de l'AUD (32-64 hex chars ; longueur/format uniquement,
+ *     on ne peut pas confirmer qu'il correspond réellement à l'app sans un
+ *     vrai token à valider).
+ */
+export async function cfTestConfig(input: {
+  teamDomain: string;
+  aud: string;
+}): Promise<CfTestResult> {
+  const teamDomain = input.teamDomain.trim().toLowerCase();
+  const aud = input.aud.trim();
+
+  const result: CfTestResult = {
+    ok: false,
+    teamDomainOk: false,
+    jwksReachable: false,
+    jwksKeyCount: 0,
+    audValid: false,
+    error: null,
+  };
+
+  if (!teamDomain) {
+    result.error = "Team domain vide.";
+    return result;
+  }
+  // Format hôte simplifié : quelque-chose.cloudflareaccess.com ou tout host valide
+  if (!/^[a-z0-9](?:[a-z0-9-.]*[a-z0-9])?$/.test(teamDomain)) {
+    result.error = "Team domain invalide (format hôte attendu).";
+    return result;
+  }
+  result.teamDomainOk = true;
+
+  // AUD : 32-64 hex chars typique CF
+  result.audValid = /^[a-f0-9]{16,128}$/i.test(aud);
+  if (!result.audValid) {
+    result.error = "AUD invalide (attendu : 16-128 caractères hexadécimaux).";
+    // On continue quand même pour tester le team domain.
+  }
+
+  try {
+    const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) {
+      result.error = result.error ?? `Clés publiques inaccessibles (HTTP ${res.status}).`;
+      return result;
+    }
+    result.jwksReachable = true;
+    try {
+      const data = await res.json();
+      const keys = Array.isArray(data?.keys) ? data.keys : [];
+      result.jwksKeyCount = keys.length;
+      if (keys.length === 0) {
+        result.error = result.error ?? "Aucune clé publique renvoyée par Cloudflare.";
+        return result;
+      }
+    } catch {
+      result.error = result.error ?? "Réponse JWKS invalide (JSON incorrect).";
+      return result;
+    }
+  } catch (e) {
+    result.error = result.error ?? (e instanceof Error ? e.message : String(e));
+    return result;
+  }
+
+  result.ok = result.teamDomainOk && result.jwksReachable && result.jwksKeyCount > 0 && result.audValid;
+  return result;
+}
+
+/**
+ * Diagnostic pour /settings. Utilise la config actuellement enregistrée
+ * (AppSetting/env). Sert au DiagnosticPanel qui reste séparé.
  */
 export async function cfDiagnostic(): Promise<{
   teamDomain: string;
   aud: string;
   verifyJwt: boolean;
   jwksReachable: boolean;
+  ok: boolean;
+  message: string | null;
   error: string | null;
 }> {
   const cfg = await getCfConfig();
-  const diag = {
+  if (!cfg.teamDomain) {
+    return {
+      teamDomain: "",
+      aud: cfg.aud,
+      verifyJwt: cfg.verifyJwt,
+      jwksReachable: false,
+      ok: false,
+      message: "Non configuré",
+      error: "CF_TEAM_DOMAIN non renseigné.",
+    };
+  }
+  const test = await cfTestConfig({ teamDomain: cfg.teamDomain, aud: cfg.aud });
+  return {
     teamDomain: cfg.teamDomain,
     aud: cfg.aud,
     verifyJwt: cfg.verifyJwt,
-    jwksReachable: false,
-    error: null as string | null,
+    jwksReachable: test.jwksReachable,
+    ok: test.ok,
+    message: test.ok
+      ? `Clés OK (${test.jwksKeyCount} clés), AUD valide`
+      : test.error,
+    error: test.error,
   };
-  if (!cfg.teamDomain) {
-    diag.error = "CF_TEAM_DOMAIN non renseigné.";
-    return diag;
-  }
-  try {
-    const res = await fetch(`https://${cfg.teamDomain}/cdn-cgi/access/certs`, {
-      cache: "no-store",
-      // Timeout court : ne bloque pas la page /settings.
-      signal: AbortSignal.timeout(3000),
-    });
-    diag.jwksReachable = res.ok;
-    if (!res.ok) diag.error = `HTTP ${res.status}`;
-  } catch (e) {
-    diag.error = e instanceof Error ? e.message : String(e);
-  }
-  return diag;
 }

@@ -19,11 +19,12 @@ export default function ForgotPasswordPage() {
           fontFamily: "var(--font-mono)",
         }}
       >
-        {"sudo -u recipelog bash -c \"cd /opt/recipelog && pnpm exec tsx scripts/reset-admin.ts\""}
+        {"sudo -u recipelog bash -c 'cd /opt/recipelog && \\\n  SUPERADMIN_EMAIL=ton@email.com \\\n  SUPERADMIN_PASSWORD=\"NouveauMdp\" \\\n  pnpm exec tsx scripts/set-admin.ts'"}
       </pre>
       <p className="fl-label" style={{ color: "var(--muted)" }}>
-        Le script te demandera un nouveau mot de passe et mettra le
-        compte administrateur à jour.
+        Une seule commande. Change simplement les valeurs de{" "}
+        <code>SUPERADMIN_EMAIL</code> et <code>SUPERADMIN_PASSWORD</code>{" "}
+        avant de la coller dans ton terminal.
       </p>
       <Link href="/login" className="fl-btn fl-btn-secondary text-center">
         ← Retour au login
