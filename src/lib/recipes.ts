@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { recipeMass } from "./massAdjust";
 
 export function normalizeForSearch(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -62,15 +63,7 @@ export async function listRecipes(opts: {
     photoPath: r.photoPath,
     favorite: r.favorite,
     rating: r.rating,
-    totalMassG: r.ingredients.reduce((sum, ing) => {
-      const q = ing.quantityGMax != null
-        ? (Number(ing.quantityG) + Number(ing.quantityGMax)) / 2
-        : Number(ing.quantityG);
-      if (!ing.unit || ing.unit === "g") return sum + q;
-      if (ing.unit === "cc") return sum + q * 5;
-      if (ing.unit === "cs") return sum + q * 15;
-      return sum;
-    }, 0),
+    totalMassG: recipeMass(r.ingredients).avg,
     tags: r.tags.map((t) => t.name),
     categories: r.categories.map((c) => ({
       id: c.category.id,
@@ -123,16 +116,6 @@ export async function getRecipeDetail(id: number) {
   });
 }
 
-export async function listRecipesMinimal(excludeId?: number) {
-  const where = excludeId ? { id: { not: excludeId } } : undefined;
-  const recipes = await prisma.recipe.findMany({
-    where,
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  return recipes;
-}
-
 export async function listAllIngredientBases() {
   const bases = await prisma.ingredientBase.findMany({
     orderBy: { name: "asc" },
@@ -182,7 +165,7 @@ export async function getIngredientBaseDetail(id: number) {
 
   return {
     base,
-    recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name })),
+    recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name ?? base.name })),
   };
 }
 

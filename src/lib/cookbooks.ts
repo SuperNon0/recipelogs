@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { computeLocalCoef } from "./subRecipes";
-import { ingMass, scaleQty, adjustToTarget, type AdjIngredient } from "./massAdjust";
+import { scaleQty, adjustToTarget, recipeMass } from "./massAdjust";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -37,10 +37,6 @@ export async function getCookbookDetail(id: number) {
       },
     },
   });
-}
-
-export async function listPdfTemplates() {
-  return prisma.pdfTemplate.findMany({ orderBy: { id: "asc" } });
 }
 
 /**
@@ -92,18 +88,13 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       unit: scaled.unit,
     };
   });
-  const totalMassGMin = ingredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  const totalMassGMax = ingredients.reduce(
-    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
-  );
-  const totalMassG = (totalMassGMin + totalMassGMax) / 2;
+  const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);
 
   const subRecipes = r.parentLinks.map((link) => {
     // Masse de base de la sous-recette (quantités brutes non scalées)
     const rawIngredients = link.child.ingredients;
-    const childBaseTotalG = rawIngredients.reduce(
-      (s, i) => s + ingMass(Number(i.quantityG), i.unit ?? "g"), 0,
-    );
+    // Même définition que la fiche recette : moyenne min/max des fourchettes.
+    const childBaseTotalG = recipeMass(rawIngredients).avg;
     // Ingrédient pivot (pour le mode pivot_ingredient)
     const pivotBaseQtyG = link.pivotIngredientId
       ? Number(rawIngredients.find((i) => i.id === link.pivotIngredientId)?.quantityG ?? 0) || null
@@ -133,10 +124,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       const effectiveTargetG = link.isLocked ? Number(link.calcValue) : Number(link.calcValue) * k;
       childIngredients = adjustToTarget(childIngredients, effectiveTargetG).ingredients;
     }
-    const childTotalGMin = childIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-    const childTotalGMax = childIngredients.reduce(
-      (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
-    );
+    const { min: childTotalGMin, max: childTotalGMax } = recipeMass(childIngredients);
     return {
       label: link.label,
       childName: link.child.name,

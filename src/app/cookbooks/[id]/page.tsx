@@ -11,6 +11,7 @@ import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
 import { ShareButton } from "@/components/ShareButton";
 import { AddCookbookToShoppingListButton } from "@/components/AddCookbookToShoppingListButton";
 import { getActiveToken } from "@/lib/share";
+import { SHARE_ENABLED } from "@/lib/features";
 import { parseTheme } from "@/lib/pdf/theme";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function CookbookDetailPage({
 
   const [cookbook, shareToken] = await Promise.all([
     getCookbookDetail(cookbookId),
-    getActiveToken("cookbook", cookbookId),
+    SHARE_ENABLED ? getActiveToken("cookbook", cookbookId) : null,
   ]);
 
   if (!cookbook) notFound();
@@ -89,11 +90,13 @@ export default async function CookbookDetailPage({
             cookbookName={cookbook.name}
             recipeCount={recipeCount}
           />
-          <ShareButton
-            entityType="cookbook"
-            entityId={cookbookId}
-            existingToken={shareToken?.token ?? null}
-          />
+          {SHARE_ENABLED && (
+            <ShareButton
+              entityType="cookbook"
+              entityId={cookbookId}
+              existingToken={shareToken?.token ?? null}
+            />
+          )}
           <a
             href={`/cookbooks/${cookbookId}/pdf`}
             className="fl-btn fl-btn-primary"

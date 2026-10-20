@@ -1,5 +1,5 @@
 // RecipeLog — Schéma Prisma V1
-// Source de vérité : CDC.md § 7
+// Description fonctionnelle : README.md « Modèle de données »
 
 generator client {
   provider        = "prisma-client-js"
@@ -323,6 +323,8 @@ model ShoppingListItem {
   shoppingListId Int      @map("shopping_list_id")
   name           String
   quantityG      Decimal? @map("quantity_g") @db.Decimal(10, 3)
+  /** null = grammes. */
+  unit           String?
   recipeId       Int?     @map("recipe_id")
   checked        Boolean  @default(false)
   position       Int      @default(0)

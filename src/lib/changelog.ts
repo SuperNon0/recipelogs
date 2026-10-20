@@ -9,6 +9,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.7",
+    date: "2026-10-20",
+    title: "Corrections & fiabilisation",
+    fixes: [
+      "Dupliquer une recette conserve les unités",
+      "« Mettre à jour la recette » : litres et fourchettes corrects",
+      "Le pivot des sous-recettes survit à la modification de la recette",
+      "Cuillères (cc/cs) en saisie texte : plus de double conversion",
+      "Liste de courses : unités séparées, sous-recettes incluses, cases cochées conservées",
+      "Photos stockées hors du build + affichées sur la fiche",
+    ],
+    migrations: ["20261020000000_shopping_item_unit", "20261020000001_backfill_name_normalized"],
+  },
+  {
     version: "V1.6",
     date: "2026-06-19",
     title: "Toggle décimales, navigation pill, masse cible exacte",

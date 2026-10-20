@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
 import { normalizeForSearch } from "@/lib/recipes";
-import { scaleQty, ingMass, adjustToTarget } from "@/lib/massAdjust";
+import { scaleQty, adjustToTarget } from "@/lib/massAdjust";
+import { ensureIngredientBases } from "@/lib/ingredientBases";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -69,10 +71,10 @@ function parseForm(formData: FormData) {
   return recipeFormSchema.parse(raw);
 }
 
-export async function createRecipe(formData: FormData) {
-  let data: z.infer<typeof recipeFormSchema>;
+/** parseForm avec un message d'erreur lisible (création ET modification). */
+function parseFormOrThrow(formData: FormData): z.infer<typeof recipeFormSchema> {
   try {
-    data = parseForm(formData);
+    return parseForm(formData);
   } catch (err) {
     if (err instanceof z.ZodError) {
       throw new Error(
@@ -81,6 +83,10 @@ export async function createRecipe(formData: FormData) {
     }
     throw err;
   }
+}
+
+export async function createRecipe(formData: FormData) {
+  const data = parseFormOrThrow(formData);
 
   const recipe = await prisma.recipe.create({
     data: {
@@ -114,7 +120,7 @@ export async function createRecipe(formData: FormData) {
     },
   });
 
-  await upsertIngredientBases(data.ingredients.map((i) => i.name));
+  await ensureIngredientBases(data.ingredients.map((i) => i.name));
 
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -122,9 +128,17 @@ export async function createRecipe(formData: FormData) {
 }
 
 export async function updateRecipe(id: number, formData: FormData) {
-  const data = parseForm(formData);
+  const data = parseFormOrThrow(formData);
 
   await prisma.$transaction(async (tx) => {
+    // Les ingrédients sont recréés (nouveaux id). On mémorise les anciens pour
+    // re-pointer ensuite les sous-recettes qui utilisent l'un d'eux comme pivot
+    // (sinon elles retombaient silencieusement à ×1).
+    const oldIngredients = await tx.ingredient.findMany({
+      where: { recipeId: id },
+      select: { id: true, name: true, position: true },
+    });
+
     await tx.recipe.update({
       where: { id },
       data: {
@@ -149,6 +163,7 @@ export async function updateRecipe(id: number, formData: FormData) {
         position: idx,
       })),
     });
+    await remapPivotIngredients(tx, id, oldIngredients);
 
     await tx.tag.deleteMany({ where: { recipeId: id } });
     if (data.tags?.length) {
@@ -178,7 +193,7 @@ export async function updateRecipe(id: number, formData: FormData) {
     }
   });
 
-  await upsertIngredientBases(data.ingredients.map((i) => i.name));
+  await ensureIngredientBases(data.ingredients.map((i) => i.name));
 
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -234,15 +249,21 @@ export async function applyMultiplierToRecipe(
   const ingredients = await prisma.ingredient.findMany({
     where: { recipeId: id },
     orderBy: { quantityG: "desc" },
-    select: { id: true, quantityG: true, unit: true },
+    select: { id: true, quantityG: true, quantityGMax: true, unit: true },
   });
   if (ingredients.length === 0) {
     return { ok: false, error: "Aucun ingrédient à mettre à jour." };
   }
 
   let scaled = ingredients.map((ing) => {
-    const s = scaleQty(Number(ing.quantityG), ing.unit ?? "g", multiplier);
-    return { id: ing.id, quantityG: s.quantityG, unit: s.unit };
+    const unit = ing.unit ?? "g";
+    if (unit === "QS") return { id: ing.id, quantityG: 0, quantityGMax: null, unit };
+    const s = scaleQty(Number(ing.quantityG), unit, multiplier);
+    const sMax = ing.quantityGMax != null
+      ? scaleQty(Number(ing.quantityGMax), unit, multiplier).quantityG
+      : null;
+    // scaleQty convertit les L en g : on écrit donc aussi la nouvelle unité.
+    return { id: ing.id, quantityG: s.quantityG, quantityGMax: sMax, unit: s.unit };
   });
 
   if (targetMassG && targetMassG > 0) {
@@ -260,7 +281,7 @@ export async function applyMultiplierToRecipe(
     scaled.map((ing) =>
       prisma.ingredient.update({
         where: { id: ing.id },
-        data: { quantityG: ing.quantityG },
+        data: { quantityG: ing.quantityG, quantityGMax: ing.quantityGMax, unit: ing.unit },
       }),
     ),
   );
@@ -301,6 +322,8 @@ export async function duplicateRecipe(id: number) {
   const copy = await prisma.recipe.create({
     data: {
       name: source.name + " (copie)",
+      nameNormalized: normalizeForSearch(source.name + " (copie)"),
+      folderId: source.folderId,
       source: source.source,
       notesTips: source.notesTips,
       favorite: false,
@@ -311,6 +334,7 @@ export async function duplicateRecipe(id: number) {
           ingredientBaseId: ing.ingredientBaseId,
           quantityG: ing.quantityG,
           quantityGMax: ing.quantityGMax ?? null,
+          unit: ing.unit,
           position: ing.position,
         })),
       },
@@ -342,21 +366,36 @@ export async function deleteComment(id: number, recipeId: number) {
   revalidatePath(`/recipes/${recipeId}`);
 }
 
-async function upsertIngredientBases(names: string[]) {
-  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  if (unique.length === 0) return;
-
-  const existing = await prisma.ingredientBase.findMany({
-    where: { name: { in: unique, mode: "insensitive" } },
-    select: { name: true },
+/**
+ * Après recréation des ingrédients d'une recette, re-pointe les sous-recettes
+ * (dans les recettes parentes) dont le pivot visait un ancien ingrédient :
+ * même nom (insensible à la casse) d'abord, sinon même position.
+ */
+async function remapPivotIngredients(
+  tx: Prisma.TransactionClient,
+  recipeId: number,
+  oldIngredients: { id: number; name: string | null; position: number }[],
+) {
+  if (oldIngredients.length === 0) return;
+  const links = await tx.subRecipe.findMany({
+    where: { childId: recipeId, pivotIngredientId: { in: oldIngredients.map((o) => o.id) } },
+    select: { id: true, pivotIngredientId: true },
   });
-  const existingLower = new Set(existing.map((e) => e.name.toLowerCase()));
-  const toCreate = unique.filter((n) => !existingLower.has(n.toLowerCase()));
+  if (links.length === 0) return;
 
-  if (toCreate.length > 0) {
-    await prisma.ingredientBase.createMany({
-      data: toCreate.map((name) => ({ name })),
-      skipDuplicates: true,
+  const fresh = await tx.ingredient.findMany({
+    where: { recipeId },
+    select: { id: true, name: true, position: true },
+  });
+  for (const link of links) {
+    const old = oldIngredients.find((o) => o.id === link.pivotIngredientId);
+    if (!old) continue;
+    const match =
+      fresh.find((f) => (f.name ?? "").toLowerCase() === (old.name ?? "").toLowerCase()) ??
+      fresh.find((f) => f.position === old.position);
+    await tx.subRecipe.update({
+      where: { id: link.id },
+      data: { pivotIngredientId: match?.id ?? null },
     });
   }
 }

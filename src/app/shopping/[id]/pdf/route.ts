@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getShoppingListDetail } from "@/lib/shopping";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
+import { formatQty } from "@/lib/format";
 
 export async function GET(
   _req: Request,
@@ -16,6 +17,7 @@ export async function GET(
   const items = list.items.map((i) => ({
     name: i.name,
     quantityG: i.quantityG ? Number(i.quantityG) : null,
+    unit: i.unit,
     checked: i.checked,
     recipeId: i.recipeId,
   }));
@@ -34,12 +36,6 @@ export async function GET(
   });
 }
 
-function formatG(g: number): string {
-  if (g >= 1000)
-    return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
-  return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
-
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -50,7 +46,7 @@ function esc(s: string): string {
 
 function buildShoppingListHtml(
   listName: string,
-  items: { name: string; quantityG: number | null; checked: boolean; recipeId: number | null }[],
+  items: { name: string; quantityG: number | null; unit: string | null; checked: boolean; recipeId: number | null }[],
   recipeNames: string[],
 ): string {
   const date = new Date().toLocaleDateString("fr-FR", {
@@ -67,7 +63,7 @@ function buildShoppingListHtml(
 
   const itemsHtml = items
     .map((item) => {
-      const qty = item.quantityG ? formatG(item.quantityG) : "";
+      const qty = item.quantityG || item.unit === "QS" ? formatQty(item.quantityG ?? 0, item.unit) : "";
       return `
         <tr class="${item.checked ? "checked" : ""}">
           <td class="check-col">☐</td>

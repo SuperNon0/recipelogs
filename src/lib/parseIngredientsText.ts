@@ -7,8 +7,9 @@
  *   "100-200g sucre"             → { name: "sucre", quantityG: 100, quantityGMax: 200, unit: "g" }
  *   "1kg sucre"                  → { name: "sucre", quantityG: 1000, unit: "g" }
  *   "250ml lait"                 → { name: "lait", quantityG: 0.25, unit: "L" }
- *   "2 cuillères à café vanille" → { name: "vanille", quantityG: 10, unit: "cc" }
- *   "1 cs huile"                 → { name: "huile", quantityG: 15, unit: "cs" }
+ *   "2 cuillères à café vanille" → { name: "vanille", quantityG: 2, unit: "cc" }  (nombre de cuillères)
+ *   "1 cs huile"                 → { name: "huile", quantityG: 1, unit: "cs" }
+ *   "3 oeufs"                    → { name: "oeufs", quantityG: 3, unit: "pièce" }
  *
  * Format multi-lignes (style fiche pâtissier) :
  *   "Farine\n- 200g\nBeurre\n- 100g"
@@ -54,7 +55,7 @@ export function extractQuantityAndUnit(text: string): ParsedQuantity {
     /(\d+(?:[.,]\d+)?)\s*(?:cc\b|c\.?\s*[àa]\.?\s*caf|cuill?[eè]r?e?s?\s*[àa]\s*caf)/i,
   );
   if (ccMatch) return {
-    quantityG: parseFloat(ccMatch[1].replace(",", ".")) * 5,
+    quantityG: parseFloat(ccMatch[1].replace(",", ".")),
     unit: "cc",
   };
 
@@ -63,7 +64,7 @@ export function extractQuantityAndUnit(text: string): ParsedQuantity {
     /(\d+(?:[.,]\d+)?)\s*(?:cs\b|c\.?\s*[àa]\.?\s*s(?:oupe)?|cuill?[eè]r?e?s?\s*[àa]\s*soupe)/i,
   );
   if (csMatch) return {
-    quantityG: parseFloat(csMatch[1].replace(",", ".")) * 15,
+    quantityG: parseFloat(csMatch[1].replace(",", ".")),
     unit: "cs",
   };
 
@@ -100,6 +101,13 @@ export function extractQuantityAndUnit(text: string): ParsedQuantity {
   if (lMatch) return {
     quantityG: parseFloat(lMatch[1].replace(",", ".")),
     unit: "L",
+  };
+
+  // Nombre seul en début de ligne : « 3 oeufs » → 3 pièces (au lieu de 0 g)
+  const countMatch = text.match(/^(\d+(?:[.,]\d+)?)\s+\D/);
+  if (countMatch) return {
+    quantityG: parseFloat(countMatch[1].replace(",", ".")),
+    unit: "pièce",
   };
 
   return { quantityG: 0, unit: "g" };

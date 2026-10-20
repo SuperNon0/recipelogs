@@ -27,6 +27,7 @@ export default async function ShoppingListDetailPage({
     id: i.id,
     name: i.name,
     quantityG: i.quantityG ? Number(i.quantityG) : null,
+    unit: i.unit,
     checked: i.checked,
     recipeId: i.recipeId,
   }));

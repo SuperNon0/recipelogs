@@ -129,6 +129,8 @@ export function RecipeKeeperImport() {
                 importée{result.imported > 1 ? "s" : ""}
                 {result.skipped > 0 &&
                   ` · ${result.skipped} ignorée${result.skipped > 1 ? "s" : ""} (déjà existante${result.skipped > 1 ? "s" : ""})`}
+                {!!result.photosRestored &&
+                  ` · ${result.photosRestored} photo${result.photosRestored > 1 ? "s" : ""} rattachée${result.photosRestored > 1 ? "s" : ""}`}
               </p>
             </>
           ) : (

@@ -79,7 +79,10 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
 NODE_ENV=production
 NEXTAUTH_SECRET="$(openssl rand -base64 32)"
 NEXTAUTH_URL="https://recipe.super-nono.cc"
+UPLOAD_DIR="/var/lib/recipelog/uploads"
 ENV
+mkdir -p /var/lib/recipelog/uploads
+chown -R "${APP_USER}:${APP_USER}" /var/lib/recipelog
 
 chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
 chmod 600 "${APP_DIR}/.env"

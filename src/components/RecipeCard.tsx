@@ -2,21 +2,9 @@
 
 import Link from "next/link";
 import type { RecipeListItem } from "@/lib/recipes";
+import { formatG } from "@/lib/format";
 import { useRecipeSelection } from "@/components/RecipeSelection";
 
-function formatG(value: number): string {
-  if (!value) return "0 g";
-  if (value >= 1000) {
-    return (
-      (value / 1000).toLocaleString("fr-FR", {
-        maximumFractionDigits: 2,
-      }) + " kg"
-    );
-  }
-  return (
-    Math.round(value).toLocaleString("fr-FR") + " g"
-  );
-}
 
 export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: string }) {
   const { selectionMode, isSelected, toggle } = useRecipeSelection();
@@ -89,7 +77,7 @@ export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: st
         <div className="flex flex-col">
           <span className="fl-label">Masse totale</span>
           <span className="fl-value-serif" style={{ fontSize: "1.55rem" }}>
-            {formatG(recipe.totalMassG)}
+            {formatG(Math.round(recipe.totalMassG))}
           </span>
         </div>
         {recipe.rating && (

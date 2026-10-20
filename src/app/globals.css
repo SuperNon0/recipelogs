@@ -2,7 +2,7 @@
 
 /* ─────────────────────────────────────────────
    Design system FuelLog — tokens
-   Source : CDC.md § 5
+   Source : README.md « Design system »
    ───────────────────────────────────────────── */
 
 @theme {
@@ -288,4 +288,9 @@ a {
 
 .fl-scroll-hidden {
   scrollbar-width: none;
+}
+
+/* Étapes au format HTML (anciennes recettes saisies avec l'éditeur riche) */
+.rte-content p {
+  margin: 0 0 0.4em;
 }

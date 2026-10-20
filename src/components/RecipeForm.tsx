@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
+import { recipeMass } from "@/lib/massAdjust";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 
@@ -69,13 +70,13 @@ export function RecipeForm({
   const [ingredientMode, setIngredientMode] = useState<IngredientMode>("list");
   const [freeText, setFreeText] = useState("");
 
-  const totalG = ingredients.reduce((s, r) => {
-    const q = Number(r.quantity) || 0;
-    if (r.unit === "g") return s + q;
-    if (r.unit === "cc") return s + q * 5;
-    if (r.unit === "cs") return s + q * 15;
-    return s;
-  }, 0);
+  const totalG = recipeMass(
+    ingredients.map((r) => ({
+      quantityG: Number(r.quantity) || 0,
+      quantityGMax: r.quantityMax ? Number(r.quantityMax) || 0 : null,
+      unit: r.unit,
+    })),
+  ).avg;
 
   const addRow = () =>
     setIngredients((rows) => [...rows, { name: "", quantity: "", quantityMax: "", unit: "g" }]);
@@ -185,7 +186,7 @@ export function RecipeForm({
         />
       </Field>
 
-      <Field label={`Ingrédients * (masse totale : ${Math.round(totalG)} g — ingrédients en g uniquement)`}>
+      <Field label={`Ingrédients * (masse totale : ${Math.round(totalG)} g — hors pièces et QS)`}>
         <div className="flex flex-col gap-3">
           <div className="flex gap-2">
             <button
