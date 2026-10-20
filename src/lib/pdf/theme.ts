@@ -81,6 +81,24 @@ export const FONTS: Record<string, FontDef> = {
     weights: [400, 700],
     category: "display",
   },
+  cormorant: {
+    family: '"Cormorant Garamond", Georgia, serif',
+    google: "Cormorant Garamond",
+    weights: [500, 700],
+    category: "serif",
+  },
+  montserrat: {
+    family: '"Montserrat", Arial, sans-serif',
+    google: "Montserrat",
+    weights: [400, 600, 700],
+    category: "sans",
+  },
+  caveat: {
+    family: '"Caveat", "Comic Sans MS", cursive',
+    google: "Caveat",
+    weights: [500, 700],
+    category: "display",
+  },
 };
 
 export type FontKey = keyof typeof FONTS;
@@ -102,6 +120,9 @@ export const FONT_LABELS: Record<FontKey, string> = {
   lora: "Lora",
   merriweather: "Merriweather",
   playfair: "Playfair Display",
+  cormorant: "Cormorant Garamond",
+  montserrat: "Montserrat",
+  caveat: "Caveat (manuscrite)",
 };
 
 const LEGACY_FONT_MAP: Record<string, FontKey> = {
@@ -185,6 +206,9 @@ export const COVER_BG_PATTERNS = [
   "gradient-vertical",
   "gradient-radial",
   "accent-corner",
+  "dots",
+  "stripes",
+  "grid",
   "image",
 ] as const;
 export type CoverBgPattern = (typeof COVER_BG_PATTERNS)[number];
@@ -195,7 +219,89 @@ export const COVER_BG_PATTERN_LABELS: Record<CoverBgPattern, string> = {
   "gradient-vertical": "Dégradé vertical",
   "gradient-radial": "Dégradé radial",
   "accent-corner": "Coin d'accent",
+  dots: "Pois",
+  stripes: "Rayures",
+  grid: "Quadrillage",
   image: "Image personnalisée",
+};
+
+/**
+ * Motifs de couverture répétés (pois, rayures, quadrillage), en CSS pur.
+ * Partagé entre le PDF (`size` en mm) et les vignettes du formulaire (en px).
+ */
+export function coverPatternCss(
+  pattern: "dots" | "stripes" | "grid",
+  c1: string,
+  c2: string,
+  size: (mm: number) => string,
+): string {
+  switch (pattern) {
+    case "dots":
+      return `radial-gradient(${c2} 22%, transparent 24%) 0 0 / ${size(9)} ${size(9)}, ${c1}`;
+    case "stripes":
+      return `repeating-linear-gradient(135deg, ${c2} 0 ${size(3)}, ${c1} ${size(3)} ${size(9)})`;
+    case "grid":
+      return `linear-gradient(${c2} 1px, transparent 1px) 0 0 / ${size(8)} ${size(8)}, linear-gradient(90deg, ${c2} 1px, transparent 1px) 0 0 / ${size(8)} ${size(8)}, ${c1}`;
+  }
+}
+
+// ─── Habillage des pages de recettes ─────────────────────────────────────────
+
+/** Fond des pages (dessiné sous le texte, marges comprises). */
+export const PAPERS = ["white", "cream", "ivory", "rose", "grid", "lined"] as const;
+export type Paper = (typeof PAPERS)[number];
+export const PAPER_LABELS: Record<Paper, string> = {
+  white: "Blanc",
+  cream: "Crème",
+  ivory: "Ivoire",
+  rose: "Rosé",
+  grid: "Quadrillé",
+  lined: "Cahier ligné",
+};
+/** Couleur de fond de chaque papier (null = blanc, rien n'est dessiné). */
+export const PAPER_COLORS: Record<Paper, string | null> = {
+  white: null,
+  cream: "#fbf6ea",
+  ivory: "#fffdf5",
+  rose: "#fdf2ef",
+  grid: null,
+  lined: "#fffef8",
+};
+
+/** Décor répété sur chaque page (dessiné dans les marges, couleur d'accent). */
+export const PAGE_FRAMES = ["none", "line", "double", "corners", "side", "band"] as const;
+export type PageFrame = (typeof PAGE_FRAMES)[number];
+export const PAGE_FRAME_LABELS: Record<PageFrame, string> = {
+  none: "Aucun",
+  line: "Filet",
+  double: "Double filet",
+  corners: "Coins",
+  side: "Liseré",
+  band: "Bandeau",
+};
+
+export const TITLE_STYLES = ["simple", "underline", "ornament", "band"] as const;
+export type TitleStyle = (typeof TITLE_STYLES)[number];
+export const TITLE_STYLE_LABELS: Record<TitleStyle, string> = {
+  simple: "Simple",
+  underline: "Souligné",
+  ornament: "Ornement",
+  band: "Bandeau coloré",
+};
+
+export const STEP_STYLES = ["numbers", "circles"] as const;
+export type StepStyle = (typeof STEP_STYLES)[number];
+export const STEP_STYLE_LABELS: Record<StepStyle, string> = {
+  numbers: "1. 2. 3.",
+  circles: "Pastilles",
+};
+
+export const INGREDIENT_STYLES = ["list", "leaders", "boxed"] as const;
+export type IngredientStyle = (typeof INGREDIENT_STYLES)[number];
+export const INGREDIENT_STYLE_LABELS: Record<IngredientStyle, string> = {
+  list: "Liste",
+  leaders: "Pointillés",
+  boxed: "Encadré",
 };
 
 // ─── Zod schema ───────────────────────────────────────────────────────────────
@@ -216,6 +322,11 @@ export const cookbookThemeSchema = z.object({
 
   // Mise en page recette
   recipeLayout: z.enum(RECIPE_LAYOUTS).default("classique"),
+  paper: z.enum(PAPERS).default("white"),
+  pageFrame: z.enum(PAGE_FRAMES).default("none"),
+  titleStyle: z.enum(TITLE_STYLES).default("simple"),
+  stepStyle: z.enum(STEP_STYLES).default("numbers"),
+  ingredientStyle: z.enum(INGREDIENT_STYLES).default("list"),
   ingredientsPosition: z.enum(["left", "right", "top"]).default("left"),
   ingredientsRatio: z.enum(["narrow", "balanced", "wide"]).default("narrow"),
 
@@ -264,6 +375,11 @@ export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
 export const recipePdfSettingsSchema = z.object({
   format: z.enum(["A4", "A5"]).default("A4"),
   recipeLayout: z.enum(RECIPE_LAYOUTS).default("classique"),
+  paper: z.enum(PAPERS).default("white"),
+  pageFrame: z.enum(PAGE_FRAMES).default("none"),
+  titleStyle: z.enum(TITLE_STYLES).default("simple"),
+  stepStyle: z.enum(STEP_STYLES).default("numbers"),
+  ingredientStyle: z.enum(INGREDIENT_STYLES).default("list"),
   textColor: hex.default("#111111"),
   accentColor: hex.default("#A52A2A"),
   titleFont: fontSchema.default("arial"),
@@ -289,6 +405,11 @@ export function recipePdfSettingsToTheme(s: RecipePdfSettings): CookbookTheme {
   return {
     ...DEFAULT_THEME,
     recipeLayout: s.recipeLayout,
+    paper: s.paper,
+    pageFrame: s.pageFrame,
+    titleStyle: s.titleStyle,
+    stepStyle: s.stepStyle,
+    ingredientStyle: s.ingredientStyle,
     textColor: s.textColor,
     accentColor: s.accentColor,
     titleFont: s.titleFont,
@@ -364,3 +485,100 @@ export function googleFontsHref(theme: CookbookTheme): string | null {
   if (families.size === 0) return null;
   return `https://fonts.googleapis.com/css2?${[...families].join("&")}&display=swap`;
 }
+
+// ─── Styles prêts à l'emploi ─────────────────────────────────────────────────
+
+/** Réglages d'apparence modifiés par un style prêt à l'emploi. */
+export type ThemePresetValues = Pick<
+  CookbookTheme,
+  | "recipeLayout" | "paper" | "pageFrame" | "titleStyle" | "stepStyle" | "ingredientStyle"
+  | "accentColor" | "textColor" | "titleFont" | "bodyFont"
+  | "coverLayout" | "coverBgPattern" | "coverBgColor" | "coverBgColor2" | "coverAccentColor" | "coverTextColor"
+>;
+
+export const THEME_PRESETS: { key: string; label: string; description: string; values: ThemePresetValues }[] = [
+  {
+    key: "classique",
+    label: "Pâtissier classique",
+    description: "Sobre et lisible, la mise en page d'origine.",
+    values: {
+      recipeLayout: "classique", paper: "white", pageFrame: "none", titleStyle: "simple",
+      stepStyle: "numbers", ingredientStyle: "list",
+      accentColor: "#A52A2A", textColor: "#111111", titleFont: "arial", bodyFont: "arial",
+      coverLayout: "circle", coverBgPattern: "gradient-diagonal", coverBgColor: "#d35a4a",
+      coverBgColor2: "#6ea8d8", coverAccentColor: "#1f4060", coverTextColor: "#111111",
+    },
+  },
+  {
+    key: "elegant",
+    label: "Élégant",
+    description: "Papier crème, double filet, typographie Garamond, touches dorées.",
+    values: {
+      recipeLayout: "classique", paper: "cream", pageFrame: "double", titleStyle: "ornament",
+      stepStyle: "numbers", ingredientStyle: "leaders",
+      accentColor: "#9a7440", textColor: "#2b2620", titleFont: "cormorant", bodyFont: "lora",
+      coverLayout: "typo-divider", coverBgPattern: "plain", coverBgColor: "#f6efe2",
+      coverBgColor2: "#e8dcc4", coverAccentColor: "#9a7440", coverTextColor: "#3b2f22",
+    },
+  },
+  {
+    key: "carnet",
+    label: "Carnet de cuisine",
+    description: "Cahier ligné, titres manuscrits, liseré bleu, étapes en pastilles.",
+    values: {
+      recipeLayout: "classique", paper: "lined", pageFrame: "side", titleStyle: "simple",
+      stepStyle: "circles", ingredientStyle: "list",
+      accentColor: "#2868b8", textColor: "#23303d", titleFont: "caveat", bodyFont: "nunito",
+      coverLayout: "framed", coverBgPattern: "grid", coverBgColor: "#fdfcf7",
+      coverBgColor2: "#d6e2f0", coverAccentColor: "#2868b8", coverTextColor: "#23303d",
+    },
+  },
+  {
+    key: "pastel",
+    label: "Pastel gourmand",
+    description: "Papier rosé, coins décoratifs, ingrédients encadrés.",
+    values: {
+      recipeLayout: "classique", paper: "rose", pageFrame: "corners", titleStyle: "underline",
+      stepStyle: "circles", ingredientStyle: "boxed",
+      accentColor: "#c8476e", textColor: "#3a2a30", titleFont: "playfair", bodyFont: "nunito",
+      coverLayout: "circle", coverBgPattern: "dots", coverBgColor: "#fde8ee",
+      coverBgColor2: "#f6c3d3", coverAccentColor: "#c8476e", coverTextColor: "#3a2a30",
+    },
+  },
+  {
+    key: "btm",
+    label: "Fiche BTM",
+    description: "Fiche technique dense : tableau avec % de masse, filet bleu marine.",
+    values: {
+      recipeLayout: "fiche-technique", paper: "white", pageFrame: "line", titleStyle: "simple",
+      stepStyle: "numbers", ingredientStyle: "list",
+      accentColor: "#1f4060", textColor: "#111111", titleFont: "arial", bodyFont: "arial",
+      coverLayout: "minimal", coverBgPattern: "plain", coverBgColor: "#ffffff",
+      coverBgColor2: "#e6edf5", coverAccentColor: "#1f4060", coverTextColor: "#1f4060",
+    },
+  },
+  {
+    key: "bistrot",
+    label: "Bistrot",
+    description: "Bandeau bordeaux, photo en tête, ingrédients en pointillés.",
+    values: {
+      recipeLayout: "magazine", paper: "ivory", pageFrame: "band", titleStyle: "simple",
+      stepStyle: "numbers", ingredientStyle: "leaders",
+      accentColor: "#8a2442", textColor: "#221a1c", titleFont: "playfair", bodyFont: "lato",
+      coverLayout: "full-bleed", coverBgPattern: "stripes", coverBgColor: "#8a2442",
+      coverBgColor2: "#7a1f3a", coverAccentColor: "#e6c83a", coverTextColor: "#ffffff",
+    },
+  },
+  {
+    key: "nordique",
+    label: "Nordique épuré",
+    description: "Beaucoup d'air, une colonne, vert sapin, titres soulignés.",
+    values: {
+      recipeLayout: "moderne", paper: "white", pageFrame: "none", titleStyle: "underline",
+      stepStyle: "circles", ingredientStyle: "leaders",
+      accentColor: "#1f7068", textColor: "#1d2524", titleFont: "montserrat", bodyFont: "inter",
+      coverLayout: "minimal", coverBgPattern: "plain", coverBgColor: "#eef3f1",
+      coverBgColor2: "#d5e3de", coverAccentColor: "#1f7068", coverTextColor: "#1d2524",
+    },
+  },
+];

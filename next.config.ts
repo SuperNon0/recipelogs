@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // deploy.sh construit dans un dossier à part (NEXT_DIST_DIR=.next-build)
+  // puis l'échange avec .next : un build raté ne casse plus le site en ligne.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
   experimental: {
     serverActions: {

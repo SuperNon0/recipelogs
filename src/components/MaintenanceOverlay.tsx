@@ -22,6 +22,7 @@ export function MaintenanceOverlay({
   const [log, setLog] = useState<string>("");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [upToDate, setUpToDate] = useState(false);
   const startedAt = useRef(Date.now());
 
   useEffect(() => {
@@ -35,45 +36,70 @@ export function MaintenanceOverlay({
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout>;
 
+    let bootChangedAt: number | null = null;
+
+    const finish = (next: Phase) => {
+      setPhase(next);
+      if (next === "done") setTimeout(() => { window.location.href = "/"; }, 1500);
+    };
+
     async function poll() {
       if (cancelled) return;
 
-      // 1. Tente de récupérer le log + statut
+      // 1. Log du script (le fichier ne contient que le déploiement en cours).
+      let tail = "";
       try {
         const logRes = await fetch("/api/deploy/log", { cache: "no-store" });
         if (logRes.ok) {
           const data = await logRes.json();
           if (data.log) setLog(data.log);
-
-          // Heuristique : on regarde la fin du log pour savoir où on en est
-          const tail = (data.log as string).slice(-1000).toLowerCase();
-          if (tail.includes("redémarrage du service")) setPhase("restarting");
-          else if (tail.includes("build next.js") || tail.includes("pnpm install")) setPhase("deploying");
-          else if (tail.includes("==> [")) setPhase("deploying");
-          if (tail.includes("erreur") || tail.includes("error")) {
-            // Pas forcément fatal mais on alerte
-          }
+          tail = String(data.log ?? "").slice(-2000).toLowerCase();
         }
       } catch {
         // Le serveur est probablement en train de redémarrer → on continue à poller
       }
 
-      // 2. Tente /api/health pour détecter le redémarrage
+      // Marqueurs écrits par deploy.sh
+      if (tail.includes("échec du déploiement")) {
+        setPhase("failed");
+        setError(
+          tail.includes("retour automatique")
+            ? "La nouvelle version ne démarrait pas : retour automatique à la version précédente. Le site fonctionne toujours."
+            : "La mise à jour a échoué. Le site n'a pas été modifié et fonctionne toujours. Détails dans les logs ci-dessous.",
+        );
+        return;
+      }
+      if (tail.includes("déjà à jour")) {
+        setUpToDate(true);
+        finish("done");
+        return;
+      }
+      if (tail.includes("déploiement terminé")) {
+        finish("done");
+        return;
+      }
+      if (tail.includes("bascule vers la nouvelle version") || tail.includes("redémarrage du service")) {
+        setPhase("restarting");
+      } else if (tail.includes("==> ")) {
+        setPhase("deploying");
+      }
+
+      // 2. Redémarrage détecté sans marqueur de fin (anciennes versions du
+      //    script) : on considère la mise à jour terminée après 60 s.
       try {
         const healthRes = await fetch("/api/health", { cache: "no-store" });
         if (healthRes.ok) {
           const h = await healthRes.json();
           if (typeof h.bootedAt === "number" && h.bootedAt > initialBootedAt) {
-            // Le serveur a redémarré avec une nouvelle instance !
-            setPhase("done");
-            setTimeout(() => {
-              window.location.href = "/";
-            }, 1200);
-            return;
+            bootChangedAt ??= Date.now();
+            if (Date.now() - bootChangedAt > 60_000) {
+              finish("done");
+              return;
+            }
           }
         }
       } catch {
-        // Server peut être en train de redémarrer → silencieux
+        // Serveur en cours de redémarrage → silencieux
       }
 
       // 3. Timeout de sécurité : 12 min (next build + puppeteer peuvent prendre longtemps)
@@ -254,7 +280,9 @@ export function MaintenanceOverlay({
           }}
         >
           {phase === "done"
-            ? "Redirection vers l'accueil…"
+            ? upToDate
+              ? "Le site était déjà à jour. Redirection vers l'accueil…"
+              : "Redirection vers l'accueil…"
             : "Ne ferme pas cette fenêtre. Le site se rechargera automatiquement."}
         </p>
 

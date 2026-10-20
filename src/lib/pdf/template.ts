@@ -5,6 +5,7 @@ import {
   FONTS,
   titleSizeFor,
   googleFontsHref,
+  coverPatternCss,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
@@ -121,6 +122,10 @@ export function coverBackgroundCss(theme: CookbookTheme): string {
       const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><polygon points='0,0 200,0 0,200' fill='${encodeURIComponent(theme.coverAccentColor)}' fill-opacity='0.55'/></svg>`;
       return `background: ${c1} url("data:image/svg+xml;utf8,${svg}") no-repeat top left; background-size: 60mm 60mm;`;
     }
+    case "dots":
+    case "stripes":
+    case "grid":
+      return `background: ${coverPatternCss(theme.coverBgPattern as "dots" | "stripes" | "grid", c1, c2, (mm) => `${mm}mm`)};`;
     case "image": {
       if (!theme.coverBgImageUrl) return `background: ${c1};`;
       const a = Math.max(0, Math.min(1, 1 - theme.coverBgImageOpacity));
@@ -173,7 +178,8 @@ export function buildCss(
       font-family: ${bodyFont};
       font-size: ${baseSize}pt;
       color: ${theme.textColor};
-      background: #ffffff;
+      /* Transparent : le papier (crème, ligné…) est dessiné sous la page par decorate.ts */
+      background: transparent;
       line-height: 1.5;
     }
 
@@ -515,7 +521,7 @@ export function buildCss(
     .subrecipe-block {
       margin-top: 6mm;
       padding-top: 3mm;
-      border-top: 2px solid ${theme.accentColor}33;
+      border-top: 2px solid ${hexToRgba(theme.accentColor, 0.2)};
     }
     .subrecipe-title {
       font-family: ${titleFont};
@@ -524,7 +530,66 @@ export function buildCss(
     }
     .muted { color: ${mute(theme.textColor)}; font-style: italic; }
     .ing-qs { color: ${theme.accentColor}; font-weight: 600; }
+    ${decorationCss(theme, { baseSize })}
     ${layoutCss(theme, { titleFont, baseSize, titleSize })}
+  `;
+}
+
+/** Classes de <body> qui activent la mise en page et les styles choisis. */
+function bodyClass(theme: CookbookTheme): string {
+  return `layout-${theme.recipeLayout} title-${theme.titleStyle} steps-${theme.stepStyle} ing-${theme.ingredientStyle}`;
+}
+
+/**
+ * Styles de titre, d'étapes et d'ingrédients (classes `title-*`, `steps-*`,
+ * `ing-*` sur <body>). Placés AVANT layoutCss : une mise en page peut les
+ * surcharger (ex. le magazine n'affiche pas de numéros d'étapes).
+ */
+function decorationCss(theme: CookbookTheme, v: { baseSize: number }): string {
+  const a = theme.accentColor;
+  const muted = mute(theme.textColor);
+  return `
+    /* ─── Titres ─── */
+    .title-underline .recipe-title::after {
+      content: ""; display: block; width: 24mm; height: 2px; background: ${a}; margin: 2.5mm auto 0;
+    }
+    .title-ornament .recipe-title::after {
+      content: ""; display: block; width: 46mm; height: 3mm; margin: 2mm auto 0;
+      background:
+        radial-gradient(circle, ${a} 0 0.9mm, transparent 1mm) center / 3mm 3mm no-repeat,
+        linear-gradient(${a}, ${a}) left center / 19mm 0.7px no-repeat,
+        linear-gradient(${a}, ${a}) right center / 19mm 0.7px no-repeat;
+    }
+    .title-band .recipe-title {
+      background: ${a}; color: #ffffff; padding: 3mm 5mm; border-radius: 1.5mm;
+    }
+    .layout-fiche-technique.title-band .recipe-title { border-bottom: none; }
+    /* Mises en page alignées à gauche : l'ornement suit le titre */
+    .layout-moderne .recipe-title::after,
+    .layout-magazine .recipe-title::after,
+    .layout-fiche-technique .recipe-title::after { margin-left: 0; }
+
+    /* ─── Étapes en pastilles ─── */
+    .steps-circles .steps-rich > p { padding-left: 9mm; }
+    .steps-circles .steps-rich > p::before {
+      content: counter(step); top: 0.05em; width: 5.4mm; height: 5.4mm; min-width: 0;
+      border-radius: 50%; background: ${a}; color: #ffffff; text-align: center;
+      font-size: ${v.baseSize - 1.5}pt; line-height: 5.4mm; font-weight: 700;
+    }
+
+    /* ─── Ingrédients ─── */
+    /* Nom, pointillés et quantité alignés sur la DERNIÈRE ligne du nom */
+    .ing-leaders .ing-item { align-items: flex-end; }
+    .ing-leaders .ing-item .ing-name { order: 1; flex: 0 1 auto; }
+    .ing-leaders .ing-item::after {
+      content: ""; order: 2; flex: 1 0 6mm;
+      border-bottom: 1.2px dotted ${muted}; margin: 0 1.5mm 1.1mm;
+    }
+    .ing-leaders .ing-item .ing-qty { order: 3; min-width: 0; text-align: right; }
+    .ing-boxed:not(.layout-fiche-technique):not(.layout-magazine) .col-ing {
+      background: ${hexToRgba(a, 0.06)}; border: 1px solid ${hexToRgba(a, 0.3)};
+      border-radius: 3mm; padding: 4mm;
+    }
   `;
 }
 
@@ -580,7 +645,7 @@ function layoutCss(
     .layout-moderne .recipe-title {
       text-align: left; font-weight: 400; font-size: ${v.titleSize + 6}pt; margin: 2mm 0 2mm;
     }
-    .layout-moderne .recipe-title::after {
+    .layout-moderne.title-simple .recipe-title::after {
       content: ""; display: block; width: 18mm; height: 2px; background: ${a}; margin-top: 3mm;
     }
     .layout-moderne .recipe-categories,
@@ -612,7 +677,7 @@ function layoutCss(
     .layout-magazine .recipe-rating { text-align: left; }
     .layout-magazine .tag-chip { margin: 0 2mm 0 0; }
     .layout-magazine .col-ing {
-      background: ${a}12; border-left: 3px solid ${a}; padding: 4mm;
+      background: ${hexToRgba(a, 0.07)}; border-left: 3px solid ${a}; padding: 4mm;
     }
     .layout-magazine .steps-rich > p { padding-left: 0; }
     .layout-magazine .steps-rich > p::before { content: none; }
@@ -1105,7 +1170,7 @@ export function buildRecipesHtml(opts: {
   ${fontsTag}
   <style>${css}</style>
 </head>
-<body class="layout-${theme.recipeLayout}">${body}</body>
+<body class="${bodyClass(theme)}">${body}</body>
 </html>`;
 }
 
@@ -1160,6 +1225,6 @@ export function buildSingleRecipeHtml(
     body > section.recipe + section.recipe { page-break-before: always; }
   </style>
 </head>
-<body class="layout-${theme.recipeLayout}">${parentCard}${subCards}</body>
+<body class="${bodyClass(theme)}">${parentCard}${subCards}</body>
 </html>`;
 }

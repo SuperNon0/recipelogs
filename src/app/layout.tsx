@@ -6,9 +6,6 @@ import { getSiteUrl } from "@/app/actions/settings";
 export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
-  icons: {
-    icon: "/favicon.svg",
-  },
 };
 
 export const viewport: Viewport = {

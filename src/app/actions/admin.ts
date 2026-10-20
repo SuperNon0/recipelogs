@@ -77,10 +77,11 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
 
   try {
     writeFileSync(LOCK_FILE, String(Date.now()));
+    // Le log est remis à zéro : il ne contient que le déploiement en cours
+    // (l'écran de maintenance y cherche les messages de fin / d'échec).
     writeFileSync(
       LOG_FILE,
-      `\n========================================\n--- Démarrage : ${new Date().toLocaleString("fr-FR")} ---\n========================================\n`,
-      { flag: "a" },
+      `--- Démarrage : ${new Date().toLocaleString("fr-FR")} ---\n`,
     );
   } catch (e) {
     return { ok: false, error: `Impossible d'écrire le lock : ${(e as Error).message}` };

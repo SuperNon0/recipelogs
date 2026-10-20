@@ -22,6 +22,19 @@ import {
   RECIPE_LAYOUTS,
   RECIPE_LAYOUT_LABELS,
   RECIPE_LAYOUT_HINTS,
+  coverPatternCss,
+  THEME_PRESETS,
+  PAPERS,
+  PAPER_LABELS,
+  PAPER_COLORS,
+  PAGE_FRAMES,
+  PAGE_FRAME_LABELS,
+  TITLE_STYLES,
+  TITLE_STYLE_LABELS,
+  STEP_STYLES,
+  STEP_STYLE_LABELS,
+  INGREDIENT_STYLES,
+  INGREDIENT_STYLE_LABELS,
 } from "@/lib/pdf/theme";
 import { CookbookPreview } from "./CookbookPreview";
 
@@ -176,6 +189,52 @@ export function CookbookConfigForm({
           </label>
         </Section>
 
+        {/* Styles prêts à l'emploi */}
+        <Section title="Styles prêts à l'emploi">
+          <p className="text-xs text-[color:var(--muted)]">
+            Un clic règle d&apos;un coup la mise en page, l&apos;habillage, les couleurs, les polices
+            et la couverture. Tout reste modifiable ensuite.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {THEME_PRESETS.map((p) => {
+              // Actif tant que tous ses réglages correspondent au thème courant
+              const active = (Object.keys(p.values) as (keyof typeof p.values)[]).every(
+                (k) => theme[k] === p.values[k],
+              );
+              return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setTheme((t) => ({ ...t, ...p.values }))}
+                className="flex items-center gap-3 rounded-md p-2.5 text-left transition-colors"
+                style={{
+                  border: active ? "2px solid var(--accent)" : "1px solid var(--border)",
+                  background: "var(--card)",
+                }}
+                aria-pressed={active}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: 30,
+                    height: 40,
+                    borderRadius: 3,
+                    background: PAPER_COLORS[p.values.paper] ?? "#ffffff",
+                    border: `2px solid ${p.values.accentColor}`,
+                    boxShadow: `inset 0 6px 0 ${p.values.accentColor}`,
+                  }}
+                />
+                <span className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-sm" style={{ fontWeight: 600 }}>{p.label}</span>
+                  <span className="text-xs text-[color:var(--muted)] leading-snug">{p.description}</span>
+                </span>
+              </button>
+              );
+            })}
+          </div>
+        </Section>
+
         {/* Mise en page des recettes */}
         <Section title="Mise en page des recettes">
           <SegmentedControl
@@ -186,10 +245,34 @@ export function CookbookConfigForm({
           <p className="text-xs text-[color:var(--muted)]">{RECIPE_LAYOUT_HINTS[theme.recipeLayout]}</p>
         </Section>
 
+        {/* Habillage */}
+        <Section title="Habillage des pages">
+          <ChoiceRow label="Papier" value={theme.paper} onChange={(v) => setT("paper", v)}
+            options={PAPERS.map((v) => ({ value: v, label: PAPER_LABELS[v] }))} />
+          <ChoiceRow label="Décor de page (couleur d'accent)" value={theme.pageFrame} onChange={(v) => setT("pageFrame", v)}
+            options={PAGE_FRAMES.map((v) => ({ value: v, label: PAGE_FRAME_LABELS[v] }))} />
+          <ChoiceRow label="Titre des recettes" value={theme.titleStyle} onChange={(v) => setT("titleStyle", v)}
+            options={TITLE_STYLES.map((v) => ({ value: v, label: TITLE_STYLE_LABELS[v] }))} />
+          <ChoiceRow label="Numéros des étapes" value={theme.stepStyle} onChange={(v) => setT("stepStyle", v)}
+            options={STEP_STYLES.map((v) => ({ value: v, label: STEP_STYLE_LABELS[v] }))} />
+          <ChoiceRow label="Liste d'ingrédients" value={theme.ingredientStyle} onChange={(v) => setT("ingredientStyle", v)}
+            options={INGREDIENT_STYLES.map((v) => ({ value: v, label: INGREDIENT_STYLE_LABELS[v] }))} />
+          {theme.recipeLayout === "fiche-technique" && (
+            <p className="text-xs text-[color:var(--muted)]">
+              En fiche technique, les ingrédients sont toujours présentés en tableau.
+            </p>
+          )}
+          {theme.recipeLayout === "magazine" && (
+            <p className="text-xs text-[color:var(--muted)]">
+              En magazine, les étapes ne sont pas numérotées (lettrine) et les ingrédients sont déjà encadrés.
+            </p>
+          )}
+        </Section>
+
         {/* Couleurs des recettes */}
         <Section title="Couleurs des recettes">
           <p className="text-xs text-[color:var(--muted)]">
-            Le fond des pages de recettes est toujours blanc (impression sur feuille blanche).
+            Le fond des pages se choisit dans « Habillage des pages ».
           </p>
           <ColorRow
             label="Couleur d'accent (titres, traits)"
@@ -504,6 +587,25 @@ function ColorRow({
           style={{ padding: 0, background: "transparent" }}
         />
       </div>
+    </div>
+  );
+}
+
+function ChoiceRow<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="fl-label">{label}</span>
+      <SegmentedControl value={value} onChange={onChange} options={options} />
     </div>
   );
 }
@@ -870,6 +972,12 @@ function CoverBgPatternThumb({
       break;
     case "gradient-radial":
       bgStyle = { background: `radial-gradient(circle at center, ${c1}, ${c2})` };
+      break;
+    case "dots":
+    case "stripes":
+    case "grid":
+      // Même motif que le PDF, à l'échelle de la vignette (A4 = 50 px de large)
+      bgStyle = { background: coverPatternCss(pattern, c1, c2, (mm) => `${(mm * 50) / 210}px`) };
       break;
     case "accent-corner":
       bgStyle = { background: c1 };
