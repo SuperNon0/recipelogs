@@ -9,6 +9,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.9",
+    date: "2026-10-20",
+    title: "PDF plus rapides et plus beaux, mise à jour fiabilisée",
+    features: [
+      "7 styles prêts à l'emploi pour les PDF",
+      "Habillage des pages : papier, décor, styles de titre, d'étapes et d'ingrédients",
+      "3 motifs de couverture et 3 nouvelles polices",
+    ],
+    fixes: [
+      "Génération des PDF ~7× plus rapide",
+      "Mise à jour du site : build séparé, retour arrière automatique, détection d'échec",
+    ],
+  },
+  {
     version: "V1.8",
     date: "2026-10-20",
     title: "Sommaire exact et 4 mises en page PDF",

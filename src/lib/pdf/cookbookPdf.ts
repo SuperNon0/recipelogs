@@ -1,6 +1,7 @@
 import { buildRecipeSnapshot, type RecipeSnapshot, getCookbookDetail } from "@/lib/cookbooks";
 import { buildCoverTocHtml, buildRecipesHtml, TOC_ANCHOR_PREFIX, type CookbookEntryUnion } from "./template";
 import { renderHtmlToPdf, mergePdfs, readAnchorPages } from "./renderer";
+import { decoratePdf } from "./decorate";
 import type { CookbookTheme } from "./theme";
 import { photoDataUri } from "@/lib/uploads";
 
@@ -16,22 +17,35 @@ export async function loadCookbookEntries(cookbook: CookbookDetail): Promise<Coo
     ...cookbook.chapters.map((c) => ({ kind: "chapter" as const, data: c })),
   ].sort((a, b) => a.data.position - b.data.position);
 
+  // Snapshots des recettes liées calculés en parallèle (par lots de 4 pour
+  // ne pas épuiser les connexions à la base), dans l'ordre du cahier.
+  const snaps: (NonNullable<RecipeSnapshot> | null)[] = [];
+  for (let i = 0; i < raw.length; i += 4) {
+    snaps.push(
+      ...(await Promise.all(
+        raw.slice(i, i + 4).map(async (r) => {
+          if (r.kind === "chapter") return null;
+          const entry = r.data;
+          return entry.linkMode === "snapshot" && entry.snapshotData
+            ? (entry.snapshotData as unknown as NonNullable<RecipeSnapshot>)
+            : buildRecipeSnapshot(entry.recipeId);
+        }),
+      )),
+    );
+  }
+
   const entries: CookbookEntryUnion[] = [];
-  for (const r of raw) {
+  raw.forEach((r, i) => {
     if (r.kind === "chapter") {
       entries.push({ type: "chapter", title: r.data.title, intro: r.data.intro ?? "" });
-      continue;
+      return;
     }
-    const entry = r.data;
-    const snap =
-      entry.linkMode === "snapshot" && entry.snapshotData
-        ? (entry.snapshotData as unknown as NonNullable<RecipeSnapshot>)
-        : await buildRecipeSnapshot(entry.recipeId);
-    if (!snap) continue;
+    const snap = snaps[i];
+    if (!snap) return;
     // Les sous-recettes sont toujours rendues sur leur propre page :
     // `buildRecipesHtml` les dérive de `snap.subRecipes` (subrecipeMode ignoré).
-    entries.push({ type: "recipe", snap, subrecipeMode: "single", sectionTitle: entry.sectionTitle ?? null });
-  }
+    entries.push({ type: "recipe", snap, subrecipeMode: "single", sectionTitle: r.data.sectionTitle ?? null });
+  });
   return entries;
 }
 
@@ -66,6 +80,7 @@ export async function renderCookbookPdf(opts: {
       showPageNumber: true,
     });
     if (opts.hasToc) tocPages = await readAnchorPages(recipesPdf, TOC_ANCHOR_PREFIX);
+    recipesPdf = await decoratePdf(recipesPdf, theme);
   }
 
   const pdfs: Uint8Array[] = [];
@@ -80,7 +95,8 @@ export async function renderCookbookPdf(opts: {
       entries,
       tocPages,
     });
-    pdfs.push(await renderHtmlToPdf(html, format, {}));
+    // Papier / cadre aussi sur le sommaire, mais pas sur la couverture.
+    pdfs.push(await decoratePdf(await renderHtmlToPdf(html, format, {}), theme, { skipFirstPage: opts.hasCover }));
   }
   if (recipesPdf) pdfs.push(recipesPdf);
 

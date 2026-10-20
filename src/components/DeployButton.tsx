@@ -66,8 +66,9 @@ export function DeployButton() {
       ) : (
         <div className="flex flex-col gap-2 fl-card" style={{ borderColor: "var(--accent)" }}>
           <p className="text-sm">
-            <strong>⚠️ Confirmation</strong> — Le site sera indisponible ~30-90 secondes
-            pendant le redémarrage. Continuer ?
+            <strong>⚠️ Confirmation</strong> — La mise à jour prend quelques minutes. Le site
+            reste utilisable pendant la préparation, puis est coupé ~10 secondes au
+            redémarrage. En cas de problème, l&apos;ancienne version est conservée. Continuer ?
           </p>
           <div className="flex gap-2">
             <button

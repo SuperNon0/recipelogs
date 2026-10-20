@@ -5,6 +5,7 @@ import { renderHtmlToPdf } from "@/lib/pdf/renderer";
 import { getRecipePdfSettings } from "@/app/actions/settings";
 import { recipePdfSettingsToTheme } from "@/lib/pdf/theme";
 import { photoDataUri } from "@/lib/uploads";
+import { decoratePdf } from "@/lib/pdf/decorate";
 
 export async function GET(
   _req: Request,
@@ -24,7 +25,7 @@ export async function GET(
 
   const photo = theme.recipeLayout === "magazine" ? await photoDataUri(snap.photoPath) : null;
   const html = buildSingleRecipeHtml({ ...snap, photoPath: photo }, settings.format, theme);
-  const pdf = await renderHtmlToPdf(html, settings.format);
+  const pdf = await decoratePdf(await renderHtmlToPdf(html, settings.format), theme);
 
   const filename = `${snap.name.replace(/[^a-z0-9\-]/gi, "_")}.pdf`;
   return new NextResponse(pdf.buffer as ArrayBuffer, {

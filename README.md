@@ -4,7 +4,7 @@
 
 Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les manques de Recipe Keeper : précision au gramme, multiplication (3 modes), sous-recettes et cahiers PDF.
 
-**Version actuelle : V1.8** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : V1.9** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la seule documentation du projet**. Il remplace l'ancien cahier des charges (`CDC.md`), le document de transmission (`HANDOFF.md`) et les guides `INSTALL.md` / `DEPLOYMENT.md`.
 
@@ -28,6 +28,51 @@ Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les 
 ---
 
 ## 1. 🆕 Mises à jour effectuées
+
+### V1.9 (20 octobre 2026) : PDF plus rapides et plus beaux, mise à jour du site fiabilisée
+
+**PDF beaucoup plus rapides**
+
+| | Avant | Maintenant |
+|---|---|---|
+| Cahier de 20 recettes | ~7 s | **~1 s** (0,7 s si un PDF vient d'être fait) |
+| Avec une police Google (Playfair, Lora…) | 9 à 11 s | **~1 s** |
+
+Pourquoi c'était lent, et ce qui a changé :
+- **Chromium** était lancé à chaque PDF (deux fois pour un cahier). Il est maintenant gardé ouvert, puis fermé automatiquement après 3 minutes sans PDF pour libérer la mémoire.
+- **Une attente fixe de 500 ms** (« réseau inactif ») avait lieu à chaque passe, même sans rien à charger. On attend maintenant seulement ce qui compte : les polices et les images.
+- **Les polices Google** étaient retéléchargées à chaque PDF. Elles sont maintenant gardées en mémoire et intégrées directement.
+- Les recettes liées d'un cahier sont calculées en parallèle.
+
+**Nouveaux styles de PDF** (onglet Apparence du cahier, et Paramètres → PDF d'une recette)
+- **7 styles prêts à l'emploi**, en un clic (mise en page, habillage, couleurs, polices et couverture assortie) :
+  - **Pâtissier classique** ;
+  - **Élégant** : papier crème, double filet, Garamond, touches dorées ;
+  - **Carnet de cuisine** : cahier ligné, titres manuscrits, liseré ;
+  - **Pastel gourmand** : papier rosé, coins décoratifs, ingrédients encadrés ;
+  - **Fiche BTM** ;
+  - **Bistrot** : bandeau bordeaux, photo, pointillés ;
+  - **Nordique épuré**.
+- **Habillage des pages**, réglable un par un :
+  - papier : blanc, crème, ivoire, rosé, quadrillé, cahier ligné ;
+  - décor : filet, double filet, coins, liseré, bandeau ;
+  - titre : simple, souligné, ornement, bandeau coloré ;
+  - étapes : numéros ou pastilles ;
+  - ingrédients : liste, pointillés (comme un menu), encadré.
+- **Couvertures** : 3 nouveaux motifs (pois, rayures, quadrillage).
+- **Polices** : 3 nouvelles (Cormorant Garamond, Montserrat, Caveat manuscrite).
+- Le papier et le décor couvrent **toute la page**, marges comprises, sur chaque page (y compris quand une recette fait plusieurs pages). La couverture n'est pas touchée.
+- Les anciens cahiers gardent exactement leur apparence (tout est « blanc / aucun » par défaut).
+
+**Mise à jour du site (bouton 🚀) fiabilisée** : testée de bout en bout sur une copie du serveur, dans 5 scénarios.
+- **Build raté** → le site n'est **pas** touché et continue de tourner (avant, il perdait ses styles et ne redémarrait plus).
+- **Nouvelle version qui ne démarre pas** → **retour automatique** à la version précédente.
+- **Rien de nouveau** → « Déjà à jour », sans rebuild ni coupure.
+- Le site reste utilisable pendant la préparation : la coupure se limite au redémarrage (~10 s).
+- L'écran de maintenance affiche maintenant clairement « terminé », « déjà à jour » ou « échec » (avant : attente de 12 minutes sans explication).
+- Le script ne peut plus être perturbé par sa propre mise à jour (le « cliquer deux fois » n'est plus nécessaire).
+
+**Divers** : icône d'onglet du site (l'ancienne était introuvable), style actif mis en évidence, 70 tests.
 
 ### V1.8 (20 octobre 2026) : sommaire exact et mises en page PDF
 
@@ -159,11 +204,12 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 - Recettes **liées 🔗** (toujours à jour) ou **figées 📌** (copie à une date, avec masse modifiable en 3 modes).
 - Glisser-déposer, chapitres, titres de section, filtre des recettes déjà présentes.
 - **4 mises en page** des recettes : Classique, Fiche technique (tableau + % de masse), Moderne, Magazine (photo).
+- **7 styles prêts à l'emploi** et habillage au choix : papier (crème, ligné, quadrillé…), décor de page (filet, coins, liseré, bandeau), style de titre, d'étapes et d'ingrédients.
 - Couverture personnalisable (layouts, couleurs, image), sommaire avec sous-recettes `↳` et **numéros de page exacts**, 1 page par recette et par sous-recette, numérotation à partir de la 1ʳᵉ recette, pied de page 3 zones, A4 / A5, aperçu sans enregistrer.
 - Bouton « Liste de courses » : ajoute toutes les recettes du cahier à une liste.
 
 ### 📄 PDF d'une recette
-Téléchargement depuis la fiche ; style réglable dans **Paramètres → PDF d'une recette** (mise en page, format, couleurs, polices, sections).
+Téléchargement depuis la fiche ; style réglable dans **Paramètres → PDF d'une recette** (styles prêts à l'emploi, mise en page, habillage, format, couleurs, polices, sections).
 
 ### 🛒 Listes de courses
 - Plusieurs listes, recettes avec coefficient, articles libres.
@@ -210,7 +256,7 @@ Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g �
 | Style | Tailwind CSS v4 + design system FuelLog |
 | Validation | Zod |
 | PDF | Puppeteer 24 (Chromium système) + pdf-lib (fusion des passes) |
-| Tests | Vitest 4 (65 tests) |
+| Tests | Vitest 4 (70 tests) |
 | Hébergement | LXC Debian 12 (Proxmox) · nginx · Cloudflare Tunnel + Zero Trust |
 
 **Monolithe Next.js** : pas de séparation front/back ; les « API » sont des Server Actions (`src/app/actions/`) et des Route Handlers (`src/app/**/route.ts`).
@@ -235,7 +281,13 @@ src/
     ├── parseIngredientsText.ts, importRecipeKeeper*.ts
     ├── uploads.ts          # dossier des photos
     ├── features.ts         # interrupteurs (SHARE_ENABLED)
-    └── pdf/                # template.ts (HTML + 4 mises en page), theme.ts, renderer.ts (Puppeteer + file d'attente + lecture des ancres), cookbookPdf.ts
+    └── pdf/
+        ├── theme.ts        # réglages (thème, styles prêts à l'emploi, polices, motifs)
+        ├── template.ts     # HTML + CSS (4 mises en page, styles de titre/étapes/ingrédients)
+        ├── renderer.ts     # Chromium partagé + file d'attente + lecture des ancres du sommaire
+        ├── fonts.ts        # polices Google mises en cache et intégrées
+        ├── decorate.ts     # papier et décor dessinés avec pdf-lib après le rendu
+        └── cookbookPdf.ts  # assemblage d'un cahier (recettes → sommaire → fusion)
 ```
 
 ### Règles à respecter (pièges connus)
@@ -248,7 +300,10 @@ src/
 7. `layout.tsx` est `async` (lit `siteUrl`) ; `AppNav` affiche `CHANGELOG[0].version` (`src/lib/changelog.ts`) : ajouter une entrée à chaque version.
 8. Le champ `cookbooks_recipes.subrecipe_mode` est ignoré (toujours « séparées »).
 9. **Sommaire PDF** : les recettes sont rendues avant la couverture ; chaque page listée porte une ancre `toc-<n>` ciblée par un lien invisible, et `readAnchorPages` relit sa page réelle dans le PDF. Garder le même ordre dans `computeTocEntries` et `buildRecipesHtml` (les deux passent par `subSnapsOf`).
-10. La mise en page (`recipeLayout`) est dans le thème : CSS dans `layoutCss()`, classe `layout-<slug>` sur `<body>`. La table `pdf_templates` n'est plus utilisée pour le rendu.
+10. La mise en page (`recipeLayout`) est dans le thème : CSS dans `layoutCss()`, classes `layout-*`, `title-*`, `steps-*`, `ing-*` sur `<body>` (`bodyClass`). La table `pdf_templates` n'est plus utilisée pour le rendu.
+11. **Papier et décor ne sont pas en CSS** : en impression, Chromium coupe fonds et éléments fixes aux marges. Ils sont dessinés dans le PDF par `decorate.ts` (papier sous le texte, décor par-dessus, dans les marges). Le `<body>` doit rester transparent.
+12. **Rendu PDF** : un seul Chromium partagé (`getBrowser`), un rendu à la fois (`runExclusive`). Ne pas revenir à `waitUntil: "networkidle0"` (+500 ms par passe).
+13. **Nouvelle option de thème** : l'ajouter avec une valeur par défaut dans `cookbookThemeSchema` (les cahiers existants gardent leur apparence), et dans `recipePdfSettingsSchema` + `recipePdfSettingsToTheme` si elle concerne aussi le PDF d'une recette.
 
 ---
 
@@ -336,9 +391,16 @@ pnpm dev                      # http://localhost:3000
 ### Mise à jour
 Bouton **Paramètres → 🚀 Mettre à jour le site**, ou :
 ```bash
-bash /opt/recipelog/deploy/proxmox/deploy.sh
+bash /opt/recipelog/deploy/proxmox/deploy.sh          # --force : reconstruit même sans nouveauté
 ```
-Enchaîne : dossier photos → `git pull` → `pnpm install` → `prisma migrate deploy` → `prisma generate` → `pnpm build` → copie `static/` et `public/` dans `.next/standalone/` → `systemctl restart recipelog`.
+Déroulé :
+1. dossier photos, `git pull` ; si le commit est déjà celui de `.next/DEPLOYED_COMMIT` → « Déjà à jour », fin ;
+2. relance la version qui vient d'être téléchargée du script ;
+3. `pnpm install`, `prisma generate`, `prisma migrate deploy`, build dans **`.next-build`** (le site reste en ligne sur `.next`) ;
+4. bascule `.next` → `.next-prev` et `.next-build` → `.next`, redémarrage, vérification de `/api/health` (60 s) ;
+5. si le site ne répond pas : retour automatique sur `.next-prev`.
+
+Les messages « ✅ Déploiement terminé », « ✅ DÉJÀ À JOUR » et « ❌ ÉCHEC DU DÉPLOIEMENT » sont lus par l'écran de maintenance : ne pas les reformuler. Tout le code du script est dans `main()` (bash le lit en entier avant de l'exécuter) : le `git pull` peut réécrire le fichier sans danger.
 
 ### Sauvegardes
 ```bash
@@ -365,7 +427,7 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 | Pack de logs | `bash /opt/recipelog/deploy/proxmox/collect-logs.sh` → `/tmp/recipelog-logs-*.tar.gz` |
 | Mise à jour bloquée | bouton « débloquer » dans Paramètres, ou `rm /tmp/recipelog-deploy.lock` |
 | PDF en erreur | `which chromium` et `grep PUPPETEER /opt/recipelog/.env` ; vérifier Nesting |
-| Retour arrière | `cd /opt/recipelog && git checkout <commit> && pnpm install --frozen-lockfile && pnpm build && systemctl restart recipelog` |
+| Retour arrière manuel | `cd /opt/recipelog && rm -rf .next-failed && mv .next .next-failed && mv .next-prev .next && systemctl restart recipelog` |
 
 **Pièges déjà rencontrés** (tous corrigés dans les scripts) : clone bloqué par le dossier home de l'utilisateur, client Prisma non généré (pnpm 10), mode standalone non activé, CSS en 404 (`static/` à copier) ou 403 (droits nginx), photos effacées au déploiement.
 
@@ -375,6 +437,7 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 
 | Version | Contenu principal |
 |---|---|
+| **V1.9** | PDF ~7× plus rapides, 7 styles prêts à l'emploi, habillage des pages, mise à jour du site avec retour arrière automatique. |
 | **V1.8** | Sommaire PDF exact, 4 mises en page des recettes, petites corrections (voir §1). |
 | **V1.7** | Corrections et fiabilisation (voir §1), partage désactivé, photos persistantes. |
 | **V1.6** | Affichage décimales / entiers, masse cible exacte à l'écran, navigation en pilules, refonte de la page ingrédients, suppression de la page « Nouveautés ». Puis : classement rapide et sélection multiple des ingrédients, sélection multiple des recettes, liste de courses depuis un cahier, PDF de liste de courses, éditeur d'étapes en texte simple. |

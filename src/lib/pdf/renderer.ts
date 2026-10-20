@@ -1,5 +1,6 @@
-import puppeteer from "puppeteer";
+import puppeteer, { type Browser } from "puppeteer";
 import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
+import { inlineGoogleFonts } from "./fonts";
 
 /**
  * Rendu HTML → PDF via Puppeteer (Chromium headless).
@@ -15,15 +16,58 @@ import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
  *   d'un côté et les recettes de l'autre, puis on fusionne (cf. `mergePdfs`).
  */
 /**
- * File d'attente : un seul Chromium à la fois. Le service est limité en
- * mémoire (MemoryMax) et chaque Chromium pèse plusieurs centaines de Mo ;
- * plusieurs PDF demandés en même temps faisaient planter le serveur.
+ * File d'attente : un seul rendu à la fois. Le service est limité en mémoire
+ * (MemoryMax) ; plusieurs PDF demandés en même temps faisaient planter le serveur.
  */
-let queue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Chromium partagé : lancer un navigateur coûte ~1 à 1,5 s, on le garde donc
+ * ouvert entre deux rendus (et entre les 2 passes d'un cahier), puis on le
+ * ferme après BROWSER_IDLE_MS d'inactivité pour rendre la mémoire.
+ * Stocké sur globalThis pour survivre au rechargement à chaud en dev.
+ */
+const BROWSER_IDLE_MS = 3 * 60 * 1000;
+const shared = globalThis as unknown as {
+  __pdfBrowser?: Promise<Browser> | null;
+  __pdfBrowserTimer?: ReturnType<typeof setTimeout>;
+  /** File d'attente globale (le module peut être chargé par plusieurs routes). */
+  __pdfQueue?: Promise<unknown>;
+};
+
 function runExclusive<T>(task: () => Promise<T>): Promise<T> {
-  const run = queue.then(task, task);
-  queue = run.catch(() => undefined);
+  const run = (shared.__pdfQueue ?? Promise.resolve()).then(task, task);
+  shared.__pdfQueue = run.catch(() => undefined);
   return run;
+}
+
+function getBrowser(): Promise<Browser> {
+  if (!shared.__pdfBrowser) {
+    const launching = puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      headless: true,
+    });
+    shared.__pdfBrowser = launching;
+    launching.then(
+      (browser) => browser.on("disconnected", () => {
+        // Chromium planté ou fermé : le prochain rendu en relancera un.
+        if (shared.__pdfBrowser === launching) shared.__pdfBrowser = null;
+      }),
+      () => {
+        if (shared.__pdfBrowser === launching) shared.__pdfBrowser = null;
+      },
+    );
+  }
+  return shared.__pdfBrowser;
+}
+
+function scheduleBrowserClose() {
+  clearTimeout(shared.__pdfBrowserTimer);
+  shared.__pdfBrowserTimer = setTimeout(() => {
+    const pending = shared.__pdfBrowser;
+    shared.__pdfBrowser = null;
+    pending?.then((b) => b.close()).catch(() => undefined);
+  }, BROWSER_IDLE_MS);
+  shared.__pdfBrowserTimer.unref?.();
 }
 
 export function renderHtmlToPdf(
@@ -49,14 +93,18 @@ async function renderHtmlToPdfNow(
     showPageNumber?: boolean;
   } = {},
 ): Promise<Uint8Array> {
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    headless: true,
-  });
+  clearTimeout(shared.__pdfBrowserTimer);
+  const browser = await getBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // « load » attend les feuilles de style et les <img> ; on attend ensuite
+    // les polices réellement utilisées, puis les éventuelles images de fond
+    // (couverture) avec un court délai d'inactivité réseau. Bien plus rapide
+    // que networkidle0 (500 ms d'attente fixe même sans aucune ressource).
+    await page.setContent(await inlineGoogleFonts(html), { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await page.waitForNetworkIdle({ idleTime: 150, timeout: 10_000 }).catch(() => undefined);
 
     const footerText = (options.footer ?? "").trim();
     const hasFooter = footerText.length > 0 || !!options.showPageNumber;
@@ -105,7 +153,8 @@ async function renderHtmlToPdfNow(
 
     return new Uint8Array(pdf.buffer, pdf.byteOffset, pdf.byteLength);
   } finally {
-    await browser.close();
+    await page.close().catch(() => undefined);
+    scheduleBrowserClose();
   }
 }
 

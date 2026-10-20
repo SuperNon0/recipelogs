@@ -11,10 +11,20 @@ import {
   TEXT_SIZE_MAX,
   TEXT_SIZE_STEP,
   type FontKey,
-  type RecipeLayout,
   RECIPE_LAYOUTS,
   RECIPE_LAYOUT_LABELS,
   RECIPE_LAYOUT_HINTS,
+  THEME_PRESETS,
+  PAPERS,
+  PAPER_LABELS,
+  PAGE_FRAMES,
+  PAGE_FRAME_LABELS,
+  TITLE_STYLES,
+  TITLE_STYLE_LABELS,
+  STEP_STYLES,
+  STEP_STYLE_LABELS,
+  INGREDIENT_STYLES,
+  INGREDIENT_STYLE_LABELS,
 } from "@/lib/pdf/theme";
 import { saveRecipePdfSettings } from "@/app/actions/settings";
 
@@ -65,65 +75,64 @@ export function RecipePdfSettingsForm({
         (les cahiers ont leur propre thème).
       </p>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="fl-label">Format de page</span>
-        <div
-          className="inline-flex rounded-md overflow-hidden border w-fit"
-          style={{ borderColor: "var(--border)" }}
-        >
-          {[
-            { v: "A4", l: "A4 (210 × 297 mm)" },
-            { v: "A5", l: "A5 (148 × 210 mm)" },
-          ].map((o) => {
-            const sel = o.v === s.format;
-            return (
-              <button
-                key={o.v}
-                type="button"
-                onClick={() => set("format", o.v as "A4" | "A5")}
-                className="px-3 py-1.5 text-sm transition-colors"
-                style={{
-                  background: sel ? "var(--accent)" : "transparent",
-                  color: sel ? "var(--bg)" : "var(--text)",
-                  fontWeight: sel ? 600 : 400,
-                  borderRight: "1px solid var(--border)",
-                }}
-              >
-                {o.l}
-              </button>
-            );
-          })}
-        </div>
-      </label>
+      <Choice label="Format de page" value={s.format} onChange={(v) => set("format", v)}
+        options={[
+          { value: "A4" as const, label: "A4 (210 × 297 mm)" },
+          { value: "A5" as const, label: "A5 (148 × 210 mm)" },
+        ]} />
 
-      <label className="flex flex-col gap-1.5">
-        <span className="fl-label">Mise en page</span>
-        <div
-          className="inline-flex rounded-md overflow-hidden border w-fit flex-wrap"
-          style={{ borderColor: "var(--border)" }}
-        >
-          {RECIPE_LAYOUTS.map((l) => {
-            const sel = l === s.recipeLayout;
-            return (
-              <button
-                key={l}
-                type="button"
-                onClick={() => set("recipeLayout", l as RecipeLayout)}
-                className="px-3 py-1.5 text-sm transition-colors"
+      <div className="flex flex-col gap-1.5">
+        <span className="fl-label">Style prêt à l&apos;emploi</span>
+        <div className="flex flex-wrap gap-1.5">
+          {THEME_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              title={p.description}
+              onClick={() =>
+                setS((prev) => ({
+                  ...prev,
+                  recipeLayout: p.values.recipeLayout,
+                  paper: p.values.paper,
+                  pageFrame: p.values.pageFrame,
+                  titleStyle: p.values.titleStyle,
+                  stepStyle: p.values.stepStyle,
+                  ingredientStyle: p.values.ingredientStyle,
+                  accentColor: p.values.accentColor,
+                  textColor: p.values.textColor,
+                  titleFont: p.values.titleFont,
+                  bodyFont: p.values.bodyFont,
+                }))
+              }
+              className="fl-btn fl-btn-secondary"
+              style={{ fontSize: "0.75rem", padding: "0.35rem 0.7rem" }}
+            >
+              <span
+                aria-hidden
                 style={{
-                  background: sel ? "var(--accent)" : "transparent",
-                  color: sel ? "var(--bg)" : "var(--text)",
-                  fontWeight: sel ? 600 : 400,
-                  borderRight: "1px solid var(--border)",
+                  display: "inline-block", width: 10, height: 10, borderRadius: 2, marginRight: 6,
+                  background: p.values.accentColor,
                 }}
-              >
-                {RECIPE_LAYOUT_LABELS[l]}
-              </button>
-            );
-          })}
+              />
+              {p.label}
+            </button>
+          ))}
         </div>
-        <span className="text-xs text-[color:var(--muted)]">{RECIPE_LAYOUT_HINTS[s.recipeLayout]}</span>
-      </label>
+      </div>
+
+      <Choice label="Mise en page" value={s.recipeLayout} onChange={(v) => set("recipeLayout", v)}
+        options={RECIPE_LAYOUTS.map((v) => ({ value: v, label: RECIPE_LAYOUT_LABELS[v] }))}
+        hint={RECIPE_LAYOUT_HINTS[s.recipeLayout]} />
+      <Choice label="Papier" value={s.paper} onChange={(v) => set("paper", v)}
+        options={PAPERS.map((v) => ({ value: v, label: PAPER_LABELS[v] }))} />
+      <Choice label="Décor de page" value={s.pageFrame} onChange={(v) => set("pageFrame", v)}
+        options={PAGE_FRAMES.map((v) => ({ value: v, label: PAGE_FRAME_LABELS[v] }))} />
+      <Choice label="Titre" value={s.titleStyle} onChange={(v) => set("titleStyle", v)}
+        options={TITLE_STYLES.map((v) => ({ value: v, label: TITLE_STYLE_LABELS[v] }))} />
+      <Choice label="Numéros des étapes" value={s.stepStyle} onChange={(v) => set("stepStyle", v)}
+        options={STEP_STYLES.map((v) => ({ value: v, label: STEP_STYLE_LABELS[v] }))} />
+      <Choice label="Liste d'ingrédients" value={s.ingredientStyle} onChange={(v) => set("ingredientStyle", v)}
+        options={INGREDIENT_STYLES.map((v) => ({ value: v, label: INGREDIENT_STYLE_LABELS[v] }))} />
 
       <ColorRow
         label="Couleur d'accent (titres, traits)"
@@ -367,6 +376,52 @@ function NumberStepper({
           +
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Rangée de boutons à choix unique (même style que le sélecteur de format). */
+function Choice<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="fl-label">{label}</span>
+      <div
+        className="inline-flex rounded-md overflow-hidden border w-fit flex-wrap"
+        style={{ borderColor: "var(--border)" }}
+      >
+        {options.map((o) => {
+          const sel = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onChange(o.value)}
+              className="px-3 py-1.5 text-sm transition-colors"
+              style={{
+                background: sel ? "var(--accent)" : "transparent",
+                color: sel ? "var(--bg)" : "var(--text)",
+                fontWeight: sel ? 600 : 400,
+                borderRight: "1px solid var(--border)",
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {hint && <span className="text-xs text-[color:var(--muted)]">{hint}</span>}
     </div>
   );
 }
