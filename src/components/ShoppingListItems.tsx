@@ -8,19 +8,17 @@ import {
   uncheckAll,
   removeChecked,
 } from "@/app/actions/shopping";
+import { formatQty } from "@/lib/format";
 
 type Item = {
   id: number;
   name: string;
   quantityG: number | null;
+  unit: string | null;
   checked: boolean;
   recipeId: number | null;
 };
 
-function formatG(g: number): string {
-  if (g >= 1000) return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
-  return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
 
 export function ShoppingListItems({
   listId,
@@ -195,9 +193,9 @@ function ItemRow({
       >
         {item.name}
       </span>
-      {item.quantityG !== null && (
+      {(item.quantityG !== null || item.unit === "QS") && (
         <span className="fl-label" style={{ whiteSpace: "nowrap" }}>
-          {formatG(item.quantityG)}
+          {formatQty(item.quantityG ?? 0, item.unit)}
         </span>
       )}
       <button

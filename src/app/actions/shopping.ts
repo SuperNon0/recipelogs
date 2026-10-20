@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { aggregateIngredients } from "@/lib/shopping";
+import { aggregateIngredients, shoppingKey } from "@/lib/shopping";
+import { buildRecipeSnapshot } from "@/lib/cookbooks";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -168,48 +169,49 @@ export async function addCookbookRecipesToList(
 async function regenerateItems(listId: number) {
   const listRecipes = await prisma.shoppingListRecipe.findMany({
     where: { shoppingListId: listId },
-    include: {
-      recipe: {
-        select: {
-          id: true,
-          name: true,
-          ingredients: {
-            orderBy: { position: "asc" },
-            include: { ingredientBase: true },
-          },
-        },
-      },
-    },
+    select: { recipeId: true, coefficient: true },
   });
 
-  const aggregated = aggregateIngredients(
-    listRecipes.map((r) => ({ coefficient: Number(r.coefficient), recipe: r.recipe })),
-  );
+  // Le snapshot applique le coefficient avec les mêmes règles que la fiche
+  // recette (arrondi, L → g, sous-recettes verrouillées ou non…) : la liste
+  // contient donc aussi les ingrédients des sous-recettes.
+  const sources = [];
+  for (const r of listRecipes) {
+    const snap = await buildRecipeSnapshot(r.recipeId, Number(r.coefficient));
+    if (!snap) continue;
+    sources.push({
+      recipeId: r.recipeId,
+      ingredients: [...snap.ingredients, ...snap.subRecipes.flatMap((sr) => sr.ingredients)],
+    });
+  }
+  const aggregated = aggregateIngredients(sources);
 
-  // Conserver les items manuels (sans recipeId)
-  const manualItems = await prisma.shoppingListItem.findMany({
-    where: { shoppingListId: listId, recipeId: null },
+  const previous = await prisma.shoppingListItem.findMany({
+    where: { shoppingListId: listId },
     orderBy: { position: "asc" },
   });
+  // Les cases déjà cochées le restent après régénération.
+  const checkedKeys = new Set(
+    previous.filter((i) => i.recipeId !== null && i.checked).map((i) => shoppingKey(i.name, i.unit)),
+  );
+  const manualItems = previous.filter((i) => i.recipeId === null);
 
   await prisma.$transaction([
-    // Supprimer tous les items générés depuis les recettes
     prisma.shoppingListItem.deleteMany({
       where: { shoppingListId: listId, recipeId: { not: null } },
     }),
-    // Réinsérer les agrégés
-    ...aggregated.map((ing, idx) =>
-      prisma.shoppingListItem.create({
-        data: {
-          shoppingListId: listId,
-          name: ing.name,
-          quantityG: ing.quantityG > 0 ? ing.quantityG : null,
-          recipeId: ing.recipeId,
-          position: idx,
-        },
-      }),
-    ),
-    // Repositionner les items manuels après
+    prisma.shoppingListItem.createMany({
+      data: aggregated.map((ing, idx) => ({
+        shoppingListId: listId,
+        name: ing.name,
+        quantityG: ing.quantityG && ing.quantityG > 0 ? ing.quantityG : null,
+        unit: ing.unit,
+        recipeId: ing.recipeId,
+        checked: checkedKeys.has(shoppingKey(ing.name, ing.unit)),
+        position: idx,
+      })),
+    }),
+    // Les articles ajoutés à la main restent après les articles générés
     ...manualItems.map((item, idx) =>
       prisma.shoppingListItem.update({
         where: { id: item.id },

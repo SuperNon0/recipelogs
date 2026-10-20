@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ensureIngredientBases } from "@/lib/ingredientBases";
 import {
   recipePdfSettingsSchema,
   parseRecipePdfSettings,
@@ -11,6 +12,34 @@ import {
 } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/** Vrai si l'erreur Prisma vient d'une contrainte d'unicité (nom déjà pris). */
+function isUniqueViolation(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+}
+
+/**
+ * Fait pointer vers la base `toId` tous les ingrédients de recette liés à
+ * `fromId` OU portant le nom `fromName` (sans casse), et leur donne le nom `toName`.
+ * Sert au renommage, à la mise en majuscule et à la fusion.
+ */
+async function relinkIngredients(
+  tx: Prisma.TransactionClient,
+  fromId: number,
+  fromName: string,
+  toId: number,
+  toName: string,
+) {
+  await tx.ingredient.updateMany({
+    where: { ingredientBaseId: fromId },
+    data: { ingredientBaseId: toId, name: toName },
+  });
+  await tx.$executeRaw`
+    UPDATE ingredients
+    SET name = ${toName}, ingredient_base_id = ${toId}
+    WHERE LOWER(name) = LOWER(${fromName}) AND ingredient_base_id IS NULL
+  `;
+}
 
 const RECIPE_PDF_KEY = "recipePdfSettings";
 
@@ -42,7 +71,9 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   const color = String(formData.get("color") ?? "#888888").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
-  const exists = await prisma.category.findFirst({ where: { name } });
+  const exists = await prisma.category.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+  });
   if (exists) return { ok: false, error: "Cette catégorie existe déjà." };
 
   await prisma.category.create({ data: { name: name.slice(0, 100), color } });
@@ -58,10 +89,15 @@ export async function updateCategory(
   const color = String(formData.get("color") ?? "#888888").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
-  await prisma.category.update({
-    where: { id },
-    data: { name: name.slice(0, 100), color },
-  });
+  try {
+    await prisma.category.update({
+      where: { id },
+      data: { name: name.slice(0, 100), color },
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { ok: false, error: "Cette catégorie existe déjà." };
+    throw e;
+  }
   revalidatePath("/settings");
   return { ok: true };
 }
@@ -79,7 +115,9 @@ export async function createFolder(formData: FormData): Promise<ActionResult> {
   const color = String(formData.get("color") ?? "#888888").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
-  const exists = await prisma.folder.findFirst({ where: { name } });
+  const exists = await prisma.folder.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+  });
   if (exists) return { ok: false, error: "Ce dossier existe déjà." };
 
   await prisma.folder.create({ data: { name: name.slice(0, 100), color } });
@@ -96,10 +134,15 @@ export async function updateFolder(
   const color = String(formData.get("color") ?? "#888888").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
-  await prisma.folder.update({
-    where: { id },
-    data: { name: name.slice(0, 100), color },
-  });
+  try {
+    await prisma.folder.update({
+      where: { id },
+      data: { name: name.slice(0, 100), color },
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { ok: false, error: "Ce dossier existe déjà." };
+    throw e;
+  }
   revalidatePath("/settings");
   revalidatePath("/");
   return { ok: true };
@@ -126,15 +169,9 @@ export async function capitalizeIngredientBase(id: number): Promise<ActionResult
   const exists = await prisma.ingredientBase.findFirst({ where: { name: newName, NOT: { id } } });
   if (exists) return { ok: false, error: "Cet ingrédient existe déjà avec cette casse." };
 
-  const oldName = current.name;
   await prisma.$transaction(async (tx) => {
     await tx.ingredientBase.update({ where: { id }, data: { name: newName } });
-    await tx.ingredient.updateMany({ where: { ingredientBaseId: id }, data: { name: newName } });
-    await tx.$executeRaw`
-      UPDATE ingredients
-      SET name = ${newName}, ingredient_base_id = ${id}
-      WHERE LOWER(name) = LOWER(${oldName}) AND ingredient_base_id IS NULL
-    `;
+    await relinkIngredients(tx, id, current.name, id, newName);
   });
 
   revalidatePath("/settings/ingredients");
@@ -162,17 +199,7 @@ export async function renameIngredientBase(
 
   await prisma.$transaction(async (tx) => {
     await tx.ingredientBase.update({ where: { id }, data: { name: newName } });
-    // Mettre à jour les ingrédients liés par ID
-    await tx.ingredient.updateMany({
-      where: { ingredientBaseId: id },
-      data: { name: newName },
-    });
-    // Mettre à jour + lier les ingrédients non-liés avec le même nom (insensible à la casse)
-    await tx.$executeRaw`
-      UPDATE ingredients
-      SET name = ${newName}, ingredient_base_id = ${id}
-      WHERE LOWER(name) = LOWER(${oldName}) AND ingredient_base_id IS NULL
-    `;
+    await relinkIngredients(tx, id, oldName, id, newName);
   });
 
   revalidatePath("/settings/ingredients");
@@ -193,18 +220,7 @@ export async function mergeIngredientBases(
   if (!source || !target) return { ok: false, error: "Ingrédient introuvable." };
 
   await prisma.$transaction(async (tx) => {
-    // Réassigner les ingrédients liés à la source vers la cible
-    await tx.ingredient.updateMany({
-      where: { ingredientBaseId: sourceId },
-      data: { ingredientBaseId: targetId, name: target.name },
-    });
-    // Réassigner les ingrédients non-liés qui ont le nom de la source
-    await tx.$executeRaw`
-      UPDATE ingredients
-      SET name = ${target.name}, ingredient_base_id = ${targetId}
-      WHERE LOWER(name) = LOWER(${source.name}) AND ingredient_base_id IS NULL
-    `;
-    // Supprimer la source
+    await relinkIngredients(tx, sourceId, source.name, targetId, target.name);
     await tx.ingredientBase.delete({ where: { id: sourceId } });
   });
 
@@ -279,17 +295,7 @@ export async function mergeIngredientBasesBulk(
 
   await prisma.$transaction(async (tx) => {
     for (const src of sourceRows) {
-      // Réassigner les ingrédients liés à la source vers la cible
-      await tx.ingredient.updateMany({
-        where: { ingredientBaseId: src.id },
-        data: { ingredientBaseId: targetId, name: target.name },
-      });
-      // Réassigner les ingrédients non-liés qui ont le nom de la source
-      await tx.$executeRaw`
-        UPDATE ingredients
-        SET name = ${target.name}, ingredient_base_id = ${targetId}
-        WHERE LOWER(name) = LOWER(${src.name}) AND ingredient_base_id IS NULL
-      `;
+      await relinkIngredients(tx, src.id, src.name, targetId, target.name);
     }
     await tx.ingredientBase.deleteMany({ where: { id: { in: sourceRows.map((s) => s.id) } } });
   });
@@ -311,25 +317,9 @@ export async function syncAllIngredientBases(): Promise<ActionResult & { created
   const rows = await prisma.ingredient.findMany({
     where: { name: { not: null } },
     select: { name: true },
+    distinct: ["name"],
   });
-
-  const unique = [...new Set(rows.map((r) => r.name!.trim()).filter(Boolean))];
-  let created = 0;
-
-  for (const name of unique) {
-    const existing = await prisma.ingredientBase.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
-    });
-    if (!existing) {
-      try {
-        await prisma.ingredientBase.create({ data: { name } });
-        created++;
-      } catch {
-        // doublon concurrent, on ignore
-      }
-    }
-  }
-
+  const created = await ensureIngredientBases(rows.map((r) => r.name!));
   revalidatePath("/settings/ingredients");
   return { ok: true, created };
 }
@@ -344,7 +334,7 @@ export async function getSiteUrl(): Promise<string | null> {
   return row.value || null;
 }
 
-export async function saveSiteUrl(formData: FormData): Promise<ActionResult> {
+export async function saveSiteUrl(formData: FormData): Promise<void> {
   const url = String(formData.get("siteUrl") ?? "").trim();
   await prisma.setting.upsert({
     where: { key: SITE_URL_KEY },
@@ -353,7 +343,6 @@ export async function saveSiteUrl(formData: FormData): Promise<ActionResult> {
   });
   revalidatePath("/settings");
   revalidatePath("/");
-  return { ok: true };
 }
 
 /**

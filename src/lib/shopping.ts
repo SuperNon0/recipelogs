@@ -42,30 +42,48 @@ export async function listRecipesMinimalForShopping() {
   });
 }
 
-/** Agrège les ingrédients des recettes liées à une liste, en appliquant les coefficients. */
-export function aggregateIngredients(
-  recipes: {
-    coefficient: number;
-    recipe: {
-      id: number;
-      name: string;
-      ingredients: { name: string | null; quantityG: unknown; ingredientBase: { name: string } | null }[];
-    };
-  }[],
-): { name: string; quantityG: number; recipeId: number }[] {
-  const map = new Map<string, { name: string; quantityG: number; recipeId: number }>();
+export type ShoppingSourceIngredient = {
+  name: string;
+  quantityG: number;
+  quantityGMax?: number | null;
+  unit?: string | null;
+};
 
-  for (const r of recipes) {
-    const coef = Number(r.coefficient);
-    for (const ing of r.recipe.ingredients) {
-      const name = (ing.name ?? ing.ingredientBase?.name ?? "—").trim();
-      const qty = Number(ing.quantityG) * coef;
-      const key = name.toLowerCase();
+export type AggregatedItem = {
+  name: string;
+  /** null pour QS (pas de quantité). */
+  quantityG: number | null;
+  unit: string;
+  recipeId: number;
+};
+
+/** Clé de fusion : même nom (sans casse) ET même unité. */
+export function shoppingKey(name: string, unit: string | null | undefined): string {
+  return `${name.trim().toLowerCase()}|${unit ?? "g"}`;
+}
+
+/**
+ * Fusionne les ingrédients de plusieurs recettes (quantités déjà multipliées).
+ * - On ne fusionne que des quantités de même unité (2 pièces + 100 g ≠ 102).
+ * - Fourchette min/max : on retient le max (pour acheter assez).
+ * - QS : une seule ligne, sans quantité.
+ */
+export function aggregateIngredients(
+  sources: { recipeId: number; ingredients: ShoppingSourceIngredient[] }[],
+): AggregatedItem[] {
+  const map = new Map<string, AggregatedItem>();
+
+  for (const src of sources) {
+    for (const ing of src.ingredients) {
+      const name = (ing.name ?? "—").trim();
+      const unit = ing.unit ?? "g";
+      const key = shoppingKey(name, unit);
+      const qty = unit === "QS" ? null : Number(ing.quantityGMax ?? ing.quantityG);
       const existing = map.get(key);
       if (existing) {
-        existing.quantityG += qty;
+        if (existing.quantityG !== null && qty !== null) existing.quantityG += qty;
       } else {
-        map.set(key, { name, quantityG: qty, recipeId: r.recipe.id });
+        map.set(key, { name, quantityG: qty, unit, recipeId: src.recipeId });
       }
     }
   }

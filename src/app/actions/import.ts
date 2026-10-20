@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
+import { createHash } from "node:crypto";
+import { UPLOAD_DIR, uploadFilePath, uploadUrl } from "@/lib/uploads";
 import { prisma } from "@/lib/prisma";
 import { normalizeForSearch } from "@/lib/recipes";
+import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { parseRecipeKeeperCsv } from "@/lib/importRecipeKeeper";
 import {
   parseRecipeKeeperHtml,
@@ -17,9 +20,18 @@ export type ImportResult = {
   imported: number;
   skipped: number;
   errors: string[];
+  /** Import ZIP : photos rattachées à des recettes déjà existantes. */
+  photosRestored?: number;
 };
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./public/uploads";
+/** Vrai si l'URL /uploads/... pointe vers un fichier présent sur le disque. */
+function photoExists(photoPath: string | null): boolean {
+  if (!photoPath?.startsWith("/uploads/")) return false;
+  const parts = photoPath.slice("/uploads/".length).split("/").map(decodeURIComponent);
+  const file = uploadFilePath(parts);
+  return !!file && existsSync(file);
+}
+
 const RECIPES_IMG_DIR = join(UPLOAD_DIR, "recipekeeper");
 
 // ─── Import CSV (existant) ────────────────────────────────────────────────────
@@ -62,6 +74,7 @@ export async function importRecipeKeeperCsv(
       await prisma.recipe.create({
         data: {
           name: rk.name,
+          nameNormalized: normalizeForSearch(rk.name),
           source: rk.source,
           notesTips: rk.notesTips,
           stepsBlock: rk.steps
@@ -81,6 +94,7 @@ export async function importRecipeKeeperCsv(
           },
         },
       });
+      await ensureIngredientBases(rk.ingredients.map((i) => i.name));
       imported++;
     } catch (err) {
       errors.push(`"${rk.name}" : ${err instanceof Error ? err.message : "erreur inconnue"}`);
@@ -209,39 +223,48 @@ export async function importRecipeKeeperHtmlOrZip(
     }
   }
 
+  /** Écrit la 1ʳᵉ photo de la recette (si présente dans le ZIP) et renvoie son URL. */
+  const savePhoto = (rk: RKHtmlRecipe): string | null => {
+    const imgPath = rk.images[0]?.path;
+    const bytes = imgPath ? imagesInZip.get(imgPath) : undefined;
+    if (!imgPath || !bytes) return null;
+    // Préfixe = empreinte du contenu : deux photos différentes portant le
+    // même nom dans le ZIP ne s'écrasent plus.
+    const hash = createHash("sha1").update(bytes).digest("hex").slice(0, 10);
+    const baseName = (imgPath.split("/").pop() ?? "photo.jpg").replace(/[^\w.\-]/g, "_");
+    const fileName = `${hash}-${baseName}`;
+    const targetPath = join(RECIPES_IMG_DIR, fileName);
+    if (!existsSync(targetPath)) {
+      try {
+        writeFileSync(targetPath, bytes);
+      } catch {
+        return null; // écriture impossible : recette sans photo
+      }
+    }
+    return uploadUrl("recipekeeper", fileName);
+  };
+
   let imported = 0;
   let skipped = 0;
+  let photosRestored = 0;
   const errors: string[] = [];
 
   for (const rk of recipes) {
     try {
+      const photoPath = savePhoto(rk);
       const exists = await prisma.recipe.findFirst({
         where: { name: rk.name },
-        select: { id: true },
+        select: { id: true, photoPath: true },
       });
       if (exists) {
+        // Recette déjà présente : on ne la réimporte pas, mais on lui
+        // rattache sa photo si elle n'en a pas (ou si le fichier a disparu).
+        if (photoPath && !photoExists(exists.photoPath)) {
+          await prisma.recipe.update({ where: { id: exists.id }, data: { photoPath } });
+          photosRestored++;
+        }
         skipped++;
         continue;
-      }
-
-      // Sauvegarde de la première image (si présente dans le ZIP)
-      let photoPath: string | null = null;
-      if (rk.images.length > 0 && imagesInZip.size > 0) {
-        const imgPath = rk.images[0].path;
-        const bytes = imagesInZip.get(imgPath);
-        if (bytes) {
-          const ext = imgPath.split(".").pop()?.toLowerCase() ?? "jpg";
-          const fileName = imgPath.split("/").pop() ?? `photo.${ext}`;
-          const targetPath = join(RECIPES_IMG_DIR, fileName);
-          if (!existsSync(targetPath)) {
-            try {
-              writeFileSync(targetPath, bytes);
-            } catch {
-              // si l'écriture échoue, on garde la recette sans photo
-            }
-          }
-          photoPath = `/uploads/recipekeeper/${fileName}`;
-        }
       }
 
       // Lookup ou création des catégories
@@ -266,6 +289,7 @@ export async function importRecipeKeeperHtmlOrZip(
       await prisma.recipe.create({
         data: {
           name: rk.name,
+          nameNormalized: normalizeForSearch(rk.name),
           source: rk.source,
           notesTips: rk.notesTips,
           favorite: rk.favorite,
@@ -292,6 +316,7 @@ export async function importRecipeKeeperHtmlOrZip(
           },
         },
       });
+      await ensureIngredientBases(rk.ingredients.map((i) => i.name));
       imported++;
     } catch (err) {
       errors.push(
@@ -303,7 +328,7 @@ export async function importRecipeKeeperHtmlOrZip(
   revalidatePath("/");
   revalidatePath("/settings");
 
-  return { ok: true, imported, skipped, errors };
+  return { ok: true, imported, skipped, errors, photosRestored };
 }
 
 // ─── Import JSON ──────────────────────────────────────────────────────────────
@@ -333,18 +358,6 @@ function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; q
     case "pièce": case "piece": case "pcs": case "unité": case "unite": return { unit: "pièce", quantityG: q };
     case "qs": return { unit: "QS", quantityG: 0 };
     default: return { unit: "g", quantityG: q };
-  }
-}
-
-async function upsertIngredientBasesInsensitive(names: string[]) {
-  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  for (const name of unique) {
-    const existing = await prisma.ingredientBase.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
-    });
-    if (!existing) {
-      await prisma.ingredientBase.create({ data: { name } }).catch(() => {});
-    }
   }
 }
 
@@ -405,7 +418,7 @@ export async function importRecipesFromJson(
         },
       });
 
-      await upsertIngredientBasesInsensitive(ingredients.map((i) => i.name));
+      await ensureIngredientBases(ingredients.map((i) => i.name));
 
       imported++;
     } catch (err) {

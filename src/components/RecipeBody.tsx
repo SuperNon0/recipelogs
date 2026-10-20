@@ -4,13 +4,14 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
 import { computeLocalCoef } from "@/lib/subRecipes";
-import { adjustToTarget, ingMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
+import { adjustToTarget, ingMass, recipeMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
   removeSubRecipe,
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
 import { applyMultiplierToRecipe } from "@/app/actions/recipes";
+import { StepsContent } from "./StepsContent";
 
 // ─────────────────────────────────────────────
 // Types
@@ -53,20 +54,7 @@ export function RecipeBody({
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
 }) {
-  const [baseTotalMinG, baseTotalMaxG] = useMemo(() => {
-    let min = 0, max = 0;
-    for (const i of ingredients) {
-      const qMin = i.unit === "L" ? i.quantityG * 1000
-        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
-      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const qMax = i.unit === "L" ? rawMax * 1000
-        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
-      min += qMin;
-      max += qMax;
-    }
-    return [min, max];
-  }, [ingredients]);
-  const baseTotalG = (baseTotalMinG + baseTotalMaxG) / 2;
+  const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
 
   const [mode, setMode] = useState<Mode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
@@ -589,20 +577,10 @@ function SubRecipeAccordion({
   const [, startTransition] = useTransition();
   const [lockedOptimistic, setLockedOptimistic] = useState(subRecipe.isLocked);
 
-  const [childBaseTotalMinG, childBaseTotalMaxG] = useMemo(() => {
-    let min = 0, max = 0;
-    for (const i of subRecipe.childIngredients) {
-      const qMin = i.unit === "L" ? i.quantityG * 1000
-        : i.quantityG * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
-      const rawMax = i.quantityGMax != null ? i.quantityGMax : i.quantityG;
-      const qMax = i.unit === "L" ? rawMax * 1000
-        : rawMax * ((!i.unit || i.unit === "g") ? 1 : i.unit === "cc" ? 5 : i.unit === "cs" ? 15 : 0);
-      min += qMin;
-      max += qMax;
-    }
-    return [min, max];
-  }, [subRecipe.childIngredients]);
-  const childBaseTotalG = (childBaseTotalMinG + childBaseTotalMaxG) / 2;
+  const childBaseTotalG = useMemo(
+    () => recipeMass(subRecipe.childIngredients).avg,
+    [subRecipe.childIngredients],
+  );
 
   const pivotBaseQty = subRecipe.pivotIngredientId
     ? subRecipe.childIngredients.find(
@@ -818,17 +796,7 @@ function SubRecipeAccordion({
               >
                 Étapes
               </summary>
-              <pre
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.82rem",
-                  lineHeight: 1.6,
-                  color: "var(--text)",
-                }}
-              >
-                {subRecipe.childSteps}
-              </pre>
+              <StepsContent content={subRecipe.childSteps} fontSize="0.82rem" />
             </details>
           )}
         </div>

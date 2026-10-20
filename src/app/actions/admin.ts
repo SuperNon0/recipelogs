@@ -1,7 +1,7 @@
 "use server";
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, statSync, writeFileSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { BOOT_TIME } from "@/lib/bootTime";
 
 const DEPLOY_SCRIPT = "/opt/recipelog/deploy/proxmox/deploy.sh";
@@ -101,11 +101,6 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
   return { ok: true, bootedAt: BOOT_TIME };
 }
 
-export async function getDeployStatus() {
-  const inProgress = existsSync(LOCK_FILE);
-  return { inProgress, bootedAt: BOOT_TIME };
-}
-
 /** Supprime le lock — utile pour débloquer après un échec. */
 export async function clearDeployLock(): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!existsSync(LOCK_FILE)) return { ok: true };
@@ -114,16 +109,5 @@ export async function clearDeployLock(): Promise<{ ok: true } | { ok: false; err
     return { ok: true };
   } catch (e) {
     return { ok: false, error: `Impossible de supprimer le lock : ${(e as Error).message}` };
-  }
-}
-
-export async function getDeployLog(maxLines = 80): Promise<string> {
-  if (!existsSync(LOG_FILE)) return "";
-  try {
-    const content = readFileSync(LOG_FILE, "utf8");
-    const lines = content.split("\n");
-    return lines.slice(-maxLines).join("\n");
-  } catch {
-    return "";
   }
 }

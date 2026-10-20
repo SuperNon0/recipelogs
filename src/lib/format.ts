@@ -40,3 +40,10 @@ export function formatCoef(coef: number): string {
     })
   );
 }
+
+/** Quantité + unité lisible : « 250 g », « 1,2 kg », « 2 cc », « QS ». */
+export function formatQty(qty: number, unit: string | null | undefined): string {
+  if (unit === "QS") return "QS";
+  if (!unit || unit === "g") return formatG(qty);
+  return qty.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " " + unit;
+}

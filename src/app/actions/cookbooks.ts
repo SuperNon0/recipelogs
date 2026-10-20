@@ -5,10 +5,23 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
-import { adjustToTarget, ingMass } from "@/lib/massAdjust";
+import { adjustToTarget, ingMass, recipeMass } from "@/lib/massAdjust";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Prochaine position libre dans un cahier. Recettes ET chapitres partagent
+ * le même ordre : il faut regarder les deux tables, sinon une nouvelle
+ * recette peut prendre la place d'un chapitre.
+ */
+async function nextCookbookPosition(cookbookId: number): Promise<number> {
+  const [maxRecipe, maxChapter] = await Promise.all([
+    prisma.cookbookRecipe.aggregate({ where: { cookbookId }, _max: { position: true } }),
+    prisma.cookbookChapter.aggregate({ where: { cookbookId }, _max: { position: true } }),
+  ]);
+  return Math.max(maxRecipe._max.position ?? -1, maxChapter._max.position ?? -1) + 1;
+}
 
 export async function createCookbook(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -106,10 +119,10 @@ export async function addMultipleRecipesToCookbook(
 
   const existing = await prisma.cookbookRecipe.findMany({
     where: { cookbookId },
-    select: { recipeId: true, position: true },
+    select: { recipeId: true },
   });
   const existingIds = new Set(existing.map((e) => e.recipeId));
-  const maxPos = existing.reduce((m, e) => Math.max(m, e.position), -1);
+  const firstPos = await nextCookbookPosition(cookbookId);
 
   const toAdd = recipeIds.filter((id) => !existingIds.has(id));
   const skipped = recipeIds.length - toAdd.length;
@@ -120,7 +133,7 @@ export async function addMultipleRecipesToCookbook(
       data: toAdd.map((recipeId, idx) => ({
         cookbookId,
         recipeId,
-        position: maxPos + 1 + idx,
+        position: firstPos + idx,
         linkMode: "linked" as const,
         subrecipeMode: "single" as const,
         snapshotData: Prisma.JsonNull,
@@ -135,7 +148,7 @@ export async function addMultipleRecipesToCookbook(
         data: {
           cookbookId,
           recipeId: toAdd[i],
-          position: maxPos + 1 + i,
+          position: firstPos + i,
           linkMode: "snapshot",
           subrecipeMode: "single",
           snapshotData: snap as unknown as Prisma.InputJsonValue,
@@ -164,10 +177,10 @@ export async function addMultipleRecipesWithMassTarget(
 
   const existing = await prisma.cookbookRecipe.findMany({
     where: { cookbookId },
-    select: { recipeId: true, position: true },
+    select: { recipeId: true },
   });
   const existingIds = new Set(existing.map((e) => e.recipeId));
-  const maxPos = existing.reduce((m, e) => Math.max(m, e.position), -1);
+  const firstPos = await nextCookbookPosition(cookbookId);
 
   const toAdd = recipeIds.filter((id) => !existingIds.has(id));
   const skipped = recipeIds.length - toAdd.length;
@@ -182,17 +195,7 @@ export async function addMultipleRecipesWithMassTarget(
     if (!r) continue;
 
     // Masse totale de base de la recette
-    const baseTotalG = r.ingredients.reduce((sum, ing) => {
-      const q = ing.quantityGMax != null
-        ? (Number(ing.quantityG) + Number(ing.quantityGMax)) / 2
-        : Number(ing.quantityG);
-      const u = ing.unit ?? "g";
-      if (!u || u === "g") return sum + q;
-      if (u === "cc") return sum + q * 5;
-      if (u === "cs") return sum + q * 15;
-      if (u === "L") return sum + q * 1000;
-      return sum;
-    }, 0);
+    const baseTotalG = recipeMass(r.ingredients).avg;
 
     const multiplier = baseTotalG > 0 ? targetMassG / baseTotalG : 1;
     let snap = await buildRecipeSnapshot(toAdd[i], multiplier);
@@ -217,7 +220,7 @@ export async function addMultipleRecipesWithMassTarget(
       data: {
         cookbookId,
         recipeId: toAdd[i],
-        position: maxPos + 1 + i,
+        position: firstPos + i,
         linkMode: "snapshot",
         subrecipeMode: "single",
         snapshotData: snap as unknown as Prisma.InputJsonValue,
@@ -244,10 +247,7 @@ export async function addRecipeToCookbook(
   });
   if (!cookbook) return { ok: false, error: "Cahier introuvable." };
 
-  const maxPos = await prisma.cookbookRecipe.aggregate({
-    where: { cookbookId },
-    _max: { position: true },
-  });
+  const position = await nextCookbookPosition(cookbookId);
 
   let snapshotData = null;
   let snapshotDate: Date | null = null;
@@ -262,7 +262,7 @@ export async function addRecipeToCookbook(
     data: {
       cookbookId,
       recipeId,
-      position: (maxPos._max.position ?? -1) + 1,
+      position,
       linkMode,
       subrecipeMode,
       snapshotData: snapshotData
@@ -278,35 +278,6 @@ export async function addRecipeToCookbook(
 
 export async function removeFromCookbook(entryId: number, cookbookId: number) {
   await prisma.cookbookRecipe.delete({ where: { id: entryId } });
-  revalidatePath(`/cookbooks/${cookbookId}`);
-}
-
-export async function moveCookbookEntry(
-  entryId: number,
-  direction: -1 | 1,
-  cookbookId: number,
-) {
-  const entries = await prisma.cookbookRecipe.findMany({
-    where: { cookbookId },
-    orderBy: { position: "asc" },
-    select: { id: true, position: true },
-  });
-  const idx = entries.findIndex((e) => e.id === entryId);
-  const target = idx + direction;
-  if (idx === -1 || target < 0 || target >= entries.length) return;
-
-  const a = entries[idx];
-  const b = entries[target];
-  await prisma.$transaction([
-    prisma.cookbookRecipe.update({
-      where: { id: a.id },
-      data: { position: b.position },
-    }),
-    prisma.cookbookRecipe.update({
-      where: { id: b.id },
-      data: { position: a.position },
-    }),
-  ]);
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
 
@@ -332,28 +303,14 @@ export async function addChapter(
   const title = data.title.trim();
   if (!title) return { ok: false, error: "Le titre du chapitre est obligatoire." };
 
-  // Position : à la fin (max position toutes entrées confondues + 1)
-  const [maxRecipe, maxChapter] = await Promise.all([
-    prisma.cookbookRecipe.aggregate({
-      where: { cookbookId },
-      _max: { position: true },
-    }),
-    prisma.cookbookChapter.aggregate({
-      where: { cookbookId },
-      _max: { position: true },
-    }),
-  ]);
-  const maxPos = Math.max(
-    maxRecipe._max.position ?? -1,
-    maxChapter._max.position ?? -1,
-  );
+  const position = await nextCookbookPosition(cookbookId);
 
   await prisma.cookbookChapter.create({
     data: {
       cookbookId,
       title: title.slice(0, 200),
       intro: data.intro?.trim().slice(0, 5000) || null,
-      position: maxPos + 1,
+      position,
     },
   });
   revalidatePath(`/cookbooks/${cookbookId}`);
@@ -443,10 +400,14 @@ export async function reorderCookbookEntries(
 export async function refreshSnapshot(entryId: number, cookbookId: number) {
   const entry = await prisma.cookbookRecipe.findUnique({
     where: { id: entryId },
-    select: { recipeId: true },
+    select: { recipeId: true, snapshotData: true },
   });
   if (!entry) return;
-  const snap = await buildRecipeSnapshot(entry.recipeId);
+  // On garde le coefficient déjà appliqué (ex. recette figée à 800 g) au lieu
+  // de revenir à la masse d'origine.
+  const previous = entry.snapshotData as { multiplier?: number } | null;
+  const multiplier = previous?.multiplier && previous.multiplier > 0 ? previous.multiplier : 1;
+  const snap = await buildRecipeSnapshot(entry.recipeId, multiplier);
   if (!snap) return;
   await prisma.cookbookRecipe.update({
     where: { id: entryId },
@@ -575,10 +536,13 @@ export async function updateSnapshotMass(
     totalMassGMax: round3(newTotalMaxG),
     totalMassG: round3((newTotalMinG + newTotalMaxG) / 2),
     subRecipes: (snap.subRecipes ?? []).map((sr) => {
+      // Sous-recette verrouillée 🔒 : sa masse ne suit pas la recette parente.
+      if (sr.isLocked) return sr;
+      // Même arrondi au supérieur que la recette principale.
       const subIngredients = sr.ingredients.map((i) => ({
         ...i,
-        quantityG: round3(i.quantityG * ratio),
-        quantityGMax: i.quantityGMax != null ? round3(i.quantityGMax * ratio) : null,
+        quantityG: Math.ceil(i.quantityG * ratio),
+        quantityGMax: i.quantityGMax != null ? Math.ceil(i.quantityGMax * ratio) : null,
       }));
       const subMinG = subIngredients.reduce(
         (s, i) => s + ingMass(i.quantityG, i.unit ?? "g"), 0,

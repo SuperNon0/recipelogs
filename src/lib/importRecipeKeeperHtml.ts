@@ -32,7 +32,7 @@
  */
 
 import { parseHTML } from "linkedom";
-import { parseIngredientsText } from "./parseIngredientsText";
+import { parseIngredientsText, type ParsedIngredient } from "./parseIngredientsText";
 
 export type RKImage = {
   /** Chemin relatif dans le ZIP, ex. "images/<uuid>_0.jpg" */
@@ -117,7 +117,7 @@ function parseRecipeNode(node: Element): RKHtmlRecipe | null {
   const ingNode = node.querySelector(
     'div.recipe-ingredients[itemprop="recipeIngredients"]',
   );
-  const ingredients: { name: string; quantityG: number }[] = [];
+  const ingredients: ParsedIngredient[] = [];
   if (ingNode) {
     const paragraphs = Array.from(ingNode.querySelectorAll("p"))
       .map((p) => p.textContent?.trim() ?? "")

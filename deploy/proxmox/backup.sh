@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# backup.sh — Sauvegarde PostgreSQL de RecipeLog
+# backup.sh — Sauvegarde PostgreSQL + photos de RecipeLog
 # À planifier dans cron (ex: quotidien à 3h)
 #
 # Crontab (root) :
@@ -24,11 +24,19 @@ echo "==> Sauvegarde de la base ${DB_NAME}..."
 sudo -u postgres pg_dump "${DB_NAME}" | gzip > "${BACKUP_FILE}"
 echo "==> Fichier : ${BACKUP_FILE} ($(du -sh "${BACKUP_FILE}" | cut -f1))"
 
+# Photos et fichiers envoyés
+UPLOAD_DIR="/var/lib/recipelog/uploads"
+if [ -d "${UPLOAD_DIR}" ]; then
+  UPLOADS_FILE="${BACKUP_DIR}/recipelog_uploads_${TIMESTAMP}.tar.gz"
+  tar -czf "${UPLOADS_FILE}" -C "$(dirname "${UPLOAD_DIR}")" "$(basename "${UPLOAD_DIR}")"
+  echo "==> Photos : ${UPLOADS_FILE} ($(du -sh "${UPLOADS_FILE}" | cut -f1))"
+fi
+
 # Nettoyage des sauvegardes anciennes
 echo "==> Nettoyage des sauvegardes > ${RETENTION_DAYS} jours..."
-find "${BACKUP_DIR}" -name "recipelog_*.sql.gz" -mtime "+${RETENTION_DAYS}" -delete
+find "${BACKUP_DIR}" -name "recipelog_*.gz" -mtime "+${RETENTION_DAYS}" -delete
 
 echo "==> Sauvegardes disponibles :"
-ls -lh "${BACKUP_DIR}"/recipelog_*.sql.gz 2>/dev/null || echo "    (aucune)"
+ls -lh "${BACKUP_DIR}"/recipelog_*.gz 2>/dev/null || echo "    (aucune)"
 
 echo "==> Backup terminé."

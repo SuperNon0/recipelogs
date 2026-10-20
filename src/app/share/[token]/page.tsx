@@ -1,18 +1,17 @@
 import { notFound } from "next/navigation";
 import { resolveShareToken, getPublicRecipeData, getPublicCookbookData } from "@/lib/share";
+import { SHARE_ENABLED } from "@/lib/features";
+import { formatQty } from "@/lib/format";
+import { StepsContent } from "@/components/StepsContent";
 
 export const dynamic = "force-dynamic";
-
-function formatG(g: number): string {
-  if (g >= 1000) return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
-  return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
 
 export default async function SharePage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
+  if (!SHARE_ENABLED) notFound();
   const { token } = await params;
   const row = await resolveShareToken(token);
   if (!row) notFound();
@@ -50,7 +49,7 @@ export default async function SharePage({
                 {snap.ingredients.map((ing, i) => (
                   <tr key={i}>
                     <td style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", fontSize: "0.9rem" }}>{ing.name}</td>
-                    <td style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontSize: "0.9rem" }}>{formatG(ing.quantityG)}</td>
+                    <td style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontSize: "0.9rem" }}>{formatQty(ing.quantityG, ing.unit)}</td>
                     <td style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontSize: "0.85rem", color: "var(--muted)" }}>
                       {snap.totalMassG > 0 ? ((ing.quantityG / snap.totalMassG) * 100).toFixed(1) + " %" : "—"}
                     </td>
@@ -60,7 +59,7 @@ export default async function SharePage({
               <tfoot>
                 <tr>
                   <td className="fl-label" style={{ padding: "6px 0" }}>Total</td>
-                  <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 600 }}>{formatG(snap.totalMassG)}</td>
+                  <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 600 }}>{formatQty(snap.totalMassG, "g")}</td>
                   <td style={{ padding: "6px 0", textAlign: "right", color: "var(--muted)", fontSize: "0.85rem" }}>100 %</td>
                 </tr>
               </tfoot>
@@ -78,15 +77,15 @@ export default async function SharePage({
                 {sr.ingredients.map((ing, j) => (
                   <tr key={j}>
                     <td style={{ padding: "3px 0", borderBottom: "1px solid var(--border)", fontSize: "0.9rem" }}>{ing.name}</td>
-                    <td style={{ padding: "3px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontSize: "0.9rem" }}>{formatG(ing.quantityG)}</td>
+                    <td style={{ padding: "3px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontSize: "0.9rem" }}>{formatQty(ing.quantityG, ing.unit)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {sr.steps && (
-              <pre style={{ marginTop: 12, whiteSpace: "pre-wrap", fontSize: "0.85rem", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
-                {sr.steps}
-              </pre>
+              <div style={{ marginTop: 12, color: "var(--muted)" }}>
+                <StepsContent content={sr.steps} fontSize="0.85rem" />
+              </div>
             )}
           </section>
         ))}
@@ -94,9 +93,7 @@ export default async function SharePage({
         {snap.steps && (
           <section className="fl-card">
             <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>Étapes</h2>
-            <pre style={{ whiteSpace: "pre-wrap", fontSize: "0.88rem", lineHeight: 1.6, fontFamily: "var(--font-mono)" }}>
-              {snap.steps}
-            </pre>
+            <StepsContent content={snap.steps} />
           </section>
         )}
 

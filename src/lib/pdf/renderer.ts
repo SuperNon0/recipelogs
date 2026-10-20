@@ -14,7 +14,32 @@ import { PDFDocument } from "pdf-lib";
  *   → Pour avoir « 1 sur la 1ʳᵉ recette », on rend la couverture/sommaire
  *   d'un côté et les recettes de l'autre, puis on fusionne (cf. `mergePdfs`).
  */
-export async function renderHtmlToPdf(
+/**
+ * File d'attente : un seul Chromium à la fois. Le service est limité en
+ * mémoire (MemoryMax) et chaque Chromium pèse plusieurs centaines de Mo ;
+ * plusieurs PDF demandés en même temps faisaient planter le serveur.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function runExclusive<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+export function renderHtmlToPdf(
+  html: string,
+  format: "A4" | "A5" = "A4",
+  options: {
+    footer?: string | null;
+    footerAlign?: "left" | "right";
+    /** Affiche le numéro de page (centré) dans le footer. */
+    showPageNumber?: boolean;
+  } = {},
+): Promise<Uint8Array> {
+  return runExclusive(() => renderHtmlToPdfNow(html, format, options));
+}
+
+async function renderHtmlToPdfNow(
   html: string,
   format: "A4" | "A5" = "A4",
   options: {

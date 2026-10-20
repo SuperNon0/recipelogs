@@ -9,7 +9,9 @@ import { AddToCookbookButton } from "@/components/AddToCookbookModal";
 import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
 import { ShareButton } from "@/components/ShareButton";
 import { getActiveToken } from "@/lib/share";
-import { sanitizeRichText, looksLikeHtml } from "@/lib/sanitizeRichText";
+import { SHARE_ENABLED } from "@/lib/features";
+import { recipeMass } from "@/lib/massAdjust";
+import { StepsContent } from "@/components/StepsContent";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ export default async function RecipePage({
 
   const [recipe, shareToken] = await Promise.all([
     getRecipeDetail(recipeId),
-    getActiveToken("recipe", recipeId),
+    SHARE_ENABLED ? getActiveToken("recipe", recipeId) : null,
   ]);
   if (!recipe) notFound();
 
@@ -76,14 +78,16 @@ export default async function RecipePage({
             ⬇ PDF
           </a>
           <AddToShoppingListButton recipeId={recipe.id} />
-          <ShareButton
-            entityType="recipe"
-            entityId={recipe.id}
-            existingToken={shareToken?.token ?? null}
-          />
+          {SHARE_ENABLED && (
+            <ShareButton
+              entityType="recipe"
+              entityId={recipe.id}
+              existingToken={shareToken?.token ?? null}
+            />
+          )}
           <AddToCookbookButton
             recipeId={recipe.id}
-            totalMassG={ingredients.reduce((s, i) => s + (i.unit === "g" ? i.quantityG : 0), 0)}
+            totalMassG={recipeMass(ingredients).avg}
             ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG }))}
           />
           <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
@@ -91,6 +95,20 @@ export default async function RecipePage({
       </div>
 
       <header className="flex flex-col gap-3">
+        {recipe.photoPath && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={recipe.photoPath}
+            alt={recipe.name}
+            style={{
+              width: "100%",
+              maxHeight: 320,
+              objectFit: "cover",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+            }}
+          />
+        )}
         <div className="flex items-start gap-3">
           <h1
             className="fl-title-serif flex-1"
@@ -157,26 +175,7 @@ export default async function RecipePage({
           <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
             Étapes
           </h2>
-          {looksLikeHtml(recipe.stepsBlock.content) ? (
-            <div
-              className="rte-content"
-              style={{ fontSize: "0.92rem", lineHeight: 1.6 }}
-              dangerouslySetInnerHTML={{
-                __html: sanitizeRichText(recipe.stepsBlock.content),
-              }}
-            />
-          ) : (
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.88rem",
-                lineHeight: 1.6,
-              }}
-            >
-              {recipe.stepsBlock.content}
-            </pre>
-          )}
+          <StepsContent content={recipe.stepsBlock.content} />
         </section>
       )}
 

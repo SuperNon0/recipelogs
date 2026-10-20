@@ -10,8 +10,21 @@ set -euo pipefail
 
 APP_USER="recipelog"
 APP_DIR="/opt/recipelog"
+UPLOAD_DIR="/var/lib/recipelog/uploads"
 
 echo "==> [$(date '+%H:%M:%S')] Démarrage du déploiement..."
+
+# ── Dossier des photos (hors du build, sinon effacé à chaque déploiement) ──
+mkdir -p "${UPLOAD_DIR}"
+# Récupère les photos qui avaient été écrites dans l'ancien emplacement.
+OLD_UPLOADS="${APP_DIR}/.next/standalone/public/uploads"
+if [ -d "${OLD_UPLOADS}" ]; then
+  cp -rn "${OLD_UPLOADS}/." "${UPLOAD_DIR}/" || true
+fi
+chown -R "${APP_USER}:${APP_USER}" "$(dirname "${UPLOAD_DIR}")"
+if ! grep -q '^UPLOAD_DIR=' "${APP_DIR}/.env"; then
+  echo "UPLOAD_DIR=\"${UPLOAD_DIR}\"" >> "${APP_DIR}/.env"
+fi
 
 # ── Pull ────────────────────────────────────────────────
 echo "==> Git pull..."

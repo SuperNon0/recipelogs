@@ -8,6 +8,7 @@ import {
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { ingMass } from "../massAdjust";
+import { formatG, formatQty } from "../format";
 
 /** Slug historique conservé pour compatibilité descendante. */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
@@ -56,11 +57,6 @@ export type RecipeSnap = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatG(g: number): string {
-  if (g >= 1000) return (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " kg";
-  return g.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " g";
-}
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
@@ -545,20 +541,20 @@ function renderIngredients(
       } else if (i.quantityGMax != null) {
         if (unit === "cc" || unit === "cs") {
           const factor = unit === "cc" ? 5 : 15;
-          qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`
+          qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`
             + `<span class="ing-unit-muted">/</span>`
-            + `<span class="ing-qty">${formatIngQty(i.quantityGMax, unit)}</span>`
+            + `<span class="ing-qty">${formatQty(i.quantityGMax, unit)}</span>`
             + `<span class="ing-unit-muted"> (≈${formatG(i.quantityG * factor)}/${formatG(i.quantityGMax * factor)})</span>`;
         } else {
-          qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`
+          qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`
             + `<span class="ing-unit-muted">/</span>`
-            + `<span class="ing-qty">${formatIngQty(i.quantityGMax, unit)}</span>`;
+            + `<span class="ing-qty">${formatQty(i.quantityGMax, unit)}</span>`;
         }
       } else if (unit === "cc" || unit === "cs") {
         const gEquiv = formatG(i.quantityG * (unit === "cc" ? 5 : 15));
-        qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span><span class="ing-unit-muted"> (≈${gEquiv})</span>`;
+        qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span><span class="ing-unit-muted"> (≈${gEquiv})</span>`;
       } else {
-        qty = `<span class="ing-qty">${formatIngQty(i.quantityG, unit)}</span>`;
+        qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`;
       }
       return `
       <div class="ing-item">
@@ -577,11 +573,6 @@ function renderIngredients(
   return list + totalLine;
 }
 
-function formatIngQty(qty: number, unit: string): string {
-  if (unit === "g") return formatG(qty);
-  const n = qty.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
-  return `${n} ${unit}`;
-}
 
 /**
  * Enlève « 1. », « 1) », « 1- », etc. en tout début de chaque <p>
