@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { addRecipeToCookbook } from "@/app/actions/cookbooks";
-import { ModalOverlay } from "./RecipeBody";
+import { ModalOverlay } from "./ModalOverlay";
 import { fetchCookbooksForModal } from "@/app/actions/modals";
 
 type Cookbook = { id: number; name: string };

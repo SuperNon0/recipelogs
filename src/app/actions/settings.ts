@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { ActionResult } from "@/lib/actionResult";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
 import {
   recipePdfSettingsSchema,
@@ -11,7 +12,12 @@ import {
   type RecipePdfSettings,
 } from "@/lib/pdf/theme";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/** Couleur saisie, limitée au format hexadécimal (#abc ou #aabbcc). */
+function parseColor(raw: FormDataEntryValue | null): string {
+  const c = String(raw ?? "").trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c) ? c : "#888888";
+}
 
 /** Vrai si l'erreur Prisma vient d'une contrainte d'unicité (nom déjà pris). */
 function isUniqueViolation(e: unknown): boolean {
@@ -68,7 +74,7 @@ export async function saveRecipePdfSettings(
 
 export async function createCategory(formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#888888").trim();
+  const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
   const exists = await prisma.category.findFirst({
@@ -86,7 +92,7 @@ export async function updateCategory(
   formData: FormData,
 ): Promise<ActionResult> {
   const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#888888").trim();
+  const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
   try {
@@ -112,7 +118,7 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
 
 export async function createFolder(formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#888888").trim();
+  const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
   const exists = await prisma.folder.findFirst({
@@ -131,7 +137,7 @@ export async function updateFolder(
   formData: FormData,
 ): Promise<ActionResult> {
   const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#888888").trim();
+  const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
   try {

@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName } from "pdf-lib";
 
 /**
  * Rendu HTML → PDF via Puppeteer (Chromium headless).
@@ -126,4 +126,27 @@ export async function mergePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
   }
   const out = await merged.save();
   return out;
+}
+
+/**
+ * Lit, dans un PDF produit par Chromium, la page (1 = première) de chaque
+ * ancre `<prefix><n>` ciblée par un lien. Renvoie un tableau indexé par n.
+ */
+export async function readAnchorPages(pdf: Uint8Array, prefix: string): Promise<number[]> {
+  const doc = await PDFDocument.load(pdf);
+  const pageRefs = doc.getPages().map((p) => p.ref.toString());
+  const dests = doc.catalog.lookup(PDFName.of("Dests"));
+  const result: number[] = [];
+  if (!(dests instanceof PDFDict)) return result;
+  for (const [key, value] of dests.entries()) {
+    const name = decodeURIComponent(key.decodeText());
+    if (!name.startsWith(prefix)) continue;
+    const index = Number(name.slice(prefix.length));
+    let dest = doc.context.lookup(value);
+    if (dest instanceof PDFDict) dest = dest.lookup(PDFName.of("D"));
+    if (!(dest instanceof PDFArray) || !Number.isInteger(index)) continue;
+    const page = pageRefs.indexOf(dest.get(0).toString());
+    if (page >= 0) result[index] = page + 1;
+  }
+  return result;
 }

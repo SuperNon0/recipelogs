@@ -9,6 +9,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.8",
+    date: "2026-10-20",
+    title: "Sommaire exact et 4 mises en page PDF",
+    features: [
+      "4 mises en page des recettes : Classique, Fiche technique, Moderne, Magazine",
+      "Choix de la mise en page par cahier et pour le PDF d'une recette",
+    ],
+    fixes: [
+      "Numéros de page du sommaire exacts même si une recette fait plusieurs pages",
+      "Alignement des fourchettes et cuillères dans les PDF",
+      "« 3 pièces » au pluriel",
+    ],
+  },
+  {
     version: "V1.7",
     date: "2026-10-20",
     title: "Corrections & fiabilisation",

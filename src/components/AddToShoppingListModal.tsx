@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addRecipeToList } from "@/app/actions/shopping";
-import { ModalOverlay } from "./RecipeBody";
+import { ModalOverlay } from "./ModalOverlay";
 import { fetchShoppingListsForModal } from "@/app/actions/modals";
 
 type ShoppingList = { id: number; name: string };

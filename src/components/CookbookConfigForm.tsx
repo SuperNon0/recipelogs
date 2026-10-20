@@ -19,6 +19,9 @@ import {
   TEXT_SIZE_MIN,
   TEXT_SIZE_MAX,
   TEXT_SIZE_STEP,
+  RECIPE_LAYOUTS,
+  RECIPE_LAYOUT_LABELS,
+  RECIPE_LAYOUT_HINTS,
 } from "@/lib/pdf/theme";
 import { CookbookPreview } from "./CookbookPreview";
 
@@ -171,6 +174,16 @@ export function CookbookConfigForm({
               ]}
             />
           </label>
+        </Section>
+
+        {/* Mise en page des recettes */}
+        <Section title="Mise en page des recettes">
+          <SegmentedControl
+            value={theme.recipeLayout}
+            onChange={(v) => setT("recipeLayout", v)}
+            options={RECIPE_LAYOUTS.map((l) => ({ value: l, label: RECIPE_LAYOUT_LABELS[l] }))}
+          />
+          <p className="text-xs text-[color:var(--muted)]">{RECIPE_LAYOUT_HINTS[theme.recipeLayout]}</p>
         </Section>
 
         {/* Couleurs des recettes */}

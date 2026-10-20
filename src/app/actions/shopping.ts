@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { ActionResult } from "@/lib/actionResult";
 import { aggregateIngredients, shoppingKey } from "@/lib/shopping";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function createShoppingList(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();

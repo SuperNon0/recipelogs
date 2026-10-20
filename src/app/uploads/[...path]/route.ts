@@ -1,13 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
-import { uploadFilePath } from "@/lib/uploads";
-
-const MIME: Record<string, string> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-};
+import { imageMime, uploadFilePath } from "@/lib/uploads";
 
 /**
  * Sert les fichiers du dossier d'upload. Nécessaire car Next.js ne sert que
@@ -19,7 +11,7 @@ export async function GET(
 ) {
   const { path } = await params;
   const file = uploadFilePath(path);
-  const type = file ? MIME[extname(file).toLowerCase()] : undefined;
+  const type = file ? imageMime(file) : null;
   if (!file || !type) return new Response("Not found", { status: 404 });
   try {
     const bytes = await readFile(file);

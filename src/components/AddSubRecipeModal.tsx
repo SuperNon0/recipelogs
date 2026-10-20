@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ModalOverlay } from "./RecipeBody";
+import { ModalOverlay } from "./ModalOverlay";
 import { addSubRecipe } from "@/app/actions/subRecipes";
 import { fetchAvailableRecipes } from "@/app/actions/modals";
 
