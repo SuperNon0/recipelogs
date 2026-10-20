@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { createHash } from "node:crypto";
-import { UPLOAD_DIR, uploadFilePath, uploadUrl } from "@/lib/uploads";
+import { UPLOAD_DIR, fileFromUploadUrl, uploadUrl } from "@/lib/uploads";
 import { prisma } from "@/lib/prisma";
 import { normalizeForSearch } from "@/lib/recipes";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
@@ -26,9 +26,7 @@ export type ImportResult = {
 
 /** Vrai si l'URL /uploads/... pointe vers un fichier présent sur le disque. */
 function photoExists(photoPath: string | null): boolean {
-  if (!photoPath?.startsWith("/uploads/")) return false;
-  const parts = photoPath.slice("/uploads/".length).split("/").map(decodeURIComponent);
-  const file = uploadFilePath(parts);
+  const file = fileFromUploadUrl(photoPath);
   return !!file && existsSync(file);
 }
 

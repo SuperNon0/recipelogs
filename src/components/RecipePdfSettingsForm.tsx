@@ -11,6 +11,10 @@ import {
   TEXT_SIZE_MAX,
   TEXT_SIZE_STEP,
   type FontKey,
+  type RecipeLayout,
+  RECIPE_LAYOUTS,
+  RECIPE_LAYOUT_LABELS,
+  RECIPE_LAYOUT_HINTS,
 } from "@/lib/pdf/theme";
 import { saveRecipePdfSettings } from "@/app/actions/settings";
 
@@ -90,6 +94,35 @@ export function RecipePdfSettingsForm({
             );
           })}
         </div>
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="fl-label">Mise en page</span>
+        <div
+          className="inline-flex rounded-md overflow-hidden border w-fit flex-wrap"
+          style={{ borderColor: "var(--border)" }}
+        >
+          {RECIPE_LAYOUTS.map((l) => {
+            const sel = l === s.recipeLayout;
+            return (
+              <button
+                key={l}
+                type="button"
+                onClick={() => set("recipeLayout", l as RecipeLayout)}
+                className="px-3 py-1.5 text-sm transition-colors"
+                style={{
+                  background: sel ? "var(--accent)" : "transparent",
+                  color: sel ? "var(--bg)" : "var(--text)",
+                  fontWeight: sel ? 600 : 400,
+                  borderRight: "1px solid var(--border)",
+                }}
+              >
+                {RECIPE_LAYOUT_LABELS[l]}
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-xs text-[color:var(--muted)]">{RECIPE_LAYOUT_HINTS[s.recipeLayout]}</span>
       </label>
 
       <ColorRow

@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { ActionResult } from "@/lib/actionResult";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { adjustToTarget, ingMass, recipeMass } from "@/lib/massAdjust";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Prochaine position libre dans un cahier. Recettes ET chapitres partagent

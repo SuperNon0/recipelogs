@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listCookbooks } from "@/lib/cookbooks";
 import { Fab } from "@/components/Fab";
+import { parseTheme, RECIPE_LAYOUT_LABELS } from "@/lib/pdf/theme";
 import { EmptyState } from "@/components/EmptyState";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +59,9 @@ export default async function CookbooksPage() {
                     {c._count.entries}
                   </div>
                 </div>
-                {c.template && (
-                  <span className="fl-tag">{c.template.name}</span>
-                )}
+                <span className="fl-tag">
+                  {RECIPE_LAYOUT_LABELS[parseTheme(c.coverConfig).recipeLayout]}
+                </span>
               </div>
             </Link>
           ))}

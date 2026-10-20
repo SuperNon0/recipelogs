@@ -143,6 +143,22 @@ const textSizeSchema = z
  * Layouts de couverture = uniquement le PLACEMENT du texte (titre + description).
  * Le fond est géré séparément via `coverBgPattern`.
  */
+/** Mise en page des fiches recettes dans les PDF. */
+export const RECIPE_LAYOUTS = ["classique", "fiche-technique", "moderne", "magazine"] as const;
+export type RecipeLayout = (typeof RECIPE_LAYOUTS)[number];
+export const RECIPE_LAYOUT_LABELS: Record<RecipeLayout, string> = {
+  classique: "Classique",
+  "fiche-technique": "Fiche technique",
+  moderne: "Moderne",
+  magazine: "Magazine",
+};
+export const RECIPE_LAYOUT_HINTS: Record<RecipeLayout, string> = {
+  classique: "Ingrédients à gauche, préparation à droite.",
+  "fiche-technique": "Style BTM : cartouche (masse, date), tableau des ingrédients avec % de la masse.",
+  moderne: "Une seule colonne, titre éditorial, ingrédients sur 2 colonnes.",
+  magazine: "Photo de la recette en tête, encadré ingrédients, lettrine.",
+};
+
 export const COVER_LAYOUTS = [
   "circle",
   "framed",
@@ -199,6 +215,7 @@ export const cookbookThemeSchema = z.object({
   textSize: textSizeSchema.default(TEXT_SIZE_DEFAULT),
 
   // Mise en page recette
+  recipeLayout: z.enum(RECIPE_LAYOUTS).default("classique"),
   ingredientsPosition: z.enum(["left", "right", "top"]).default("left"),
   ingredientsRatio: z.enum(["narrow", "balanced", "wide"]).default("narrow"),
 
@@ -246,6 +263,7 @@ export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
  */
 export const recipePdfSettingsSchema = z.object({
   format: z.enum(["A4", "A5"]).default("A4"),
+  recipeLayout: z.enum(RECIPE_LAYOUTS).default("classique"),
   textColor: hex.default("#111111"),
   accentColor: hex.default("#A52A2A"),
   titleFont: fontSchema.default("arial"),
@@ -270,6 +288,7 @@ export const DEFAULT_RECIPE_PDF_SETTINGS: RecipePdfSettings =
 export function recipePdfSettingsToTheme(s: RecipePdfSettings): CookbookTheme {
   return {
     ...DEFAULT_THEME,
+    recipeLayout: s.recipeLayout,
     textColor: s.textColor,
     accentColor: s.accentColor,
     titleFont: s.titleFont,

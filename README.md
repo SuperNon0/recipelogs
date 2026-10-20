@@ -4,7 +4,7 @@
 
 Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les manques de Recipe Keeper : précision au gramme, multiplication (3 modes), sous-recettes et cahiers PDF.
 
-**Version actuelle : V1.7** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : V1.8** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la seule documentation du projet**. Il remplace l'ancien cahier des charges (`CDC.md`), le document de transmission (`HANDOFF.md`) et les guides `INSTALL.md` / `DEPLOYMENT.md`.
 
@@ -28,6 +28,25 @@ Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les 
 ---
 
 ## 1. 🆕 Mises à jour effectuées
+
+### V1.8 (20 octobre 2026) : sommaire exact et mises en page PDF
+
+| # | Avant | Maintenant |
+|---|---|---|
+| 1 | **Sommaire des cahiers faux** dès qu'une recette faisait plus d'une page : tous les numéros suivants étaient décalés. | Le sommaire lit la vraie page de chaque recette dans le PDF généré : numéros toujours exacts. |
+| 2 | **Les styles « moderne », « fiche technique » et « magazine » n'existaient pas** (tout sortait en « classique », sans moyen de choisir). | Nouveau réglage **« Mise en page des recettes »** (onglet Apparence du cahier, et Paramètres → PDF d'une recette) avec 4 styles, détaillés sous le tableau. |
+| 3 | Dans les PDF, une **fourchette ou une cuillère** (« 90 g / 100 g », « 1 cc (≈5 g) ») décalait le nom de l'ingrédient. | Colonne quantité bien alignée. |
+| 4 | « 3 pièce ». | « 3 pièces ». |
+| 5 | Couleurs des dossiers / catégories acceptées sans contrôle. | Seules les couleurs valides (#abc ou #aabbcc) sont enregistrées. |
+| 6 | Détection des boucles de sous-recettes : une requête par niveau. | Une seule requête. |
+
+Les 4 styles :
+- **Classique** : ingrédients à gauche, préparation à droite (inchangé).
+- **Fiche technique** (style BTM) : cartouche masse totale / nombre d'ingrédients / date, tableau des ingrédients avec le **% de chaque ingrédient dans la masse totale**.
+- **Moderne** : une seule colonne, grand titre, ingrédients sur 2 colonnes.
+- **Magazine** : photo de la recette en tête de page, encadré ingrédients, lettrine.
+
+Nettoyage : `ModalOverlay` dans son propre fichier, type `ActionResult` commun, conversion des URL de photos regroupée. 65 tests verts.
 
 ### V1.7 (20 octobre 2026) : corrections et fiabilisation
 
@@ -85,11 +104,11 @@ Aujourd'hui tout le site est protégé par Cloudflare, donc un lien partagé est
 
 À ajouter en même temps : bouton « Télécharger le PDF » sur la page partagée, date d'expiration du lien, partage d'une liste de courses.
 
-### 📄 Templates PDF
-Seul le style « classique » est dessiné ; « moderne », « fiche technique » et « magazine » retombent dessus. Options :
-- **Fiche technique** (style BTM) : tableau compact avec % de masse, en-tête étiquette (date, masse, n° fiche). C'est le plus utile pour l'examen.
-- **Moderne** : une colonne, typographie serif.
-- **Magazine** : photo pleine page (maintenant possible grâce aux photos).
+### 🖼️ Logo personnel sur les cahiers
+Option prévue en base mais sans interface. Options : envoi d'un logo dans Paramètres, puis affichage sur la couverture et/ou en pied de page.
+
+### 🧪 Variantes de recette
+Créer « v2, v3 » d'une recette en gardant le lien avec l'original, pour comparer les essais (la table existe déjà en base).
 
 ### 💾 Export / import JSON complet
 Sauvegarde téléchargeable de toutes les données (recettes, dossiers, cahiers, listes), avec restauration. Options : bouton manuel dans Paramètres, et/ou envoi automatique vers un NAS ou S3 (cron).
@@ -101,10 +120,7 @@ Ajouter / changer la photo depuis le formulaire de recette (aujourd'hui seulemen
 Prix au kilo dans la base d'ingrédients, puis coût total et par portion sur la fiche et dans le PDF.
 
 ### 🛒 Liste de courses
-Groupement par rayon (frais, sec, fruits…) en réutilisant les catégories d'ingrédients (base / fruit / préparation) ; pluriel automatique (« 9 pièces »).
-
-### 🔢 Sommaire PDF exact
-Le sommaire suppose 1 page par recette. Option : 2ᵉ passe qui lit le vrai nombre de pages pour numéroter juste.
+Groupement par rayon (frais, sec, fruits…) en réutilisant les catégories d'ingrédients (base / fruit / préparation).
 
 ### 📱 PWA (application installable)
 Installation sur iPad / téléphone et consultation hors-ligne des recettes en cuisine.
@@ -113,10 +129,8 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 
 ## 3. ⚠️ Problèmes connus restants
 
-- **Sommaire PDF** : si une recette déborde sur 2 pages, les numéros suivants sont décalés.
-- **3 templates PDF sur 4** ne sont pas stylés (rendu « classique »).
-- **Variantes de recette** : table présente en base mais fonctionnalité jamais développée.
-- **Logo personnel sur les cahiers** : option visible mais non branchée.
+- **Variantes de recette** et **logo des cahiers** : prévus en base, pas encore développés (voir propositions).
+- **Gros composants** (`IngredientBaseManager`, `RecipeBody`, `CookbookConfigForm` : ~1 000 lignes chacun, beaucoup de styles en ligne) : fonctionnels, mais à découper si on les fait évoluer.
 - **Format des étapes** : les anciennes recettes sont en HTML (ancien éditeur), les nouvelles en texte (1 étape par ligne). Les deux s'affichent correctement ; ouvrir puis enregistrer une ancienne recette la convertit en texte (le gras est perdu).
 
 ---
@@ -144,11 +158,12 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 ### 📖 Cahiers PDF
 - Recettes **liées 🔗** (toujours à jour) ou **figées 📌** (copie à une date, avec masse modifiable en 3 modes).
 - Glisser-déposer, chapitres, titres de section, filtre des recettes déjà présentes.
-- Couverture personnalisable (layouts, couleurs, image), sommaire avec sous-recettes `↳`, 1 page par recette et par sous-recette, numérotation à partir de la 1ʳᵉ recette, pied de page 3 zones, A4 / A5, aperçu sans enregistrer.
+- **4 mises en page** des recettes : Classique, Fiche technique (tableau + % de masse), Moderne, Magazine (photo).
+- Couverture personnalisable (layouts, couleurs, image), sommaire avec sous-recettes `↳` et **numéros de page exacts**, 1 page par recette et par sous-recette, numérotation à partir de la 1ʳᵉ recette, pied de page 3 zones, A4 / A5, aperçu sans enregistrer.
 - Bouton « Liste de courses » : ajoute toutes les recettes du cahier à une liste.
 
 ### 📄 PDF d'une recette
-Téléchargement depuis la fiche ; style réglable dans **Paramètres → PDF d'une recette**.
+Téléchargement depuis la fiche ; style réglable dans **Paramètres → PDF d'une recette** (mise en page, format, couleurs, polices, sections).
 
 ### 🛒 Listes de courses
 - Plusieurs listes, recettes avec coefficient, articles libres.
@@ -195,7 +210,7 @@ Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g �
 | Style | Tailwind CSS v4 + design system FuelLog |
 | Validation | Zod |
 | PDF | Puppeteer 24 (Chromium système) + pdf-lib (fusion des passes) |
-| Tests | Vitest 4 (61 tests) |
+| Tests | Vitest 4 (65 tests) |
 | Hébergement | LXC Debian 12 (Proxmox) · nginx · Cloudflare Tunnel + Zero Trust |
 
 **Monolithe Next.js** : pas de séparation front/back ; les « API » sont des Server Actions (`src/app/actions/`) et des Route Handlers (`src/app/**/route.ts`).
@@ -220,7 +235,7 @@ src/
     ├── parseIngredientsText.ts, importRecipeKeeper*.ts
     ├── uploads.ts          # dossier des photos
     ├── features.ts         # interrupteurs (SHARE_ENABLED)
-    └── pdf/                # template.ts (HTML), theme.ts, renderer.ts (Puppeteer + file d'attente), cookbookPdf.ts
+    └── pdf/                # template.ts (HTML + 4 mises en page), theme.ts, renderer.ts (Puppeteer + file d'attente + lecture des ancres), cookbookPdf.ts
 ```
 
 ### Règles à respecter (pièges connus)
@@ -232,6 +247,8 @@ src/
 6. Recettes et chapitres d'un cahier **partagent la même `position`** : utiliser `nextCookbookPosition`.
 7. `layout.tsx` est `async` (lit `siteUrl`) ; `AppNav` affiche `CHANGELOG[0].version` (`src/lib/changelog.ts`) : ajouter une entrée à chaque version.
 8. Le champ `cookbooks_recipes.subrecipe_mode` est ignoré (toujours « séparées »).
+9. **Sommaire PDF** : les recettes sont rendues avant la couverture ; chaque page listée porte une ancre `toc-<n>` ciblée par un lien invisible, et `readAnchorPages` relit sa page réelle dans le PDF. Garder le même ordre dans `computeTocEntries` et `buildRecipesHtml` (les deux passent par `subSnapsOf`).
+10. La mise en page (`recipeLayout`) est dans le thème : CSS dans `layoutCss()`, classe `layout-<slug>` sur `<body>`. La table `pdf_templates` n'est plus utilisée pour le rendu.
 
 ---
 
@@ -358,6 +375,7 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 
 | Version | Contenu principal |
 |---|---|
+| **V1.8** | Sommaire PDF exact, 4 mises en page des recettes, petites corrections (voir §1). |
 | **V1.7** | Corrections et fiabilisation (voir §1), partage désactivé, photos persistantes. |
 | **V1.6** | Affichage décimales / entiers, masse cible exacte à l'écran, navigation en pilules, refonte de la page ingrédients, suppression de la page « Nouveautés ». Puis : classement rapide et sélection multiple des ingrédients, sélection multiple des recettes, liste de courses depuis un cahier, PDF de liste de courses, éditeur d'étapes en texte simple. |
 | **V1.5** | Masse exacte (`adjustToTarget`, `is_exact`), filtre des recettes déjà dans un cahier, cadenas optimiste, index de recherche. |

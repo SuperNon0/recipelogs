@@ -7,7 +7,7 @@ import {
   googleFontsHref,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
-import { ingMass } from "../massAdjust";
+import { recipeMass } from "../massAdjust";
 import { formatG, formatQty } from "../format";
 
 /** Slug historique conservé pour compatibilité descendante. */
@@ -414,7 +414,9 @@ export function buildCss(
       color: ${theme.accentColor};
       font-variant-numeric: tabular-nums;
       min-width: 18mm;
+      white-space: nowrap;
     }
+    .ing-unit-muted { font-weight: 400; color: ${mute(theme.textColor)}; font-size: 0.9em; }
     .ing-item .ing-name {
       flex: 1 1 auto;
       color: ${theme.textColor};
@@ -521,41 +523,169 @@ export function buildCss(
       margin-bottom: 2mm;
     }
     .muted { color: ${mute(theme.textColor)}; font-style: italic; }
+    .ing-qs { color: ${theme.accentColor}; font-weight: 600; }
+    ${layoutCss(theme, { titleFont, baseSize, titleSize })}
+  `;
+}
+
+/**
+ * CSS propre à chaque mise en page (classe `layout-<slug>` sur <body>).
+ * « classique » = styles de base ci-dessus, sans surcharge.
+ */
+function layoutCss(
+  theme: CookbookTheme,
+  v: { titleFont: string; baseSize: number; titleSize: number },
+): string {
+  const a = theme.accentColor;
+  const muted = mute(theme.textColor);
+  return `
+    /* ─── Fiche technique : dense, tableau avec % de masse ─── */
+    .layout-fiche-technique .recipe-title {
+      text-align: left; text-transform: uppercase; letter-spacing: 0.03em;
+      font-size: ${v.titleSize - 2}pt; margin: 0 0 2mm;
+      border-bottom: 2px solid ${a}; padding-bottom: 1.5mm;
+    }
+    .layout-fiche-technique .recipe-categories,
+    .layout-fiche-technique .tags-line,
+    .layout-fiche-technique .subrecipe-of,
+    .layout-fiche-technique .portion,
+    .layout-fiche-technique .recipe-rating { text-align: left; }
+    .fiche-label { display: flex; border: 1.5px solid ${a}; margin: 2mm 0 4mm; }
+    .fiche-label > div { flex: 1; padding: 1.2mm 3mm; border-right: 1px solid ${a}; }
+    .fiche-label > div:last-child { border-right: none; }
+    .fiche-label .k {
+      display: block; font-size: ${v.baseSize - 2}pt; color: ${muted};
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .fiche-label .v { font-weight: 700; }
+    .layout-fiche-technique .columns { flex-direction: column; gap: 4mm; }
+    .layout-fiche-technique .col-title {
+      font-size: ${v.baseSize + 1}pt; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2mm;
+    }
+    .ing-table { width: 100%; border-collapse: collapse; font-size: ${v.baseSize - 0.5}pt; }
+    .ing-table th {
+      text-align: left; background: ${a}; color: #fff; padding: 1mm 2mm;
+      font-size: ${v.baseSize - 1}pt; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .ing-table td { padding: 0.9mm 2mm; border-bottom: 0.5px solid #dddddd; }
+    .ing-table tbody tr:nth-child(even) td { background: #f5f5f5; }
+    .ing-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .ing-table th.num { text-align: right; }
+    .ing-table .pct { color: ${muted}; width: 16mm; }
+    .ing-table td .ing-qty { color: ${theme.textColor}; }
+    .ing-table tfoot td { font-weight: 700; color: ${a}; border-top: 1.5px solid ${a}; border-bottom: none; }
+    .layout-fiche-technique .steps-rich > p { margin-bottom: 1.5mm; }
+
+    /* ─── Moderne : une colonne, titre éditorial ─── */
+    .layout-moderne .recipe-title {
+      text-align: left; font-weight: 400; font-size: ${v.titleSize + 6}pt; margin: 2mm 0 2mm;
+    }
+    .layout-moderne .recipe-title::after {
+      content: ""; display: block; width: 18mm; height: 2px; background: ${a}; margin-top: 3mm;
+    }
+    .layout-moderne .recipe-categories,
+    .layout-moderne .tags-line,
+    .layout-moderne .subrecipe-of,
+    .layout-moderne .portion,
+    .layout-moderne .recipe-rating { text-align: left; }
+    .layout-moderne .tag-chip { margin: 0 2mm 0 0; }
+    .layout-moderne .columns { flex-direction: column; gap: 7mm; }
+    .layout-moderne .col-title {
+      font-size: ${v.baseSize}pt; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.14em; color: ${muted}; border-bottom: 1px solid #e2e2e2;
+      padding-bottom: 1.5mm;
+    }
+    .layout-moderne .ing-list { column-count: 2; column-gap: 10mm; }
+    .layout-moderne .ing-item { break-inside: avoid; }
+
+    /* ─── Magazine : photo, encadré ingrédients, lettrine ─── */
+    .recipe-photo {
+      display: block; width: 100%; height: 70mm; object-fit: cover; margin-bottom: 4mm;
+    }
+    .layout-magazine .recipe-title {
+      text-align: left; font-size: ${v.titleSize + 8}pt; font-weight: 700; margin: 0 0 2mm;
+    }
+    .layout-magazine .recipe-categories,
+    .layout-magazine .tags-line,
+    .layout-magazine .subrecipe-of,
+    .layout-magazine .portion,
+    .layout-magazine .recipe-rating { text-align: left; }
+    .layout-magazine .tag-chip { margin: 0 2mm 0 0; }
+    .layout-magazine .col-ing {
+      background: ${a}12; border-left: 3px solid ${a}; padding: 4mm;
+    }
+    .layout-magazine .steps-rich > p { padding-left: 0; }
+    .layout-magazine .steps-rich > p::before { content: none; }
+    .layout-magazine .steps-rich > p:first-child { display: flow-root; }
+    .layout-magazine .steps-rich > p:first-child::first-letter {
+      float: left; font-family: ${v.titleFont}; font-size: 3.4em; line-height: 0.85;
+      font-weight: 700; color: ${a}; margin: 1mm 2mm 0 0;
+    }
   `;
 }
 
 // ─── Rendu des morceaux ──────────────────────────────────────────────────────
 
+type PdfIngredient = { name: string; quantityG: number; quantityGMax?: number | null; unit?: string };
+
+/**
+ * Quantité affichée dans un PDF (QS, fourchette, équivalent g des cuillères),
+ * dans UN seul bloc `.ing-qty` pour garder l'alignement de la colonne.
+ */
+function ingQtyHtml(i: PdfIngredient): string {
+  const unit = i.unit ?? "g";
+  if (unit === "QS") return `<span class="ing-qty ing-qs">QS</span>`;
+  const factor = unit === "cc" ? 5 : unit === "cs" ? 15 : 0;
+  let inner = formatQty(i.quantityG, unit);
+  if (i.quantityGMax != null) inner += ` / ${formatQty(i.quantityGMax, unit)}`;
+  if (factor) {
+    const approx = i.quantityGMax != null
+      ? `${formatG(i.quantityG * factor)}/${formatG(i.quantityGMax * factor)}`
+      : formatG(i.quantityG * factor);
+    inner += ` <span class="ing-unit-muted">(≈${approx})</span>`;
+  }
+  return `<span class="ing-qty">${inner}</span>`;
+}
+
+function totalText(totalMinG: number, totalMaxG: number): string {
+  return totalMinG !== totalMaxG
+    ? `${formatG(totalMinG)} / ${formatG(totalMaxG)}`
+    : formatG(totalMinG);
+}
+
+/**
+ * Mise en page « fiche technique » : tableau Quantité / Ingrédient / % de la
+ * masse totale (le % n'est calculé que pour les ingrédients pesables).
+ */
+function renderIngredientsTable(
+  items: PdfIngredient[],
+  totalMinG: number,
+  totalMaxG: number,
+  showTotal: boolean,
+): string {
+  const avgTotal = (totalMinG + totalMaxG) / 2;
+  const rows = items
+    .map((i) => {
+      const { avg } = recipeMass([i]);
+      const pct = avgTotal > 0 && avg > 0 ? ((avg / avgTotal) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %" : "";
+      return `<tr><td class="num">${ingQtyHtml(i)}</td><td>${esc(i.name)}</td><td class="num pct">${pct}</td></tr>`;
+    })
+    .join("");
+  const foot = showTotal && totalMinG > 0
+    ? `<tfoot><tr><td class="num">${totalText(totalMinG, totalMaxG)}</td><td>Masse totale</td><td class="num pct">100 %</td></tr></tfoot>`
+    : "";
+  return `<table class="ing-table"><thead><tr><th class="num">Quantité</th><th>Ingrédient</th><th class="num">%</th></tr></thead><tbody>${rows}</tbody>${foot}</table>`;
+}
+
 function renderIngredients(
-  items: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[],
+  items: PdfIngredient[],
   totalMinG: number,
   totalMaxG: number,
   showTotal: boolean,
 ): string {
   const list = items
     .map((i) => {
-      const unit = i.unit ?? "g";
-      let qty: string;
-      if (unit === "QS") {
-        qty = `<span class="ing-qty" style="color:var(--accent,#e8c547);font-weight:600">QS</span>`;
-      } else if (i.quantityGMax != null) {
-        if (unit === "cc" || unit === "cs") {
-          const factor = unit === "cc" ? 5 : 15;
-          qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`
-            + `<span class="ing-unit-muted">/</span>`
-            + `<span class="ing-qty">${formatQty(i.quantityGMax, unit)}</span>`
-            + `<span class="ing-unit-muted"> (≈${formatG(i.quantityG * factor)}/${formatG(i.quantityGMax * factor)})</span>`;
-        } else {
-          qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`
-            + `<span class="ing-unit-muted">/</span>`
-            + `<span class="ing-qty">${formatQty(i.quantityGMax, unit)}</span>`;
-        }
-      } else if (unit === "cc" || unit === "cs") {
-        const gEquiv = formatG(i.quantityG * (unit === "cc" ? 5 : 15));
-        qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span><span class="ing-unit-muted"> (≈${gEquiv})</span>`;
-      } else {
-        qty = `<span class="ing-qty">${formatQty(i.quantityG, unit)}</span>`;
-      }
+      const qty = ingQtyHtml(i);
       return `
       <div class="ing-item">
         ${qty}
@@ -563,14 +693,10 @@ function renderIngredients(
       </div>`;
     })
     .join("");
-  let totalLine = "";
-  if (showTotal && totalMinG > 0) {
-    const totalStr = totalMinG !== totalMaxG
-      ? `${formatG(totalMinG)} / ${formatG(totalMaxG)}`
-      : formatG(totalMinG);
-    totalLine = `<div class="total-line">Total · ${totalStr}</div>`;
-  }
-  return list + totalLine;
+  const totalLine = showTotal && totalMinG > 0
+    ? `<div class="total-line">Total · ${totalText(totalMinG, totalMaxG)}</div>`
+    : "";
+  return `<div class="ing-list">${list}</div>` + totalLine;
 }
 
 
@@ -646,17 +772,26 @@ export function renderRecipeCard(
   // = la somme des lignes ci-dessus, même pour des recettes figées dont la
   // masse a été modifiée après coup (les champs totalMassGMin/Max stockés
   // pouvaient être périmés → cf. ancien bug de masse totale incohérente).
-  const totalMinG = snap.ingredients.reduce(
-    (s, i) => s + ingMass(i.quantityG, i.unit ?? "g"),
-    0,
-  );
-  const totalMaxG = snap.ingredients.reduce(
-    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit ?? "g"),
-    0,
-  );
-  const ingHtml = snap.ingredients.length > 0
-    ? renderIngredients(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass)
-    : "<p class='muted'>Aucun ingrédient.</p>";
+  const { min: totalMinG, max: totalMaxG } = recipeMass(snap.ingredients);
+  const layout = theme.recipeLayout;
+  const ingHtml = snap.ingredients.length === 0
+    ? "<p class='muted'>Aucun ingrédient.</p>"
+    : layout === "fiche-technique"
+      ? renderIngredientsTable(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass)
+      : renderIngredients(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass);
+
+  // Fiche technique : cartouche d'en-tête (masse, nb d'ingrédients, date).
+  const ficheLabelHtml = layout === "fiche-technique"
+    ? `<div class="fiche-label">
+        <div><span class="k">Masse totale</span><span class="v">${totalMinG > 0 ? totalText(totalMinG, totalMaxG) : "—"}</span></div>
+        <div><span class="k">Ingrédients</span><span class="v">${snap.ingredients.length}</span></div>
+        <div><span class="k">Date</span><span class="v">${new Date().toLocaleDateString("fr-FR")}</span></div>
+      </div>`
+    : "";
+  // Magazine : photo en tête (la route PDF l'a déjà convertie en data: URI).
+  const photoHtml = layout === "magazine" && snap.photoPath?.startsWith("data:")
+    ? `<img class="recipe-photo" src="${snap.photoPath}" alt="" />`
+    : "";
 
   const stepsHtml =
     snap.steps && !isStepsHtmlEffectivelyEmpty(snap.steps)
@@ -698,8 +833,10 @@ export function renderRecipeCard(
 
   return `
     <section class="recipe">
+      ${photoHtml}
       <h2 class="recipe-title">${esc(snap.name)}</h2>
       ${parentLabelHtml}
+      ${ficheLabelHtml}
       ${categoriesHtml}
       ${tagsHtml}
       ${ratingHtml}
@@ -784,6 +921,42 @@ function renderChapterPage(title: string, intro: string): string {
 }
 
 /**
+ * Sous-recettes d'une entrée, chacune rendue sur sa propre page.
+ * Utilisé à la fois par le sommaire et par le rendu : l'ordre doit être identique.
+ */
+function subSnapsOf(entry: Extract<CookbookEntryUnion, { type: "recipe" }>): RecipeSnap[] {
+  if (entry.separateSnaps && entry.separateSnaps.length > 0) return entry.separateSnaps;
+  return entry.snap.subRecipes.map((sr): RecipeSnap => ({
+    name: sr.label ?? sr.childName,
+    source: null,
+    notesTips: null,
+    rating: null,
+    photoPath: null,
+    tags: [],
+    categories: [],
+    ingredients: sr.ingredients,
+    steps: sr.steps,
+    totalMassG: sr.totalMassG,
+    totalMassGMin: sr.totalMassGMin,
+    totalMassGMax: sr.totalMassGMax,
+    subRecipes: [],
+  }));
+}
+
+/**
+ * Ancres du sommaire : chaque page listée au sommaire (chapitre, recette,
+ * sous-recette) porte l'id `toc-<n>`, n = rang dans le sommaire. Des liens
+ * invisibles vers ces ids obligent Chromium à écrire dans le PDF la page
+ * réelle de chaque ancre ; `readAnchorPages` (renderer.ts) la relit ensuite
+ * pour numéroter le sommaire exactement, même si une recette fait 2 pages.
+ */
+export const TOC_ANCHOR_PREFIX = "toc-";
+
+function withAnchor(sectionHtml: string, index: number): string {
+  return sectionHtml.replace("<section ", `<section id="${TOC_ANCHOR_PREFIX}${index}" `);
+}
+
+/**
  * Calcule, pour chaque entrée du cahier, son numéro de page LOGIQUE
  * (la 1ʳᵉ recette = page 1, la couverture et le sommaire ne sont pas comptés).
  */
@@ -796,7 +969,11 @@ type TocEntry = {
   isSubrecipe?: boolean;
 };
 
-function computeTocEntries(entries: CookbookEntryUnion[]): TocEntry[] {
+function computeTocEntries(
+  entries: CookbookEntryUnion[],
+  /** Pages réelles relevées dans le PDF des recettes (index = rang dans le sommaire). */
+  realPages?: number[],
+): TocEntry[] {
   let pageNumPreview = 1;
   const tocEntries: TocEntry[] = [];
 
@@ -819,10 +996,7 @@ function computeTocEntries(entries: CookbookEntryUnion[]): TocEntry[] {
     pageNumPreview += 1;
 
     // Sous-recettes indentées dessous
-    const subs = entry.separateSnaps && entry.separateSnaps.length > 0
-      ? entry.separateSnaps.map((s) => s.name)
-      : entry.snap.subRecipes.map((sr) => sr.label ?? sr.childName);
-    for (const subName of subs) {
+    for (const subName of subSnapsOf(entry).map((s) => s.name)) {
       tocEntries.push({
         name: subName,
         pageNum: pageNumPreview,
@@ -830,6 +1004,12 @@ function computeTocEntries(entries: CookbookEntryUnion[]): TocEntry[] {
       });
       pageNumPreview += 1;
     }
+  }
+  // Estimation (1 page par entrée) remplacée par la page réelle quand elle est connue.
+  if (realPages) {
+    tocEntries.forEach((e, i) => {
+      if (realPages[i] !== undefined) e.pageNum = realPages[i];
+    });
   }
   return tocEntries;
 }
@@ -847,6 +1027,8 @@ export function buildCoverTocHtml(opts: {
   format: "A4" | "A5";
   theme?: CookbookTheme;
   entries: CookbookEntryUnion[];
+  /** Pages réelles des entrées du sommaire (voir TOC_ANCHOR_PREFIX). */
+  tocPages?: number[];
 }): string {
   const { cookbookName, description, hasCover, hasToc, entries } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
@@ -859,7 +1041,7 @@ export function buildCoverTocHtml(opts: {
 
   let body = "";
   if (hasCover) body += renderCover({ cookbookName, description, theme });
-  if (hasToc) body += renderToc(computeTocEntries(entries), theme);
+  if (hasToc) body += renderToc(computeTocEntries(entries, opts.tocPages), theme);
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -895,40 +1077,26 @@ export function buildRecipesHtml(opts: {
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
 
   let body = "";
+  let anchor = 0; // rang dans le sommaire (même ordre que computeTocEntries)
   for (const entry of entries) {
     if (entry.type === "chapter") {
-      body += renderChapterPage(entry.title, entry.intro);
+      body += withAnchor(renderChapterPage(entry.title, entry.intro), anchor++);
       continue;
     }
     if (entry.sectionTitle) {
       body += `<div class="section-title">${esc(entry.sectionTitle)}</div>`;
     }
     // Recette parente sur sa propre page.
-    body += renderRecipeCard(entry.snap, "single", null, entry.portion ?? "", theme);
+    body += withAnchor(renderRecipeCard(entry.snap, "single", null, entry.portion ?? "", theme), anchor++);
     // Chaque sous-recette : sa propre page, avec mention « Sous-recette de · [parent] ».
-    // On utilise soit separateSnaps déjà construit côté route, soit on dérive
-    // depuis snap.subRecipes.
-    const subs = entry.separateSnaps && entry.separateSnaps.length > 0
-      ? entry.separateSnaps
-      : entry.snap.subRecipes.map((sr): RecipeSnap => ({
-          name: sr.label ?? sr.childName,
-          source: null,
-          notesTips: null,
-          rating: null,
-          photoPath: null,
-          tags: [],
-          categories: [],
-          ingredients: sr.ingredients,
-          steps: sr.steps,
-          totalMassG: sr.totalMassG,
-          totalMassGMin: sr.totalMassGMin,
-          totalMassGMax: sr.totalMassGMax,
-          subRecipes: [],
-        }));
-    for (const sub of subs) {
-      body += renderRecipeCard(sub, "single", null, "", theme, entry.snap.name);
+    for (const sub of subSnapsOf(entry)) {
+      body += withAnchor(renderRecipeCard(sub, "single", null, "", theme, entry.snap.name), anchor++);
     }
   }
+  // Liens invisibles vers chaque ancre (nécessaires pour que Chromium
+  // enregistre la page de destination dans le PDF).
+  const links = Array.from({ length: anchor }, (_, i) => `<a href="#${TOC_ANCHOR_PREFIX}${i}">.</a>`).join("");
+  body = `<div style="position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;opacity:0">${links}</div>` + body;
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -937,7 +1105,7 @@ export function buildRecipesHtml(opts: {
   ${fontsTag}
   <style>${css}</style>
 </head>
-<body>${body}</body>
+<body class="layout-${theme.recipeLayout}">${body}</body>
 </html>`;
 }
 
@@ -992,6 +1160,6 @@ export function buildSingleRecipeHtml(
     body > section.recipe + section.recipe { page-break-before: always; }
   </style>
 </head>
-<body>${parentCard}${subCards}</body>
+<body class="layout-${theme.recipeLayout}">${parentCard}${subCards}</body>
 </html>`;
 }

@@ -45,5 +45,6 @@ export function formatCoef(coef: number): string {
 export function formatQty(qty: number, unit: string | null | undefined): string {
   if (unit === "QS") return "QS";
   if (!unit || unit === "g") return formatG(qty);
-  return qty.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " " + unit;
+  const label = unit === "pièce" && qty > 1 ? "pièces" : unit;
+  return qty.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " " + label;
 }
