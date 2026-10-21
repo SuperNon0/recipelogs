@@ -84,7 +84,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Refonte responsive de la page ingrédients (grille auto-fill)",
     ],
     fixes: [
-      "Correction de la précision masse cible (393g demandé → affichait 396g)",
+      "Correction de la précision masse cible (393 g demandés affichaient 396 g)",
       "Correction du ModeSwitcher sur mobile (hauteur et styles inadaptés)",
       "Suppression de la page Nouveautés (non fonctionnelle)",
     ],
@@ -111,7 +111,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "Unités cuillère à café (cc ≈ 5g) et cuillère à soupe (cs ≈ 15g) avec équivalent grammes affiché",
       "Recherche sans accents : taper \"creme\" trouve \"crème\", \"cafe\" trouve \"café\"",
-      "Bouton ← retourne au dossier d'origine lors de la navigation depuis un dossier",
+      "Le bouton retour ramène au dossier d'origine lors de la navigation depuis un dossier",
       "Page d'import JSON avec prompt IA intégré pour convertir les livres scannés",
     ],
     fixes: [

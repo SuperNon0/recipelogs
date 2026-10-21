@@ -5,6 +5,9 @@ import { CommandPalette } from "@/components/ui/CommandPalette";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 
+// Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
