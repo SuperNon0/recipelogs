@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { listAllIngredientBases } from "@/lib/recipes";
 import { IngredientBaseManager } from "@/components/IngredientBaseManager";
 import { SyncIngredientsButton } from "@/components/SyncIngredientsButton";
@@ -13,46 +14,19 @@ export default async function IngredientsSettingsPage() {
     .map((i) => ({ id: i.id, name: i.name }));
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto">
-      <div className="max-w-2xl w-full mx-auto">
-        <Link
-          href="/settings"
-          className="fl-label hover:text-[color:var(--text)]"
-          style={{ fontSize: "0.75rem" }}
-        >
-          ← Paramètres
-        </Link>
-        <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
-          🧂 Ingrédients
-        </h1>
-        <p className="fl-label mt-1">
-          {ingredientBases.length} ingrédient{ingredientBases.length > 1 ? "s" : ""} dans
-          la base · ajoutés automatiquement à chaque création ou modification de recette
-        </p>
+    <div className="set-page-wide">
+      <Link href="/settings" className="crumb">
+        <ChevronLeft size={14} /> Réglages
+      </Link>
+      <IngredientBaseManager ingredientBases={ingredientBases} />
+
+      <div className="sect-title" style={{ marginTop: 32 }}>
+        <h2>Entretien de la base</h2>
       </div>
-
-      <section className="fl-card flex flex-col gap-3 max-w-2xl w-full mx-auto">
-        <div>
-          <h2 className="fl-title-serif" style={{ fontSize: "1rem" }}>🔄 Synchronisation</h2>
-          <p className="fl-label mt-1" style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
-            Parcourt toutes les recettes et ajoute les ingrédients manquants dans la base.
-            À faire une fois après un import ou si des ingrédients sont manquants.
-          </p>
-        </div>
+      <div className="fl-list">
         <SyncIngredientsButton />
-
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.85rem" }} className="flex flex-col gap-2">
-          <p className="fl-label" style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
-            Nettoie la base en retirant les ingrédients qui ne sont plus présents
-            dans aucune recette. Un aperçu de la liste s&apos;affiche avant suppression.
-          </p>
-          <DeleteOrphanIngredientsButton orphans={orphans} />
-        </div>
-      </section>
-
-      <section className="fl-card flex flex-col gap-4 w-full">
-        <IngredientBaseManager ingredientBases={ingredientBases} />
-      </section>
+        <DeleteOrphanIngredientsButton orphans={orphans} />
+      </div>
     </div>
   );
 }

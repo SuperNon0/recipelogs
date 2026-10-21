@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { RefreshCw } from "lucide-react";
 import { syncAllIngredientBases } from "@/app/actions/settings";
 import { useRouter } from "next/navigation";
+import { Help } from "@/components/ui/Help";
 
+/** Rangée « Synchroniser » : ajoute à la base les ingrédients manquants des recettes. */
 export function SyncIngredientsButton() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -21,23 +24,30 @@ export function SyncIngredientsButton() {
   }
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      <button
-        type="button"
-        onClick={handleSync}
-        disabled={pending}
-        className="fl-btn fl-btn-secondary"
-        style={{ fontSize: "0.85rem" }}
-      >
-        {pending ? "Synchronisation…" : "🔄 Synchroniser depuis toutes les recettes"}
+    <div className="fl-row">
+      <span className="ic">
+        <RefreshCw size={16} className={pending ? "set-spin" : undefined} />
+      </span>
+      <span className="set-tx">
+        <b>
+          <span>Synchroniser</span>
+          <Help title="Synchroniser la base">
+            Parcourt toutes les recettes et ajoute à la base les ingrédients qui n&apos;y sont pas
+            encore. Ça arrive surtout après un import. Rien n&apos;est supprimé ni modifié dans les
+            recettes ; tu peux le relancer sans risque.
+          </Help>
+        </b>
+        <small style={result ? { color: "var(--accent-2)" } : undefined}>
+          {result
+            ? result.created > 0
+              ? `${result.created} ingrédient${result.created > 1 ? "s" : ""} ajouté${result.created > 1 ? "s" : ""}`
+              : "Tout était déjà à jour"
+            : "Ajoute les ingrédients manquants depuis toutes les recettes"}
+        </small>
+      </span>
+      <button type="button" onClick={handleSync} disabled={pending} className="fl-btn fl-btn-secondary">
+        {pending ? "En cours…" : "Lancer"}
       </button>
-      {result && (
-        <p style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
-          {result.created > 0
-            ? `✓ ${result.created} ingrédient${result.created > 1 ? "s" : ""} ajouté${result.created > 1 ? "s" : ""}`
-            : "✓ Tout était déjà à jour"}
-        </p>
-      )}
     </div>
   );
 }

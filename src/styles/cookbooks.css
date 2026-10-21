@@ -440,3 +440,9 @@
   font-size: 13px;
   padding: 16px;
 }
+
+@media (max-width: 899px) {
+  .cb-head + .cb-item {
+    border-top: none;
+  }
+}
