@@ -516,7 +516,7 @@ export function CookbookConfigForm({
               label="Taille de portion"
               checked={theme.showPortion}
               onChange={(v) => set("showPortion", v)}
-              help="Indique sous le titre la masse à laquelle la recette est imprimée quand elle a été figée à une autre masse que l'originale."
+              help="Ligne « Taille de portion » imprimée sous le titre de la recette, quand une taille de portion est connue."
             />
           </Section>
 

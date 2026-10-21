@@ -614,7 +614,7 @@ function UnitHelp() {
   return (
     <Help
       title="Unités"
-      calc={"g     gramme\nL     litre      ≈ 1000 g\ncc    cuillère à café  ≈ 5 g\ncs    cuillère à soupe ≈ 15 g\npièce compté à l'unité (œufs…)\nQS    quantité suffisante"}
+      calc={"g      gramme\nL      litre ≈ 1000 g\ncc     cuillère à café ≈ 5 g\ncs     cuillère à soupe ≈ 15 g\npièce  à l'unité (œufs…), non comptée\nQS     quantité suffisante, non comptée"}
     >
       L&apos;unité de chaque ingrédient. Les litres et les cuillères sont convertis en grammes pour la
       masse totale. Les pièces et « QS » (selon le goût) ne sont pas comptés dans la masse.

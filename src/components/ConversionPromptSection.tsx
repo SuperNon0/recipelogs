@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Bot, Check, ChevronRight, Copy, ListChecks, Ruler } from "lucide-react";
 
 const PROMPT = `Tu vas convertir le texte suivant (extrait d'un livre de recettes scanné) en fichier JSON importable dans RecipeLog.
 
@@ -8,10 +9,10 @@ Règles strictes :
 - Le résultat est un tableau JSON valide contenant une entrée par recette
 - Champs requis : name (string), yield (string ou null), ingredients (array), steps (string), notes (string), source (string)
 - Unités acceptées UNIQUEMENT : "g", "L", "cc", "cs", "pièce", "QS"
-- Conversions : kg→g×1000, mL→g×1, cl→g×10, dl→g×100, cuillère à soupe→"cs" (valeur inchangée), cuillère à café→"cc" (valeur inchangée)
-- Ingrédients décoratifs / "pour le décor" / "QS" → unit:"QS", quantity:0
+- Conversions : kg en g × 1000, mL en g × 1, cl en g × 10, dl en g × 100, cuillère à soupe en "cs" (valeur inchangée), cuillère à café en "cc" (valeur inchangée)
+- Ingrédients décoratifs / "pour le décor" / "QS" : unit "QS", quantity 0
 - Étapes séparées par \\n\\n dans une seule chaîne, sans numérotation
-- Fractions converties en décimal (1/2→0.5)
+- Fractions converties en décimal (1/2 devient 0.5)
 - Source : "[NOM DU LIVRE]"
 - Retourner UNIQUEMENT le JSON brut, sans explication ni markdown
 
@@ -27,149 +28,12 @@ const UNITS_ROWS = [
   ["dl, dL, décilitre", '"g"', "× 100"],
   ["cuillère à soupe (cs)", '"cs"', "valeur inchangée"],
   ["cuillère à café (cc)", '"cc"', "valeur inchangée"],
-  ["pièce, pcs, unité", '"pièce"', "—"],
-  ["œuf(s), citron(s)…", '"pièce"', "—"],
-  ["feuille(s) de gélatine…", '"pièce"', "—"],
+  ["pièce, pcs, unité", '"pièce"', ""],
+  ["œuf(s), citron(s)…", '"pièce"', ""],
+  ["feuille(s) de gélatine…", '"pièce"', ""],
 ];
 
-export function ConversionPromptSection() {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(PROMPT);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-
-      {/* Prompt à copier */}
-      <section className="fl-card flex flex-col gap-4">
-        <div>
-          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            🤖 Prompt de conversion pour l&apos;IA
-          </h2>
-          <p className="fl-label mt-1">
-            Copie ce prompt et colle-le dans Claude (ou tout autre IA) avec le texte extrait de ton scan.
-            Remplace <code>[NOM DU LIVRE]</code> et <code>[TEXTE DES RECETTES]</code> avant d&apos;envoyer.
-          </p>
-        </div>
-
-        <div style={{ position: "relative" }}>
-          <pre
-            style={{
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "1rem",
-              fontSize: "0.78rem",
-              lineHeight: 1.65,
-              color: "var(--text)",
-              overflowX: "auto",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {PROMPT}
-          </pre>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="fl-btn fl-btn-primary"
-            style={{
-              position: "absolute",
-              top: "0.6rem",
-              right: "0.6rem",
-              fontSize: "0.78rem",
-              padding: "0.3rem 0.75rem",
-            }}
-          >
-            {copied ? "✓ Copié !" : "Copier"}
-          </button>
-        </div>
-      </section>
-
-      {/* Conversions d'unités */}
-      <section className="fl-card flex flex-col gap-3">
-        <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-          📐 Conversions d&apos;unités
-        </h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                <th style={{ textAlign: "left", padding: "0.4rem 0.75rem 0.4rem 0", color: "var(--muted)", fontWeight: 500 }}>Dans le livre</th>
-                <th style={{ textAlign: "left", padding: "0.4rem 0.75rem", color: "var(--muted)", fontWeight: 500 }}>Unité JSON</th>
-                <th style={{ textAlign: "left", padding: "0.4rem 0 0.4rem 0.75rem", color: "var(--muted)", fontWeight: 500 }}>Conversion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {UNITS_ROWS.map(([from, unit, conv], i) => (
-                <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                  <td style={{ padding: "0.35rem 0.75rem 0.35rem 0", color: "var(--text)" }}>{from}</td>
-                  <td style={{ padding: "0.35rem 0.75rem" }}>
-                    <code style={{ color: "var(--accent)", fontSize: "0.8rem" }}>{unit}</code>
-                  </td>
-                  <td style={{ padding: "0.35rem 0 0.35rem 0.75rem", color: "var(--muted)" }}>{conv}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Règles spéciales */}
-      <section className="fl-card flex flex-col gap-3">
-        <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-          📋 Règles spéciales
-        </h2>
-        <ul className="flex flex-col gap-2" style={{ fontSize: "0.85rem" }}>
-          <li style={{ color: "var(--text)" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
-            <span style={{ color: "var(--muted)" }}> — </span>
-            Tout ingrédient &quot;pour le décor&quot;, &quot;à volonté&quot;, &quot;selon goût&quot; ou sans quantité → <code>unit:&quot;QS&quot;</code>, <code>quantity:0</code>
-          </li>
-          <li style={{ color: "var(--text)" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>Fractions</span>
-            <span style={{ color: "var(--muted)" }}> — </span>
-            Convertir en décimal : <code>1/2 → 0.5</code> · <code>3/4 → 0.75</code> · <code>1 1/2 → 1.5</code>
-          </li>
-          <li style={{ color: "var(--text)" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>Étapes</span>
-            <span style={{ color: "var(--muted)" }}> — </span>
-            Une seule chaîne de texte, paragraphes séparés par <code>\n\n</code>, sans numérotation
-          </li>
-          <li style={{ color: "var(--text)" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>Rendement</span>
-            <span style={{ color: "var(--muted)" }}> — </span>
-            &quot;Pour 4 personnes&quot;, &quot;Pour 3/4 de litre&quot;… → champ <code>yield</code> en texte libre
-          </li>
-          <li style={{ color: "var(--text)" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 600 }}>Conseils / variantes</span>
-            <span style={{ color: "var(--muted)" }}> — </span>
-            Tout ce qui n&apos;est pas une étape de préparation → champ <code>notes</code>
-          </li>
-        </ul>
-      </section>
-
-      {/* Exemple */}
-      <section className="fl-card flex flex-col gap-3">
-        <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-          💡 Exemple de résultat attendu
-        </h2>
-        <pre
-          style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "0.8rem 1rem",
-            fontSize: "0.75rem",
-            overflowX: "auto",
-            color: "var(--muted)",
-            lineHeight: 1.6,
-          }}
-        >{`[
+const EXAMPLE = `[
   {
     "name": "Glace au Café",
     "yield": "Pour 3/4 de litre",
@@ -185,9 +49,108 @@ export function ConversionPromptSection() {
     "notes": "Se conserve 2 semaines au congélateur.",
     "source": "Nom du livre"
   }
-]`}</pre>
+]`;
+
+/** Aide à la conversion d'un livre scanné en JSON : prompt, unités, règles, exemple. */
+export function ConversionPromptSection() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(PROMPT);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Prompt à copier */}
+      <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h2 className="set-card-h" style={{ flex: 1 }}>
+            <Bot size={17} />
+            Prompt de conversion
+          </h2>
+          <button type="button" onClick={handleCopy} className={`fl-btn ${copied ? "fl-btn-secondary" : "fl-btn-primary"}`}>
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+            {copied ? "Copié" : "Copier"}
+          </button>
+        </div>
+        <p className="set-note">
+          Colle ce texte dans Claude (ou une autre IA) avec le texte extrait de ton scan. Remplace{" "}
+          <code>[NOM DU LIVRE]</code> et <code>[TEXTE DES RECETTES]</code> avant d&apos;envoyer.
+        </p>
+        <pre className="set-code set-code-wrap" style={{ color: "var(--text)" }}>
+          {PROMPT}
+        </pre>
       </section>
 
+      {/* Conversions d'unités */}
+      <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <h2 className="set-card-h">
+          <Ruler size={17} />
+          Conversions d&apos;unités
+        </h2>
+        <div style={{ overflowX: "auto" }}>
+          <table className="set-table">
+            <thead>
+              <tr>
+                <th>Dans le livre</th>
+                <th>Unité JSON</th>
+                <th>Conversion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {UNITS_ROWS.map(([from, unit, conv], i) => (
+                <tr key={i}>
+                  <td style={{ color: "var(--text)" }}>{from}</td>
+                  <td>
+                    <code>{unit}</code>
+                  </td>
+                  <td>{conv}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Règles spéciales */}
+      <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <h2 className="set-card-h">
+          <ListChecks size={17} />
+          Règles spéciales
+        </h2>
+        <ul className="set-rules">
+          <li>
+            <b>QS</b> : tout ingrédient « pour le décor », « à volonté », « selon goût » ou sans
+            quantité devient <code>unit: &quot;QS&quot;</code>, <code>quantity: 0</code>.
+          </li>
+          <li>
+            <b>Fractions</b> : en décimal, <code>1/2</code> donne <code>0.5</code>, <code>3/4</code> donne{" "}
+            <code>0.75</code>, <code>1 1/2</code> donne <code>1.5</code>.
+          </li>
+          <li>
+            <b>Étapes</b> : une seule chaîne de texte, paragraphes séparés par <code>\n\n</code>, sans
+            numérotation.
+          </li>
+          <li>
+            <b>Rendement</b> : « Pour 4 personnes », « Pour 3/4 de litre »… va dans le champ{" "}
+            <code>yield</code>, en texte libre.
+          </li>
+          <li>
+            <b>Conseils, variantes</b> : tout ce qui n&apos;est pas une étape de préparation va dans le
+            champ <code>notes</code>.
+          </li>
+        </ul>
+        <details className="set-details">
+          <summary>
+            <ChevronRight size={14} /> Voir un exemple de résultat attendu
+          </summary>
+          <pre className="set-code" style={{ marginTop: 10 }}>
+            {EXAMPLE}
+          </pre>
+        </details>
+      </section>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import {
-  updateSnapshotMass,
-  type UpdateSnapshotMassPayload,
-} from "@/app/actions/cookbooks";
-import { formatG, formatGDecimal } from "@/lib/format";
+import { Pin, Scale } from "lucide-react";
+import { updateSnapshotMass, type UpdateSnapshotMassPayload } from "@/app/actions/cookbooks";
+import { formatG } from "@/lib/format";
+import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 
@@ -14,6 +14,9 @@ type SnapInfo = {
   totalMassG: number;
 };
 
+const num = (s: string) => parseFloat(s.replace(",", "."));
+
+/** Change la masse d'une recette figée (copie) dans un cahier. */
 export function EditSnapshotMassModal({
   cookbookId,
   entryId,
@@ -27,7 +30,7 @@ export function EditSnapshotMassModal({
 }) {
   const [snap, setSnap] = useState<SnapInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("coefficient");
+  const [mode, setMode] = useState<Mode>("mass_target");
   const [coefficient, setCoefficient] = useState("1");
   const [targetMassG, setTargetMassG] = useState("");
   const [pivotIndex, setPivotIndex] = useState<number>(0);
@@ -36,29 +39,23 @@ export function EditSnapshotMassModal({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Charge les ingrédients du snapshot à l'ouverture
+  // Charge les ingrédients de la copie figée à l'ouverture.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/cookbooks/${cookbookId}/entries/${entryId}/snapshot`,
-        );
+        const res = await fetch(`/api/cookbooks/${cookbookId}/entries/${entryId}/snapshot`);
         if (!res.ok) {
-          if (!cancelled) setLoadError(`Erreur ${res.status}`);
+          if (!cancelled) setLoadError("Impossible de charger la recette figée.");
           return;
         }
         const data = (await res.json()) as SnapInfo;
         if (cancelled) return;
         setSnap(data);
         setTargetMassG(String(Math.round(data.totalMassG)));
-        if (data.ingredients[0]) {
-          setPivotTargetG(String(Math.round(data.ingredients[0].quantityG)));
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setLoadError(e instanceof Error ? e.message : "Erreur réseau");
-        }
+        if (data.ingredients[0]) setPivotTargetG(String(Math.round(data.ingredients[0].quantityG)));
+      } catch {
+        if (!cancelled) setLoadError("Erreur réseau. Réessaie dans un instant.");
       }
     })();
     return () => {
@@ -68,7 +65,7 @@ export function EditSnapshotMassModal({
 
   function buildPayload(): UpdateSnapshotMassPayload | null {
     if (mode === "coefficient") {
-      const c = parseFloat(coefficient.replace(",", "."));
+      const c = num(coefficient);
       if (!Number.isFinite(c) || c <= 0) {
         setError("Coefficient invalide.");
         return null;
@@ -76,14 +73,14 @@ export function EditSnapshotMassModal({
       return { mode: "coefficient", coefficient: c };
     }
     if (mode === "mass_target") {
-      const m = parseFloat(targetMassG.replace(",", "."));
+      const m = num(targetMassG);
       if (!Number.isFinite(m) || m <= 0) {
         setError("Masse cible invalide.");
         return null;
       }
       return { mode: "mass_target", targetMassG: m, forceExact };
     }
-    const t = parseFloat(pivotTargetG.replace(",", "."));
+    const t = num(pivotTargetG);
     if (!Number.isFinite(t) || t <= 0) {
       setError("Quantité cible invalide.");
       return null;
@@ -97,276 +94,168 @@ export function EditSnapshotMassModal({
     if (!payload) return;
     startTransition(async () => {
       const r = await updateSnapshotMass(entryId, payload, cookbookId);
-      if (r.ok) {
-        onClose();
-      } else {
-        setError(r.error);
-      }
+      if (r.ok) onClose();
+      else setError(r.error);
     });
   }
 
-  // Ratio aperçu (pour montrer le résultat avant validation)
-  let previewRatio: number | null = null;
+  // Coefficient obtenu (affiché avant validation).
+  let ratio: number | null = null;
   if (snap) {
     if (mode === "coefficient") {
-      const c = parseFloat(coefficient.replace(",", "."));
-      if (Number.isFinite(c) && c > 0) previewRatio = c;
+      const c = num(coefficient);
+      if (Number.isFinite(c) && c > 0) ratio = c;
     } else if (mode === "mass_target") {
-      const m = parseFloat(targetMassG.replace(",", "."));
-      if (Number.isFinite(m) && m > 0 && snap.totalMassG > 0) {
-        previewRatio = m / snap.totalMassG;
-      }
+      const m = num(targetMassG);
+      if (Number.isFinite(m) && m > 0 && snap.totalMassG > 0) ratio = m / snap.totalMassG;
     } else if (snap.ingredients[pivotIndex]) {
-      const t = parseFloat(pivotTargetG.replace(",", "."));
-      const pivotQty = snap.ingredients[pivotIndex].quantityG;
-      if (Number.isFinite(t) && t > 0 && pivotQty > 0) {
-        previewRatio = t / pivotQty;
-      }
+      const t = num(pivotTargetG);
+      const q = snap.ingredients[pivotIndex].quantityG;
+      if (Number.isFinite(t) && t > 0 && q > 0) ratio = t / q;
     }
   }
 
+  const title = (
+    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <Scale size={18} style={{ color: "var(--accent)" }} /> Masse de la recette figée
+    </span>
+  );
+
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="fl-card"
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          padding: 20,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-          maxHeight: "85vh",
-          overflowY: "auto",
-        }}
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            ⚖️ Modifier la masse
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="fl-label hover:text-[color:var(--text)]"
-            style={{ fontSize: "0.8rem" }}
-          >
-            ✕
-          </button>
-        </div>
+    <ModalOverlay onClose={onClose} title={title}>
+      <p style={{ color: "var(--muted)", marginTop: -6, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <Pin size={14} style={{ color: "var(--lock)" }} />
+        <span style={{ color: "var(--text)" }}>{recipeName}</span>
+        <Help title="Masse figée">
+          Cette recette est figée dans le cahier : c&apos;est une copie. Changer sa masse multiplie
+          toutes les quantités de la copie, sans toucher à la recette d&apos;origine.
+        </Help>
+      </p>
 
-        <div className="text-sm text-[color:var(--muted)]">
-          <strong style={{ color: "var(--text)" }}>{recipeName}</strong> · recette
-          figée 📌
-        </div>
+      {loadError && <p style={{ color: "var(--danger)", fontSize: 13 }}>{loadError}</p>}
+      {!snap && !loadError && <p style={{ color: "var(--muted)" }}>Chargement…</p>}
 
-        {loadError && (
-          <div className="text-sm" style={{ color: "var(--danger)" }}>
-            Erreur : {loadError}
+      {snap && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <div className="fl-seg">
+              <button type="button" aria-pressed={mode === "mass_target"} onClick={() => setMode("mass_target")}>
+                Masse totale
+              </button>
+              <button type="button" aria-pressed={mode === "coefficient"} onClick={() => setMode("coefficient")}>
+                Coefficient
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === "pivot_ingredient"}
+                onClick={() => setMode("pivot_ingredient")}
+                disabled={snap.ingredients.length === 0}
+              >
+                Pivot
+              </button>
+            </div>
+            <Help
+              title="Trois façons de changer la masse"
+              calc={"Masse totale : coef = masse voulue ÷ masse actuelle\nCoefficient : coef saisi\nPivot : coef = quantité voulue ÷ quantité actuelle de l'ingrédient\nChaque quantité = quantité actuelle × coef"}
+              example="Recette de 800 g, masse voulue 1 200 g : coef 1,5 ; 200 g de beurre deviennent 300 g."
+            >
+              Choisis la masse totale voulue, un coefficient direct, ou la quantité d&apos;un ingrédient
+              (le pivot) : toutes les autres quantités suivent la même proportion.
+            </Help>
           </div>
-        )}
 
-        {!snap && !loadError && (
-          <div className="text-sm text-[color:var(--muted)]">Chargement…</div>
-        )}
+          <p style={{ color: "var(--muted)", fontSize: 12.5 }}>
+            Masse actuelle : <span className="num" style={{ color: "var(--text)" }}>{formatG(snap.totalMassG)}</span>
+          </p>
 
-        {snap && (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <span className="fl-label">Mode</span>
-              <div
-                className="inline-flex rounded-md overflow-hidden border flex-wrap"
-                style={{ borderColor: "var(--border)" }}
-              >
-                {[
-                  { v: "coefficient", l: "Coefficient" },
-                  { v: "mass_target", l: "Masse totale" },
-                  { v: "pivot_ingredient", l: "Pivot" },
-                ].map((o) => {
-                  const sel = o.v === mode;
-                  return (
-                    <button
-                      key={o.v}
-                      type="button"
-                      onClick={() => setMode(o.v as Mode)}
-                      className="px-3 py-1.5 text-sm transition-colors"
-                      style={{
-                        background: sel ? "var(--accent)" : "transparent",
-                        color: sel ? "var(--bg)" : "var(--text)",
-                        fontWeight: sel ? 600 : 400,
-                        borderRight: "1px solid var(--border)",
-                      }}
-                    >
-                      {o.l}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          {mode === "coefficient" && (
+            <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              <span className="fl-label">Coefficient (multiplie tout)</span>
+              <input type="number" step="0.01" min="0.01" inputMode="decimal" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} className="fl-input" autoFocus />
+            </label>
+          )}
 
-            <div className="text-xs text-[color:var(--muted)]">
-              Masse totale actuelle :{" "}
-              <strong style={{ color: "var(--text)" }}>
-                {formatG(snap.totalMassG)}
-              </strong>
-            </div>
-
-            {mode === "coefficient" && (
-              <label className="flex flex-col gap-1.5">
-                <span className="fl-label">Coefficient (× tout)</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={coefficient}
-                  onChange={(e) => setCoefficient(e.target.value)}
-                  className="fl-input"
-                  autoFocus
-                />
+          {mode === "mass_target" && (
+            <>
+              <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <span className="fl-label">Masse totale voulue (g)</span>
+                <input type="number" step="1" min="1" inputMode="numeric" value={targetMassG} onChange={(e) => setTargetMassG(e.target.value)} className="fl-input" autoFocus />
               </label>
-            )}
+              <ExactToggle checked={forceExact} onChange={setForceExact} />
+            </>
+          )}
 
-            {mode === "mass_target" && (
-              <>
-                <label className="flex flex-col gap-1.5">
-                  <span className="fl-label">Masse totale cible (g)</span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={targetMassG}
-                    onChange={(e) => setTargetMassG(e.target.value)}
-                    className="fl-input"
-                    autoFocus
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setForceExact((v) => !v)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    padding: "0.4rem 0.75rem",
-                    borderRadius: 8,
-                    border: "1px solid",
-                    borderColor: forceExact ? "var(--accent)" : "var(--border)",
-                    background: forceExact ? "rgba(240, 166, 74,0.12)" : "transparent",
-                    color: forceExact ? "var(--accent)" : "var(--muted)",
-                    fontSize: "0.75rem",
-                    fontFamily: "var(--font-mono)",
-                    cursor: "pointer",
-                    fontWeight: forceExact ? 600 : 400,
+          {mode === "pivot_ingredient" && (
+            <>
+              <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <span className="fl-label">Ingrédient pivot</span>
+                <select
+                  value={pivotIndex}
+                  onChange={(e) => {
+                    const idx = Number(e.target.value);
+                    setPivotIndex(idx);
+                    const ing = snap.ingredients[idx];
+                    if (ing) setPivotTargetG(String(Math.round(ing.quantityG)));
                   }}
+                  className="fl-input"
                 >
-                  <span>{forceExact ? "⚖️" : "≈"}</span>
-                  Masse exacte — ajuste ±1 g sur les plus gros ingrédients
-                </button>
-              </>
-            )}
+                  {snap.ingredients.map((i, idx) => (
+                    <option key={idx} value={idx}>
+                      {i.name} ({formatG(i.quantityG)})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <span className="fl-label">Quantité voulue pour cet ingrédient (g)</span>
+                <input type="number" step="1" min="1" inputMode="numeric" value={pivotTargetG} onChange={(e) => setPivotTargetG(e.target.value)} className="fl-input" autoFocus />
+              </label>
+            </>
+          )}
 
-            {mode === "pivot_ingredient" && (
-              <>
-                <label className="flex flex-col gap-1.5">
-                  <span className="fl-label">Ingrédient pivot</span>
-                  <select
-                    value={pivotIndex}
-                    onChange={(e) => {
-                      const idx = Number(e.target.value);
-                      setPivotIndex(idx);
-                      const ing = snap.ingredients[idx];
-                      if (ing) setPivotTargetG(String(Math.round(ing.quantityG)));
-                    }}
-                    className="fl-input"
-                  >
-                    {snap.ingredients.map((i, idx) => (
-                      <option key={idx} value={idx}>
-                        {i.name} ({formatG(i.quantityG)})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="fl-label">
-                    Quantité cible pour cet ingrédient (g)
-                  </span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={pivotTargetG}
-                    onChange={(e) => setPivotTargetG(e.target.value)}
-                    className="fl-input"
-                    autoFocus
-                  />
-                </label>
-              </>
-            )}
-
-            {previewRatio !== null && (
-              <div
-                className="text-xs"
-                style={{
-                  color: "var(--muted)",
-                  padding: "8px 10px",
-                  background: "var(--surface)",
-                  borderRadius: 6,
-                  border: "1px dashed var(--border)",
-                }}
-              >
-                Aperçu :{" "}
-                <strong style={{ color: "var(--accent)" }}>
-                  ×{previewRatio.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
-                </strong>
-                {" "} → masse totale ≈{" "}
-                <strong style={{ color: "var(--text)" }}>
-                  {formatG(snap.totalMassG * previewRatio)}
-                </strong>
-              </div>
-            )}
-
-            {error && (
-              <div className="text-sm" style={{ color: "var(--danger)" }}>
-                {error}
-              </div>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={pending}
-                className="fl-btn"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={pending}
-                className="fl-btn fl-btn-primary"
-              >
-                {pending ? "Application…" : "Appliquer"}
-              </button>
+          {ratio !== null && (
+            <div className="fl-card" style={{ padding: "10px 12px", background: "var(--bg)", fontSize: 13, color: "var(--soft)" }}>
+              Résultat : coefficient{" "}
+              <span className="num" style={{ color: "var(--accent)" }}>
+                × {ratio.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
+              </span>
+              , masse totale d&apos;environ{" "}
+              <span className="num" style={{ color: "var(--text)" }}>{formatG(snap.totalMassG * ratio)}</span>
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onClose} disabled={pending} className="fl-btn fl-btn-secondary">
+              Annuler
+            </button>
+            <button type="button" onClick={handleSubmit} disabled={pending} className="fl-btn fl-btn-primary">
+              {pending ? "Application…" : "Appliquer"}
+            </button>
+          </div>
+        </>
+      )}
+    </ModalOverlay>
+  );
+}
+
+/** Interrupteur « masse exacte » (partagé avec l'ajout de recettes). */
+export function ExactToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ fontSize: 13.5, color: "var(--soft)", display: "flex", alignItems: "center" }}>
+        Masse exacte
+        <Help
+          title="Masse exacte"
+          calc="quantités arrondies au gramme, puis ± 1 g sur les plus gros ingrédients jusqu'à tomber juste"
+          example="Cible 1 000 g : sans cette option on peut obtenir 1 002 g ; avec, exactement 1 000 g."
+        >
+          Les quantités sont arrondies au gramme, ce qui peut donner quelques grammes de plus que la
+          masse voulue. Active cette option pour corriger l&apos;écart sur les plus gros ingrédients.
+        </Help>
+      </span>
+      <button type="button" role="switch" aria-checked={checked} aria-label="Masse exacte" className="fl-switch" onClick={() => onChange(!checked)} />
     </div>
   );
 }

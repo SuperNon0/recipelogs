@@ -317,3 +317,14 @@
     display: inline-flex;
   }
 }
+
+/* Pas de flèches +/- dans les cases de quantité (place comptée au plus juste) */
+.rf-ing-qty input::-webkit-outer-spin-button,
+.rf-ing-qty input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rf-ing-qty input[type="number"] {
+  -moz-appearance: textfield;
+}
