@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BookOpen,
   FileText,
+  FolderOpen,
   Library,
   Palette,
   Plus,
@@ -38,6 +39,7 @@ type Item = {
 
 type Results = {
   recipes: { id: number; name: string; folder: string | null; color: string | null }[];
+  folders: { id: number; name: string; color: string; count: number }[];
   ingredients: { id: number; name: string; uses: number }[];
   cookbooks: { id: number; name: string }[];
   lists: { id: number; name: string }[];
@@ -119,6 +121,10 @@ export function CommandPalette() {
       ...res.recipes.map((r) => ({
         key: `r${r.id}`, group: "Recettes", label: r.name, href: `/recipes/${r.id}`,
         icon: BookOpen, side: r.folder ?? undefined, color: r.color,
+      })),
+      ...res.folders.map((f) => ({
+        key: `f${f.id}`, group: "Dossiers", label: f.name, href: `/?folder=${f.id}`,
+        icon: FolderOpen, side: `${f.count} recette${f.count > 1 ? "s" : ""}`, color: f.color,
       })),
       ...res.ingredients.map((i) => ({
         key: `i${i.id}`, group: "Ingrédients", label: i.name, href: `/settings/ingredients/${i.id}`,

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { getShoppingListDetail, listRecipesMinimalForShopping } from "@/lib/shopping";
 import { ShoppingListItems } from "@/components/ShoppingListItems";
 import { AddRecipeToListPanel } from "@/components/AddRecipeToListPanel";
-import { DeleteShoppingListButton } from "@/components/DeleteShoppingListButton";
+import { ShoppingListHeaderMenu } from "@/components/ShoppingListMenus";
 
 export const dynamic = "force-dynamic";
 
@@ -42,59 +43,38 @@ export default async function ShoppingListDetailPage({
     (r) => !linkedRecipes.some((lr) => lr.recipeId === r.id),
   );
 
+  const checked = items.filter((i) => i.checked).length;
+  const sub = [
+    `${items.length} article${items.length > 1 ? "s" : ""}`,
+    checked > 0 ? `${checked} coché${checked > 1 ? "s" : ""}` : null,
+    `${linkedRecipes.length} recette${linkedRecipes.length > 1 ? "s" : ""}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Link href="/shopping" className="fl-label hover:text-[color:var(--text)]">
-            ← Listes
-          </Link>
-          <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
-            {list.name}
-          </h1>
-        </div>
-        <a
-          href={`/shopping/${listId}/pdf`}
-          className="fl-btn fl-btn-secondary"
-          style={{ fontSize: "0.8rem", flexShrink: 0 }}
-        >
-          ⬇ PDF
-        </a>
+    <>
+      <Link href="/shopping" className="crumb">
+        <ChevronLeft size={14} /> Listes de courses
+      </Link>
+      <div className="page-head">
+        <h1>{list.name}</h1>
+        <ShoppingListHeaderMenu listId={listId} listName={list.name} checked={checked} />
+        <p className="sub">{sub}</p>
       </div>
 
-      {/* Recettes liées */}
-      <section>
-        <h2 className="fl-label mb-3" style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-          Recettes ({linkedRecipes.length})
-        </h2>
-        <AddRecipeToListPanel
-          listId={listId}
-          linkedRecipes={linkedRecipes}
-          availableRecipes={availableRecipes}
-        />
-      </section>
-
-      {/* Articles */}
-      <section>
-        <h2 className="fl-label mb-3" style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-          Articles ({items.length})
-        </h2>
-        <ShoppingListItems listId={listId} initialItems={items} />
-      </section>
-
-      {/* Zone dangereuse */}
-      <section>
-        <h2 className="fl-label mb-3" style={{ fontSize: "0.9rem", color: "var(--danger)" }}>
-          Zone dangereuse
-        </h2>
-        <div className="fl-card" style={{ borderColor: "var(--danger-muted, #3a1a1a)" }}>
-          <p className="text-sm text-[color:var(--muted)] mb-3">
-            La suppression est irréversible.
-          </p>
-          <DeleteShoppingListButton listId={listId} listName={list.name} />
-        </div>
-      </section>
-    </div>
+      <div className="sh-grid">
+        <section className="sh-main" aria-label="Articles">
+          <ShoppingListItems listId={listId} initialItems={items} />
+        </section>
+        <aside className="sh-side" aria-label="Recettes de la liste">
+          <AddRecipeToListPanel
+            listId={listId}
+            linkedRecipes={linkedRecipes}
+            availableRecipes={availableRecipes}
+          />
+        </aside>
+      </div>
+    </>
   );
 }

@@ -187,10 +187,11 @@ export function RecipeBody({
             <Help
               title="Masse totale"
               calc={massCalc}
-              example={<>Pièces (œufs entiers…) et « QS » ne sont pas comptés. 1 cc ≈ 5 g, 1 cs ≈ 15 g, 1 L = 1 000 g.</>}
+              example={<>Au multiplicateur ×2, une recette de 570 g passe à 1 140 g (sauf les sous-recettes verrouillées, qui gardent leur poids).</>}
             >
               Le poids de tout ce qui se pèse dans la recette, sous-recettes comprises, avec le
-              multiplicateur appliqué. Une sous-recette verrouillée garde sa quantité.
+              multiplicateur appliqué. Les pièces (œufs entiers…) et « QS » ne sont pas comptés ;
+              1 cc ≈ 5 g, 1 cs ≈ 15 g, 1 L = 1 000 g.
             </Help>
           </div>
           <div className="kpi-v num">
@@ -250,7 +251,7 @@ export function RecipeBody({
           <span className="q">Quantité</span>
           <span className="p desk-only">
             % masse
-            <Help title="% de la masse" calc="% = masse de la ligne ÷ masse totale × 100" example="300 g de purée dans une recette de 1 500 g → 20 %.">
+            <Help title="% de la masse" calc="% = masse de la ligne ÷ masse totale × 100" example="300 g de purée dans une recette de 1 500 g : 20 %.">
               La part de chaque ingrédient ou sous-recette dans la masse totale (sous-recettes
               comprises). Pratique pour comparer deux recettes.
             </Help>
@@ -547,7 +548,7 @@ function MultiplierCard({
         <Help
           title="Multiplicateur"
           calc={"quantité affichée = quantité de base × multiplicateur"}
-          example={<>Masse : 1 400 g → 2 100 g donne ×1,5. Pivot : 300 g de purée → 450 g donne aussi ×1,5.</>}
+          example={<>Masse : passer de 1 400 g à 2 100 g donne ×1,5. Pivot : passer la purée de 300 g à 450 g donne aussi ×1,5.</>}
         >
           Agrandit ou réduit toute la recette sans la modifier. Trois façons de le régler :
           <br />• <b>Coef.</b> : tu tapes le multiplicateur.

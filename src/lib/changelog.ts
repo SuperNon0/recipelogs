@@ -9,6 +9,29 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.0",
+    date: "2026-10-21",
+    title: "Nouveau design, thèmes PDF personnalisables",
+    features: [
+      "Nouveau design sombre « Encre et ambre » sur tout le site, sans emoji, avec des icônes",
+      "Menu latéral sur ordinateur, barre d'onglets et feuilles d'actions sur téléphone",
+      "Menu d'actions par clic droit, bouton à trois points ou appui long",
+      "Recherche globale Ctrl K (recettes, ingrédients, cahiers, listes)",
+      "Bulles d'aide « ? » qui expliquent chaque information et son calcul",
+      "Thèmes PDF : 7 thèmes fournis, modifiables, duplicables, et création de ses propres thèmes",
+      "Téléchargement du PDF avec choix du thème et aperçu",
+      "Nouvelles dispositions PDF : place des ingrédients, alignement du titre, espacement, intertitres, photo",
+      "Sous-recettes : masse totale qui les inclut, verrouillage, réglage et ordre depuis leur menu",
+      "Installable comme une application (PWA)",
+    ],
+    fixes: [
+      "Ajout d'une sous-recette en mode « ingrédient pivot » (échouait toujours)",
+      "Dupliquer une recette copie aussi ses sous-recettes",
+      "Recherche du sélecteur de recettes d'un dossier qui ignorait le texte saisi",
+    ],
+    migrations: ["Nouvelle table pdf_themes (créée automatiquement à la mise à jour)"],
+  },
+  {
     version: "V1.9",
     date: "2026-10-20",
     title: "PDF plus rapides et plus beaux, mise à jour fiabilisée",

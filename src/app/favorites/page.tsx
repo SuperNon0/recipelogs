@@ -1,45 +1,53 @@
-import { RecipeCard } from "@/components/RecipeCard";
+import Link from "next/link";
+import { Plus, Star } from "lucide-react";
 import {
   RecipeSelectionProvider,
   RecipeSelectionToggle,
 } from "@/components/RecipeSelection";
 import { EmptyState } from "@/components/EmptyState";
-import { Fab } from "@/components/Fab";
-import { listRecipes } from "@/lib/recipes";
+import { RecipeTable } from "@/components/recipe/RecipeTable";
+import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
+import { listAllFolders, listRecipes, toRecipeRows } from "@/lib/recipes";
+import { listPdfThemes } from "@/lib/pdfThemes";
 
 export const dynamic = "force-dynamic";
 
 export default async function FavoritesPage() {
-  const recipes = await listRecipes({ favoritesOnly: true });
+  const [recipes, folders, themes] = await Promise.all([
+    listRecipes({ favoritesOnly: true }),
+    listAllFolders(),
+    listPdfThemes(),
+  ]);
+  const folderOptions = folders.map((f) => ({ id: f.id, name: f.name, color: f.color }));
 
   return (
-    <RecipeSelectionProvider>
-      <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
-        <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
-          Favoris
-        </h1>
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="fl-label">
-            {recipes.length} {recipes.length > 1 ? "recettes" : "recette"}
-          </span>
+    <RecipeMenuProvider folders={folderOptions} themes={themes}>
+      <RecipeSelectionProvider>
+        <div className="page-head">
+          <h1>Favoris</h1>
           {recipes.length > 0 && <RecipeSelectionToggle />}
+          <Link href="/recipes/new" className="fl-btn fl-btn-primary desk-only">
+            <Plus size={16} /> Nouvelle recette
+          </Link>
+          <p className="sub">
+            {recipes.length} recette{recipes.length > 1 ? "s" : ""}
+          </p>
         </div>
-      </div>
 
-      {recipes.length === 0 ? (
-        <EmptyState
-          title="Aucun favori"
-          description="Marquez une recette comme favorite depuis sa fiche pour la retrouver ici."
-        />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recipes.map((r) => (
-            <RecipeCard key={r.id} recipe={r} />
-          ))}
-        </div>
-      )}
+        {recipes.length === 0 ? (
+          <EmptyState
+            icon={Star}
+            title="Aucun favori"
+            description="Ajoute une recette aux favoris depuis sa fiche ou son menu pour la retrouver ici."
+          />
+        ) : (
+          <RecipeTable recipes={toRecipeRows(recipes)} folders={folderOptions} />
+        )}
 
-      <Fab href="/recipes/new" label="Créer une recette" />
-    </RecipeSelectionProvider>
+        <Link href="/recipes/new" className="fab" aria-label="Créer une recette">
+          <Plus size={24} />
+        </Link>
+      </RecipeSelectionProvider>
+    </RecipeMenuProvider>
   );
 }

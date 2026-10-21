@@ -134,7 +134,7 @@ export default async function SharePage({
         {cookbook.entries.map((e) => (
           <div key={e.id} className="flex items-center justify-between gap-3 py-2 border-b border-[color:var(--border)]">
             <span className="text-sm">{e.recipe.name}</span>
-            <span className="fl-tag">{e.linkMode === "linked" ? "🔗" : "📌"}</span>
+            <span className="fl-tag">{e.linkMode === "linked" ? "liée" : "figée"}</span>
           </div>
         ))}
       </section>

@@ -240,7 +240,7 @@ export function ThemeEditor({ theme, recipes }: Props) {
             <FontField label="Police du texte" value={c.bodyFont} onChange={(v) => set("bodyFont", v)} />
             <Field
               label={`Taille du texte : ${String(c.textSize).replace(".", ",")} pt`}
-              help={{ title: "Taille du texte", text: "Taille du texte courant. Les titres suivent automatiquement.", calc: "titre = taille du texte × 2,2", example: "10 pt → titre de 22 pt." }}
+              help={{ title: "Taille du texte", text: "Taille du texte courant. Les titres suivent automatiquement.", calc: "titre = taille du texte × 2,2", example: "Texte de 10 pt : titres de 22 pt." }}
             >
               <input
                 type="range"

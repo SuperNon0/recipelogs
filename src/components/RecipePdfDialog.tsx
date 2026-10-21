@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Download, FileDown, Palette, Star } from "lucide-react";
 import { ModalOverlay } from "./ModalOverlay";
@@ -38,10 +38,16 @@ export function RecipePdfDialog({
   const initial = themes.find((t) => t.isDefault) ?? themes[0];
   const [selected, setSelected] = useState<number | null>(phone ? null : initial?.id ?? null);
   const pdf = usePdfFetch();
+  const picked = useRef(false);
+  const pick = (id: number | null) => {
+    picked.current = true;
+    setSelected(id);
+  };
 
-  // Sur ordinateur, le thème par défaut est présélectionné dès l'ouverture.
+  // Ordinateur : thème par défaut présélectionné. Téléphone : on commence par la liste.
   useEffect(() => {
-    if (!phone && selected == null && initial) setSelected(initial.id);
+    if (picked.current) return;
+    setSelected(phone ? null : initial?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone]);
 
@@ -63,7 +69,7 @@ export function RecipePdfDialog({
       title={
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {phone && selected != null ? (
-            <button type="button" onClick={() => setSelected(null)} aria-label="Retour aux thèmes" style={{ background: "none", border: "none", color: "var(--accent)", display: "grid", padding: 0 }}>
+            <button type="button" onClick={() => pick(null)} aria-label="Retour aux thèmes" style={{ background: "none", border: "none", color: "var(--accent)", display: "grid", padding: 0 }}>
               <ArrowLeft size={20} />
             </button>
           ) : (
@@ -89,15 +95,13 @@ export function RecipePdfDialog({
                   type="button"
                   className="pdf-theme-opt"
                   aria-pressed={on}
-                  onClick={() => setSelected(t.id)}
+                  onClick={() => pick(t.id)}
                 >
                   <ThemeThumb config={t.config} width={38} />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <b>
-                      {t.name}
-                      {t.isDefault && <Star size={12} style={{ color: "var(--accent)", marginLeft: 6, verticalAlign: -1 }} aria-label="Thème par défaut" />}
-                    </b>
+                    <b>{t.name}</b>
                     <small>
+                      {t.isDefault && <><Star size={11} fill="currentColor" style={{ color: "var(--accent)", verticalAlign: -1 }} aria-hidden /> Par défaut · </>}
                       {RECIPE_LAYOUT_LABELS[t.config.recipeLayout]} · {FONT_LABELS[t.config.titleFont] ?? t.config.titleFont} · {t.format}
                     </small>
                   </span>

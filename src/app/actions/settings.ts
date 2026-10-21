@@ -87,6 +87,30 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
   return { ok: true };
 }
 
+/**
+ * Création rapide depuis le formulaire de recette : renvoie la catégorie
+ * (existante si le nom est déjà pris) pour la cocher directement.
+ */
+export async function createCategoryInline(
+  name: string,
+  color: string,
+): Promise<{ ok: true; category: { id: number; name: string; color: string } } | { ok: false; error: string }> {
+  const clean = name.trim().slice(0, 100);
+  if (!clean) return { ok: false, error: "Le nom est obligatoire." };
+  const select = { id: true, name: true, color: true } as const;
+  const exists = await prisma.category.findFirst({
+    where: { name: { equals: clean, mode: "insensitive" } },
+    select,
+  });
+  if (exists) return { ok: true, category: exists };
+  const category = await prisma.category.create({
+    data: { name: clean, color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#888888" },
+    select,
+  });
+  revalidatePath("/settings");
+  return { ok: true, category };
+}
+
 export async function updateCategory(
   id: number,
   formData: FormData,
