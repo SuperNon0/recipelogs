@@ -67,9 +67,10 @@ export function DeployButton() {
           setConfirm(true);
         }}
         className="fl-btn fl-btn-secondary"
+        aria-label="Mettre à jour le site"
       >
         <RefreshCw size={15} />
-        Mettre à jour
+        <span className="set-hide-phone">Mettre à jour</span>
       </button>
 
       {confirm && (

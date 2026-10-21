@@ -512,12 +512,7 @@ export function CookbookConfigForm({
             <Toggle label="Note (étoiles)" checked={theme.showRating} onChange={(v) => set("showRating", v)} />
             <Toggle label="Notes et astuces" checked={theme.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Source" checked={theme.showSource} onChange={(v) => set("showSource", v)} />
-            <Toggle
-              label="Taille de portion"
-              checked={theme.showPortion}
-              onChange={(v) => set("showPortion", v)}
-              help="Ligne « Taille de portion » imprimée sous le titre de la recette, quand une taille de portion est connue."
-            />
+            <Toggle label="Numéros de page" checked={theme.showPageNumbers} onChange={(v) => set("showPageNumbers", v)} />
           </Section>
 
           <section className="fl-card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", borderColor: "rgba(239,125,107,.25)" }}>

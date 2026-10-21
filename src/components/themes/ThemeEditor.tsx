@@ -265,8 +265,7 @@ export function ThemeEditor({ theme, recipes }: Props) {
             <Toggle label="Note (étoiles)" checked={c.showRating} onChange={(v) => set("showRating", v)} />
             <Toggle label="Notes et astuces" checked={c.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Source" checked={c.showSource} onChange={(v) => set("showSource", v)} />
-            <Toggle label="Taille de portion (cahiers)" checked={c.showPortion} onChange={(v) => set("showPortion", v)} />
-            <Toggle label="Numéros de page" checked={c.showPageNumbers} onChange={(v) => set("showPageNumbers", v)} />
+            <Toggle label="Numéros de page (cahiers et recettes de plusieurs pages)" checked={c.showPageNumbers} onChange={(v) => set("showPageNumbers", v)} />
           </Section>
 
           <Section icon={BookImage} title="Couverture des cahiers" help="Utilisée seulement quand ce thème est appliqué à un cahier qui a une page de couverture.">

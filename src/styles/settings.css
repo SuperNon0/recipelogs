@@ -667,3 +667,19 @@ button.set-row:first-child {
     -webkit-box-orient: vertical;
   }
 }
+
+.set-selbtns {
+  display: flex;
+  gap: 8px;
+}
+
+.set-selbtns .fl-btn {
+  flex: 1;
+  padding: 0 10px;
+}
+
+@media (max-width: 699px) {
+  .set-hide-phone {
+    display: none;
+  }
+}

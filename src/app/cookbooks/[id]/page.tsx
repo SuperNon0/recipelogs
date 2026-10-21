@@ -4,6 +4,7 @@ import { ChevronLeft, Download } from "lucide-react";
 import { getCookbookDetail } from "@/lib/cookbooks";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { prisma } from "@/lib/prisma";
+import { recipeMass } from "@/lib/massAdjust";
 import { CookbookEntriesTable, type Entry } from "@/components/CookbookEntriesTable";
 import { CookbookConfigForm } from "@/components/CookbookConfigForm";
 import { CookbookTabs } from "@/components/CookbookTabs";
@@ -33,14 +34,14 @@ export default async function CookbookDetailPage({
 
   if (!cookbook) notFound();
 
-  // Photos des recettes (vignettes du tableau).
-  const photos = new Map(
+  // Photos (vignettes) et masse actuelle des recettes liées.
+  const extra = new Map(
     (
       await prisma.recipe.findMany({
         where: { id: { in: cookbook.entries.map((e) => e.recipe.id) } },
-        select: { id: true, photoPath: true },
+        select: { id: true, photoPath: true, ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } } },
       })
-    ).map((r) => [r.id, r.photoPath]),
+    ).map((r) => [r.id, { photoPath: r.photoPath, massG: recipeMass(r.ingredients).avg }]),
   );
 
   const recipeCount = cookbook.entries.length;
@@ -55,7 +56,8 @@ export default async function CookbookDetailPage({
         position: e.position,
         recipeId: e.recipe.id,
         recipeName: e.recipe.name,
-        photoPath: photos.get(e.recipe.id) ?? null,
+        photoPath: extra.get(e.recipe.id)?.photoPath ?? null,
+        linkedMassG: extra.get(e.recipe.id)?.massG ?? 0,
         categories: e.recipe.categories.map((rc) => ({
           name: rc.category.name,
           color: rc.category.color,

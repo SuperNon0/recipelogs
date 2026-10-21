@@ -584,7 +584,7 @@ function SelectionBar({
           <X size={16} />
         </button>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="set-selbtns">
         <button
           ref={classifyRef}
           type="button"
@@ -603,7 +603,7 @@ function SelectionBar({
         <button type="button" className="fl-btn fl-btn-secondary" disabled={disabled} onClick={onMerge}>
           <Merge size={15} /> Fusionner
         </button>
-        <button type="button" className="fl-btn fl-btn-danger" disabled={disabled} onClick={onDelete} style={{ marginLeft: "auto" }}>
+        <button type="button" className="fl-btn fl-btn-danger" disabled={disabled} onClick={onDelete}>
           <Trash2 size={15} /> Supprimer
         </button>
       </div>

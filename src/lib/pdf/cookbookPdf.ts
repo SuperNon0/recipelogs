@@ -77,7 +77,7 @@ export async function renderCookbookPdf(opts: {
     recipesPdf = await renderHtmlToPdf(html, format, {
       footer: opts.footer,
       footerAlign: theme.footerAlign,
-      showPageNumber: true,
+      showPageNumber: theme.showPageNumbers,
     });
     if (opts.hasToc) tocPages = await readAnchorPages(recipesPdf, TOC_ANCHOR_PREFIX);
     recipesPdf = await decoratePdf(recipesPdf, theme);

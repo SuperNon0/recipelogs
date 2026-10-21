@@ -14,7 +14,9 @@ export async function renderRecipePdf(
 ): Promise<Uint8Array> {
   const photo = themeShowsPhoto(theme) ? await photoDataUri(snap.photoPath) : null;
   const html = buildSingleRecipeHtml({ ...snap, photoPath: photo }, format, theme);
-  return decoratePdf(await renderHtmlToPdf(html, format), theme);
+  // Numéros de page seulement quand la recette tient sur plusieurs pages (sous-recettes).
+  const showPageNumber = theme.showPageNumbers && snap.subRecipes.length > 0;
+  return decoratePdf(await renderHtmlToPdf(html, format, { showPageNumber }), theme);
 }
 
 /** Recette d'exemple quand la base ne contient encore aucune recette. */

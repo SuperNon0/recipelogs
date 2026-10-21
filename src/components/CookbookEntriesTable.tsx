@@ -69,6 +69,8 @@ export type RecipeEntry = {
   snapshotDate: Date | null;
   /** Masse de la copie figée (null pour une recette liée). */
   snapshotMassG: number | null;
+  /** Masse actuelle de la recette (affichée pour une recette liée). */
+  linkedMassG: number;
 };
 
 export type ChapterEntry = {
@@ -425,10 +427,14 @@ function RecipeRow({ entry, no, cookbookId, handle, canUp, canDown, onMove, onDi
             <ModeIcon size={14} /> {linked ? "Liée" : "Figée"}
           </span>
           <span className="cb-mass num desk-only">
-            {entry.snapshotMassG !== null ? formatG(Math.round(entry.snapshotMassG)) : <span style={{ color: "var(--muted)" }}>—</span>}
+            {entry.snapshotMassG !== null
+              ? formatG(Math.round(entry.snapshotMassG))
+              : entry.linkedMassG > 0
+                ? formatG(Math.round(entry.linkedMassG))
+                : <span style={{ color: "var(--muted)" }}>—</span>}
           </span>
           <span className="cb-mode mob-only" data-mode={entry.linkMode} aria-label={linked ? "Liée" : "Figée"}>
-            {entry.snapshotMassG !== null && <span className="num" style={{ color: "var(--soft)" }}>{formatG(Math.round(entry.snapshotMassG))}</span>}
+            {(entry.snapshotMassG ?? entry.linkedMassG) > 0 && <span className="num" style={{ color: "var(--soft)" }}>{formatG(Math.round(entry.snapshotMassG ?? entry.linkedMassG))}</span>}
             <ModeIcon size={15} />
           </span>
         </Link>
