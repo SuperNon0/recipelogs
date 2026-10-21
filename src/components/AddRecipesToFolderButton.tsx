@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FolderInput } from "lucide-react";
 import { AddRecipesToFolderModal } from "./AddRecipesToFolderModal";
 
 /**
@@ -18,11 +19,11 @@ export function AddRecipesToFolderButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fl-btn fl-btn-primary"
-        style={{ fontSize: "0.8rem" }}
+        className="fl-btn fl-btn-secondary"
         title="Ranger des recettes existantes dans ce dossier"
       >
-        + Ranger des recettes ici
+        <FolderInput size={16} />
+        Ranger des recettes ici
       </button>
       {open && (
         <AddRecipesToFolderModal

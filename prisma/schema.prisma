@@ -232,6 +232,27 @@ model PdfTemplate {
   @@map("pdf_templates")
 }
 
+/**
+ * Thème PDF enregistré (couleurs, polices, disposition, couverture).
+ * Les thèmes fournis d'origine portent un `presetKey` (réinitialisables).
+ * `config` = objet CookbookTheme (lib/pdf/theme.ts), validé à la lecture.
+ */
+model PdfTheme {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.VarChar(80)
+  description String?     @db.Text
+  presetKey   String?     @unique @map("preset_key")
+  format      PaperFormat @default(A4)
+  config      Json        @default("{}")
+  isDefault   Boolean     @default(false) @map("is_default")
+  position    Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([position])
+  @@map("pdf_themes")
+}
+
 model Cookbook {
   id                  Int         @id @default(autoincrement())
   name                String

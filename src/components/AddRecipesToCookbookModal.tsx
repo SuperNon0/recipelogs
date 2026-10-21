@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { BookPlus, Check, Search, X } from "lucide-react";
 import { addMultipleRecipesToCookbook, addMultipleRecipesWithMassTarget } from "@/app/actions/cookbooks";
+import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
+import { ExactToggle } from "./EditSnapshotMassModal";
 
 type RecipeOption = {
   id: number;
@@ -14,6 +18,7 @@ type LinkMode = "linked" | "snapshot" | "mass_target";
 
 const DEBOUNCE_MS = 200;
 
+/** Fenêtre « Ajouter des recettes » : recherche, sélection multiple, mode d'ajout. */
 export function AddRecipesToCookbookModal({
   cookbookId,
   existingRecipeIds = [],
@@ -34,19 +39,6 @@ export function AddRecipesToCookbookModal({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ added: number; skipped: number } | null>(null);
   const reqIdRef = useRef(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   useEffect(() => {
     const handle = setTimeout(async () => {
@@ -57,20 +49,22 @@ export function AddRecipesToCookbookModal({
         if (query.trim()) params.set("q", query.trim());
         const res = await fetch(`/api/recipes?${params.toString()}`);
         if (myId !== reqIdRef.current) return;
-        if (!res.ok) { setLoading(false); return; }
-        const data = (await res.json()) as { recipes: RecipeOption[] };
-        if (myId !== reqIdRef.current) return;
-        setOptions(data.recipes);
-        setLoading(false);
+        if (res.ok) {
+          const data = (await res.json()) as { recipes: RecipeOption[] };
+          if (myId !== reqIdRef.current) return;
+          setOptions(data.recipes);
+        }
       } catch {
-        if (myId !== reqIdRef.current) return;
-        setLoading(false);
+        // Erreur réseau : on garde la liste précédente.
+      } finally {
+        if (myId === reqIdRef.current) setLoading(false);
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [query]);
 
   function toggleSelect(opt: RecipeOption) {
+    setResult(null);
     setSelected((prev) => {
       const next = new Map(prev);
       if (next.has(opt.id)) next.delete(opt.id);
@@ -86,7 +80,7 @@ export function AddRecipesToCookbookModal({
     startTransition(async () => {
       let r;
       if (linkMode === "mass_target") {
-        const mass = Number(targetMass);
+        const mass = Number(targetMass.replace(",", "."));
         if (!Number.isFinite(mass) || mass <= 0) {
           setError("Masse cible invalide.");
           return;
@@ -95,266 +89,172 @@ export function AddRecipesToCookbookModal({
       } else {
         r = await addMultipleRecipesToCookbook(cookbookId, ids, linkMode);
       }
-      if (!r.ok) { setError(r.error); return; }
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
       setResult({ added: r.added ?? 0, skipped: r.skipped ?? 0 });
       setSelected(new Map());
     });
   }
 
   const existingSet = new Set(existingRecipeIds);
-  const visibleOptions = options.filter((o) => !selected.has(o.id) && !existingSet.has(o.id));
+  const visibleOptions = options.filter((o) => !existingSet.has(o.id));
+  const n = selected.size;
+
+  const title = (
+    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <BookPlus size={18} style={{ color: "var(--accent)" }} /> Ajouter des recettes
+    </span>
+  );
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 500,
-        background: "rgba(0,0,0,0.8)",
-        backdropFilter: "blur(6px)",
-        display: "flex", alignItems: "flex-end",
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        style={{
-          width: "100%", maxWidth: 560, margin: "0 auto",
-          background: "var(--card)",
-          borderRadius: "20px 20px 0 0",
-          maxHeight: "90vh",
-          display: "flex", flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Poignée */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "0.75rem 0 0" }}>
-          <div style={{ width: 32, height: 4, borderRadius: 2, background: "var(--border)" }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ padding: "1rem 1.25rem 0.75rem", borderBottom: "1px solid var(--border)" }}>
-          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            📖 Ajouter des recettes au cahier
-          </h2>
-          {selected.size > 0 && (
-            <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: 4 }}>
-              {selected.size} recette{selected.size > 1 ? "s" : ""} sélectionnée{selected.size > 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-
-        {/* Chips sélectionnées */}
-        {selected.size > 0 && (
-          <div
-            style={{
-              display: "flex", flexWrap: "wrap", gap: "0.4rem",
-              padding: "0.75rem 1.25rem",
-              borderBottom: "1px solid var(--border)",
-              maxHeight: 120, overflowY: "auto",
-            }}
-          >
-            {Array.from(selected.values()).map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => toggleSelect(r)}
-                style={{
-                  display: "flex", alignItems: "center", gap: "0.35rem",
-                  padding: "0.2rem 0.55rem",
-                  borderRadius: 20,
-                  border: "1px solid var(--accent)",
-                  background: "rgba(232,197,71,0.12)",
-                  color: "var(--accent)",
-                  fontSize: "0.78rem",
-                  fontFamily: "var(--font-mono)",
-                  cursor: "pointer",
-                }}
-              >
-                {r.name} <span style={{ opacity: 0.7 }}>×</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Corps scrollable */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 1.25rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-
-          {/* Barre de recherche */}
-          <input
-            ref={inputRef}
-            type="search"
-            placeholder="Rechercher une recette…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="fl-input"
-            style={{ fontSize: "0.9rem" }}
-          />
-
-          {/* Mode de liaison */}
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            {([
-              { key: "linked", label: "🔗 Liée" },
-              { key: "snapshot", label: "📌 Figée" },
-              { key: "mass_target", label: "⚖ Masse cible" },
-            ] as { key: LinkMode; label: string }[]).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setLinkMode(key)}
-                style={{
-                  flex: 1,
-                  padding: "0.45rem 0.3rem",
-                  borderRadius: 8,
-                  border: "1px solid",
-                  borderColor: linkMode === key ? "var(--accent)" : "var(--border)",
-                  background: linkMode === key ? "rgba(232,197,71,0.1)" : "transparent",
-                  color: linkMode === key ? "var(--accent)" : "var(--muted)",
-                  fontSize: "0.75rem",
-                  fontFamily: "var(--font-mono)",
-                  cursor: "pointer",
-                  textAlign: "center",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Champ masse cible */}
-          {linkMode === "mass_target" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                <span className="fl-label" style={{ whiteSpace: "nowrap" }}>Masse cible (g)</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={targetMass}
-                  onChange={(e) => setTargetMass(e.target.value)}
-                  className="fl-input"
-                  style={{ width: 110 }}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => setForceExact((v) => !v)}
-                style={{
-                  display: "flex", alignItems: "center", gap: "0.5rem",
-                  padding: "0.45rem 0.75rem",
-                  borderRadius: 8,
-                  border: "1px solid",
-                  borderColor: forceExact ? "var(--accent)" : "var(--border)",
-                  background: forceExact ? "rgba(232,197,71,0.15)" : "transparent",
-                  color: forceExact ? "var(--accent)" : "var(--muted)",
-                  fontSize: "0.78rem",
-                  fontFamily: "var(--font-mono)",
-                  cursor: "pointer",
-                  fontWeight: forceExact ? 600 : 400,
-                  width: "100%",
-                  textAlign: "left",
-                }}
-              >
-                <span style={{ fontSize: "1rem" }}>{forceExact ? "⚖️" : "≈"}</span>
-                Masse exacte — ajuste ±1 g sur les plus gros ingrédients
-              </button>
-              {!forceExact && (
-                <p className="fl-label" style={{ fontWeight: 400, color: "var(--muted)", fontSize: "0.72rem" }}>
-                  La masse réelle peut être légèrement supérieure (arrondi au gramme supérieur).
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Liste des recettes */}
-          {loading && (
-            <p style={{ fontSize: "0.82rem", color: "var(--muted)", textAlign: "center" }}>Chargement…</p>
-          )}
-          {!loading && visibleOptions.length === 0 && query.length > 0 && (
-            <p style={{ fontSize: "0.82rem", color: "var(--muted)" }}>Aucun résultat pour « {query} ».</p>
-          )}
-          {!loading && visibleOptions.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-              {visibleOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => toggleSelect(opt)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "0.75rem",
-                    padding: "0.55rem 0.75rem",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    background: "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                      border: "1px solid var(--border)",
-                      background: "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  />
-                  <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: "0.88rem", color: "var(--text)" }}>
-                    {opt.name}
-                  </span>
-                  {opt.folder && (
-                    <span
-                      style={{
-                        fontSize: "0.7rem", fontFamily: "var(--font-mono)",
-                        padding: "0.1rem 0.4rem", borderRadius: 4,
-                        background: `${opt.folder.color}22`,
-                        color: opt.folder.color,
-                        border: `1px solid ${opt.folder.color}44`,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {opt.folder.name}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: "0.75rem 1.25rem",
-            borderTop: "1px solid var(--border)",
-            display: "flex", flexDirection: "column", gap: "0.5rem",
-          }}
-        >
-          {error && <p style={{ fontSize: "0.82rem", color: "var(--danger)" }}>{error}</p>}
-          {result && (
-            <p style={{ fontSize: "0.82rem", color: "var(--accent)" }}>
-              ✓ {result.added} recette{result.added > 1 ? "s" : ""} ajoutée{result.added > 1 ? "s" : ""}
-              {result.skipped > 0 && ` · ${result.skipped} déjà présente${result.skipped > 1 ? "s" : ""}`}
-            </p>
-          )}
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={pending || selected.size === 0}
-              className="fl-btn fl-btn-primary"
-              style={{ flex: 1, fontSize: "0.9rem" }}
-            >
-              {pending
-                ? "Ajout en cours…"
-                : selected.size === 0
-                  ? "Sélectionner des recettes"
-                  : linkMode === "mass_target"
-                    ? `Ajouter ${selected.size} recette${selected.size > 1 ? "s" : ""} à ${targetMass} g →`
-                    : `Ajouter ${selected.size} recette${selected.size > 1 ? "s" : ""} →`}
-            </button>
-            <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary" style={{ fontSize: "0.9rem" }}>
-              Fermer
-            </button>
-          </div>
-        </div>
+    <ModalOverlay onClose={onClose} title={title}>
+      <div className="searchbox">
+        <Search size={16} />
+        <input
+          type="search"
+          placeholder="Rechercher une recette…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+          aria-label="Rechercher une recette"
+        />
       </div>
-    </div>
+
+      {n > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 96, overflowY: "auto" }} className="fl-scroll">
+          {Array.from(selected.values()).map((r) => (
+            <button key={r.id} type="button" className="fl-chip" aria-pressed onClick={() => toggleSelect(r)} title="Retirer de la sélection">
+              <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+              <X size={13} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="fl-list fl-scroll" style={{ background: "var(--bg)", maxHeight: "min(42vh, 360px)", overflowY: "auto", flex: "none" }}>
+        {loading && options.length === 0 && <p style={{ padding: 14, color: "var(--muted)", fontSize: 13 }}>Chargement…</p>}
+        {!loading && visibleOptions.length === 0 && (
+          <p style={{ padding: 14, color: "var(--muted)", fontSize: 13 }}>
+            {query ? `Aucune recette pour « ${query} ».` : "Toutes les recettes sont déjà dans ce cahier."}
+          </p>
+        )}
+        {visibleOptions.map((opt, i) => {
+          const on = selected.has(opt.id);
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggleSelect(opt)}
+              className="fl-row"
+              style={{
+                width: "100%",
+                minHeight: 44,
+                padding: "8px 14px",
+                border: "none",
+                borderTop: i === 0 ? "none" : "1px solid var(--border)",
+                background: on ? "var(--accent-dim)" : "transparent",
+                color: "var(--text)",
+                textAlign: "left",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 6,
+                  flex: "none",
+                  display: "grid",
+                  placeItems: "center",
+                  border: `1.5px solid ${on ? "var(--accent)" : "var(--border2)"}`,
+                  background: on ? "var(--accent)" : "transparent",
+                  color: "var(--accent-ink)",
+                }}
+              >
+                {on && <Check size={14} strokeWidth={3} />}
+              </span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.name}</span>
+              {opt.folder && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)", flex: "none", maxWidth: "40%" }}>
+                  <span className="dot" style={{ background: opt.folder.color }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.folder.name}</span>
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <span className="fl-label" style={{ display: "flex", alignItems: "center" }}>
+          Ajouter en tant que
+          <Help title="Liée, figée ou masse cible">
+            <b>Liée</b> : le cahier affiche toujours la version actuelle de la recette ; si tu la
+            modifies, le cahier suit.
+            <br />
+            <b>Figée</b> : le cahier garde une copie de la recette telle qu&apos;elle est aujourd&apos;hui.
+            Les modifications futures de la recette ne la changent pas.
+            <br />
+            <b>Masse cible</b> : chaque recette est figée puis multipliée pour peser la masse indiquée.
+          </Help>
+        </span>
+        <div className="fl-seg" style={{ alignSelf: "flex-start" }}>
+          <button type="button" aria-pressed={linkMode === "linked"} onClick={() => setLinkMode("linked")}>
+            Liée
+          </button>
+          <button type="button" aria-pressed={linkMode === "snapshot"} onClick={() => setLinkMode("snapshot")}>
+            Figée
+          </button>
+          <button type="button" aria-pressed={linkMode === "mass_target"} onClick={() => setLinkMode("mass_target")}>
+            Masse cible
+          </button>
+        </div>
+        {linkMode === "mass_target" && (
+          <>
+            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 13.5, color: "var(--soft)", flex: 1, display: "flex", alignItems: "center" }}>
+                Masse de chaque recette (g)
+              </span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={targetMass}
+                onChange={(e) => setTargetMass(e.target.value)}
+                className="fl-input num"
+                style={{ width: 110, textAlign: "right" }}
+              />
+            </label>
+            <ExactToggle checked={forceExact} onChange={setForceExact} />
+          </>
+        )}
+      </div>
+
+      {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+      {result && (
+        <p style={{ color: "var(--accent-2)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+          <Check size={15} />
+          {result.added} recette{result.added > 1 ? "s" : ""} ajoutée{result.added > 1 ? "s" : ""}
+          {result.skipped > 0 && ` · ${result.skipped} déjà présente${result.skipped > 1 ? "s" : ""}`}
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
+        <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">
+          {result ? "Fermer" : "Annuler"}
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={pending || n === 0} className="fl-btn fl-btn-primary">
+          {pending
+            ? "Ajout…"
+            : n === 0
+              ? "Ajouter"
+              : `Ajouter ${n} recette${n > 1 ? "s" : ""}${linkMode === "mass_target" ? ` à ${targetMass} g` : ""}`}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }

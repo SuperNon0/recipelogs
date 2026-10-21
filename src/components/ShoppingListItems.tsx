@@ -1,13 +1,10 @@
 "use client";
 
-import { useOptimistic, useTransition, useState } from "react";
-import {
-  toggleItem,
-  removeItem,
-  addManualItem,
-  uncheckAll,
-  removeChecked,
-} from "@/app/actions/shopping";
+import { useOptimistic, useRef, useState, useTransition } from "react";
+import { Check, Plus, RotateCcw, ShoppingBasket, Trash2 } from "lucide-react";
+import { toggleItem, removeItem, addManualItem } from "@/app/actions/shopping";
+import { ContextArea, MoreButton, type MenuSpec } from "@/components/ui/Menu";
+import { Help } from "@/components/ui/Help";
 import { formatQty } from "@/lib/format";
 
 type Item = {
@@ -19,7 +16,15 @@ type Item = {
   recipeId: number | null;
 };
 
+type OptimisticAction =
+  | { type: "toggle"; id: number }
+  | { type: "remove"; id: number }
+  | { type: "add"; item: Item };
 
+/**
+ * Articles de la liste, pensés pour le téléphone en magasin : ajout rapide en
+ * haut, grosses cases à cocher, articles cochés grisés et regroupés en bas.
+ */
 export function ShoppingListItems({
   listId,
   initialItems,
@@ -28,141 +33,159 @@ export function ShoppingListItems({
   initialItems: Item[];
 }) {
   const [, startTransition] = useTransition();
-  const [optimisticItems, updateOptimistic] = useOptimistic(
-    initialItems,
-    (state, action: { type: "toggle"; id: number } | { type: "remove"; id: number }) => {
-      if (action.type === "toggle") {
-        return state.map((i) =>
-          i.id === action.id ? { ...i, checked: !i.checked } : i,
-        );
-      }
-      return state.filter((i) => i.id !== action.id);
-    },
-  );
+  const [items, updateOptimistic] = useOptimistic(initialItems, (state, action: OptimisticAction) => {
+    if (action.type === "toggle") {
+      return state.map((i) => (i.id === action.id ? { ...i, checked: !i.checked } : i));
+    }
+    if (action.type === "add") return [...state, action.item];
+    return state.filter((i) => i.id !== action.id);
+  });
 
-  const [manualName, setManualName] = useState("");
-  const [manualQty, setManualQty] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  const checkedCount = optimisticItems.filter((i) => i.checked).length;
-  const recipeItems = optimisticItems.filter((i) => i.recipeId !== null);
-  const manualItems = optimisticItems.filter((i) => i.recipeId === null);
+  const todo = items.filter((i) => !i.checked);
+  const done = items.filter((i) => i.checked);
 
   function handleToggle(id: number) {
-    startTransition(() => {
+    startTransition(async () => {
       updateOptimistic({ type: "toggle", id });
-      void toggleItem(id, listId);
+      await toggleItem(id, listId);
     });
   }
 
   function handleRemove(id: number) {
-    startTransition(() => {
+    startTransition(async () => {
       updateOptimistic({ type: "remove", id });
-      void removeItem(id, listId);
+      await removeItem(id, listId);
     });
   }
 
-  async function handleAddManual(e: React.FormEvent) {
+  function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    const name = manualName.trim();
-    if (!name) return;
-    const qty = manualQty ? parseFloat(manualQty) : null;
-    setAdding(true);
-    await addManualItem(listId, name, qty && !isNaN(qty) ? qty : null);
-    setManualName("");
-    setManualQty("");
-    setAdding(false);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const q = qty ? parseFloat(qty.replace(",", ".")) : null;
+    const quantityG = q !== null && isFinite(q) && q > 0 ? q : null;
+    setName("");
+    setQty("");
+    setError(null);
+    nameRef.current?.focus();
+    startTransition(async () => {
+      updateOptimistic({
+        type: "add",
+        item: { id: -Date.now(), name: trimmed, quantityG, unit: null, checked: false, recipeId: null },
+      });
+      const r = await addManualItem(listId, trimmed, quantityG);
+      if (!r.ok) setError(r.error);
+    });
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Actions groupées */}
-      {optimisticItems.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {checkedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => startTransition(() => { void removeChecked(listId); })}
-              className="fl-btn fl-btn-danger"
-              style={{ fontSize: "0.75rem", padding: "0.3rem 0.65rem" }}
-            >
-              Supprimer les cochés ({checkedCount})
-            </button>
-          )}
-          {checkedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => startTransition(() => { void uncheckAll(listId); })}
-              className="fl-btn fl-btn-secondary"
-              style={{ fontSize: "0.75rem", padding: "0.3rem 0.65rem" }}
-            >
-              Tout décocher
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Items depuis recettes */}
-      {recipeItems.length > 0 && (
-        <div className="fl-card flex flex-col gap-1 p-3">
-          <p className="fl-label mb-2">Ingrédients des recettes</p>
-          {recipeItems.map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              onToggle={handleToggle}
-              onRemove={handleRemove}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Items manuels */}
-      {manualItems.length > 0 && (
-        <div className="fl-card flex flex-col gap-1 p-3">
-          <p className="fl-label mb-2">Articles manuels</p>
-          {manualItems.map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              onToggle={handleToggle}
-              onRemove={handleRemove}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Ajouter un article manuel */}
-      <form onSubmit={handleAddManual} className="fl-card flex flex-col gap-3 p-3">
-        <p className="fl-label">Ajouter un article</p>
-        <div className="flex gap-2">
+      {/* Ajout rapide d'un article libre */}
+      <form onSubmit={handleAdd} className="sh-add">
+        <input
+          ref={nameRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ajouter un article…"
+          aria-label="Nom de l'article"
+          maxLength={200}
+          className="sh-add-name"
+          enterKeyHint="done"
+        />
+        <span className="sh-add-qty">
           <input
-            value={manualName}
-            onChange={(e) => setManualName(e.target.value)}
-            placeholder="Nom de l'article"
-            className="fl-input flex-1"
-            style={{ fontSize: "0.9rem" }}
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            placeholder="Qté"
+            aria-label="Quantité en grammes (facultatif)"
+            inputMode="decimal"
+            className="num"
           />
-          <input
-            value={manualQty}
-            onChange={(e) => setManualQty(e.target.value)}
-            placeholder="Qté (g)"
-            type="number"
-            min="0"
-            step="0.1"
-            className="fl-input"
-            style={{ width: 100, fontSize: "0.9rem" }}
-          />
-          <button
-            type="submit"
-            disabled={adding || !manualName.trim()}
-            className="fl-btn fl-btn-primary"
-            style={{ fontSize: "0.85rem", whiteSpace: "nowrap" }}
-          >
-            {adding ? "…" : "+ Ajouter"}
-          </button>
-        </div>
+          <span>g</span>
+        </span>
+        <button
+          type="submit"
+          disabled={!name.trim()}
+          className="fl-btn fl-btn-primary fl-btn-icon"
+          aria-label="Ajouter l'article"
+        >
+          <Plus size={18} />
+        </button>
       </form>
+      {error && (
+        <p className="text-sm" style={{ color: "var(--danger)", marginTop: -8 }}>
+          {error}
+        </p>
+      )}
+
+      {items.length === 0 ? (
+        <div className="fl-card sh-empty">
+          <ShoppingBasket size={22} />
+          <p>
+            La liste est vide. Ajoute une recette pour remplir la liste avec ses ingrédients, ou
+            un article à la main ci-dessus.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <div className="sh-head">
+              <h2>À acheter</h2>
+              <span className="num">{todo.length}</span>
+              <Help
+                title="Quantités additionnées"
+                calc="quantité = somme de (quantité dans la recette × coefficient), arrondie au-dessus"
+                example="Tarte A : 200 g de beurre, coefficient 2. Tarte B : 100 g de beurre, coefficient 1. La liste affiche 500 g de beurre."
+              >
+                Un ingrédient présent dans plusieurs recettes n&apos;apparaît qu&apos;une fois : ses
+                quantités sont additionnées, après multiplication par le coefficient de chaque
+                recette. Les ingrédients des sous-recettes sont inclus. Pour une fourchette (min –
+                max), on garde le maximum pour acheter assez.
+              </Help>
+              <span style={{ flex: 1 }} />
+              <span className="sh-muted" style={{ fontSize: 12 }}>Unités</span>
+              <Help
+                title="Unités"
+                example="2 pièces d'œuf et 100 g d'œuf restent sur deux lignes séparées."
+              >
+                On n&apos;additionne que des quantités de même unité et de même nom. Les litres sont
+                convertis en grammes (1 L = 1000 g). « QS » (quantité suffisante) n&apos;a pas de quantité. Les
+                articles ajoutés à la main sont en grammes ; la quantité est facultative.
+              </Help>
+            </div>
+            {todo.length === 0 ? (
+              <div className="fl-card sh-alldone">
+                <Check size={18} /> Tout est dans le panier.
+              </div>
+            ) : (
+              <div className="fl-list">
+                {todo.map((item) => (
+                  <ItemRow key={item.id} item={item} onToggle={handleToggle} onRemove={handleRemove} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {done.length > 0 && (
+            <div>
+              <div className="sh-head">
+                <h2>Dans le panier</h2>
+                <span className="num">{done.length}</span>
+              </div>
+              <div className="fl-list sh-done">
+                {done.map((item) => (
+                  <ItemRow key={item.id} item={item} onToggle={handleToggle} onRemove={handleRemove} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -176,37 +199,43 @@ function ItemRow({
   onToggle: (id: number) => void;
   onRemove: (id: number) => void;
 }) {
+  const pending = item.id < 0;
+  const showQty = item.quantityG !== null || item.unit === "QS";
+  const spec = (): MenuSpec => ({
+    title: item.name,
+    items: [
+      {
+        label: item.checked ? "Décocher" : "Cocher",
+        icon: item.checked ? RotateCcw : Check,
+        disabled: pending,
+        onSelect: () => onToggle(item.id),
+      },
+      { separator: true },
+      { label: "Retirer de la liste", icon: Trash2, danger: true, disabled: pending, onSelect: () => onRemove(item.id) },
+    ],
+  });
+
   return (
-    <div
-      className="flex items-center gap-3 py-1.5 rounded"
-      style={{ opacity: item.checked ? 0.5 : 1 }}
-    >
-      <input
-        type="checkbox"
-        checked={item.checked}
-        onChange={() => onToggle(item.id)}
-        className="accent-[color:var(--accent-2)] w-4 h-4 flex-shrink-0 cursor-pointer"
-      />
-      <span
-        className="flex-1 text-sm"
-        style={{ textDecoration: item.checked ? "line-through" : "none" }}
-      >
-        {item.name}
-      </span>
-      {(item.quantityG !== null || item.unit === "QS") && (
-        <span className="fl-label" style={{ whiteSpace: "nowrap" }}>
-          {formatQty(item.quantityG ?? 0, item.unit)}
-        </span>
-      )}
+    <ContextArea spec={spec} className="fl-row sh-item">
       <button
         type="button"
-        onClick={() => onRemove(item.id)}
-        className="fl-label hover:text-[color:var(--danger)] flex-shrink-0"
-        style={{ fontSize: "1rem", lineHeight: 1, padding: "0 4px" }}
-        aria-label="Retirer"
+        role="checkbox"
+        aria-checked={item.checked}
+        disabled={pending}
+        onClick={() => onToggle(item.id)}
+        className="sh-item-btn"
+        data-checked={item.checked ? "true" : undefined}
       >
-        ×
+        <span className="sh-box" aria-hidden>
+          {item.checked && <Check size={18} strokeWidth={3} />}
+        </span>
+        <span className="sh-item-name">
+          {item.name}
+          {item.recipeId === null && <small>ajouté à la main</small>}
+        </span>
+        {showQty && <span className="sh-item-qty num">{formatQty(item.quantityG ?? 0, item.unit)}</span>}
       </button>
-    </div>
+      {!pending && <MoreButton spec={spec} label={`Actions pour ${item.name}`} />}
+    </ContextArea>
   );
 }

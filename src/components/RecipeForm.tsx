@@ -1,27 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChefHat,
+  CircleAlert,
+  FileText,
+  ListPlus,
+  MoveHorizontal,
+  Plus,
+  Save,
+  Scale,
+  Star,
+  StickyNote,
+  Trash2,
+  X,
+} from "lucide-react";
 import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { recipeMass } from "@/lib/massAdjust";
+import { formatG } from "@/lib/format";
+import { Help } from "@/components/ui/Help";
+import { MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 
 type IngredientUnit = "g" | "L" | "cc" | "cs" | "pièce" | "QS";
 const UNITS: IngredientUnit[] = ["g", "L", "cc", "cs", "pièce", "QS"];
-const UNIT_LABELS: Record<IngredientUnit, string> = {
-  g: "g",
-  L: "L",
-  cc: "cc (~5g)",
-  cs: "cs (~15g)",
-  pièce: "pièce",
-  QS: "QS",
-};
+const isUnit = (u: string | undefined): u is IngredientUnit => UNITS.includes(u as IngredientUnit);
 
 type IngredientRow = {
+  /** Clé stable pour React (les lignes peuvent être réordonnées). */
+  key: number;
   name: string;
   quantity: string;
-  quantityMax: string;  // empty = not a range; non-empty = max value
+  /** Quantité max, utilisée seulement si `range` est vrai. */
+  quantityMax: string;
+  range: boolean;
   unit: IngredientUnit;
 };
 
@@ -41,6 +57,9 @@ export type RecipeFormInitial = {
   ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
 };
 
+let nextKey = 1;
+const emptyRow = (): IngredientRow => ({ key: nextKey++, name: "", quantity: "", quantityMax: "", range: false, unit: "g" });
+
 export function RecipeForm({
   initial,
   categories,
@@ -54,39 +73,76 @@ export function RecipeForm({
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
 }) {
-  const [ingredients, setIngredients] = useState<IngredientRow[]>(
+  const [ingredients, setIngredients] = useState<IngredientRow[]>(() =>
     initial?.ingredients?.length
-      ? initial.ingredients.map((i) => ({
-          name: i.name,
-          quantity: i.unit === "QS" ? "" : String(i.quantityG),
-          quantityMax: i.quantityGMax != null ? String(i.quantityGMax) : "",
-          unit: (i.unit as IngredientUnit) ?? "g",
-        }))
-      : [{ name: "", quantity: "", quantityMax: "", unit: "g" }],
+      ? initial.ingredients.map((i) => {
+          const unit = isUnit(i.unit) ? i.unit : "g";
+          return {
+            key: nextKey++,
+            name: i.name,
+            quantity: unit === "QS" ? "" : String(i.quantityG),
+            quantityMax: i.quantityGMax != null ? String(i.quantityGMax) : "",
+            range: i.quantityGMax != null && unit !== "QS",
+            unit,
+          };
+        })
+      : [emptyRow()],
   );
   const [folderId, setFolderId] = useState<number | "">(initial?.folderId ?? "");
+  const [favorite, setFavorite] = useState(initial?.favorite ?? false);
+  const [rating, setRating] = useState<number | null>(initial?.rating ?? null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [ingredientMode, setIngredientMode] = useState<IngredientMode>("list");
   const [freeText, setFreeText] = useState("");
+  const [focusKey, setFocusKey] = useState<number | null>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
 
-  const totalG = recipeMass(
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  // Prévient avant de quitter la page avec des modifications non enregistrées.
+  useEffect(() => {
+    if (!dirty || submitting) return;
+    const onLeave = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, [dirty, submitting]);
+
+  // Place le curseur dans le nom d'un ingrédient qu'on vient d'ajouter.
+  useEffect(() => {
+    if (focusKey == null) return;
+    const idx = ingredients.findIndex((r) => r.key === focusKey);
+    rowsRef.current?.querySelector<HTMLInputElement>(`[data-row="${idx}"] .rf-ing-name input`)?.focus();
+    setFocusKey(null);
+  }, [focusKey, ingredients]);
+
+  const mass = recipeMass(
     ingredients.map((r) => ({
       quantityG: Number(r.quantity) || 0,
-      quantityGMax: r.quantityMax ? Number(r.quantityMax) || 0 : null,
+      quantityGMax: r.range && r.quantityMax ? Number(r.quantityMax) || 0 : null,
       unit: r.unit,
     })),
-  ).avg;
+  );
 
-  const addRow = () =>
-    setIngredients((rows) => [...rows, { name: "", quantity: "", quantityMax: "", unit: "g" }]);
+  const updateRow = (idx: number, patch: Partial<IngredientRow>) => {
+    setIngredients((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setDirty(true);
+  };
 
-  const removeRow = (idx: number) =>
-    setIngredients((rows) =>
-      rows.length === 1 ? rows : rows.filter((_, i) => i !== idx),
-    );
+  const addRow = () => {
+    const row = emptyRow();
+    setIngredients((rows) => [...rows, row]);
+    setFocusKey(row.key);
+    setDirty(true);
+  };
 
-  const moveRow = (idx: number, dir: -1 | 1) =>
+  const removeRow = (idx: number) => {
+    setIngredients((rows) => (rows.length === 1 ? [emptyRow()] : rows.filter((_, i) => i !== idx)));
+    setDirty(true);
+  };
+
+  const moveRow = (idx: number, dir: -1 | 1) => {
     setIngredients((rows) => {
       const target = idx + dir;
       if (target < 0 || target >= rows.length) return rows;
@@ -94,36 +150,64 @@ export function RecipeForm({
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
     });
+    setDirty(true);
+  };
 
-  const importFreeText = () => {
+  const setUnit = (idx: number, unit: IngredientUnit) =>
+    updateRow(idx, unit === "QS" ? { unit, quantity: "", quantityMax: "", range: false } : { unit });
+
+  const toggleRange = (idx: number, row: IngredientRow) => {
+    if (row.range) return updateRow(idx, { range: false, quantityMax: "" });
+    updateRow(idx, { range: true, quantityMax: "", unit: row.unit === "QS" ? "g" : row.unit });
+    // Place le curseur dans la nouvelle case « max ».
+    setTimeout(() => rowsRef.current?.querySelector<HTMLInputElement>(`[data-row="${idx}"] input[aria-label="Quantité max"]`)?.focus(), 50);
+  };
+
+  const importFreeText = (append: boolean) => {
     const parsed = parseIngredientsText(freeText);
     if (parsed.length === 0) {
-      setError("Aucun ingrédient détecté dans le texte.");
+      setError("Aucun ingrédient trouvé dans le texte.");
       return;
     }
     setError(null);
-    setIngredients(
-      parsed.map((p) => ({
+    const rows: IngredientRow[] = parsed.map((p) => {
+      const unit = isUnit(p.unit) ? p.unit : "g";
+      return {
+        key: nextKey++,
         name: p.name,
-        quantity: p.quantityG > 0 ? String(p.quantityG) : "",
-        quantityMax: "",
-        unit: "g" as IngredientUnit,
-      })),
-    );
+        quantity: unit !== "QS" && p.quantityG > 0 ? String(p.quantityG) : "",
+        quantityMax: p.quantityGMax != null ? String(p.quantityGMax) : "",
+        range: p.quantityGMax != null,
+        unit,
+      };
+    });
+    setIngredients((cur) => {
+      const kept = cur.filter((r) => r.name.trim() || r.quantity);
+      return append ? [...kept, ...rows] : rows;
+    });
+    setFreeText("");
     setIngredientMode("list");
+    setDirty(true);
   };
 
   const onSubmit = async (formData: FormData) => {
     setError(null);
     if (!formData.get("name")?.toString().trim()) {
-      setError("Le nom est obligatoire.");
+      setError("Le nom de la recette est obligatoire.");
       return;
     }
     const hasValidIngredient = ingredients.some(
       (r) => r.name.trim() && (r.unit === "QS" || Number(r.quantity) > 0),
     );
     if (!hasValidIngredient) {
-      setError("Au moins un ingrédient avec une quantité (ou QS) est obligatoire.");
+      setError("Ajoute au moins un ingrédient avec une quantité (ou QS).");
+      return;
+    }
+    const badRange = ingredients.findIndex(
+      (r) => r.name.trim() && r.range && r.quantityMax !== "" && Number(r.quantityMax) <= Number(r.quantity),
+    );
+    if (badRange >= 0) {
+      setError(`Ligne ${badRange + 1} : la quantité max doit être plus grande que la quantité min.`);
       return;
     }
     setSubmitting(true);
@@ -135,466 +219,460 @@ export function RecipeForm({
     }
   };
 
+  const rowMenu = (idx: number, row: IngredientRow): MenuSpec => ({
+    title: row.name.trim() || `Ingrédient ${idx + 1}`,
+    items: [
+      {
+        label: row.range ? "Quantité simple" : "Fourchette (min – max)",
+        icon: MoveHorizontal,
+        disabled: row.unit === "QS",
+        onSelect: () => toggleRange(idx, row),
+      },
+      { separator: true },
+      { label: "Monter", icon: ArrowUp, disabled: idx === 0, onSelect: () => moveRow(idx, -1) },
+      { label: "Descendre", icon: ArrowDown, disabled: idx === ingredients.length - 1, onSelect: () => moveRow(idx, 1) },
+      { separator: true },
+      { label: "Supprimer", icon: Trash2, danger: true, onSelect: () => removeRow(idx) },
+    ],
+  });
+
+  const cancelHref = initial?.id ? `/recipes/${initial.id}` : "/";
+
   return (
-    <form action={onSubmit} className="flex flex-col gap-5">
-      <Field label="Nom de la recette *">
-        <input
-          name="name"
-          className="fl-input"
-          required
-          maxLength={200}
-          defaultValue={initial?.name ?? ""}
-          placeholder="Ex : Tarte citron meringuée"
-        />
-      </Field>
-
-      {folders.length > 0 && (
-        <Field label="📁 Dossier">
-          <select
-            name="folderId"
-            value={folderId}
-            onChange={(e) =>
-              setFolderId(e.target.value === "" ? "" : Number(e.target.value))
-            }
-            className="fl-input"
-          >
-            <option value="">— Aucun dossier —</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-
-      {categories.length > 0 && (
-        <Field label="Catégories">
-          <CategoryCombobox
-            allCategories={categories}
-            initialSelected={initial?.categoryIds ?? []}
-          />
-        </Field>
-      )}
-
-      <Field label="Tags (séparés par une virgule)">
-        <input
-          name="tags"
-          className="fl-input"
-          defaultValue={initial?.tags?.join(", ") ?? ""}
-          placeholder="framboise, été, tarte"
-        />
-      </Field>
-
-      <Field label={`Ingrédients * (masse totale : ${Math.round(totalG)} g — hors pièces et QS)`}>
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setIngredientMode("list")}
-              className={`fl-btn ${ingredientMode === "list" ? "fl-btn-primary" : "fl-btn-secondary"}`}
-              style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
-            >
-              📋 Liste
-            </button>
-            <button
-              type="button"
-              onClick={() => setIngredientMode("text")}
-              className={`fl-btn ${ingredientMode === "text" ? "fl-btn-primary" : "fl-btn-secondary"}`}
-              style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
-            >
-              📝 Texte libre
-            </button>
-          </div>
-
-          {ingredientMode === "text" ? (
-            <div className="flex flex-col gap-2">
-              <textarea
-                className="fl-input"
-                rows={10}
-                value={freeText}
-                onChange={(e) => setFreeText(e.target.value)}
-                placeholder={"Colle ou saisis tes ingrédients, un par ligne :\n\n200g farine\n100g beurre\n3 oeufs\n\nOu format fiche pâtissier :\nFarine\n- 200g\nBeurre\n- 100g"}
-              />
-              <div className="flex gap-2 items-center">
-                <button
-                  type="button"
-                  onClick={importFreeText}
-                  className="fl-btn fl-btn-primary"
-                  disabled={!freeText.trim()}
-                  style={{ padding: "0.5rem 1rem", fontSize: "0.9rem" }}
-                >
-                  ↓ Importer dans la liste
-                </button>
-                <span className="fl-label" style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                  Le bouton remplit la liste structurée à partir de ton texte
-                </span>
-              </div>
-              {/* Champs cachés pour conserver les ingrédients lors du submit */}
-              {ingredients.map((row, idx) => (
-                <div key={idx} style={{ display: "none" }}>
-                  <input name="ingredientQty" value={row.unit === "QS" ? "0" : row.quantity} readOnly />
-                  <input name="ingredientQtyMax" value={row.quantityMax} readOnly />
-                  <input name="ingredientName" value={row.name} readOnly />
-                  <input name="ingredientUnit" value={row.unit} readOnly />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {ingredients.map((row, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  {row.quantityMax !== "" ? (
-                    <>
-                      <input
-                        type="number" step="0.01" min="0"
-                        name="ingredientQty"
-                        placeholder="min"
-                        className="fl-input"
-                        style={{ width: 62, textAlign: "right", fontSize: "0.85rem" }}
-                        value={row.quantity}
-                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
-                      />
-                      <span style={{ color: "var(--muted)", fontSize: "0.8rem", flexShrink: 0 }}>—</span>
-                      <input
-                        type="number" step="0.01" min="0"
-                        name="ingredientQtyMax"
-                        placeholder="max"
-                        className="fl-input"
-                        style={{ width: 62, textAlign: "right", fontSize: "0.85rem" }}
-                        value={row.quantityMax}
-                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: e.target.value } : r))}
-                      />
-                      <UnitSelector
-                        value={row.unit}
-                        isRange={true}
-                        onChange={(u) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u } : r))}
-                        onRangeExit={() => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: "" } : r))}
-                      />
-                      <input type="hidden" name="ingredientUnit" value={row.unit} />
-                    </>
-                  ) : row.unit === "QS" ? (
-                    <>
-                      <input type="hidden" name="ingredientQty" value="0" />
-                      <input type="hidden" name="ingredientQtyMax" value="" />
-                      <UnitSelector
-                        value={row.unit}
-                        isRange={false}
-                        onChange={(unit) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit } : r))}
-                        onRangeExit={() => {}}
-                      />
-                      <input type="hidden" name="ingredientUnit" value={row.unit} />
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number" step="0.01" min="0"
-                        name="ingredientQty"
-                        placeholder="0"
-                        className="fl-input"
-                        style={{ width: 80, textAlign: "right" }}
-                        value={row.quantity}
-                        onChange={(e) => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
-                      />
-                      <input type="hidden" name="ingredientQtyMax" value="" />
-                      <UnitSelector
-                        value={row.unit}
-                        isRange={false}
-                        onChange={(u) => {
-                          if (u === "QS") setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u, quantity: "", quantityMax: "" } : r));
-                          else setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, unit: u } : r));
-                        }}
-                        onRangeEnter={() => setIngredients(rows => rows.map((r, i) => i === idx ? { ...r, quantityMax: row.quantity || "0", unit: row.unit === "QS" ? "g" : row.unit } : r))}
-                        onRangeExit={() => {}}
-                      />
-                      <input type="hidden" name="ingredientUnit" value={row.unit} />
-                    </>
-                  )}
-                  <IngredientNameInput
-                    value={row.name}
-                    onChange={(name) =>
-                      setIngredients((rows) =>
-                        rows.map((r, i) =>
-                          i === idx ? { ...r, name } : r,
-                        ),
-                      )
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => moveRow(idx, -1)}
-                    disabled={idx === 0}
-                    className="fl-btn fl-btn-secondary"
-                    style={{ padding: "0.4rem 0.55rem" }}
-                    aria-label="Monter"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveRow(idx, 1)}
-                    disabled={idx === ingredients.length - 1}
-                    className="fl-btn fl-btn-secondary"
-                    style={{ padding: "0.4rem 0.55rem" }}
-                    aria-label="Descendre"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(idx)}
-                    disabled={ingredients.length === 1}
-                    className="fl-btn fl-btn-danger"
-                    style={{ padding: "0.4rem 0.6rem" }}
-                    aria-label="Supprimer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addRow}
-                className="fl-btn fl-btn-secondary self-start"
-              >
-                + Ingrédient
-              </button>
-            </div>
-          )}
-        </div>
-      </Field>
-
-      <Field label="Étapes (une étape par ligne)">
-        <textarea
-          name="steps"
-          className="fl-input"
-          rows={10}
-          defaultValue={htmlToPlainText(initial?.steps ?? "")}
-          placeholder={
-            "Une étape par ligne :\n\nPréparer la pâte sablée\nCuire 20 min à 180°C\nGarnir et laisser refroidir\n\nLa numérotation (1. 2. 3.) est ajoutée automatiquement dans le PDF."
-          }
-          style={{ lineHeight: 1.6, fontFamily: "inherit" }}
-        />
-      </Field>
-
-      <Field label="Source (livre, site, chef…)">
-        <input
-          name="source"
-          className="fl-input"
-          defaultValue={initial?.source ?? ""}
-        />
-      </Field>
-
-      <Field label="Notes & astuces">
-        <textarea
-          name="notesTips"
-          className="fl-input"
-          rows={4}
-          defaultValue={initial?.notesTips ?? ""}
-        />
-      </Field>
-
-      <div className="flex flex-wrap gap-4 items-center">
-        <label className="flex items-center gap-2 cursor-pointer">
+    <form action={onSubmit} onInput={markDirty} className="rf-form">
+      {/* ─── Informations ─────────────────────────────────────────── */}
+      <Section icon={FileText} title="Informations">
+        <Field label="Nom de la recette">
           <input
-            type="checkbox"
-            name="favorite"
-            defaultChecked={initial?.favorite ?? false}
-          />
-          <span className="fl-label">Favori</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="fl-label">Note</span>
-          <select
-            name="rating"
+            name="name"
             className="fl-input"
-            defaultValue={initial?.rating ?? ""}
-            style={{ width: 90 }}
-          >
-            <option value="">—</option>
-            {[1, 2, 3, 4, 5].map((v) => (
-              <option key={v} value={v}>
-                {"★".repeat(v)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            required
+            maxLength={200}
+            defaultValue={initial?.name ?? ""}
+            placeholder="Ex. Tarte citron meringuée"
+            autoFocus={!initial?.id}
+          />
+        </Field>
 
-      {error && (
-        <div
-          className="fl-card"
-          style={{
-            background: "rgba(232, 92, 71, 0.08)",
-            borderColor: "rgba(232, 92, 71, 0.4)",
-            color: "var(--danger)",
-            padding: "0.8rem 1rem",
+        <div className="rf-grid2">
+          {folders.length > 0 && (
+            <Field label="Dossier">
+              <select
+                name="folderId"
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value === "" ? "" : Number(e.target.value))}
+                className="fl-input"
+              >
+                <option value="">Aucun dossier</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field label="Source" hint="Livre, site, chef…">
+            <input name="source" className="fl-input" defaultValue={initial?.source ?? ""} placeholder="Ex. Pâtisserie, Christophe Felder" />
+          </Field>
+        </div>
+
+        <Field
+          label="Catégories"
+          help={{
+            title: "Catégories ou tags ?",
+            text: "Les catégories sont une liste commune, avec une couleur, qui sert à filtrer et à ranger tes recettes (ex. Tartes, Entremets). Tape un nom qui n'existe pas pour créer une nouvelle catégorie. Les tags sont des mots libres, propres à cette recette (ex. framboise, été).",
           }}
         >
-          {error}
-        </div>
-      )}
+          <CategoryCombobox allCategories={categories} initialSelected={initial?.categoryIds ?? []} onChange={markDirty} />
+        </Field>
 
-      <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="fl-btn fl-btn-primary"
+        <Field
+          label="Tags"
+          hint="Sépare les tags par une virgule."
+          help={{
+            title: "Tags",
+            text: "Mots libres pour retrouver la recette avec la recherche. Contrairement aux catégories, ils n'ont pas de couleur et ne servent pas au classement.",
+            example: "framboise, été, sans gluten",
+          }}
         >
-          {submitting ? "Enregistrement…" : submitLabel}
-        </button>
-        <Link
-          href={initial?.id ? `/recipes/${initial.id}` : "/"}
-          className="fl-btn fl-btn-secondary"
-        >
+          <input name="tags" className="fl-input" defaultValue={initial?.tags?.join(", ") ?? ""} placeholder="framboise, été, tarte" />
+        </Field>
+
+        <div className="rf-grid2">
+          <div className="rf-field">
+            <Label
+              text="Note"
+              help={{
+                title: "Note",
+                text: "Ton avis sur la recette, de 1 à 5 étoiles. Clique sur l'étoile déjà choisie pour retirer la note. Elle sert au tri et peut être imprimée sur le PDF.",
+              }}
+            />
+            <div className="rf-stars" role="radiogroup" aria-label="Note">
+              {[1, 2, 3, 4, 5].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={rating === v}
+                  aria-label={`${v} étoile${v > 1 ? "s" : ""}`}
+                  className="rf-star"
+                  data-on={rating != null && v <= rating}
+                  onClick={() => {
+                    setRating(rating === v ? null : v);
+                    setDirty(true);
+                  }}
+                >
+                  <Star size={20} fill={rating != null && v <= rating ? "currentColor" : "none"} />
+                </button>
+              ))}
+              {rating == null && <span className="rf-hint" style={{ marginLeft: 6 }}>Pas de note</span>}
+            </div>
+            <input type="hidden" name="rating" value={rating ?? ""} />
+          </div>
+          <div className="rf-field">
+            <Label text="Favori" />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 36 }}>
+              <span style={{ fontSize: 13.5, color: "var(--soft)" }}>Mettre dans les favoris</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={favorite}
+                aria-label="Favori"
+                className="fl-switch"
+                onClick={() => {
+                  setFavorite(!favorite);
+                  setDirty(true);
+                }}
+              />
+            </div>
+            {favorite && <input type="hidden" name="favorite" value="on" />}
+          </div>
+        </div>
+      </Section>
+
+      {/* ─── Ingrédients ──────────────────────────────────────────── */}
+      <Section
+        icon={Scale}
+        title="Ingrédients"
+        extra={
+          <span className="rf-mass">
+            Masse totale <b className="num">{formatG(mass.avg)}</b>
+            <Help
+              title="Masse totale"
+              calc={"g      = quantité\ncc     = quantité × 5 g\ncs     = quantité × 15 g\nL      = quantité × 1000 g\npièce, QS = non comptés"}
+              example={
+                mass.min !== mass.max ? (
+                  <>
+                    Avec tes fourchettes : entre {formatG(mass.min)} et {formatG(mass.max)}, la moyenne ({formatG(mass.avg)}) est affichée.
+                  </>
+                ) : (
+                  "200 g de farine + 2 cs de sucre (30 g) + 3 œufs (pièces, non comptés) = 230 g."
+                )
+              }
+            >
+              Somme des quantités de la recette, recalculée pendant que tu tapes. Sert à adapter
+              la recette à une autre masse. Pour une fourchette, c&apos;est la moyenne entre min et max.
+            </Help>
+          </span>
+        }
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <div className="fl-seg" role="group" aria-label="Mode de saisie">
+            <button type="button" aria-pressed={ingredientMode === "list"} onClick={() => setIngredientMode("list")}>
+              Liste
+            </button>
+            <button type="button" aria-pressed={ingredientMode === "text"} onClick={() => setIngredientMode("text")}>
+              Saisie en lot
+            </button>
+          </div>
+          <Help
+            title="Saisie en lot"
+            example={
+              <span style={{ whiteSpace: "pre-line", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+                {"200g farine\n100-120g sucre\n2 cs huile\n3 oeufs\n\nou format fiche :\nFarine\n- 200g"}
+              </span>
+            }
+          >
+            Colle une liste d&apos;ingrédients (un par ligne) : les quantités, unités (g, kg, ml, cc, cs,
+            pièces) et fourchettes sont reconnues, puis la liste est remplie automatiquement. Vérifie le
+            résultat avant d&apos;enregistrer.
+          </Help>
+        </div>
+
+        {ingredientMode === "text" ? (
+          <div className="rf-bulk">
+            <textarea
+              className="fl-input"
+              rows={10}
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              aria-label="Ingrédients en texte libre"
+              placeholder={"Un ingrédient par ligne :\n\n200g farine\n100g beurre\n3 oeufs"}
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button type="button" className="fl-btn fl-btn-secondary" disabled={!freeText.trim()} onClick={() => importFreeText(true)}>
+                <ListPlus size={16} /> Ajouter à la suite
+              </button>
+              <button
+                type="button"
+                className="fl-btn fl-btn-primary"
+                disabled={!freeText.trim()}
+                onClick={() => {
+                  const hasRows = ingredients.some((r) => r.name.trim());
+                  if (hasRows && !confirm("Remplacer les ingrédients déjà saisis par ceux du texte ?")) return;
+                  importFreeText(false);
+                }}
+              >
+                Remplir la liste
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              className="rf-ings"
+              ref={rowsRef}
+              onKeyDown={(e) => {
+                // Entrée dans une ligne ne doit pas envoyer le formulaire.
+                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
+              }}
+            >
+              <div className="rf-ing-head fl-label">
+                <span />
+                <span>Ingrédient</span>
+                <span>
+                  Quantité
+                  <RangeHelp />
+                </span>
+                <span>
+                  Unité
+                  <UnitHelp />
+                </span>
+                <span />
+                <span />
+              </div>
+
+              {ingredients.map((row, idx) => (
+                <div key={row.key} className="rf-ing" data-row={idx}>
+                  <span className="rf-ing-num">{idx + 1}</span>
+                  <div className="rf-ing-name">
+                    <IngredientNameInput
+                      value={row.name}
+                      ariaLabel={`Ingrédient ${idx + 1}`}
+                      onChange={(name) => updateRow(idx, { name })}
+                    />
+                  </div>
+                  <div className="rf-ing-qty">
+                    {row.unit === "QS" ? (
+                      <div className="rf-ing-qs">selon le goût</div>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          inputMode="decimal"
+                          className="fl-input num"
+                          placeholder={row.range ? "min" : "0"}
+                          aria-label={row.range ? "Quantité min" : "Quantité"}
+                          value={row.quantity}
+                          onChange={(e) => updateRow(idx, { quantity: e.target.value })}
+                        />
+                        {row.range && (
+                          <>
+                            <span className="rf-dash">–</span>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              inputMode="decimal"
+                              className="fl-input num"
+                              placeholder="max"
+                              aria-label="Quantité max"
+                              value={row.quantityMax}
+                              onChange={(e) => updateRow(idx, { quantityMax: e.target.value })}
+                            />
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <select
+                    className="fl-input rf-ing-unit"
+                    aria-label="Unité"
+                    value={row.unit}
+                    onChange={(e) => setUnit(idx, e.target.value as IngredientUnit)}
+                  >
+                    {UNITS.map((u) => (
+                      <option key={u} value={u} disabled={u === "QS" && row.range}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="fl-btn fl-btn-ghost fl-btn-icon rf-ing-del"
+                    aria-label={`Supprimer l'ingrédient ${idx + 1}`}
+                    title="Supprimer"
+                    onClick={() => removeRow(idx)}
+                  >
+                    <X size={16} />
+                  </button>
+                  <div className="rf-ing-more">
+                    <MoreButton spec={() => rowMenu(idx, row)} label={`Actions pour l'ingrédient ${idx + 1}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <button type="button" onClick={addRow} className="fl-btn fl-btn-secondary">
+                <Plus size={16} /> Ajouter un ingrédient
+              </button>
+              {/* Sur téléphone, les aides des colonnes (masquées) sont ici. */}
+              <span className="rf-hint rf-ing-mobhelp">
+                Unités <UnitHelp />
+                <span style={{ marginLeft: 12 }}>Fourchette</span> <RangeHelp />
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Champs envoyés avec le formulaire (une entrée par ligne, dans l'ordre) */}
+        {ingredients.map((row) => (
+          <div key={row.key} hidden>
+            <input type="hidden" name="ingredientName" value={row.name} />
+            <input type="hidden" name="ingredientQty" value={row.unit === "QS" ? "0" : row.quantity} />
+            <input type="hidden" name="ingredientQtyMax" value={row.range ? row.quantityMax : ""} />
+            <input type="hidden" name="ingredientUnit" value={row.unit} />
+          </div>
+        ))}
+      </Section>
+
+      {/* ─── Préparation ──────────────────────────────────────────── */}
+      <Section
+        icon={ChefHat}
+        title="Préparation"
+        help="Écris une étape par ligne. La numérotation (1, 2, 3…) est ajoutée automatiquement à l'affichage et dans le PDF."
+      >
+        <textarea
+          name="steps"
+          className="fl-input rf-textarea"
+          rows={10}
+          aria-label="Étapes de préparation"
+          defaultValue={htmlToPlainText(initial?.steps ?? "")}
+          placeholder={"Une étape par ligne :\n\nPréparer la pâte sablée\nCuire 20 min à 180 °C\nGarnir et laisser refroidir"}
+        />
+      </Section>
+
+      {/* ─── Notes ────────────────────────────────────────────────── */}
+      <Section icon={StickyNote} title="Notes et astuces">
+        <textarea
+          name="notesTips"
+          className="fl-input rf-textarea"
+          rows={4}
+          aria-label="Notes et astuces"
+          defaultValue={initial?.notesTips ?? ""}
+          placeholder="Conservation, variantes, conseils…"
+        />
+      </Section>
+
+      <div className="theme-savebar">
+        <span style={{ fontSize: 13, marginRight: "auto", minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          {error ? (
+            <span style={{ color: "var(--danger)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <CircleAlert size={15} style={{ flex: "none" }} /> {error}
+            </span>
+          ) : dirty ? (
+            <span style={{ color: "var(--accent)" }}>Modifications non enregistrées</span>
+          ) : (
+            <span style={{ color: "var(--muted)" }}>{initial?.id ? "Aucune modification" : "Nom et un ingrédient minimum"}</span>
+          )}
+        </span>
+        <Link href={cancelHref} className="fl-btn fl-btn-ghost desk-only">
           Annuler
         </Link>
+        <button type="submit" disabled={submitting} className="fl-btn fl-btn-primary">
+          <Save size={16} /> {submitting ? "Enregistrement…" : submitLabel}
+        </button>
       </div>
     </form>
   );
 }
 
-const UNITS_NO_QS: IngredientUnit[] = ["g", "L", "cc", "cs", "pièce"];
-
-function UnitSelector({
-  value,
-  onChange,
-  isRange,
-  onRangeEnter,
-  onRangeExit,
-}: {
-  value: IngredientUnit;
-  onChange: (u: IngredientUnit) => void;
-  isRange: boolean;
-  onRangeEnter?: () => void;
-  onRangeExit?: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const isQs = value === "QS";
-  const displayUnits = isRange ? UNITS_NO_QS : UNITS;
-
+function RangeHelp() {
   return (
-    <div style={{ position: "relative" }}>
-      {isRange ? (
-        <button
-          type="button"
-          onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-          className="fl-btn fl-btn-secondary"
-          style={{
-            padding: "0.35rem 0.55rem",
-            fontSize: "0.8rem",
-            minWidth: 46,
-            fontWeight: 600,
-            background: "var(--accent)",
-            color: "var(--bg)",
-            borderColor: "var(--accent)",
-          }}
-          aria-label="Mode entre (plage)"
-        >
-          ↔
-        </button>
-      ) : (
-        <button
-          type="button"
-          onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-          className="fl-btn fl-btn-secondary"
-          style={{
-            padding: "0.35rem 0.55rem",
-            fontSize: "0.8rem",
-            minWidth: 46,
-            fontWeight: 600,
-            background: isQs ? "var(--accent)" : undefined,
-            color: isQs ? "var(--bg)" : undefined,
-            borderColor: isQs ? "var(--accent)" : undefined,
-          }}
-          aria-label="Changer l'unité"
-        >
-          {value}
-        </button>
+    <Help title="Quantité et fourchette" example="« 100 à 120 g de sucre » : saisis 100 et 120. La masse totale compte 110 g.">
+      La quantité dans l&apos;unité choisie. Si la recette donne une fourchette, ouvre le menu de la
+      ligne (bouton à trois points) et choisis « Fourchette » : une case « max » apparaît. La masse
+      totale utilise alors la moyenne entre min et max.
+    </Help>
+  );
+}
+
+function UnitHelp() {
+  return (
+    <Help
+      title="Unités"
+      calc={"g      gramme\nL      litre ≈ 1000 g\ncc     cuillère à café ≈ 5 g\ncs     cuillère à soupe ≈ 15 g\npièce  à l'unité (œufs…), non comptée\nQS     quantité suffisante, non comptée"}
+    >
+      L&apos;unité de chaque ingrédient. Les litres et les cuillères sont convertis en grammes pour la
+      masse totale. Les pièces et « QS » (selon le goût) ne sont pas comptés dans la masse.
+    </Help>
+  );
+}
+
+// ─── Petits composants de formulaire ─────────────────────────────────────────
+
+type HelpSpec = { title: string; text: string; calc?: string; example?: React.ReactNode };
+
+function Section({
+  icon: Icon,
+  title,
+  help,
+  extra,
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number }>;
+  title: string;
+  help?: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="fl-card rf-section">
+      <h2 className="rf-section-head">
+        <span className="rf-ic">
+          <Icon size={17} />
+        </span>
+        {title}
+        {help && <Help title={title}>{help}</Help>}
+        {extra}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Label({ text, help }: { text: string; help?: HelpSpec }) {
+  return (
+    <span className="fl-label rf-label">
+      {text}
+      {help && (
+        <Help title={help.title} calc={help.calc} example={help.example}>
+          {help.text}
+        </Help>
       )}
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "110%",
-            left: 0,
-            zIndex: 50,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            overflow: "hidden",
-            minWidth: 120,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-          }}
-        >
-          {displayUnits.map((u) => (
-            <button
-              key={u}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange(u);
-                setOpen(false);
-              }}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "0.45rem 0.8rem",
-                textAlign: "left",
-                fontSize: "0.85rem",
-                fontWeight: u === value ? 700 : 400,
-                background: u === value ? "var(--accent)" : "transparent",
-                color: u === value ? "var(--bg)" : "var(--text)",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              {UNIT_LABELS[u]}
-            </button>
-          ))}
-          {isRange ? (
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); setOpen(false); if (onRangeExit) onRangeExit(); }}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "0.45rem 0.8rem",
-                textAlign: "left",
-                fontSize: "0.85rem",
-                fontWeight: 400,
-                background: "transparent",
-                color: "var(--muted)",
-                border: "none",
-                borderTop: "1px solid var(--border)",
-                cursor: "pointer",
-              }}
-            >
-              ← unité simple
-            </button>
-          ) : (
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); setOpen(false); if (onRangeEnter) onRangeEnter(); }}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "0.45rem 0.8rem",
-                textAlign: "left",
-                fontSize: "0.85rem",
-                fontWeight: 400,
-                background: "transparent",
-                color: "var(--accent)",
-                border: "none",
-                borderTop: "1px solid var(--border)",
-                cursor: "pointer",
-              }}
-            >
-              ↔ entre (min/max)
-            </button>
-          )}
-        </div>
-      )}
+    </span>
+  );
+}
+
+function Field({ label, help, hint, children }: { label: string; help?: HelpSpec; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="rf-field">
+      <Label text={label} help={help} />
+      {children}
+      {hint && <p className="rf-hint">{hint}</p>}
     </div>
   );
 }
@@ -634,19 +712,4 @@ function htmlToPlainText(input: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return text;
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="fl-label">{label}</span>
-      {children}
-    </label>
-  );
 }

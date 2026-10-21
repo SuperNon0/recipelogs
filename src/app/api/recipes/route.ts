@@ -32,8 +32,9 @@ export async function GET(req: Request) {
   if (onlyNoFolder) {
     where.folderId = null;
   } else if (excludeFolderRaw && /^\d+$/.test(excludeFolderRaw)) {
+    // AND : ne pas écraser le filtre de recherche (where.OR) ci-dessus.
     const fid = Number(excludeFolderRaw);
-    where.OR = [{ folderId: null }, { folderId: { not: fid } }];
+    where.AND = [{ OR: [{ folderId: null }, { folderId: { not: fid } }] }];
   }
 
   const recipes = await prisma.recipe.findMany({

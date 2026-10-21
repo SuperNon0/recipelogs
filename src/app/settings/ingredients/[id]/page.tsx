@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { getIngredientBaseDetail, listAllIngredientBases } from "@/lib/recipes";
 import { IngredientDetailClient } from "@/components/IngredientDetailClient";
 
@@ -23,27 +24,14 @@ export default async function IngredientDetailPage({
   const otherBases = allBases.filter((b) => b.id !== baseId);
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <Link
-          href="/settings/ingredients"
-          className="fl-label hover:text-[color:var(--text)]"
-          style={{ fontSize: "0.75rem" }}
-        >
-          ← Ingrédients
-        </Link>
-        <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
-          🧂 {detail.base.name}
-        </h1>
-        <p className="fl-label mt-1">
-          {detail.recipes.length} recette{detail.recipes.length > 1 ? "s" : ""} utilisent cet ingrédient
-        </p>
-      </div>
-
+    <div className="set-page">
+      <Link href="/settings/ingredients" className="crumb">
+        <ChevronLeft size={14} /> Ingrédients
+      </Link>
       <IngredientDetailClient
         base={detail.base}
         recipes={detail.recipes}
-        otherBases={otherBases.map((b) => ({ id: b.id, name: b.name }))}
+        otherBases={otherBases.map((b) => ({ id: b.id, name: b.name, count: b._count.usages }))}
       />
     </div>
   );

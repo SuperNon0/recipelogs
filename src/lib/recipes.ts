@@ -16,6 +16,8 @@ export type RecipeListItem = {
   tags: string[];
   categories: { id: number; name: string; color: string }[];
   folderId: number | null;
+  /** Nombre de sous-recettes utilisées par cette recette. */
+  subCount: number;
   updatedAt: Date;
 };
 
@@ -53,6 +55,7 @@ export async function listRecipes(opts: {
       tags: true,
       categories: { include: { category: true } },
       ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } },
+      _count: { select: { parentLinks: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -71,8 +74,14 @@ export async function listRecipes(opts: {
       color: c.category.color,
     })),
     folderId: r.folderId,
+    subCount: r._count.parentLinks,
     updatedAt: r.updatedAt,
   }));
+}
+
+/** Lignes sérialisables (date en texte ISO) pour le tableau des recettes. */
+export function toRecipeRows(list: RecipeListItem[]) {
+  return list.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }));
 }
 
 export async function listAllFolders() {
@@ -96,8 +105,14 @@ export async function getRecipeDetail(id: number) {
       },
       stepsBlock: true,
       tags: true,
+      folder: true,
       categories: { include: { category: true } },
       comments: { orderBy: { createdAt: "desc" } },
+      // Recettes qui utilisent celle-ci comme sous-recette.
+      childLinks: {
+        orderBy: { parent: { name: "asc" } },
+        select: { id: true, label: true, parent: { select: { id: true, name: true } } },
+      },
       parentLinks: {
         orderBy: { position: "asc" },
         include: {

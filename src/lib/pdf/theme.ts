@@ -304,6 +304,66 @@ export const INGREDIENT_STYLE_LABELS: Record<IngredientStyle, string> = {
   boxed: "Encadré",
 };
 
+/** Alignement du titre (et des lignes sous le titre). « auto » = selon la mise en page. */
+export const TITLE_ALIGNS = ["auto", "left", "center", "right"] as const;
+export type TitleAlign = (typeof TITLE_ALIGNS)[number];
+export const TITLE_ALIGN_LABELS: Record<TitleAlign, string> = {
+  auto: "Selon la mise en page",
+  left: "À gauche",
+  center: "Centré",
+  right: "À droite",
+};
+
+export const INGREDIENT_POSITIONS = ["left", "right", "top"] as const;
+export type IngredientPosition = (typeof INGREDIENT_POSITIONS)[number];
+export const INGREDIENT_POSITION_LABELS: Record<IngredientPosition, string> = {
+  left: "À gauche",
+  right: "À droite",
+  top: "Au-dessus",
+};
+
+export const INGREDIENT_RATIOS = ["narrow", "balanced", "wide"] as const;
+export type IngredientRatio = (typeof INGREDIENT_RATIOS)[number];
+export const INGREDIENT_RATIO_LABELS: Record<IngredientRatio, string> = {
+  narrow: "Étroite",
+  balanced: "Moitié",
+  wide: "Large",
+};
+/** Largeur de la colonne ingrédients quand elle est à côté de la préparation. */
+export const INGREDIENT_RATIO_WIDTH: Record<IngredientRatio, string> = {
+  narrow: "38%",
+  balanced: "48%",
+  wide: "58%",
+};
+
+/** Style des intertitres « Ingrédients » / « Préparation ». */
+export const SECTION_TITLE_STYLES = ["simple", "underline", "caps", "pill"] as const;
+export type SectionTitleStyle = (typeof SECTION_TITLE_STYLES)[number];
+export const SECTION_TITLE_STYLE_LABELS: Record<SectionTitleStyle, string> = {
+  simple: "Simple",
+  underline: "Souligné",
+  caps: "Petites capitales",
+  pill: "Étiquette",
+};
+
+/** Espacement général du texte. */
+export const DENSITIES = ["compact", "normal", "airy"] as const;
+export type Density = (typeof DENSITIES)[number];
+export const DENSITY_LABELS: Record<Density, string> = {
+  compact: "Serré",
+  normal: "Normal",
+  airy: "Aéré",
+};
+
+/** Photo de la recette : « auto » = seulement en mise en page Magazine. */
+export const PHOTO_MODES = ["auto", "top", "none"] as const;
+export type PhotoMode = (typeof PHOTO_MODES)[number];
+export const PHOTO_MODE_LABELS: Record<PhotoMode, string> = {
+  auto: "Magazine uniquement",
+  top: "En tête de page",
+  none: "Jamais",
+};
+
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 
 const hex = z
@@ -327,8 +387,13 @@ export const cookbookThemeSchema = z.object({
   titleStyle: z.enum(TITLE_STYLES).default("simple"),
   stepStyle: z.enum(STEP_STYLES).default("numbers"),
   ingredientStyle: z.enum(INGREDIENT_STYLES).default("list"),
-  ingredientsPosition: z.enum(["left", "right", "top"]).default("left"),
-  ingredientsRatio: z.enum(["narrow", "balanced", "wide"]).default("narrow"),
+  ingredientsPosition: z.enum(INGREDIENT_POSITIONS).default("left"),
+  ingredientsRatio: z.enum(INGREDIENT_RATIOS).default("narrow"),
+  titleAlign: z.enum(TITLE_ALIGNS).default("auto"),
+  titleUppercase: z.boolean().default(false),
+  sectionTitleStyle: z.enum(SECTION_TITLE_STYLES).default("simple"),
+  density: z.enum(DENSITIES).default("normal"),
+  photoMode: z.enum(PHOTO_MODES).default("auto"),
 
   // Sections affichées sur la fiche recette
   showTags: z.boolean().default(true),
@@ -361,6 +426,13 @@ export const cookbookThemeSchema = z.object({
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;
+
+/** La photo de la recette est-elle imprimée avec ce thème ? */
+export function themeShowsPhoto(theme: Pick<CookbookTheme, "photoMode" | "recipeLayout">): boolean {
+  if (theme.photoMode === "none") return false;
+  if (theme.photoMode === "top") return true;
+  return theme.recipeLayout === "magazine";
+}
 
 export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
 
@@ -473,9 +545,19 @@ export function parseTheme(raw: unknown): CookbookTheme {
   return result as CookbookTheme;
 }
 
+/** Feuille Google Fonts des polices du thème (null si polices système). */
 export function googleFontsHref(theme: CookbookTheme): string | null {
+  return fontsHref([theme.titleFont, theme.bodyFont]);
+}
+
+/** Feuille Google Fonts de toutes les polices des PDF (miniatures, éditeur). */
+export function allPdfFontsHref(): string | null {
+  return fontsHref(FONT_KEYS);
+}
+
+function fontsHref(keys: readonly string[]): string | null {
   const families = new Set<string>();
-  for (const key of [theme.titleFont, theme.bodyFont]) {
+  for (const key of keys) {
     const def = FONTS[key];
     if (def?.google) {
       const weights = def.weights?.length ? def.weights.join(";") : "400";

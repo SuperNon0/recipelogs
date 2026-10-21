@@ -66,7 +66,7 @@ function buildShoppingListHtml(
       const qty = item.quantityG || item.unit === "QS" ? formatQty(item.quantityG ?? 0, item.unit) : "";
       return `
         <tr class="${item.checked ? "checked" : ""}">
-          <td class="check-col">☐</td>
+          <td class="check-col"><span class="box"></span></td>
           <td class="name-col">${esc(item.name)}</td>
           <td class="qty-col">${qty}</td>
         </tr>`;
@@ -124,8 +124,14 @@ function buildShoppingListHtml(
     .check-col {
       width: 8mm;
       text-align: center;
-      color: #ccc;
-      font-size: 11pt;
+    }
+    .check-col .box {
+      display: inline-block;
+      width: 3.4mm;
+      height: 3.4mm;
+      border: 0.3mm solid #bbb;
+      border-radius: 0.6mm;
+      vertical-align: middle;
     }
     .name-col {
       font-size: 10.5pt;
@@ -154,7 +160,7 @@ function buildShoppingListHtml(
 </head>
 <body>
   <div class="header">
-    <div class="title">🛒 ${esc(listName)}</div>
+    <div class="title">${esc(listName)}</div>
     <div class="date">${esc(date)}</div>
     ${recipesHtml}
   </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
+import { useCallback, useEffect, useId, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -20,6 +21,22 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
+  BookPlus,
+  FileText,
+  GripVertical,
+  Heading,
+  Layers,
+  Link2,
+  Pencil,
+  Pin,
+  RefreshCw,
+  Scale,
+  Trash2,
+} from "lucide-react";
+import {
   reorderCookbookEntries,
   setSectionTitle,
   refreshSnapshot,
@@ -29,8 +46,12 @@ import {
   updateChapter,
   addChapter,
 } from "@/app/actions/cookbooks";
+import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
+import { Help } from "./ui/Help";
+import { ModalOverlay } from "./ModalOverlay";
 import { EditSnapshotMassModal } from "./EditSnapshotMassModal";
 import { AddRecipesToCookbookModal } from "./AddRecipesToCookbookModal";
+import { formatG } from "@/lib/format";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,11 +61,16 @@ export type RecipeEntry = {
   position: number;
   recipeId: number;
   recipeName: string;
+  photoPath: string | null;
   categories: { name: string; color: string }[];
   linkMode: "linked" | "snapshot";
   subrecipeMode: "single" | "separate";
   sectionTitle: string | null;
   snapshotDate: Date | null;
+  /** Masse de la copie figée (null pour une recette liée). */
+  snapshotMassG: number | null;
+  /** Masse actuelle de la recette (affichée pour une recette liée). */
+  linkedMassG: number;
 };
 
 export type ChapterEntry = {
@@ -57,10 +83,23 @@ export type ChapterEntry = {
 
 export type Entry = RecipeEntry | ChapterEntry;
 
+type Dialog =
+  | { kind: "add" }
+  | { kind: "chapter"; entry: ChapterEntry | null }
+  | { kind: "section"; entry: RecipeEntry }
+  | { kind: "mass"; entry: RecipeEntry };
+
 const DND_ID = (e: Entry) => `${e.type}-${e.id}`;
+
+const fmtDate = (d: Date) =>
+  new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 
 // ─── Composant principal ─────────────────────────────────────────────────────
 
+/**
+ * Contenu du cahier : recettes et chapitres dans l'ordre du PDF.
+ * Poignée pour glisser-déposer ; clic droit, appui long ou « ⋯ » pour les actions.
+ */
 export function CookbookEntriesTable({
   cookbookId,
   initial,
@@ -70,9 +109,12 @@ export function CookbookEntriesTable({
 }) {
   const [entries, setEntries] = useState<Entry[]>(initial);
   const [pending, startTransition] = useTransition();
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const closeDialog = useCallback(() => setDialog(null), []);
+  // Identifiant stable : évite l'écart serveur / navigateur des attributs dnd-kit.
+  const dndId = useId();
 
-  // Sync l'état local avec les props quand le serveur revalide
+  // Reprend l'état du serveur après chaque revalidation.
   useEffect(() => {
     setEntries(initial);
   }, [initial]);
@@ -82,716 +124,487 @@ export function CookbookEntriesTable({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = entries.findIndex((e) => DND_ID(e) === active.id);
-    const newIndex = entries.findIndex((e) => DND_ID(e) === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const next = arrayMove(entries, oldIndex, newIndex);
-    setEntries(next); // optimistic
-
+  const saveOrder = (next: Entry[]) => {
+    const prev = entries;
+    setEntries(next);
     startTransition(async () => {
       const r = await reorderCookbookEntries(
         cookbookId,
         next.map((e) => ({ type: e.type, id: e.id })),
       );
-      if (!r.ok) {
-        // rollback
-        setEntries(entries);
-      }
+      if (!r.ok) setEntries(prev);
     });
+  };
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = entries.findIndex((e) => DND_ID(e) === active.id);
+    const newIndex = entries.findIndex((e) => DND_ID(e) === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    saveOrder(arrayMove(entries, oldIndex, newIndex));
   }
 
+  const move = (index: number, delta: number) => {
+    const to = index + delta;
+    if (to < 0 || to >= entries.length) return;
+    saveOrder(arrayMove(entries, index, to));
+  };
+
+  const run = (fn: () => Promise<unknown>) => startTransition(async () => void (await fn()));
+
+  // Numéro de chaque recette dans le cahier (les chapitres ne comptent pas).
+  const numbers = new Map<string, number>();
+  entries.filter((e) => e.type === "recipe").forEach((e, i) => numbers.set(DND_ID(e), i + 1));
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="fl-label" style={{ color: "var(--text)" }}>
-          {entries.length} entrée{entries.length > 1 ? "s" : ""}
-          {pending && (
-            <span style={{ color: "var(--muted)", fontWeight: 400, marginLeft: 8 }}>
-              · synchronisation…
-            </span>
-          )}
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <p style={{ color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", marginRight: "auto" }}>
+          {pending ? "Enregistrement…" : "Dans l'ordre du PDF"}
+          <Help title="Chapitres et sections">
+            <b>Chapitre</b> : une page à part entière dans le PDF (titre et texte d&apos;introduction),
+            qui ouvre une partie du cahier. Il apparaît dans le sommaire.
+            <br />
+            <b>Titre de section</b> : un simple intertitre imprimé au-dessus d&apos;une recette, sans
+            page dédiée. Pratique pour regrouper quelques recettes (« Les crèmes »).
+            <br />
+            <br />
+            Glisse la poignée à gauche d&apos;une ligne pour changer l&apos;ordre, ou utilise « Monter »
+            et « Descendre » dans le menu de la ligne.
+          </Help>
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="fl-btn fl-btn-primary"
-            style={{ fontSize: "0.8rem" }}
-          >
-            📖 Ajouter des recettes
-          </button>
-          <AddChapterButton cookbookId={cookbookId} />
-        </div>
+        <button type="button" onClick={() => setDialog({ kind: "chapter", entry: null })} className="fl-btn fl-btn-secondary">
+          <BookOpen size={16} /> Chapitre
+        </button>
+        <button type="button" onClick={() => setDialog({ kind: "add" })} className="fl-btn fl-btn-primary">
+          <BookPlus size={16} /> Ajouter des recettes
+        </button>
       </div>
 
-      {showAddModal && (
-        <AddRecipesToCookbookModal
-          cookbookId={cookbookId}
-          existingRecipeIds={entries.filter((e): e is RecipeEntry => e.type === "recipe").map((e) => e.recipeId)}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
-
       {entries.length === 0 ? (
-        <div className="fl-card text-center py-8">
-          <p className="text-[color:var(--muted)] text-sm">
-            Aucune entrée dans ce cahier.
-          </p>
-          <p className="text-[color:var(--muted)] text-xs mt-1">
-            Ajoute des recettes depuis leur fiche, ou crée un chapitre ci-dessus.
+        <div className="fl-card" style={{ textAlign: "center", padding: "36px 18px", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+          <p className="fl-title-serif" style={{ fontSize: 20 }}>Cahier vide</p>
+          <p style={{ color: "var(--muted)", maxWidth: 420 }}>
+            Ajoute des recettes avec le bouton ci-dessus, ou depuis la fiche d&apos;une recette (menu
+            « Ajouter à un cahier »).
           </p>
         </div>
       ) : (
         <DndContext
+          id={dndId}
           sensors={sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext
-            items={entries.map(DND_ID)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div
-              className="flex flex-col rounded-md border"
-              style={{ borderColor: "var(--border)" }}
-            >
-              {entries.map((entry, idx) => (
-                <SortableEntryRow
-                  key={DND_ID(entry)}
-                  entry={entry}
-                  index={idx}
-                  cookbookId={cookbookId}
-                />
-              ))}
+          <SortableContext items={entries.map(DND_ID)} strategy={verticalListSortingStrategy}>
+            <div className="cb-table" style={{ opacity: pending ? 0.75 : 1, transition: "opacity 120ms ease" }}>
+              <div className="cb-head desk-only">
+                <span style={{ textAlign: "right" }}>N°</span>
+                <span />
+                <span>Recette</span>
+                <span style={{ display: "flex", alignItems: "center" }}>
+                  Liaison
+                  <LinkHelp />
+                </span>
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  Masse
+                  <Help title="Masse figée">
+                    Pour une recette figée, la masse de la copie gardée dans le cahier : tu peux la
+                    changer (menu de la ligne, « Modifier la masse figée ») sans toucher à la recette.
+                    Une recette liée est imprimée avec la masse actuelle de la recette.
+                  </Help>
+                </span>
+              </div>
+              {entries.map((entry, idx) => {
+                return (
+                  <SortableItem key={DND_ID(entry)} id={DND_ID(entry)}>
+                    {(handle) =>
+                      entry.type === "recipe" ? (
+                        <RecipeRow
+                          entry={entry}
+                          no={numbers.get(DND_ID(entry)) ?? 0}
+                          cookbookId={cookbookId}
+                          handle={handle}
+                          canUp={idx > 0}
+                          canDown={idx < entries.length - 1}
+                          onMove={(d) => move(idx, d)}
+                          onDialog={setDialog}
+                          run={run}
+                        />
+                      ) : (
+                        <ChapterRow
+                          entry={entry}
+                          cookbookId={cookbookId}
+                          handle={handle}
+                          canUp={idx > 0}
+                          canDown={idx < entries.length - 1}
+                          onMove={(d) => move(idx, d)}
+                          onDialog={setDialog}
+                          run={run}
+                        />
+                      )
+                    }
+                  </SortableItem>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
       )}
-    </div>
-  );
-}
 
-// ─── Sortable wrapper ─────────────────────────────────────────────────────────
+      {entries.length > 0 && (
+        <p className="mob-only" style={{ color: "var(--muted)", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <Link2 size={14} style={{ color: "var(--accent-2)" }} /> liée
+          <Pin size={14} style={{ color: "var(--lock)", marginLeft: 6 }} /> figée
+          <LinkHelp />
+        </p>
+      )}
 
-function SortableEntryRow({
-  entry,
-  index,
-  cookbookId,
-}: {
-  entry: Entry;
-  index: number;
-  cookbookId: number;
-}) {
-  const sortable = useSortable({ id: DND_ID(entry) });
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.5 : 1,
-    background: sortable.isDragging ? "var(--card)" : "transparent",
-    borderTop: index === 0 ? "none" : "1px solid var(--border)",
-  };
-
-  return (
-    <div ref={sortable.setNodeRef} style={style}>
-      {entry.type === "recipe" ? (
-        <RecipeRow
-          entry={entry}
-          index={index}
+      {dialog?.kind === "add" && (
+        <AddRecipesToCookbookModal
           cookbookId={cookbookId}
-          dragHandleProps={{ ...sortable.attributes, ...sortable.listeners }}
+          existingRecipeIds={entries.filter((e): e is RecipeEntry => e.type === "recipe").map((e) => e.recipeId)}
+          onClose={closeDialog}
         />
-      ) : (
-        <ChapterRow
-          entry={entry}
-          cookbookId={cookbookId}
-          dragHandleProps={{ ...sortable.attributes, ...sortable.listeners }}
-        />
+      )}
+      {dialog?.kind === "chapter" && <ChapterDialog cookbookId={cookbookId} entry={dialog.entry} onClose={closeDialog} />}
+      {dialog?.kind === "section" && <SectionDialog cookbookId={cookbookId} entry={dialog.entry} onClose={closeDialog} />}
+      {dialog?.kind === "mass" && (
+        <EditSnapshotMassModal cookbookId={cookbookId} entryId={dialog.entry.id} recipeName={dialog.entry.recipeName} onClose={closeDialog} />
       )}
     </div>
   );
 }
 
-// ─── Recipe row ───────────────────────────────────────────────────────────────
+function LinkHelp() {
+  return (
+    <Help title="Recette liée ou figée">
+      <b>Liée</b> : le cahier imprime toujours la version actuelle de la recette ; si tu la modifies,
+      le cahier suit.
+      <br />
+      <b>Figée</b> : le cahier garde une copie de la recette prise à une date donnée, éventuellement
+      à une autre masse. Les modifications futures de la recette ne la changent pas, sauf si tu
+      rafraîchis la copie.
+      <br />
+      <br />
+      Menu de la ligne : « Figer » prend une copie maintenant ; « Relier à la recette » abandonne la
+      copie.
+    </Help>
+  );
+}
 
-function RecipeRow({
-  entry,
-  index,
-  cookbookId,
-  dragHandleProps,
-}: {
-  entry: RecipeEntry;
-  index: number;
+// ─── Élément déplaçable ──────────────────────────────────────────────────────
+
+type Handle = Record<string, unknown>;
+
+function SortableItem({ id, children }: { id: string; children: (handle: Handle) => React.ReactNode }) {
+  const s = useSortable({ id });
+  return (
+    <div
+      ref={s.setNodeRef}
+      className="cb-item"
+      data-dragging={s.isDragging ? "true" : undefined}
+      style={{ transform: CSS.Transform.toString(s.transform), transition: s.transition }}
+    >
+      {children({ ...s.attributes, ...s.listeners })}
+    </div>
+  );
+}
+
+function Grip({ handle }: { handle: Handle }) {
+  return (
+    <button type="button" {...handle} className="cb-grip" aria-label="Glisser pour réorganiser" title="Glisser pour réorganiser">
+      <GripVertical size={16} />
+    </button>
+  );
+}
+
+type RowProps = {
   cookbookId: number;
-  dragHandleProps: Record<string, unknown>;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [editingSection, setEditingSection] = useState(false);
-  const [sectionDraft, setSectionDraft] = useState(entry.sectionTitle ?? "");
-  const [massModalOpen, setMassModalOpen] = useState(false);
+  handle: Handle;
+  canUp: boolean;
+  canDown: boolean;
+  onMove: (delta: number) => void;
+  onDialog: (d: Dialog) => void;
+  run: (fn: () => Promise<unknown>) => void;
+};
 
-  const linkBadge =
-    entry.linkMode === "linked"
-      ? { emoji: "🔗", title: "Liée", color: "var(--accent-2)" }
-      : { emoji: "📌", title: "Figée", color: "var(--pending)" };
-  function handleSaveSection() {
-    const v = sectionDraft.trim();
-    startTransition(async () => {
-      await setSectionTitle(entry.id, v, cookbookId);
-      setEditingSection(false);
-    });
-  }
+// ─── Ligne de recette ────────────────────────────────────────────────────────
+
+function RecipeRow({ entry, no, cookbookId, handle, canUp, canDown, onMove, onDialog, run }: RowProps & { entry: RecipeEntry; no: number }) {
+  const linked = entry.linkMode === "linked";
+  const color = entry.categories[0]?.color ?? "#3b475e";
+  const sub = [
+    !linked && entry.snapshotDate ? `Figée le ${fmtDate(entry.snapshotDate)}` : null,
+    ...entry.categories.slice(0, 3).map((c) => c.name),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const getSpec = (): MenuSpec => {
+    const open = { label: "Ouvrir la recette", icon: FileText, href: `/recipes/${entry.recipeId}` };
+    const freeze = {
+      label: "Figer (prendre une copie)",
+      icon: Pin,
+      onSelect: () => run(() => refreshSnapshot(entry.id, cookbookId)),
+    };
+    const relink = {
+      label: "Relier à la recette",
+      icon: Link2,
+      onSelect: () => {
+        if (confirm(`Relier « ${entry.recipeName} » ? La copie figée (et sa masse) sera abandonnée : le cahier suivra la recette.`)) {
+          run(() => convertToLinked(entry.id, cookbookId));
+        }
+      },
+    };
+    const section = {
+      label: entry.sectionTitle ? "Modifier le titre de section…" : "Ajouter un titre de section…",
+      icon: Heading,
+      onSelect: () => onDialog({ kind: "section", entry }),
+    };
+    const remove = {
+      label: "Retirer du cahier…",
+      icon: Trash2,
+      danger: true,
+      onSelect: () => {
+        if (confirm(`Retirer « ${entry.recipeName} » du cahier ? La recette elle-même n'est pas supprimée.`)) {
+          run(() => removeFromCookbook(entry.id, cookbookId));
+        }
+      },
+    };
+    return {
+      title: entry.recipeName,
+      icon: linked ? Link2 : Pin,
+      quick: [open, linked ? freeze : { ...relink, label: "Relier" }, { ...section, label: "Section" }],
+      items: [
+        open,
+        { separator: true },
+        ...(linked
+          ? [freeze]
+          : [
+              { label: "Modifier la masse figée…", icon: Scale, onSelect: () => onDialog({ kind: "mass", entry }) },
+              { label: "Rafraîchir la copie", icon: RefreshCw, onSelect: () => run(() => refreshSnapshot(entry.id, cookbookId)) },
+              relink,
+            ]),
+        section,
+        { separator: true },
+        { label: "Monter", icon: ArrowUp, disabled: !canUp, onSelect: () => onMove(-1) },
+        { label: "Descendre", icon: ArrowDown, disabled: !canDown, onSelect: () => onMove(1) },
+        { separator: true },
+        remove,
+      ],
+    };
+  };
+
+  const ModeIcon = linked ? Link2 : Pin;
 
   return (
     <>
-      {/* Section title above the recipe */}
-      {entry.sectionTitle && !editingSection && (
-        <div
-          className="px-3 pt-3 pb-1 flex items-center justify-between gap-2"
-          style={{ background: "var(--surface)" }}
-        >
-          <span
-            className="fl-title-serif"
-            style={{ fontSize: "0.95rem", color: "var(--accent)" }}
-          >
-            ▸ {entry.sectionTitle}
-          </span>
-          <button
-            type="button"
-            onClick={() => setEditingSection(true)}
-            className="fl-label hover:text-[color:var(--text)]"
-            style={{ fontSize: "0.7rem" }}
-          >
-            Modifier section
-          </button>
-        </div>
-      )}
-      {editingSection && (
-        <div
-          className="px-3 py-2 flex items-center gap-2 flex-wrap"
-          style={{ background: "var(--surface)" }}
-        >
-          <input
-            type="text"
-            value={sectionDraft}
-            onChange={(e) => setSectionDraft(e.target.value)}
-            placeholder="Titre de section (vide pour retirer)"
-            className="fl-input flex-1 min-w-[140px]"
-            style={{ fontSize: "0.85rem" }}
-            autoFocus
-          />
-          <button
-            type="button"
-            onClick={handleSaveSection}
-            disabled={pending}
-            className="fl-btn fl-btn-primary"
-            style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-          >
-            OK
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSectionDraft(entry.sectionTitle ?? "");
-              setEditingSection(false);
-            }}
-            className="fl-btn"
-            style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
-          >
-            Annuler
-          </button>
-        </div>
-      )}
-
-      <div
-        className="px-3 py-2.5 flex items-center gap-2 flex-wrap hover:bg-[color:var(--card)] transition-colors"
-      >
-        {/* Drag handle */}
-        <button
-          type="button"
-          {...dragHandleProps}
-          className="cursor-grab active:cursor-grabbing"
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--muted)",
-            fontSize: "1.1rem",
-            padding: "0 4px",
-            touchAction: "none",
-          }}
-          aria-label="Réorganiser"
-          title="Glisser pour réorganiser"
-        >
-          ⋮⋮
+      {entry.sectionTitle && (
+        <button type="button" className="cb-section" onClick={() => onDialog({ kind: "section", entry })} title="Modifier le titre de section">
+          {entry.sectionTitle}
         </button>
-
-        {/* Position number */}
-        <span
-          className="fl-label"
-          style={{ minWidth: 22, textAlign: "right" }}
-        >
-          {index + 1}
-        </span>
-
-        {/* Recipe name + categories */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <a
-            href={`/recipes/${entry.recipeId}`}
-            className="text-sm hover:underline"
-            style={{ color: "var(--text)" }}
-          >
-            {entry.recipeName}
-          </a>
-          {entry.categories.length > 0 && (
-            <div className="flex gap-1 flex-wrap mt-0.5">
-              {entry.categories.slice(0, 3).map((c) => (
-                <span
-                  key={c.name}
-                  className="text-xs"
-                  style={{
-                    color: c.color,
-                    background: `${c.color}1a`,
-                    padding: "0 5px",
-                    borderRadius: 999,
-                    border: `1px solid ${c.color}33`,
-                  }}
-                >
-                  {c.name}
-                </span>
-              ))}
-              {entry.categories.length > 3 && (
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--muted)" }}
-                >
-                  +{entry.categories.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Badges */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <span
-            title={linkBadge.title}
-            style={{
-              fontSize: "0.85rem",
-              padding: "0 4px",
-              color: linkBadge.color,
-            }}
-          >
-            {linkBadge.emoji}
-          </span>
-        </div>
-
-        {/* Actions menu */}
-        <div className="relative flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className="fl-btn fl-btn-secondary"
-            style={{ padding: "0.25rem 0.5rem", fontSize: "0.85rem" }}
-            aria-label="Plus"
-          >
-            ⋯
-          </button>
-          {menuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div
-                className="absolute right-0 mt-1 z-50 min-w-[220px] flex flex-col"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  padding: 4,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                }}
-              >
-                <MenuButton
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setEditingSection(true);
-                    if (!entry.sectionTitle) setSectionDraft("");
-                  }}
-                >
-                  ▸ {entry.sectionTitle ? "Modifier" : "Définir"} le titre de section
-                </MenuButton>
-                {entry.linkMode === "linked" ? (
-                  <MenuButton
-                    onClick={() =>
-                      startTransition(() => {
-                        setMenuOpen(false);
-                        return refreshSnapshot(entry.id, cookbookId);
-                      })
-                    }
-                  >
-                    📌 Figer à cette date
-                  </MenuButton>
-                ) : (
-                  <>
-                    <MenuButton
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setMassModalOpen(true);
-                      }}
-                    >
-                      ⚖️ Modifier la masse
-                    </MenuButton>
-                    <MenuButton
-                      onClick={() =>
-                        startTransition(() => {
-                          setMenuOpen(false);
-                          return refreshSnapshot(entry.id, cookbookId);
-                        })
-                      }
-                    >
-                      🔄 Mettre à jour le snapshot
-                    </MenuButton>
-                    <MenuButton
-                      onClick={() =>
-                        startTransition(() => {
-                          setMenuOpen(false);
-                          return convertToLinked(entry.id, cookbookId);
-                        })
-                      }
-                    >
-                      🔗 Reconvertir en liée
-                    </MenuButton>
-                  </>
-                )}
-                <a
-                  href={`/recipes/${entry.recipeId}`}
-                  className="px-3 py-2 rounded text-sm hover:bg-[color:var(--border)]"
-                >
-                  Voir la fiche complète
-                </a>
-                <MenuButton
-                  danger
-                  onClick={() => {
-                    if (
-                      confirm(`Retirer « ${entry.recipeName} » du cahier ?`)
-                    ) {
-                      startTransition(() => {
-                        setMenuOpen(false);
-                        return removeFromCookbook(entry.id, cookbookId);
-                      });
-                    }
-                  }}
-                >
-                  Retirer du cahier
-                </MenuButton>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {massModalOpen && (
-        <EditSnapshotMassModal
-          cookbookId={cookbookId}
-          entryId={entry.id}
-          recipeName={entry.recipeName}
-          onClose={() => setMassModalOpen(false)}
-        />
       )}
+      <ContextArea spec={getSpec} className="cb-row">
+        <Grip handle={handle} />
+        <Link href={`/recipes/${entry.recipeId}`} className="cb-link">
+          <span className="cb-no desk-only">{no}</span>
+          <span className="rthumb" style={{ "--c": color } as React.CSSProperties}>
+            {entry.photoPath ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={entry.photoPath} alt="" loading="lazy" />
+            ) : (
+              <Layers size={16} style={{ opacity: 0.5 }} />
+            )}
+          </span>
+          <span className="rname">
+            <b>{entry.recipeName}</b>
+            {sub && <small>{sub}</small>}
+          </span>
+          <span className="cb-mode desk-only" data-mode={entry.linkMode}>
+            <ModeIcon size={14} /> {linked ? "Liée" : "Figée"}
+          </span>
+          <span className="cb-mass num desk-only">
+            {entry.snapshotMassG !== null
+              ? formatG(Math.round(entry.snapshotMassG))
+              : entry.linkedMassG > 0
+                ? formatG(Math.round(entry.linkedMassG))
+                : <span style={{ color: "var(--muted)" }}>—</span>}
+          </span>
+          <span className="cb-mode mob-only" data-mode={entry.linkMode} aria-label={linked ? "Liée" : "Figée"}>
+            {(entry.snapshotMassG ?? entry.linkedMassG) > 0 && <span className="num" style={{ color: "var(--soft)" }}>{formatG(Math.round(entry.snapshotMassG ?? entry.linkedMassG))}</span>}
+            <ModeIcon size={15} />
+          </span>
+        </Link>
+        <MoreButton spec={getSpec} label={`Actions pour ${entry.recipeName}`} />
+      </ContextArea>
     </>
   );
 }
 
-// ─── Chapter row ──────────────────────────────────────────────────────────────
+// ─── Ligne de chapitre ───────────────────────────────────────────────────────
 
-function ChapterRow({
-  entry,
-  cookbookId,
-  dragHandleProps,
-}: {
-  entry: ChapterEntry;
-  cookbookId: number;
-  dragHandleProps: Record<string, unknown>;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(entry.title);
-  const [introDraft, setIntroDraft] = useState(entry.intro ?? "");
-  const [error, setError] = useState<string | null>(null);
-
-  function handleSave() {
-    setError(null);
-    startTransition(async () => {
-      const r = await updateChapter(
-        entry.id,
-        { title: titleDraft, intro: introDraft },
-        cookbookId,
-      );
-      if (r.ok) {
-        setEditing(false);
-      } else {
-        setError(r.error);
-      }
-    });
-  }
+function ChapterRow({ entry, cookbookId, handle, canUp, canDown, onMove, onDialog, run }: RowProps & { entry: ChapterEntry }) {
+  const getSpec = (): MenuSpec => {
+    const edit = { label: "Modifier le chapitre…", icon: Pencil, onSelect: () => onDialog({ kind: "chapter", entry }) };
+    const remove = {
+      label: "Supprimer le chapitre…",
+      icon: Trash2,
+      danger: true,
+      onSelect: () => {
+        if (confirm(`Supprimer le chapitre « ${entry.title} » ? Les recettes du cahier ne sont pas touchées.`)) {
+          run(() => deleteChapter(entry.id, cookbookId));
+        }
+      },
+    };
+    return {
+      title: `Chapitre : ${entry.title}`,
+      icon: BookOpen,
+      quick: [{ ...edit, label: "Modifier" }, { ...remove, label: "Supprimer" }],
+      items: [
+        edit,
+        { separator: true },
+        { label: "Monter", icon: ArrowUp, disabled: !canUp, onSelect: () => onMove(-1) },
+        { label: "Descendre", icon: ArrowDown, disabled: !canDown, onSelect: () => onMove(1) },
+        { separator: true },
+        remove,
+      ],
+    };
+  };
 
   return (
-    <div
-      className="px-3 py-3 flex items-start gap-2"
-      style={{
-        background: "rgba(232, 197, 71, 0.06)",
-        borderLeft: "3px solid var(--accent)",
-      }}
-    >
-      <button
-        type="button"
-        {...dragHandleProps}
-        className="cursor-grab active:cursor-grabbing mt-1"
-        style={{
-          background: "transparent",
-          border: "none",
-          color: "var(--muted)",
-          fontSize: "1.1rem",
-          padding: "0 4px",
-          touchAction: "none",
-        }}
-        aria-label="Réorganiser"
-      >
-        ⋮⋮
+    <ContextArea spec={getSpec} className="cb-row cb-chapter">
+      <Grip handle={handle} />
+      <button type="button" className="cb-link" onClick={() => onDialog({ kind: "chapter", entry })}>
+        <span className="cb-no desk-only" />
+        <span className="cb-chap-ic">
+          <BookOpen size={18} />
+        </span>
+        <span className="rname">
+          <small style={{ color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 10.5 }}>Chapitre</small>
+          <span className="cb-chap-title">{entry.title}</span>
+          {entry.intro && <small>{entry.intro}</small>}
+        </span>
       </button>
-
-      {!editing ? (
-        <>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className="fl-label"
-                style={{ color: "var(--accent)", fontSize: "0.7rem" }}
-              >
-                CHAPITRE
-              </span>
-              <span
-                className="fl-title-serif"
-                style={{ fontSize: "1.05rem", color: "var(--text)" }}
-              >
-                {entry.title}
-              </span>
-            </div>
-            {entry.intro && (
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--muted)", whiteSpace: "pre-wrap" }}
-              >
-                {entry.intro.length > 140
-                  ? `${entry.intro.slice(0, 140)}…`
-                  : entry.intro}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="fl-btn fl-btn-secondary flex-shrink-0"
-            style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
-          >
-            Éditer
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm(`Supprimer le chapitre « ${entry.title} » ?`)) {
-                startTransition(() => deleteChapter(entry.id, cookbookId));
-              }
-            }}
-            className="fl-btn fl-btn-secondary flex-shrink-0"
-            style={{
-              padding: "0.25rem 0.5rem",
-              fontSize: "0.75rem",
-              color: "var(--danger)",
-            }}
-          >
-            ✕
-          </button>
-        </>
-      ) : (
-        <div className="flex-1 flex flex-col gap-2">
-          <input
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            placeholder="Titre du chapitre"
-            className="fl-input"
-            maxLength={200}
-            autoFocus
-          />
-          <textarea
-            value={introDraft}
-            onChange={(e) => setIntroDraft(e.target.value)}
-            placeholder="Intro (optionnelle, affichée sur la page chapitre du PDF)"
-            rows={3}
-            maxLength={5000}
-            className="fl-input"
-          />
-          {error && (
-            <span className="text-xs" style={{ color: "var(--danger)" }}>
-              {error}
-            </span>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={pending}
-              className="fl-btn fl-btn-primary"
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }}
-            >
-              {pending ? "Enregistrement…" : "Enregistrer"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTitleDraft(entry.title);
-                setIntroDraft(entry.intro ?? "");
-                setEditing(false);
-                setError(null);
-              }}
-              className="fl-btn"
-              style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }}
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      <MoreButton spec={getSpec} label={`Actions pour le chapitre ${entry.title}`} />
+    </ContextArea>
   );
 }
 
-// ─── Add chapter button ───────────────────────────────────────────────────────
+// ─── Fenêtres ────────────────────────────────────────────────────────────────
 
-function AddChapterButton({ cookbookId }: { cookbookId: number }) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [intro, setIntro] = useState("");
-  const [pending, startTransition] = useTransition();
+function ChapterDialog({ cookbookId, entry, onClose }: { cookbookId: number; entry: ChapterEntry | null; onClose: () => void }) {
+  const [title, setTitle] = useState(entry?.title ?? "");
+  const [intro, setIntro] = useState(entry?.intro ?? "");
   const [error, setError] = useState<string | null>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (open) titleRef.current?.focus();
-  }, [open]);
-
-  function handleAdd() {
+  function save() {
     setError(null);
     startTransition(async () => {
-      const r = await addChapter(cookbookId, { title, intro });
-      if (r.ok) {
-        setTitle("");
-        setIntro("");
-        setOpen(false);
-      } else {
-        setError(r.error);
-      }
+      const r = entry
+        ? await updateChapter(entry.id, { title, intro }, cookbookId)
+        : await addChapter(cookbookId, { title, intro });
+      if (r.ok) onClose();
+      else setError(r.error);
     });
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fl-btn fl-btn-secondary"
-        style={{ fontSize: "0.8rem" }}
-      >
-        + Ajouter un chapitre
-      </button>
-    );
-  }
-
   return (
-    <div
-      className="flex flex-col gap-2 p-3 rounded-md w-full max-w-md"
-      style={{ background: "var(--card)", border: "1px solid var(--accent)" }}
-    >
-      <span className="fl-label">Nouveau chapitre</span>
-      <input
-        ref={titleRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Titre"
-        className="fl-input"
-        maxLength={200}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleAdd();
-          if (e.key === "Escape") setOpen(false);
-        }}
-      />
-      <textarea
-        value={intro}
-        onChange={(e) => setIntro(e.target.value)}
-        placeholder="Intro (optionnelle)"
-        rows={2}
-        maxLength={5000}
-        className="fl-input"
-      />
-      {error && (
-        <span className="text-xs" style={{ color: "var(--danger)" }}>
-          {error}
+    <ModalOverlay
+      onClose={onClose}
+      title={
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <BookOpen size={18} style={{ color: "var(--accent)" }} /> {entry ? "Modifier le chapitre" : "Nouveau chapitre"}
+          <Help title="Chapitre">
+            Une page de titre dans le PDF, avec un texte d&apos;introduction facultatif. Elle est
+            placée là où se trouve le chapitre dans la liste et apparaît au sommaire. Un nouveau
+            chapitre est ajouté à la fin : déplace-le ensuite au bon endroit.
+          </Help>
         </span>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={pending || !title.trim()}
-          className="fl-btn fl-btn-primary"
-          style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }}
-        >
-          {pending ? "Ajout…" : "Ajouter"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setTitle("");
-            setIntro("");
-            setError(null);
+      }
+    >
+      <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        <span className="fl-label">Titre</span>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex. Les entremets"
+          className="fl-input"
+          maxLength={200}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && title.trim()) save();
           }}
-          className="fl-btn"
-          style={{ fontSize: "0.8rem", padding: "0.3rem 0.7rem" }}
-        >
+        />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        <span className="fl-label">Introduction (facultatif)</span>
+        <textarea value={intro} onChange={(e) => setIntro(e.target.value)} rows={4} maxLength={5000} className="fl-input" placeholder="Quelques lignes imprimées sous le titre du chapitre" />
+      </label>
+      {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">
           Annuler
         </button>
+        <button type="button" onClick={save} disabled={pending || !title.trim()} className="fl-btn fl-btn-primary">
+          {pending ? "Enregistrement…" : entry ? "Enregistrer" : "Ajouter le chapitre"}
+        </button>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
-// ─── Menu button helper ───────────────────────────────────────────────────────
+function SectionDialog({ cookbookId, entry, onClose }: { cookbookId: number; entry: RecipeEntry; onClose: () => void }) {
+  const [value, setValue] = useState(entry.sectionTitle ?? "");
+  const [pending, startTransition] = useTransition();
 
-function MenuButton({
-  onClick,
-  children,
-  danger,
-}: {
-  onClick: () => void;
-  children: React.ReactNode;
-  danger?: boolean;
-}) {
+  const save = (v: string) =>
+    startTransition(async () => {
+      await setSectionTitle(entry.id, v, cookbookId);
+      onClose();
+    });
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="px-3 py-2 rounded text-sm text-left hover:bg-[color:var(--border)]"
-      style={{ color: danger ? "var(--danger)" : undefined }}
+    <ModalOverlay
+      onClose={onClose}
+      title={
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Heading size={18} style={{ color: "var(--accent)" }} /> Titre de section
+          <Help title="Titre de section">
+            Un intertitre imprimé juste au-dessus de cette recette, sur la même page (pas de page
+            dédiée, contrairement à un chapitre). Laisse vide pour le retirer.
+          </Help>
+        </span>
+      }
     >
-      {children}
-    </button>
+      <p style={{ color: "var(--muted)", marginTop: -6 }}>Au-dessus de « {entry.recipeName} »</p>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Ex. Les crèmes"
+        className="fl-input"
+        maxLength={200}
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save(value);
+        }}
+      />
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+        {entry.sectionTitle && (
+          <button type="button" onClick={() => save("")} disabled={pending} className="fl-btn fl-btn-ghost" style={{ marginRight: "auto" }}>
+            <Trash2 size={15} /> Retirer
+          </button>
+        )}
+        <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">
+          Annuler
+        </button>
+        <button type="button" onClick={() => save(value)} disabled={pending} className="fl-btn fl-btn-primary">
+          {pending ? "Enregistrement…" : "Enregistrer"}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }

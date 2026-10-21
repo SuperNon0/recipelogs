@@ -19,24 +19,5 @@ export async function hasCycle(parentId: number, childId: number): Promise<boole
   return rows.length > 0;
 }
 
-/**
- * Calcule le coefficient local effectif d'une sous-recette
- * selon son mode et les ingrédients de la recette enfant.
- */
-export function computeLocalCoef(
-  calcMode: "coefficient" | "mass_target" | "pivot_ingredient",
-  calcValue: number,
-  childBaseTotalG: number,
-  pivotBaseQtyG: number | null,
-): number {
-  if (calcMode === "coefficient") {
-    return Number.isFinite(calcValue) && calcValue > 0 ? calcValue : 1;
-  }
-  if (calcMode === "mass_target") {
-    if (childBaseTotalG <= 0) return 1;
-    return calcValue / childBaseTotalG;
-  }
-  // pivot_ingredient
-  if (!pivotBaseQtyG || pivotBaseQtyG <= 0) return 1;
-  return calcValue / pivotBaseQtyG;
-}
+// Calcul pur (sans base de données), utilisable côté navigateur.
+export { computeLocalCoef } from "./subRecipeCalc";

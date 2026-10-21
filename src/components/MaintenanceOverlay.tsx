@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Check, CircleAlert, Loader, ScrollText, Wrench } from "lucide-react";
 
 type Phase = "starting" | "deploying" | "restarting" | "done" | "failed";
 
@@ -8,7 +10,7 @@ const PHASES: { key: Phase; label: string }[] = [
   { key: "starting", label: "Démarrage du déploiement…" },
   { key: "deploying", label: "Mise à jour en cours (git, build)…" },
   { key: "restarting", label: "Redémarrage du service…" },
-  { key: "done", label: "Mise à jour terminée ✓" },
+  { key: "done", label: "Mise à jour terminée" },
 ];
 
 export function MaintenanceOverlay({
@@ -122,103 +124,56 @@ export function MaintenanceOverlay({
   }, [initialBootedAt]);
 
   const progress = phase === "done" ? 100 : phase === "restarting" ? 80 : phase === "deploying" ? 50 : 15;
+  const phaseIndex = PHASES.findIndex((x) => x.key === phase);
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(14, 15, 17, 0.96)",
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 640,
-          width: "100%",
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: 16,
-          padding: 24,
-          color: "var(--text)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-          maxHeight: "92vh",
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-            🔧 Mise à jour en cours
-          </h2>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: "0.8rem",
-              color: "var(--muted)",
-            }}
-          >
+  // Rendu dans <body> pour couvrir toute la page, quel que soit le parent.
+  return createPortal(
+    <div className="set-maint" role="dialog" aria-modal="true" aria-label="Mise à jour en cours">
+      <div className="set-maint-box">
+        <div className="modal-head">
+          <h3 style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Wrench size={18} style={{ color: "var(--accent)" }} />
+            {phase === "done" ? "Mise à jour terminée" : "Mise à jour en cours"}
+          </h3>
+          <span className="num" style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--muted)" }}>
             {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
           </span>
         </div>
 
         {/* Barre de progression */}
-        <div
-          style={{
-            height: 8,
-            background: "var(--border)",
-            borderRadius: 4,
-            overflow: "hidden",
-          }}
-        >
+        <div className="set-progress">
           <div
             style={{
               width: `${progress}%`,
-              height: "100%",
               background:
                 phase === "done"
                   ? "var(--accent-2)"
                   : phase === "failed"
                     ? "var(--danger)"
                     : "var(--accent)",
-              transition: "width 600ms ease-out",
             }}
           />
         </div>
 
-        {/* Phase courante */}
-        <div className="flex flex-col gap-1">
-          {PHASES.map((p) => {
-            const reached =
-              PHASES.findIndex((x) => x.key === phase) >= PHASES.findIndex((x) => x.key === p.key);
+        {/* Étapes */}
+        <div className="set-steps">
+          {PHASES.map((p, i) => {
+            const reached = phaseIndex >= i;
             const current = p.key === phase;
             return (
               <div
                 key={p.key}
-                style={{
-                  fontSize: "0.85rem",
-                  color: reached ? "var(--text)" : "var(--muted)",
-                  fontWeight: current ? 600 : 400,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
+                className="set-step"
+                data-reached={reached ? "true" : undefined}
+                data-current={current ? "true" : undefined}
               >
-                <span
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: "50%",
-                    background: reached ? "var(--accent)" : "transparent",
-                    border: reached ? "none" : "1px solid var(--border)",
-                    flexShrink: 0,
-                  }}
-                />
+                <span className="set-step-dot">
+                  {current && phase !== "done" && !error ? (
+                    <Loader size={12} className="set-spin" />
+                  ) : reached ? (
+                    <Check size={12} strokeWidth={3} />
+                  ) : null}
+                </span>
                 {p.label}
               </div>
             );
@@ -226,59 +181,25 @@ export function MaintenanceOverlay({
         </div>
 
         {error && (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              background: "rgba(232, 92, 71, 0.1)",
-              border: "1px solid var(--danger)",
-              color: "var(--danger)",
-              fontSize: "0.85rem",
-            }}
-          >
-            ⚠️ {error}
+          <div className="set-alert">
+            <CircleAlert size={16} />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Logs */}
+        {/* Journal */}
         {log && (
-          <details>
-            <summary
-              style={{
-                cursor: "pointer",
-                fontSize: "0.8rem",
-                color: "var(--muted)",
-              }}
-            >
-              📋 Voir les logs
+          <details className="set-details">
+            <summary>
+              <ScrollText size={14} /> Voir le journal
             </summary>
-            <pre
-              style={{
-                background: "var(--bg)",
-                padding: 10,
-                marginTop: 8,
-                borderRadius: 6,
-                fontSize: "0.7rem",
-                lineHeight: 1.4,
-                overflow: "auto",
-                maxHeight: 240,
-                whiteSpace: "pre-wrap",
-                color: "var(--muted)",
-                border: "1px solid var(--border)",
-              }}
-            >
+            <pre className="set-code set-code-wrap" style={{ marginTop: 8, maxHeight: 240, overflow: "auto", fontSize: 11 }}>
               {log}
             </pre>
           </details>
         )}
 
-        <p
-          style={{
-            fontSize: "0.75rem",
-            color: "var(--muted)",
-            textAlign: "center",
-          }}
-        >
+        <p className="set-note" style={{ textAlign: "center" }}>
           {phase === "done"
             ? upToDate
               ? "Le site était déjà à jour. Redirection vers l'accueil…"
@@ -287,15 +208,14 @@ export function MaintenanceOverlay({
         </p>
 
         {error && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="fl-btn fl-btn-secondary"
-          >
-            Fermer
-          </button>
+          <div className="set-foot">
+            <button type="button" onClick={onCancel} className="fl-btn fl-btn-secondary">
+              Fermer
+            </button>
+          </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

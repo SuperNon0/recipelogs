@@ -1,0 +1,330 @@
+/* Styles propres à la zone « recipe-form » (design V2). */
+
+/* Colonne du formulaire (cartes empilées) + place pour la barre d'enregistrement. */
+.rf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 860px;
+  padding-bottom: 80px;
+}
+
+.rf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rf-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rf-section-head .rf-ic {
+  color: var(--accent);
+  display: grid;
+}
+
+.rf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.rf-label {
+  display: flex;
+  align-items: center;
+}
+
+.rf-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.rf-grid2 {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 700px) {
+  .rf-grid2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* Note en étoiles */
+.rf-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rf-star {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--border2);
+  cursor: pointer;
+}
+
+.rf-star:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.rf-star[data-on="true"] {
+  color: var(--accent);
+}
+
+/* Masse totale (en-tête de la section Ingrédients) */
+.rf-mass {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.rf-mass b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ─── Lignes d'ingrédients ─────────────────────────────────────────────── */
+
+.rf-ings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rf-ing-head,
+.rf-ing {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 190px 104px 36px 36px;
+  grid-template-areas: "num name qty unit del more";
+  align-items: center;
+  gap: 8px;
+}
+
+.rf-ing-head {
+  padding-bottom: 2px;
+}
+
+.rf-ing-head > * {
+  display: flex;
+  align-items: center;
+}
+
+.rf-ing-num {
+  grid-area: num;
+  color: var(--muted);
+  font: 500 12px var(--font-mono);
+  text-align: right;
+}
+
+.rf-ing-name {
+  grid-area: name;
+  min-width: 0;
+}
+
+.rf-ing-qty {
+  grid-area: qty;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rf-ing-qty .fl-input {
+  text-align: right;
+  min-width: 0;
+}
+
+.rf-ing-qty .rf-dash {
+  color: var(--muted);
+  flex: none;
+}
+
+.rf-ing-qs {
+  flex: 1;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px;
+  border: 1px dashed var(--border2);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rf-ing-unit {
+  grid-area: unit;
+}
+
+.rf-ing-del {
+  grid-area: del;
+}
+
+.rf-ing-more {
+  grid-area: more;
+}
+
+.rf-ing-more .more-btn {
+  width: 36px;
+  height: 36px;
+}
+
+/* Téléphone : nom sur toute la largeur, quantité + unité en dessous. */
+@media (max-width: 699px) {
+  .rf-ing-head {
+    display: none;
+  }
+  .rf-ings {
+    gap: 0;
+  }
+  .rf-ing {
+    grid-template-columns: 22px minmax(0, 1fr) 96px 36px;
+    grid-template-areas:
+      "num name name more"
+      ".   qty  unit del";
+    row-gap: 8px;
+    column-gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+  }
+  .rf-ing:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+}
+
+/* Saisie en lot */
+.rf-bulk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rf-bulk textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rf-textarea {
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* Message d'erreur dans le formulaire */
+.rf-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(239, 125, 107, 0.08);
+  border: 1px solid rgba(239, 125, 107, 0.35);
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+/* ─── Listes déroulantes (autocomplétion ingrédients, catégories) ───────── */
+
+.rf-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--pop);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.rf-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rf-pop-item:hover,
+.rf-pop-item[data-active="true"] {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rf-pop-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.rf-pop-note svg {
+  color: var(--accent);
+  flex: none;
+}
+
+/* Catégories sélectionnées */
+.rf-cat-chip {
+  cursor: pointer;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  font-size: 12.5px;
+}
+
+.rf-cat-chip svg {
+  opacity: 0.75;
+}
+
+/* Aides des colonnes, affichées sous la liste sur téléphone seulement */
+.rf-ing-mobhelp {
+  display: none;
+  align-items: center;
+}
+
+@media (max-width: 699px) {
+  .rf-ing-mobhelp {
+    display: inline-flex;
+  }
+}
+
+/* Pas de flèches +/- dans les cases de quantité (place comptée au plus juste) */
+.rf-ing-qty input::-webkit-outer-spin-button,
+.rf-ing-qty input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rf-ing-qty input[type="number"] {
+  -moz-appearance: textfield;
+}

@@ -33,6 +33,7 @@
 
 import { parseHTML } from "linkedom";
 import { parseIngredientsText, type ParsedIngredient } from "./parseIngredientsText";
+import { cleanParsedIngredients } from "./ingredientRepair";
 
 export type RKImage = {
   /** Chemin relatif dans le ZIP, ex. "images/<uuid>_0.jpg" */
@@ -124,7 +125,8 @@ function parseRecipeNode(node: Element): RKHtmlRecipe | null {
       .filter((t) => t.length > 0);
     const ingLines = paragraphs.filter((t) => !isTotalLine(t));
     if (ingLines.length > 0) {
-      const parsed = parseIngredientsText(ingLines.join("\n"));
+      // Total recopié en dernière ligne (« 500g ») retiré, quantités recollées.
+      const parsed = cleanParsedIngredients(parseIngredientsText(ingLines.join("\n")));
       ingredients.push(...parsed);
     }
   }

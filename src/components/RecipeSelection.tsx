@@ -9,13 +9,14 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+import { ListChecks, Trash2, X } from "lucide-react";
 import { deleteRecipes } from "@/app/actions/recipes";
 
 /**
  * Sélection multiple de recettes + suppression en lot.
  *
  * Le contexte est posé tout en haut de la page d'accueil (et des favoris),
- * si bien que TOUTES les RecipeCard — quelle que soit la vue (explorateur,
+ * si bien que TOUTES les lignes de recettes — quelle que soit la vue (explorateur,
  * dossier ouvert, « tout afficher » groupé par dossier, résultats de
  * recherche) — partagent le même état de sélection.
  *
@@ -122,65 +123,18 @@ export function RecipeSelectionProvider({
 
       {/* Barre d'action flottante (mode sélection) */}
       {selectionMode && (
-        <div
-          style={{
-            position: "fixed",
-            left: "50%",
-            transform: "translateX(-50%)",
-            bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
-            zIndex: 90,
-            width: "calc(100% - 2rem)",
-            maxWidth: 480,
-            background: "var(--card)",
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
-            padding: "0.75rem 0.9rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.5rem",
-          }}
-        >
-          {error && (
-            <p style={{ fontSize: "0.78rem", color: "var(--danger)", margin: 0 }}>
-              {error}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-            <span
-              style={{
-                flex: 1,
-                fontSize: "0.85rem",
-                fontFamily: "var(--font-mono)",
-                color: "var(--text)",
-              }}
-            >
-              {selected.size} recette{selected.size > 1 ? "s" : ""} sélectionnée
-              {selected.size > 1 ? "s" : ""}
+        <div className="selbar" role="region" aria-label="Sélection">
+          {error && <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{error}</p>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 13.5 }}>
+              <b className="num" style={{ color: "var(--accent)" }}>{selected.size}</b> recette{selected.size > 1 ? "s" : ""} sélectionnée{selected.size > 1 ? "s" : ""}
             </span>
-            <button
-              type="button"
-              onClick={exitSelection}
-              disabled={pending}
-              className="fl-btn"
-              style={{ fontSize: "0.8rem" }}
-            >
+            <button type="button" onClick={exitSelection} disabled={pending} className="fl-btn fl-btn-secondary">
               Annuler
             </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={pending || selected.size === 0}
-              className="fl-btn"
-              style={{
-                fontSize: "0.8rem",
-                background: selected.size > 0 ? "var(--danger)" : "transparent",
-                color: selected.size > 0 ? "#fff" : "var(--muted)",
-                borderColor: "var(--danger)",
-                opacity: pending ? 0.6 : 1,
-              }}
-            >
-              {pending ? "Suppression…" : `🗑 Supprimer`}
+            <button type="button" onClick={handleDelete} disabled={pending || selected.size === 0} className="fl-btn fl-btn-danger">
+              <Trash2 size={15} />
+              {pending ? "Suppression…" : "Supprimer"}
             </button>
           </div>
         </div>
@@ -199,11 +153,11 @@ export function RecipeSelectionToggle() {
     <button
       type="button"
       onClick={selectionMode ? exitSelection : enterSelection}
-      className="fl-btn fl-btn-secondary"
-      style={{ fontSize: "0.8rem" }}
+      className="fl-btn fl-btn-ghost"
       title="Sélectionner plusieurs recettes pour les supprimer"
     >
-      {selectionMode ? "✕ Annuler" : "☑ Sélectionner"}
+      {selectionMode ? <X size={16} /> : <ListChecks size={16} />}
+      {selectionMode ? "Annuler" : "Sélectionner"}
     </button>
   );
 }

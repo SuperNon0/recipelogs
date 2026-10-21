@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { CircleAlert, LockOpen, RefreshCw } from "lucide-react";
 import { triggerDeploy, clearDeployLock } from "@/app/actions/admin";
+import { ModalOverlay } from "./ModalOverlay";
 import { MaintenanceOverlay } from "./MaintenanceOverlay";
 
 type DeployError = { message: string; hint?: string };
 
+/**
+ * Bouton « Mettre à jour » : ouvre une fenêtre de confirmation, lance le
+ * script de déploiement puis affiche le suivi plein écran.
+ */
 export function DeployButton() {
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState(false);
@@ -46,95 +52,69 @@ export function DeployButton() {
     );
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-[color:var(--muted)]">
-        Lance le script <code>deploy.sh</code> sur le serveur :
-        <code> git pull</code> → <code>install</code> → <code>build</code> → redémarrage
-        automatique du service. Ne ferme pas la page pendant l&apos;opération.
-      </p>
+  const close = () => {
+    if (pending) return;
+    setConfirm(false);
+    setError(null);
+  };
 
-      {!confirm ? (
-        <button
-          type="button"
-          onClick={() => setConfirm(true)}
-          className="fl-btn fl-btn-primary self-start"
-          style={{ fontSize: "0.85rem" }}
-        >
-          🚀 Mettre à jour le site
-        </button>
-      ) : (
-        <div className="flex flex-col gap-2 fl-card" style={{ borderColor: "var(--accent)" }}>
-          <p className="text-sm">
-            <strong>⚠️ Confirmation</strong> — La mise à jour prend quelques minutes. Le site
-            reste utilisable pendant la préparation, puis est coupé ~10 secondes au
-            redémarrage. En cas de problème, l&apos;ancienne version est conservée. Continuer ?
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setError(null);
+          setConfirm(true);
+        }}
+        className="fl-btn fl-btn-secondary"
+        aria-label="Mettre à jour le site"
+      >
+        <RefreshCw size={15} />
+        <span className="set-hide-phone">Mettre à jour</span>
+      </button>
+
+      {confirm && (
+        <ModalOverlay title="Mettre à jour le site" onClose={close}>
+          <p style={{ color: "var(--soft)", fontSize: 14 }}>
+            Le serveur récupère la dernière version sur GitHub, l&apos;installe et la prépare, puis
+            redémarre le site. Compte quelques minutes : le site reste utilisable pendant la
+            préparation, puis est coupé une dizaine de secondes au redémarrage. En cas de problème,
+            l&apos;ancienne version est conservée.
           </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleClick}
-              disabled={pending}
-              className="fl-btn fl-btn-primary"
-              style={{ fontSize: "0.85rem" }}
-            >
-              {pending ? "Démarrage…" : "Oui, lancer"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirm(false)}
-              disabled={pending}
-              className="fl-btn fl-btn-secondary"
-              style={{ fontSize: "0.85rem" }}
-            >
+          <p className="set-note">Ne ferme pas la page pendant l&apos;opération.</p>
+
+          {error && (
+            <div className="set-alert" style={{ flexDirection: "column" }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <CircleAlert size={16} style={{ flex: "none", marginTop: 1 }} />
+                <span>{error.message}</span>
+              </div>
+              {error.hint && <pre className="set-code set-code-wrap" style={{ width: "100%" }}>{error.hint}</pre>}
+              {error.message.toLowerCase().includes("en cours") && (
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  disabled={unlocking}
+                  className="fl-btn fl-btn-secondary"
+                >
+                  <LockOpen size={15} />
+                  {unlocking ? "Déblocage…" : "Forcer le déblocage"}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="set-foot">
+            <button type="button" onClick={close} disabled={pending} className="fl-btn fl-btn-secondary">
               Annuler
             </button>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div
-          className="flex flex-col gap-2 text-sm"
-          style={{
-            color: "var(--danger)",
-            padding: "10px 14px",
-            background: "rgba(232, 92, 71, 0.08)",
-            border: "1px solid var(--danger)",
-            borderRadius: 8,
-          }}
-        >
-          <div>⚠️ {error.message}</div>
-          {error.hint && (
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                background: "var(--bg)",
-                color: "var(--text)",
-                padding: 8,
-                borderRadius: 6,
-                lineHeight: 1.4,
-                overflow: "auto",
-              }}
-            >
-              {error.hint}
-            </pre>
-          )}
-          {error.message.toLowerCase().includes("en cours") && (
-            <button
-              type="button"
-              onClick={handleUnlock}
-              disabled={unlocking}
-              className="fl-btn fl-btn-secondary self-start"
-              style={{ fontSize: "0.75rem" }}
-            >
-              {unlocking ? "Déblocage…" : "🔓 Forcer le déblocage du lock"}
+            <button type="button" onClick={handleClick} disabled={pending} className="fl-btn fl-btn-primary">
+              <RefreshCw size={15} className={pending ? "set-spin" : undefined} />
+              {pending ? "Démarrage…" : "Oui, lancer la mise à jour"}
             </button>
-          )}
-        </div>
+          </div>
+        </ModalOverlay>
       )}
-    </div>
+    </>
   );
 }

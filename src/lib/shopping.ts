@@ -67,6 +67,7 @@ export function shoppingKey(name: string, unit: string | null | undefined): stri
  * - On ne fusionne que des quantités de même unité (2 pièces + 100 g ≠ 102).
  * - Fourchette min/max : on retient le max (pour acheter assez).
  * - QS : une seule ligne, sans quantité.
+ * - Lignes à 0 g (titres de section importés) : ignorées.
  */
 export function aggregateIngredients(
   sources: { recipeId: number; ingredients: ShoppingSourceIngredient[] }[],
@@ -79,6 +80,8 @@ export function aggregateIngredients(
       const unit = ing.unit ?? "g";
       const key = shoppingKey(name, unit);
       const qty = unit === "QS" ? null : Number(ing.quantityGMax ?? ing.quantityG);
+      // 0 g sans fourchette : titre de section importé (« Levain », « Pâte »…), rien à acheter.
+      if (qty === 0) continue;
       const existing = map.get(key);
       if (existing) {
         if (existing.quantityG !== null && qty !== null) existing.quantityG += qty;

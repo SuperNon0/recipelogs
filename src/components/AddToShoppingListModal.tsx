@@ -1,78 +1,41 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { Check, ShoppingBasket } from "lucide-react";
 import { addRecipeToList } from "@/app/actions/shopping";
 import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
 import { fetchShoppingListsForModal } from "@/app/actions/modals";
 
 type ShoppingList = { id: number; name: string };
 
-export function AddToShoppingListButton({ recipeId }: { recipeId: number }) {
-  const [open, setOpen] = useState(false);
-  const [lists, setLists] = useState<ShoppingList[] | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleOpen = async () => {
-    if (!lists) {
-      setLoading(true);
-      const data = await fetchShoppingListsForModal();
-      setLists(data);
-      setLoading(false);
-    }
-    setOpen(true);
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        disabled={loading}
-        className="fl-btn fl-btn-secondary"
-        style={{ fontSize: "0.8rem" }}
-      >
-        {loading ? "…" : "🛒 Ajouter à la liste"}
-      </button>
-      {open && lists && lists.length > 0 && (
-        <AddToShoppingListModal
-          recipeId={recipeId}
-          lists={lists}
-          onClose={() => setOpen(false)}
-        />
-      )}
-      {open && lists && lists.length === 0 && (
-        <ModalOverlay onClose={() => setOpen(false)}>
-          <div className="flex flex-col gap-4" style={{ minWidth: 280 }}>
-            <h2 className="fl-title-serif" style={{ fontSize: "1.2rem" }}>Ajouter à la liste</h2>
-            <p className="fl-label" style={{ fontWeight: 400 }}>
-              Aucune liste de courses disponible. Créez-en une dans la section Courses.
-            </p>
-            <button type="button" onClick={() => setOpen(false)} className="fl-btn fl-btn-secondary">
-              Fermer
-            </button>
-          </div>
-        </ModalOverlay>
-      )}
-    </>
-  );
-}
-
-function AddToShoppingListModal({
+/** Fenêtre « Ajouter aux courses » : charge les listes puis ajoute la recette. */
+export function AddToShoppingListDialog({
   recipeId,
-  lists,
+  recipeName,
   onClose,
 }: {
   recipeId: number;
-  lists: ShoppingList[];
+  recipeName?: string;
   onClose: () => void;
 }) {
+  const [lists, setLists] = useState<ShoppingList[] | null>(null);
   const [pending, startTransition] = useTransition();
-  const [listId, setListId] = useState(lists[0]?.id ?? 0);
+  const [listId, setListId] = useState(0);
   const [coef, setCoef] = useState("1");
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    fetchShoppingListsForModal().then((l) => {
+      setLists(l);
+      setListId(l[0]?.id ?? 0);
+    });
+  }, []);
 
   function handleAdd() {
-    const c = parseFloat(coef);
+    const c = parseFloat(coef.replace(",", "."));
     if (isNaN(c) || c <= 0) {
       setError("Le coefficient doit être un nombre positif.");
       return;
@@ -81,7 +44,8 @@ function AddToShoppingListModal({
     startTransition(async () => {
       const result = await addRecipeToList(listId, recipeId, c);
       if (result.ok) {
-        onClose();
+        setDone(true);
+        setTimeout(onClose, 700);
       } else {
         setError(result.error);
       }
@@ -89,66 +53,56 @@ function AddToShoppingListModal({
   }
 
   return (
-    <ModalOverlay onClose={onClose}>
-      <div className="flex flex-col gap-5" style={{ minWidth: 300 }}>
-        <h2 className="fl-title-serif" style={{ fontSize: "1.2rem" }}>
-          Ajouter à la liste de courses
-        </h2>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Liste</span>
-          <select
-            value={listId}
-            onChange={(e) => setListId(Number(e.target.value))}
-            className="fl-input"
-          >
-            {lists.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="fl-label">Coefficient (quantité)</span>
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={coef}
-            onChange={(e) => setCoef(e.target.value)}
-            className="fl-input"
-          />
-          <span className="fl-label" style={{ fontWeight: 400 }}>
-            Ex : 2 = doubler toutes les quantités de la recette
-          </span>
-        </label>
-
-        {error && (
-          <p className="text-sm" style={{ color: "var(--danger)" }}>
-            {error}
+    <ModalOverlay
+      onClose={onClose}
+      title={
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ShoppingBasket size={18} style={{ color: "var(--accent)" }} /> Ajouter aux courses
+        </span>
+      }
+    >
+      {recipeName && <p style={{ color: "var(--muted)", marginTop: -6 }}>{recipeName}</p>}
+      {lists === null ? (
+        <p style={{ color: "var(--muted)" }}>Chargement…</p>
+      ) : lists.length === 0 ? (
+        <>
+          <p style={{ color: "var(--soft)" }}>
+            Aucune liste de courses pour le moment. Crée d&apos;abord une liste dans la section Courses.
           </p>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={pending}
-            className="fl-btn fl-btn-primary"
-          >
-            {pending ? "Ajout…" : "Ajouter"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="fl-btn fl-btn-secondary"
-          >
-            Annuler
-          </button>
-        </div>
-      </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">Fermer</button>
+            <Link href="/shopping/new" className="fl-btn fl-btn-primary" onClick={onClose}>Créer une liste</Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            <span className="fl-label">Liste</span>
+            <select value={listId} onChange={(e) => setListId(Number(e.target.value))} className="fl-input">
+              {lists.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            <span className="fl-label" style={{ display: "flex", alignItems: "center" }}>
+              Coefficient
+              <Help title="Coefficient" calc="quantité ajoutée = quantité de la recette × coefficient" example="2 = le double de chaque ingrédient ; 0,5 = la moitié.">
+                Multiplie toutes les quantités de la recette avant de les ajouter à la liste.
+                Les ingrédients déjà présents sont additionnés.
+              </Help>
+            </span>
+            <input type="number" min="0.01" step="0.01" inputMode="decimal" value={coef} onChange={(e) => setCoef(e.target.value)} className="fl-input" />
+          </div>
+          {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">Annuler</button>
+            <button type="button" onClick={handleAdd} disabled={pending || done} className="fl-btn fl-btn-primary">
+              {done ? <><Check size={16} /> Ajoutée</> : pending ? "Ajout…" : "Ajouter"}
+            </button>
+          </div>
+        </>
+      )}
     </ModalOverlay>
   );
 }

@@ -1,53 +1,12 @@
 import Link from "next/link";
+import { Braces, ChevronLeft, FileJson } from "lucide-react";
 import { JsonRecipeImport } from "@/components/JsonRecipeImport";
 import { ConversionPromptSection } from "@/components/ConversionPromptSection";
+import { Help } from "@/components/ui/Help";
 
 export const dynamic = "force-dynamic";
 
-export default function ImportJsonPage() {
-  return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div className="flex items-center gap-3">
-        <Link href="/settings" className="fl-label hover:text-[color:var(--text)]">
-          ← Paramètres
-        </Link>
-      </div>
-
-      <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
-        Import JSON
-      </h1>
-
-      {/* Import du fichier */}
-      <section className="fl-card flex flex-col gap-4">
-        <div>
-          <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            📥 Importer des recettes depuis un fichier JSON
-          </h2>
-          <p className="fl-label mt-1">
-            Charge un fichier JSON exporté depuis RecipeLog ou converti depuis un autre format.
-            Les recettes déjà existantes (même nom) sont ignorées.
-          </p>
-        </div>
-        <JsonRecipeImport />
-      </section>
-
-      {/* Format attendu */}
-      <section className="fl-card flex flex-col gap-3">
-        <h2 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-          Format attendu
-        </h2>
-        <pre
-          style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            padding: "0.8rem 1rem",
-            fontSize: "0.75rem",
-            overflowX: "auto",
-            color: "var(--muted)",
-            lineHeight: 1.6,
-          }}
-        >{`[
+const EXAMPLE = `[
   {
     "name": "Glace Café",
     "yield": "Pour 3/4 de litre",
@@ -61,29 +20,60 @@ export default function ImportJsonPage() {
     "notes": "Vous pouvez décorer avec des macarons café.",
     "source": "Livre Glaces"
   }
-]`}</pre>
-        <p className="fl-label" style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-          Unités natives : <code>g</code> · <code>L</code> · <code>cc</code> · <code>cs</code> · <code>pièce</code> · <code>QS</code>
-          <span style={{ marginLeft: 8 }}>— Converties auto : <code>mL→g</code> · <code>cl→g×10</code> · <code>kg→g×1000</code></span>
-        </p>
-      </section>
+]`;
 
-      {/* Séparateur */}
-      <div style={{ borderTop: "1px solid var(--border)", margin: "0.5rem 0" }} />
-
-      <div>
-        <h2 className="fl-title-serif" style={{ fontSize: "1.3rem" }}>
-          Convertir un livre de recettes
-        </h2>
-        <p className="fl-label mt-1">
-          Tu as scanné un livre ? Utilise l&apos;IA pour convertir le texte extrait en JSON importable.
-          Voici tout ce dont tu as besoin.
+export default function ImportJsonPage() {
+  return (
+    <div className="set-page">
+      <Link href="/settings" className="crumb">
+        <ChevronLeft size={14} /> Réglages
+      </Link>
+      <div className="page-head">
+        <h1>Import JSON</h1>
+        <p className="sub">
+          Charge un fichier JSON exporté depuis RecipeLog ou converti depuis un autre format. Les
+          recettes déjà présentes (même nom) sont ignorées.
         </p>
       </div>
 
-      {/* Instructions de conversion */}
-      <ConversionPromptSection />
+      <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <h2 className="set-card-h">
+          <FileJson size={17} />
+          Importer un fichier
+        </h2>
+        <JsonRecipeImport />
+      </section>
 
+      <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+        <h2 className="set-card-h">
+          <Braces size={17} />
+          Format attendu
+          <Help title="Format JSON d'import">
+            Le fichier contient une liste de recettes entre crochets <code>[ … ]</code>. Pour chaque
+            recette : <b>name</b> (nom, obligatoire), <b>yield</b> (rendement, texte libre),{" "}
+            <b>ingredients</b> (liste avec <b>name</b>, <b>quantity</b> et <b>unit</b>), <b>steps</b>{" "}
+            (étapes dans un seul texte, séparées par une ligne vide), <b>notes</b> et <b>source</b>.
+            <br />
+            <br />
+            Unités reconnues : g, L, cc, cs, pièce et QS. Les mL, cl et kg sont convertis en
+            grammes à l&apos;import.
+          </Help>
+        </h2>
+        <pre className="set-code">{EXAMPLE}</pre>
+        <p className="set-note">
+          Unités : <code>g</code>, <code>L</code>, <code>cc</code>, <code>cs</code>, <code>pièce</code>,{" "}
+          <code>QS</code>. Converties automatiquement : mL en g, cl en g × 10, kg en g × 1000.
+        </p>
+      </section>
+
+      <div className="sect-title" style={{ marginTop: 32 }}>
+        <h2>Convertir un livre de recettes</h2>
+      </div>
+      <p style={{ color: "var(--soft)", marginBottom: 12 }}>
+        Tu as scanné un livre ? Demande à une IA de convertir le texte extrait en JSON importable.
+        Voici tout ce dont tu as besoin.
+      </p>
+      <ConversionPromptSection />
     </div>
   );
 }

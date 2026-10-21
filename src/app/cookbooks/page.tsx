@@ -1,74 +1,68 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { listCookbooks } from "@/lib/cookbooks";
-import { Fab } from "@/components/Fab";
-import { parseTheme, RECIPE_LAYOUT_LABELS } from "@/lib/pdf/theme";
+import { allPdfFontsHref, parseTheme } from "@/lib/pdf/theme";
 import { EmptyState } from "@/components/EmptyState";
+import { CookbookGrid } from "@/components/CookbookMenu";
+import { Help } from "@/components/ui/Help";
 
 export const dynamic = "force-dynamic";
 
 export default async function CookbooksPage() {
   const cookbooks = await listCookbooks();
+  const fonts = allPdfFontsHref();
 
   return (
     <>
-      <div className="flex items-baseline justify-between mb-5">
-        <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
+      {fonts && <link rel="stylesheet" href={fonts} />}
+      <div className="page-head">
+        <h1 style={{ display: "flex", alignItems: "center" }}>
           Cahiers
+          <Help title="Cahiers">
+            Un cahier rassemble plusieurs recettes dans un seul PDF, avec une couverture, un sommaire
+            et des chapitres si tu le souhaites. Son apparence vient d&apos;un thème PDF, que tu peux
+            ensuite ajuster.
+            <br />
+            <br />
+            Clic droit (ou bouton à trois points) sur un cahier pour télécharger son PDF, ajouter ses
+            recettes aux courses ou le supprimer.
+          </Help>
         </h1>
-        <span className="fl-label">
+        <Link href="/cookbooks/new" className="fl-btn fl-btn-primary desk-only">
+          <Plus size={16} /> Nouveau cahier
+        </Link>
+        <p className="sub">
           {cookbooks.length} cahier{cookbooks.length > 1 ? "s" : ""}
-        </span>
+        </p>
       </div>
 
       {cookbooks.length === 0 ? (
         <EmptyState
           title="Aucun cahier"
-          description="Créez un cahier pour assembler vos recettes et générer un PDF personnalisé."
+          description="Crée un cahier pour assembler tes recettes et en faire un PDF à imprimer."
           ctaHref="/cookbooks/new"
           ctaLabel="Créer un cahier"
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cookbooks.map((c) => (
-            <Link
-              key={c.id}
-              href={`/cookbooks/${c.id}`}
-              className="fl-card flex flex-col gap-3 hover:border-[color:var(--muted)] transition-colors"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3
-                  className="fl-title-serif"
-                  style={{ fontSize: "1.15rem" }}
-                >
-                  {c.name}
-                </h3>
-                <span className="fl-tag">{c.format}</span>
-              </div>
-              {c.description && (
-                <p className="text-[color:var(--muted)] text-sm line-clamp-3">
-                  {c.description}
-                </p>
-              )}
-              <div className="flex items-end justify-between mt-auto">
-                <div>
-                  <span className="fl-label">Recettes</span>
-                  <div
-                    className="fl-value-serif"
-                    style={{ fontSize: "1.55rem" }}
-                  >
-                    {c._count.entries}
-                  </div>
-                </div>
-                <span className="fl-tag">
-                  {RECIPE_LAYOUT_LABELS[parseTheme(c.coverConfig).recipeLayout]}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <CookbookGrid
+          cookbooks={cookbooks.map((c) => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            format: c.format,
+            recipeCount: c._count.entries,
+            hasCover: c.hasCover,
+            hasToc: c.hasToc,
+            // L'image de couverture (parfois lourde) est inutile pour la vignette.
+            theme: { ...parseTheme(c.coverConfig), coverBgImageUrl: "" },
+            updatedAt: c.updatedAt.toISOString(),
+          }))}
+        />
       )}
 
-      <Fab href="/cookbooks/new" label="Créer un cahier" />
+      <Link href="/cookbooks/new" className="fab" aria-label="Créer un cahier">
+        <Plus size={24} />
+      </Link>
     </>
   );
 }

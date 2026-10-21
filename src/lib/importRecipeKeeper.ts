@@ -11,7 +11,8 @@
  * — on extrait le nombre en grammes si possible, sinon on crée un ingrédient libre.
  */
 
-import { extractQuantityAndUnit, cleanIngredientName } from "./parseIngredientsText";
+import { parseIngredientsText } from "./parseIngredientsText";
+import { cleanParsedIngredients } from "./ingredientRepair";
 
 export type RKRecipe = {
   name: string;
@@ -76,17 +77,8 @@ export function parseRecipeKeeperCsv(csvText: string): RKRecipe[] {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function parseIngredients(raw: string): { name: string; quantityG: number; quantityGMax?: number; unit: string }[] {
-  if (!raw) return [];
-
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const { quantityG, quantityGMax, unit } = extractQuantityAndUnit(line);
-      const name = cleanIngredientName(line);
-      return { name: name || line, quantityG, quantityGMax, unit };
-    });
+  // Même analyse que la saisie en lot (gère les quantités sur leur propre ligne).
+  return raw ? cleanParsedIngredients(parseIngredientsText(raw)) : [];
 }
 
 // ─── CSV parser minimal ───────────────────────────────────────────────────────

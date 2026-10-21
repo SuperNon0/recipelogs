@@ -2,50 +2,73 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check, ShoppingBasket } from "lucide-react";
 import { addCookbookRecipesToList } from "@/app/actions/shopping";
 import { fetchShoppingListsForModal } from "@/app/actions/modals";
+import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
 
 type ListOption = { id: number; name: string };
 
+/** Bouton « Courses » : ajoute toutes les recettes du cahier à une liste. */
 export function AddCookbookToShoppingListButton({
   cookbookId,
   cookbookName,
   recipeCount,
+  className = "fl-btn fl-btn-secondary",
 }: {
   cookbookId: number;
   cookbookName: string;
   recipeCount: number;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={recipeCount === 0}
+        className={className}
+        title={recipeCount === 0 ? "Aucune recette dans ce cahier" : undefined}
+      >
+        <ShoppingBasket size={16} /> Courses
+      </button>
+      {open && (
+        <AddCookbookToShoppingListDialog
+          cookbookId={cookbookId}
+          cookbookName={cookbookName}
+          recipeCount={recipeCount}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Fenêtre « Ajouter aux courses » (nouvelle liste ou liste existante). */
+export function AddCookbookToShoppingListDialog({
+  cookbookId,
+  cookbookName,
+  recipeCount,
+  onClose,
+}: {
+  cookbookId: number;
+  cookbookName: string;
+  recipeCount: number;
+  onClose: () => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"new" | "existing">("new");
-  const [newName, setNewName] = useState("");
-  const [lists, setLists] = useState<ListOption[]>([]);
+  const [newName, setNewName] = useState(`Courses ${cookbookName}`);
+  const [lists, setLists] = useState<ListOption[] | null>(null);
   const [selectedListId, setSelectedListId] = useState<number | null>(null);
-  const [loadingLists, setLoadingLists] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
-    setNewName(`Courses — ${cookbookName}`);
-    setError(null);
-    setLoadingLists(true);
-    fetchShoppingListsForModal().then((result) => {
-      setLists(result);
-      setLoadingLists(false);
-      if (result.length === 0) setMode("new");
-    });
-  }, [open, cookbookName]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+    fetchShoppingListsForModal().then(setLists);
+  }, []);
 
   function handleSubmit() {
     setError(null);
@@ -59,206 +82,105 @@ export function AddCookbookToShoppingListButton({
         setError(r.error);
         return;
       }
-      setOpen(false);
+      onClose();
       router.push(`/shopping/${r.listId}`);
     });
   }
 
+  const title = (
+    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <ShoppingBasket size={18} style={{ color: "var(--accent)" }} /> Ajouter aux courses
+    </span>
+  );
+
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={recipeCount === 0}
-        className="fl-btn fl-btn-secondary"
-        style={{
-          fontSize: "0.8rem",
-          opacity: recipeCount === 0 ? 0.5 : 1,
-        }}
-        title={
-          recipeCount === 0
-            ? "Aucune recette dans ce cahier"
-            : `Ajouter les ${recipeCount} recette${recipeCount > 1 ? "s" : ""} à une liste de courses`
-        }
-      >
-        🛒 Liste de courses
-      </button>
+    <ModalOverlay onClose={onClose} title={title}>
+      <p style={{ color: "var(--soft)", marginTop: -4, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+        {recipeCount} recette{recipeCount > 1 ? "s" : ""} du cahier « {cookbookName} »
+        <Help title="Ajout aux courses">
+          Les ingrédients de toutes les recettes du cahier sont ajoutés à la liste. Les ingrédients
+          identiques sont regroupés et leurs quantités additionnées. Une recette figée compte avec sa
+          masse figée.
+        </Help>
+      </p>
 
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="fl-card"
-            style={{
-              width: "100%",
-              maxWidth: 440,
-              background: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            <div className="flex items-baseline justify-between gap-2">
-              <h3 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-                🛒 Ajouter à une liste de courses
-              </h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="fl-label hover:text-[color:var(--text)]"
-                style={{ fontSize: "0.8rem" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="fl-label" style={{ color: "var(--muted)" }}>
-              {recipeCount} recette{recipeCount > 1 ? "s" : ""} du cahier «&nbsp;{cookbookName}&nbsp;»
-              {recipeCount > 1 ? " seront ajoutées" : " sera ajoutée"} à la liste.
-              Les ingrédients similaires seront regroupés.
-            </p>
-
-            {/* Toggle new / existing */}
-            {lists.length > 0 && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMode("new")}
-                  className="fl-btn"
-                  style={{
-                    flex: 1,
-                    fontSize: "0.8rem",
-                    background: mode === "new" ? "var(--accent)" : "transparent",
-                    color: mode === "new" ? "var(--bg)" : "var(--text)",
-                    borderColor: mode === "new" ? "var(--accent)" : "var(--border)",
-                  }}
-                >
-                  Nouvelle liste
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("existing")}
-                  className="fl-btn"
-                  style={{
-                    flex: 1,
-                    fontSize: "0.8rem",
-                    background: mode === "existing" ? "var(--accent)" : "transparent",
-                    color: mode === "existing" ? "var(--bg)" : "var(--text)",
-                    borderColor: mode === "existing" ? "var(--accent)" : "var(--border)",
-                  }}
-                >
-                  Liste existante
-                </button>
-              </div>
-            )}
-
-            {mode === "new" && (
-              <label className="flex flex-col gap-1.5">
-                <span className="fl-label" style={{ fontSize: "0.82rem" }}>
-                  Nom de la nouvelle liste
-                </span>
-                <input
-                  className="fl-input"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Ex : Commande du lundi"
-                  maxLength={200}
-                  autoFocus
-                />
-              </label>
-            )}
-
-            {mode === "existing" && (
-              <div className="flex flex-col gap-1.5">
-                <span className="fl-label" style={{ fontSize: "0.82rem" }}>
-                  Choisir une liste
-                </span>
-                {loadingLists ? (
-                  <p className="fl-label" style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-                    Chargement…
-                  </p>
-                ) : (
-                  <div
-                    className="flex flex-col rounded-md"
-                    style={{
-                      border: "1px solid var(--border)",
-                      maxHeight: 240,
-                      overflowY: "auto",
-                    }}
-                  >
-                    {lists.map((l, idx) => (
-                      <button
-                        key={l.id}
-                        type="button"
-                        onClick={() => setSelectedListId(l.id)}
-                        className="px-3 py-2 text-sm text-left"
-                        style={{
-                          color: "var(--text)",
-                          background:
-                            selectedListId === l.id
-                              ? "rgba(232,197,71,0.12)"
-                              : "transparent",
-                          borderTop:
-                            idx === 0 ? "none" : "1px solid var(--border)",
-                          cursor: "pointer",
-                          fontWeight: selectedListId === l.id ? 600 : 400,
-                        }}
-                      >
-                        {l.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {error && (
-              <p className="text-sm" style={{ color: "var(--danger)" }}>
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                disabled={pending}
-                className="fl-btn"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={
-                  pending ||
-                  (mode === "new" && !newName.trim()) ||
-                  (mode === "existing" && !selectedListId)
-                }
-                className="fl-btn fl-btn-primary"
-                style={{ opacity: pending ? 0.6 : 1 }}
-              >
-                {pending ? "Ajout en cours…" : "🛒 Ajouter"}
-              </button>
-            </div>
-          </div>
+      {lists && lists.length > 0 && (
+        <div className="fl-seg" style={{ alignSelf: "flex-start" }}>
+          <button type="button" aria-pressed={mode === "new"} onClick={() => setMode("new")}>
+            Nouvelle liste
+          </button>
+          <button type="button" aria-pressed={mode === "existing"} onClick={() => setMode("existing")}>
+            Liste existante
+          </button>
         </div>
       )}
-    </>
+
+      {mode === "new" && (
+        <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <span className="fl-label">Nom de la nouvelle liste</span>
+          <input
+            className="fl-input"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Ex. commande du lundi"
+            maxLength={200}
+            autoFocus
+          />
+        </label>
+      )}
+
+      {mode === "existing" && lists && (
+        <div className="fl-list fl-scroll" style={{ maxHeight: 260, overflowY: "auto", background: "var(--bg)" }}>
+          {lists.map((l, i) => {
+            const on = selectedListId === l.id;
+            return (
+              <button
+                key={l.id}
+                type="button"
+                className="fl-row"
+                aria-pressed={on}
+                onClick={() => setSelectedListId(l.id)}
+                style={{
+                  width: "100%",
+                  background: on ? "var(--accent-dim)" : "transparent",
+                  border: "none",
+                  borderTop: i === 0 ? "none" : "1px solid var(--border)",
+                  color: on ? "var(--accent)" : "var(--text)",
+                  textAlign: "left",
+                  minHeight: 44,
+                }}
+              >
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {l.name}
+                </span>
+                {on && <Check size={16} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {lists === null && <p style={{ color: "var(--muted)", fontSize: 13 }}>Chargement des listes…</p>}
+      {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onClose} disabled={pending} className="fl-btn fl-btn-secondary">
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={
+            pending ||
+            recipeCount === 0 ||
+            (mode === "new" && !newName.trim()) ||
+            (mode === "existing" && !selectedListId)
+          }
+          className="fl-btn fl-btn-primary"
+        >
+          {pending ? "Ajout…" : "Ajouter"}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }

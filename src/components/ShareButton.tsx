@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Check, Link2 } from "lucide-react";
 import { generateShareToken, revokeToken } from "@/app/actions/share";
 
 export function ShareButton({
@@ -52,7 +53,7 @@ export function ShareButton({
         className="fl-btn fl-btn-secondary"
         style={{ fontSize: "0.8rem" }}
       >
-        {pending ? "…" : "🔗 Partager"}
+        {pending ? "…" : <><Link2 size={15} /> Partager</>}
       </button>
     );
   }
@@ -73,7 +74,7 @@ export function ShareButton({
           className="fl-btn fl-btn-secondary"
           style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}
         >
-          {copied ? "✓ Copié" : "Copier"}
+          {copied ? <><Check size={15} /> Copié</> : "Copier"}
         </button>
         <button
           type="button"

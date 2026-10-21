@@ -1,0 +1,685 @@
+/* Styles propres à la zone « settings » (réglages, dossiers, catégories,
+   ingrédients, imports, mise à jour du site) — design V2. */
+
+/* Largeur de lecture des pages de réglages */
+.set-page {
+  max-width: 760px;
+}
+
+.set-page-wide {
+  max-width: 980px;
+}
+
+/* Texte d'une rangée : titre + sous-titre */
+.set-tx {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-tx b {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.set-tx b > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.set-tx small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.set-chev {
+  color: var(--muted);
+  flex: none;
+}
+
+/* Rangée cliquable en entier (lien ou bouton) */
+.fl-row.set-row {
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+button.set-row:first-child {
+  border-top: none;
+}
+
+/* Rangée avec menu : zone cliquable + bouton « ⋯ » */
+.fl-row.set-item {
+  gap: 6px;
+  padding: 0 10px 0 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.set-item:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.set-item[data-menu-open="true"] {
+  background: var(--accent-dim);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.set-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 6px 10px 16px;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+/* Icône teintée par la couleur de la donnée (dossier, catégorie) */
+.set-ic-c {
+  background: color-mix(in srgb, var(--c) 16%, transparent) !important;
+  color: var(--c) !important;
+}
+
+.set-count {
+  color: var(--muted);
+  font: 12px var(--font-mono);
+  flex: none;
+}
+
+/* Valeur affichée à droite d'une rangée (version, URL…) */
+.set-val {
+  color: var(--muted);
+  font-size: 12.5px;
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pastilles de couleur à choisir */
+.set-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.set-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  place-items: center;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.set-swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 4px var(--accent);
+}
+
+.set-swatch-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px 0 4px;
+  border-radius: 9px;
+  border: 1px dashed var(--border2);
+  color: var(--muted);
+  font: 12px var(--font-mono);
+  cursor: pointer;
+}
+
+.set-swatch-custom input {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.set-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+/* Pied de fenêtre : Annuler puis action, à droite */
+.set-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.set-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.set-note {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ─── Ingrédients ─────────────────────────────────────────── */
+
+.set-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.set-toolbar .searchbox {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-toolbar select.fl-input {
+  width: auto;
+  flex: none;
+  max-width: 46%;
+}
+
+@media (min-width: 700px) {
+  .set-toolbar select.fl-input {
+    width: 240px;
+  }
+}
+
+.set-catchips {
+  align-items: center;
+}
+
+.set-catchips .fl-chip b {
+  font: 500 11.5px var(--font-mono);
+  color: var(--muted);
+}
+
+.set-catchips .fl-chip[aria-pressed="true"] b {
+  color: inherit;
+}
+
+.set-meta {
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.set-ing-cat {
+  --c: var(--muted);
+}
+
+.set-ing-cat[data-cat="base"] {
+  --c: var(--accent);
+}
+
+.set-ing-cat[data-cat="fruit"] {
+  --c: var(--accent-2);
+}
+
+.set-ing-cat[data-cat="preparation"] {
+  --c: var(--pending);
+}
+
+.set-ing-zero {
+  color: var(--danger);
+}
+
+/* Case à cocher (mode sélection) */
+.set-check {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 2px solid var(--border2);
+  color: var(--accent-ink);
+}
+
+.set-check[data-on="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Classement rapide (vue « À classer ») */
+.set-quick {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.set-quick .fl-chip {
+  height: 30px;
+  padding: 0 10px;
+}
+
+@media (max-width: 699px) {
+  .set-item-wrap {
+    flex-wrap: wrap;
+  }
+  .set-quick {
+    order: 3;
+    width: 100%;
+    padding: 0 0 12px 60px;
+  }
+}
+
+.set-pick {
+  max-height: min(46vh, 360px);
+  overflow-y: auto;
+}
+
+.set-pick .fl-row {
+  min-height: 46px;
+  padding: 8px 14px;
+}
+
+.set-pick button.fl-row[aria-pressed="true"] {
+  background: var(--accent-dim);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.set-pick button.fl-row[aria-pressed="true"] .set-tx b {
+  color: var(--accent);
+}
+
+/* ─── Imports ─────────────────────────────────────────────── */
+
+.set-file {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--border2);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.set-file:hover,
+.set-file:focus-within {
+  border-color: var(--accent);
+}
+
+.set-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.set-code {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font: 12px/1.6 var(--font-mono);
+  color: var(--soft);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.set-code-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.set-card-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.set-card-h > svg {
+  color: var(--accent);
+  flex: none;
+}
+
+.set-result {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border2);
+  background: var(--bg);
+  font-size: 13.5px;
+}
+
+.set-result > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.set-result[data-ok="true"] > svg {
+  color: var(--accent-2);
+}
+
+.set-result[data-ok="false"] {
+  border-color: rgba(239, 125, 107, 0.4);
+}
+
+.set-result[data-ok="false"] > svg {
+  color: var(--danger);
+}
+
+.set-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.set-table th {
+  text-align: left;
+  padding: 0 12px 8px 0;
+  font: 500 10.5px var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.set-table td {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--soft);
+  vertical-align: top;
+}
+
+.set-table tr:last-child td {
+  border-bottom: none;
+}
+
+.set-table code,
+.set-rules code {
+  font: 12px var(--font-mono);
+  color: var(--accent);
+}
+
+.set-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--soft);
+}
+
+.set-rules b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ─── Nouveautés (journal des versions) ───────────────────── */
+
+.set-log {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.set-log h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.set-log h4 small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.set-log ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.set-log li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.set-log li svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+/* ─── Mise à jour du site ─────────────────────────────────── */
+
+.set-maint {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 7, 12, 0.94);
+  backdrop-filter: blur(6px);
+}
+
+.set-maint-box {
+  width: 100%;
+  max-width: 600px;
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--pop);
+  border: 1px solid var(--border2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.set-progress {
+  height: 6px;
+  border-radius: 6px;
+  background: var(--border2);
+  overflow: hidden;
+}
+
+.set-progress > div {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 600ms ease-out;
+}
+
+.set-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.set-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.set-step[data-reached="true"] {
+  color: var(--text);
+}
+
+.set-step[data-current="true"] {
+  font-weight: 600;
+}
+
+.set-step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid var(--border2);
+}
+
+.set-step[data-reached="true"] .set-step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.set-spin {
+  animation: set-spin 1s linear infinite;
+}
+
+@keyframes set-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.set-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: rgba(239, 125, 107, 0.08);
+  border: 1px solid rgba(239, 125, 107, 0.35);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.set-alert > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.set-details summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+  list-style: none;
+}
+
+.set-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.set-details summary:hover {
+  color: var(--text);
+}
+
+/* ─── État vide ───────────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 20px;
+  text-align: center;
+}
+
+.empty-state-ic {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.empty-state h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-state p {
+  max-width: 420px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* Téléphone : sous-titres sur deux lignes au lieu d'être coupés */
+@media (max-width: 699px) {
+  .set-tx small {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+
+.set-selbtns {
+  display: flex;
+  gap: 8px;
+}
+
+.set-selbtns .fl-btn {
+  flex: 1;
+  padding: 0 10px;
+}
+
+@media (max-width: 699px) {
+  .set-hide-phone {
+    display: none;
+  }
+}

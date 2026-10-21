@@ -1,70 +1,62 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { listShoppingLists } from "@/lib/shopping";
-import { Fab } from "@/components/Fab";
+import { prisma } from "@/lib/prisma";
 import { EmptyState } from "@/components/EmptyState";
+import { ShoppingListRow } from "@/components/ShoppingListMenus";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShoppingPage() {
-  const lists = await listShoppingLists();
+  const [lists, checkedCounts] = await Promise.all([
+    listShoppingLists(),
+    prisma.shoppingListItem.groupBy({
+      by: ["shoppingListId"],
+      where: { checked: true },
+      _count: { _all: true },
+    }),
+  ]);
+  const checkedBy = new Map(checkedCounts.map((c) => [c.shoppingListId, c._count._all]));
 
   return (
     <>
-      <div className="flex items-baseline justify-between mb-5">
-        <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
-          Listes de courses
-        </h1>
-        <span className="fl-label">
+      <div className="page-head">
+        <h1>Listes de courses</h1>
+        <Link href="/shopping/new" className="fl-btn fl-btn-primary desk-only">
+          <Plus size={16} /> Nouvelle liste
+        </Link>
+        <p className="sub">
           {lists.length} liste{lists.length > 1 ? "s" : ""}
-        </span>
+        </p>
       </div>
 
       {lists.length === 0 ? (
         <EmptyState
           title="Aucune liste"
-          description="Créez une liste pour agréger les ingrédients de vos recettes et préparer vos achats."
+          description="Crée une liste pour additionner les ingrédients de tes recettes et préparer tes achats."
           ctaHref="/shopping/new"
           ctaLabel="Créer une liste"
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lists.map((l) => {
-            const total = l._count.items;
-            const checked = 0; // non chargé dans la liste — affiché uniquement dans le détail
-            return (
-              <Link
-                key={l.id}
-                href={`/shopping/${l.id}`}
-                className="fl-card flex flex-col gap-3 hover:border-[color:var(--muted)] transition-colors"
-              >
-                <h3 className="fl-title-serif" style={{ fontSize: "1.15rem" }}>
-                  {l.name}
-                </h3>
-                {l.recipes.length > 0 && (
-                  <p className="text-[color:var(--muted)] text-xs line-clamp-2">
-                    {l.recipes.map((r) => r.recipe.name).join(", ")}
-                  </p>
-                )}
-                <div className="flex items-end justify-between mt-auto">
-                  <div>
-                    <span className="fl-label">Articles</span>
-                    <div className="fl-value-serif" style={{ fontSize: "1.55rem" }}>
-                      {total}
-                    </div>
-                  </div>
-                  {total > 0 && (
-                    <span className="fl-tag">
-                      {total} article{total > 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+        <div className="fl-list">
+          {lists.map((l) => (
+            <ShoppingListRow
+              key={l.id}
+              list={{
+                id: l.id,
+                name: l.name,
+                recipeNames: l.recipes.map((r) => r.recipe.name),
+                total: l._count.items,
+                checked: checkedBy.get(l.id) ?? 0,
+              }}
+            />
+          ))}
         </div>
       )}
 
-      <Fab href="/shopping/new" label="Créer une liste" />
+      <Link href="/shopping/new" className="fab" aria-label="Créer une liste">
+        <Plus size={24} />
+      </Link>
     </>
   );
 }

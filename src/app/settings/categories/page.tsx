@@ -1,34 +1,24 @@
 import Link from "next/link";
-import { listAllCategories } from "@/lib/recipes";
+import { ChevronLeft } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { CategoryManager } from "@/components/CategoryManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function CategoriesSettingsPage() {
-  const categories = await listAllCategories();
+  const categories = await prisma.category.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { recipes: true } } },
+  });
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div>
-        <Link
-          href="/settings"
-          className="fl-label hover:text-[color:var(--text)]"
-          style={{ fontSize: "0.75rem" }}
-        >
-          ← Paramètres
-        </Link>
-        <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
-          🏷️ Catégories
-        </h1>
-        <p className="fl-label mt-1">
-          {categories.length} catégorie{categories.length > 1 ? "s" : ""} ·
-          tags secondaires libres pour décrire la recette
-        </p>
-      </div>
-
-      <section className="fl-card flex flex-col gap-4">
-        <CategoryManager categories={categories} />
-      </section>
+    <div className="set-page">
+      <Link href="/settings" className="crumb">
+        <ChevronLeft size={14} /> Réglages
+      </Link>
+      <CategoryManager
+        categories={categories.map((c) => ({ id: c.id, name: c.name, color: c.color, count: c._count.recipes }))}
+      />
     </div>
   );
 }

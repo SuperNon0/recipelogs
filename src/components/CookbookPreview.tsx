@@ -1,350 +1,116 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Maximize2, RefreshCw } from "lucide-react";
+import { PdfPreview, usePdfFetch } from "./PdfPreview";
+import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
 import { type CookbookTheme } from "@/lib/pdf/theme";
 
-const ZOOM_PRESETS = [
-  { key: "S", label: "Petit", height: 420 },
-  { key: "M", label: "Moyen", height: 640 },
-  { key: "L", label: "Grand", height: 940 },
-  { key: "XL", label: "Plein écran", height: 0 },
-] as const;
-
-type ZoomKey = (typeof ZOOM_PRESETS)[number]["key"];
-
-/**
- * Aperçu PDF "fidèle" : la génération est lancée UNIQUEMENT quand l'utilisateur
- * clique sur le bouton « Mettre à jour l'aperçu ». Cela évite de saturer le
- * serveur en lançant Puppeteer à chaque frappe au clavier.
- *
- * Le bouton fonctionne sans devoir enregistrer la config : on POSTe la version
- * en cours sur l'API preview-pdf.
- */
-export function CookbookPreview({
-  cookbookId,
-  cookbookName,
-  description,
-  theme,
-  hasCover,
-  hasToc,
-  format,
-  footer,
-}: {
-  cookbookId: number;
-  cookbookName: string;
-  description?: string;
+export type CookbookPreviewPayload = {
+  name: string;
+  description: string;
   theme: CookbookTheme;
   hasCover: boolean;
   hasToc: boolean;
   format: string;
   footer: string;
-}) {
-  const [zoom, setZoom] = useState<ZoomKey>("M");
-  const [fullscreen, setFullscreen] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  /** Marque l'aperçu comme « périmé » dès qu'une option change après la dernière génération. */
-  const [stale, setStale] = useState(false);
+};
 
-  const prevUrlRef = useRef<string | null>(null);
-  const reqIdRef = useRef(0);
-  const generatedOnceRef = useRef(false);
+/**
+ * Aperçu fidèle du cahier (le vrai PDF, affiché avec pdf.js).
+ *
+ * La génération ne se lance qu'au clic sur « Mettre à jour l'aperçu » : un
+ * cahier complet est long à produire. On envoie les réglages en cours (pas
+ * besoin d'enregistrer avant). L'état est gardé par le formulaire pour que
+ * l'aperçu survive à l'ouverture / fermeture de la fenêtre sur téléphone.
+ */
+export function useCookbookPreview(cookbookId: number, payload: CookbookPreviewPayload) {
+  const pdf = usePdfFetch();
+  const key = JSON.stringify(payload);
+  const [lastKey, setLastKey] = useState<string | null>(null);
 
-  // Marque l'aperçu comme périmé à chaque modif (mais sans déclencher la génération).
+  const generate = () => {
+    setLastKey(key);
+    return pdf.load(`/api/cookbooks/${cookbookId}/preview-pdf`, payload);
+  };
+
+  return {
+    ...pdf,
+    generate,
+    /** Les réglages ont changé depuis la dernière génération. */
+    stale: lastKey !== null && lastKey !== key,
+    generated: lastKey !== null,
+  };
+}
+
+export type CookbookPreviewState = ReturnType<typeof useCookbookPreview>;
+
+export function CookbookPreview({ state, inModal }: { state: CookbookPreviewState; inModal?: boolean }) {
+  const [big, setBig] = useState(false);
+  const { data, loading, error, generate, stale, generated } = state;
+
+  // Première ouverture dans la fenêtre téléphone : génère tout de suite.
+  const autoRef = useRef(false);
   useEffect(() => {
-    if (generatedOnceRef.current) setStale(true);
-  }, [
-    cookbookName,
-    description,
-    format,
-    hasCover,
-    hasToc,
-    footer,
-    theme,
-  ]);
-
-  // Cleanup à la destruction
-  useEffect(() => {
-    return () => {
-      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-    };
-  }, []);
-
-  async function generatePreview() {
-    const myId = ++reqIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/cookbooks/${cookbookId}/preview-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: cookbookName,
-          description,
-          format,
-          hasCover,
-          hasToc,
-          footer,
-          theme,
-        }),
-      });
-      if (myId !== reqIdRef.current) return;
-      if (!res.ok) {
-        setError(`Erreur ${res.status}`);
-        setLoading(false);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-      prevUrlRef.current = url;
-      setPdfUrl(url);
-      setStale(false);
-      generatedOnceRef.current = true;
-      setLoading(false);
-    } catch (e) {
-      if (myId !== reqIdRef.current) return;
-      setError(e instanceof Error ? e.message : "Erreur réseau");
-      setLoading(false);
+    if (inModal && !generated && !autoRef.current) {
+      autoRef.current = true;
+      generate();
     }
-  }
-
-  const currentZoom = ZOOM_PRESETS.find((z) => z.key === zoom) ?? ZOOM_PRESETS[1];
-  const iframeSrc = pdfUrl ? `${pdfUrl}#toolbar=0&navpanes=0` : "";
-  const refreshLabel = !pdfUrl
-    ? "🔄 Générer l'aperçu PDF"
-    : stale
-      ? "🔄 Mettre à jour l'aperçu PDF"
-      : "🔄 Régénérer l'aperçu";
-
-  if (fullscreen) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(14, 15, 17, 0.96)",
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          padding: 12,
-          gap: 8,
-        }}
-      >
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="fl-label" style={{ color: "var(--text)" }}>
-            Aperçu PDF plein écran
-            {loading && (
-              <span style={{ color: "var(--muted)", marginLeft: 8 }}>
-                · génération…
-              </span>
-            )}
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={generatePreview}
-              disabled={loading}
-              className="fl-btn fl-btn-primary"
-              style={{ fontSize: "0.8rem" }}
-            >
-              {loading ? "…" : refreshLabel}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFullscreen(false)}
-              className="fl-btn fl-btn-secondary"
-              style={{ fontSize: "0.8rem" }}
-            >
-              ✕ Fermer
-            </button>
-          </div>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            position: "relative",
-            background: "#2a2a2a",
-            borderRadius: 8,
-            overflow: "hidden",
-          }}
-        >
-          {iframeSrc ? (
-            <iframe
-              title="Aperçu PDF (plein écran)"
-              src={iframeSrc}
-              style={{
-                width: "100%",
-                height: "100%",
-                border: 0,
-                display: "block",
-                background: "#2a2a2a",
-              }}
-            />
-          ) : (
-            <EmptyState />
-          )}
-          {loading && <LoadingOverlay />}
-          {error && !loading && <ErrorOverlay message={error} />}
-        </div>
-      </div>
-    );
-  }
+  }, [inModal, generated, generate]);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {!inModal && (
+          <span className="fl-label" style={{ display: "flex", alignItems: "center", marginRight: "auto" }}>
+            Aperçu du PDF
+            <Help title="Aperçu du PDF">
+              Le vrai PDF du cahier, généré avec les réglages affichés (même avant
+              d&apos;enregistrer). Comme un cahier complet prend quelques secondes à produire,
+              l&apos;aperçu ne se met à jour que quand tu cliques sur le bouton. Les premières pages
+              seulement sont affichées.
+            </Help>
+          </span>
+        )}
         <button
           type="button"
-          onClick={generatePreview}
+          onClick={generate}
           disabled={loading}
-          className={stale || !pdfUrl ? "fl-btn fl-btn-primary" : "fl-btn"}
-          style={{ fontSize: "0.78rem" }}
-          title="Génère un PDF d'aperçu fidèle (sans avoir à enregistrer)"
+          className={`fl-btn ${!generated || stale ? "fl-btn-primary" : "fl-btn-secondary"}`}
+          style={inModal ? { flex: 1, justifyContent: "center" } : undefined}
         >
-          {loading ? "Génération…" : refreshLabel}
+          <RefreshCw size={15} className={loading ? "animate-spin" : undefined} />
+          {loading ? "Génération…" : generated ? "Mettre à jour l'aperçu" : "Générer l'aperçu"}
         </button>
-        {stale && !loading && pdfUrl && (
-          <span
-            className="fl-label"
-            style={{ fontSize: "0.7rem", color: "var(--accent)" }}
-          >
-            ⚠️ Aperçu obsolète
-          </span>
+        {!inModal && data && (
+          <button type="button" className="fl-btn fl-btn-secondary fl-btn-icon" onClick={() => setBig(true)} aria-label="Agrandir l'aperçu" title="Agrandir">
+            <Maximize2 size={16} />
+          </button>
         )}
       </div>
+      {stale && !loading && (
+        <p style={{ color: "var(--accent)", fontSize: 12.5 }}>Réglages modifiés depuis l&apos;aperçu : mets-le à jour.</p>
+      )}
 
-      <div className="flex items-center gap-1 flex-wrap">
-        <span className="fl-label" style={{ fontSize: "0.7rem", marginRight: 4 }}>
-          Taille :
-        </span>
-        {ZOOM_PRESETS.map((p) => {
-          const selected = p.key === zoom;
-          if (p.key === "XL") {
-            return (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setFullscreen(true)}
-                className="fl-btn"
-                style={{ fontSize: "0.75rem", padding: "0.3rem 0.55rem" }}
-                title="Plein écran"
-              >
-                ⛶ {p.label}
-              </button>
-            );
-          }
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setZoom(p.key)}
-              style={{
-                padding: "0.3rem 0.55rem",
-                fontSize: "0.75rem",
-                fontWeight: selected ? 700 : 500,
-                background: selected ? "var(--accent)" : "transparent",
-                color: selected ? "var(--bg)" : "var(--text)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        className="rounded-md overflow-hidden border"
-        style={{
-          borderColor: "var(--border)",
-          background: "#2a2a2a",
-          position: "relative",
-          height: currentZoom.height,
-        }}
-      >
-        {iframeSrc ? (
-          <iframe
-            title="Aperçu PDF du cahier"
-            src={iframeSrc}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: 0,
-              display: "block",
-              background: "#2a2a2a",
-            }}
-          />
+      <div className="cb-preview-box">
+        {data || loading || error ? (
+          <PdfPreview data={data} loading={loading} error={error} maxPages={8} />
         ) : (
-          <EmptyState />
+          <div className="cb-preview-empty">
+            Clique sur « Générer l&apos;aperçu » pour voir le PDF du cahier tel qu&apos;il sera
+            téléchargé.
+          </div>
         )}
-        {loading && <LoadingOverlay />}
-        {error && !loading && <ErrorOverlay message={error} />}
       </div>
-    </div>
-  );
-}
 
-function EmptyState() {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#aaa",
-        fontSize: "0.85rem",
-        textAlign: "center",
-        padding: 16,
-      }}
-    >
-      Clique sur « Générer l&apos;aperçu PDF » pour voir le résultat fidèle.
-    </div>
-  );
-}
-
-function LoadingOverlay() {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#ccc",
-        fontSize: "0.85rem",
-        background: "rgba(0,0,0,0.35)",
-        pointerEvents: "none",
-      }}
-    >
-      ⏳ Génération de l&apos;aperçu PDF…
-    </div>
-  );
-}
-
-function ErrorOverlay({ message }: { message: string }) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--danger)",
-        fontSize: "0.85rem",
-        background: "rgba(0,0,0,0.4)",
-        textAlign: "center",
-        padding: 16,
-      }}
-    >
-      Aperçu indisponible : {message}
+      {big && data && (
+        <ModalOverlay wide title="Aperçu du cahier" onClose={() => setBig(false)}>
+          <div className="cb-preview-box" style={{ maxWidth: 760, width: "100%", margin: "0 auto" }}>
+            <PdfPreview data={data} loading={loading} error={error} maxPages={20} />
+          </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 }

@@ -1,14 +1,13 @@
 import { sanitizeRichText, looksLikeHtml } from "@/lib/sanitizeRichText";
 
 /**
- * Affiche le bloc d'étapes d'une recette.
- * Deux formats coexistent en base : l'ancien HTML (éditeur Tiptap) et le
- * texte brut actuel (1 étape par ligne). Les deux sont gérés ici, pour que
- * la fiche, les sous-recettes et toute autre vue affichent la même chose.
+ * Affiche le bloc d'étapes d'une recette, en étapes numérotées.
+ * Deux formats coexistent en base : l'ancien HTML (éditeur Tiptap, un
+ * paragraphe par étape) et le texte brut actuel (une étape par ligne).
  */
 export function StepsContent({
   content,
-  fontSize = "0.88rem",
+  fontSize = "14px",
 }: {
   content: string;
   fontSize?: string;
@@ -16,22 +15,26 @@ export function StepsContent({
   if (looksLikeHtml(content)) {
     return (
       <div
-        className="rte-content"
+        className="rte-content rte-steps"
         style={{ fontSize, lineHeight: 1.6 }}
         dangerouslySetInnerHTML={{ __html: sanitizeRichText(content) }}
       />
     );
   }
+  const steps = content
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    // « 1. », « 2) », « - » en début de ligne : la numérotation est ajoutée ici.
+    .map((l) => l.replace(/^(\d+\s*[.)-]|[-•*])\s+/, ""));
   return (
-    <pre
-      style={{
-        whiteSpace: "pre-wrap",
-        fontFamily: "var(--font-mono)",
-        fontSize,
-        lineHeight: 1.6,
-      }}
-    >
-      {content}
-    </pre>
+    <div style={{ fontSize }}>
+      {steps.map((s, i) => (
+        <div className="step-line" key={i}>
+          <b className="no">{i + 1}</b>
+          <span style={{ whiteSpace: "pre-wrap", minWidth: 0 }}>{s}</span>
+        </div>
+      ))}
+    </div>
   );
 }

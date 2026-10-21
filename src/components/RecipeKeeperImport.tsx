@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { CircleAlert, CircleCheck, Download, Upload } from "lucide-react";
 import {
   importRecipeKeeperCsv,
   importRecipeKeeperHtmlOrZip,
   type ImportResult,
 } from "@/app/actions/import";
+import { Help } from "@/components/ui/Help";
 
 type Mode = "html-zip" | "csv";
 
@@ -13,6 +15,7 @@ export function RecipeKeeperImport() {
   const [mode, setMode] = useState<Mode>("html-zip");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -36,121 +39,107 @@ export function RecipeKeeperImport() {
 
     if (res.ok && inputRef.current) {
       inputRef.current.value = "";
+      setFileName(null);
     }
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setResult(null);
+    setFileName(null);
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   const accept = mode === "csv" ? ".csv,text/csv" : ".zip,.html,.htm";
   const helpText =
     mode === "csv"
-      ? "Recipe Keeper → Exporter → CSV. Les recettes déjà présentes (même nom) sont ignorées."
-      : "Recipe Keeper → Sauvegarde → Recettes au format HTML. Tu obtiens un dossier ; zippe-le et uploade-le ici (ou un seul fichier .html si tu n'as pas le zip). Les images sont sauvegardées et associées aux recettes. Les recettes déjà présentes (même nom) sont ignorées.";
+      ? "Dans Recipe Keeper : Exporter, puis CSV."
+      : "Dans Recipe Keeper : Sauvegarde, puis Recettes au format HTML. Tu obtiens un dossier : compresse-le en .zip et choisis-le ici (ou un seul fichier .html si tu n'as pas le zip). Les photos sont récupérées et rattachées aux recettes.";
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Onglets de mode */}
-      <div
-        className="inline-flex rounded-md overflow-hidden border self-start"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setMode("html-zip");
-            setResult(null);
-            if (inputRef.current) inputRef.current.value = "";
-          }}
-          className="px-3 py-1.5 text-sm transition-colors"
-          style={{
-            background: mode === "html-zip" ? "var(--accent)" : "transparent",
-            color: mode === "html-zip" ? "var(--bg)" : "var(--text)",
-            fontWeight: mode === "html-zip" ? 600 : 400,
-            borderRight: "1px solid var(--border)",
-          }}
-        >
-          ZIP / HTML
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("csv");
-            setResult(null);
-            if (inputRef.current) inputRef.current.value = "";
-          }}
-          className="px-3 py-1.5 text-sm transition-colors"
-          style={{
-            background: mode === "csv" ? "var(--accent)" : "transparent",
-            color: mode === "csv" ? "var(--bg)" : "var(--text)",
-            fontWeight: mode === "csv" ? 600 : 400,
-          }}
-        >
-          CSV
-        </button>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <form onSubmit={handleSubmit} className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span className="fl-label" style={{ display: "flex", alignItems: "center" }}>
+            Format du fichier
+            <Help title="Quel format choisir ?">
+              Le format ZIP / HTML est le plus complet : il garde les photos des recettes. Le
+              format CSV ne contient que le texte (nom, ingrédients, étapes, notes).
+            </Help>
+          </span>
+          <div className="fl-seg" style={{ alignSelf: "flex-start" }}>
+            <button type="button" aria-pressed={mode === "html-zip"} onClick={() => switchMode("html-zip")}>
+              ZIP / HTML
+            </button>
+            <button type="button" aria-pressed={mode === "csv"} onClick={() => switchMode("csv")}>
+              CSV
+            </button>
+          </div>
+          <p className="set-note">{helpText}</p>
+        </div>
 
-      <p className="text-sm text-[color:var(--muted)]">{helpText}</p>
+        <label className="set-file">
+          <input
+            key={mode}
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            onChange={(e) => {
+              setResult(null);
+              setFileName(e.target.files?.[0]?.name ?? null);
+            }}
+          />
+          <span className="ic" style={{ width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", background: "var(--surface)", color: "var(--accent)", flex: "none" }}>
+            <Upload size={17} />
+          </span>
+          <span className="set-tx">
+            <b>
+              <span>{fileName ?? "Choisir un fichier"}</span>
+            </b>
+            <small>{mode === "csv" ? "Fichier .csv" : "Fichier .zip ou .html"}</small>
+          </span>
+        </label>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          key={mode}
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          className="fl-input"
-          style={{ fontSize: "0.875rem" }}
-        />
-        <div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="fl-btn fl-btn-primary"
-          >
+        <div className="set-foot">
+          <button type="submit" disabled={loading || !fileName} className="fl-btn fl-btn-primary">
+            <Download size={15} />
             {loading ? "Importation…" : "Importer"}
           </button>
         </div>
       </form>
 
       {result && (
-        <div
-          className="fl-card flex flex-col gap-2"
-          style={{
-            borderColor: result.ok ? "var(--accent-2)" : "var(--danger)",
-          }}
-        >
-          {result.ok ? (
-            <>
-              <p
-                className="text-sm font-medium"
-                style={{ color: "var(--accent-2)" }}
-              >
-                ✓ Import terminé
-              </p>
-              <p className="text-sm">
-                {result.imported} recette{result.imported > 1 ? "s" : ""}{" "}
-                importée{result.imported > 1 ? "s" : ""}
-                {result.skipped > 0 &&
-                  ` · ${result.skipped} ignorée${result.skipped > 1 ? "s" : ""} (déjà existante${result.skipped > 1 ? "s" : ""})`}
-                {!!result.photosRestored &&
-                  ` · ${result.photosRestored} photo${result.photosRestored > 1 ? "s" : ""} rattachée${result.photosRestored > 1 ? "s" : ""}`}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm" style={{ color: "var(--danger)" }}>
-              {result.errors[0] ?? "Erreur inconnue"}
-            </p>
-          )}
-          {result.errors.length > 0 && result.ok && (
-            <details className="text-xs text-[color:var(--muted)]">
-              <summary className="cursor-pointer">
-                {result.errors.length} erreur
-                {result.errors.length > 1 ? "s" : ""} individuelles
-              </summary>
-              <ul className="mt-2 flex flex-col gap-1 pl-3">
-                {result.errors.map((e, i) => (
-                  <li key={i}>· {e}</li>
-                ))}
-              </ul>
-            </details>
-          )}
+        <div className="set-result" data-ok={result.ok ? "true" : "false"}>
+          {result.ok ? <CircleCheck size={18} /> : <CircleAlert size={18} />}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+            {result.ok ? (
+              <>
+                <b style={{ fontWeight: 600 }}>Import terminé</b>
+                <span style={{ color: "var(--soft)" }}>
+                  {result.imported} recette{result.imported > 1 ? "s" : ""}{" "}
+                  importée{result.imported > 1 ? "s" : ""}
+                  {result.skipped > 0 &&
+                    ` · ${result.skipped} ignorée${result.skipped > 1 ? "s" : ""} (déjà existante${result.skipped > 1 ? "s" : ""})`}
+                  {!!result.photosRestored &&
+                    ` · ${result.photosRestored} photo${result.photosRestored > 1 ? "s" : ""} rattachée${result.photosRestored > 1 ? "s" : ""}`}
+                </span>
+              </>
+            ) : (
+              <span style={{ color: "var(--danger)" }}>{result.errors[0] ?? "Erreur inconnue"}</span>
+            )}
+            {result.errors.length > 0 && result.ok && (
+              <details className="set-details" style={{ marginTop: 4 }}>
+                <summary>
+                  {result.errors.length} erreur{result.errors.length > 1 ? "s" : ""} sur des recettes isolées
+                </summary>
+                <ul style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3, fontSize: 12.5, color: "var(--muted)" }}>
+                  {result.errors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         </div>
       )}
     </div>

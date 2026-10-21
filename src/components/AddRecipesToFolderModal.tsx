@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { FolderInput, Plus, Search, X } from "lucide-react";
 import { assignRecipesToFolder } from "@/app/actions/settings";
+import { ModalOverlay } from "./ModalOverlay";
 
 type RecipeOption = {
   id: number;
@@ -23,7 +26,7 @@ const DEBOUNCE_MS = 200;
  *  - Toggle « Que les recettes sans dossier » activé par défaut (95% des cas)
  *  - Autocomplétion qui filtre via l'API à la frappe (debounced 200ms)
  *  - Multi-sélection avec chips × en haut
- *  - Bouton primaire « Ranger les N recette(s) → 📁 [nom] »
+ *  - Bouton primaire « Ranger N recette(s) »
  */
 export function AddRecipesToFolderModal({
   folder,
@@ -43,20 +46,12 @@ export function AddRecipesToFolderModal({
   const [error, setError] = useState<string | null>(null);
   const reqIdRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Focus auto à l'ouverture
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  // Fermeture sur Escape
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   // Fetch des recettes (debounced)
   useEffect(() => {
@@ -108,6 +103,7 @@ export function AddRecipesToFolderModal({
         Array.from(selected.keys()),
       );
       if (r.ok) {
+        router.refresh();
         onClose();
       } else {
         setError(r.error);
@@ -119,192 +115,103 @@ export function AddRecipesToFolderModal({
   const visibleOptions = options.filter((o) => !selected.has(o.id));
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+    <ModalOverlay
+      onClose={onClose}
+      title={
+        <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <FolderInput size={18} style={{ color: folder.color, flex: "none" }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Ranger dans « {folder.name} »</span>
+        </span>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="fl-card"
-        style={{
-          width: "100%",
-          maxWidth: 560,
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          padding: 20,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-          maxHeight: "85vh",
-        }}
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="fl-title-serif" style={{ fontSize: "1.1rem" }}>
-            Ajouter des recettes à{" "}
-            <span style={{ color: folder.color }}>📁 {folder.name}</span>
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="fl-label hover:text-[color:var(--text)]"
-            style={{ fontSize: "0.8rem" }}
-          >
-            ✕
-          </button>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={onlyNoFolder}
+          className="fl-switch"
+          onClick={() => setOnlyNoFolder(!onlyNoFolder)}
+          aria-label="Seulement les recettes sans dossier"
+        />
+        <span style={{ fontSize: 13.5, color: "var(--soft)" }}>Seulement les recettes sans dossier</span>
+      </div>
 
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={onlyNoFolder}
-            onChange={(e) => setOnlyNoFolder(e.target.checked)}
-            className="accent-[color:var(--accent)]"
-          />
-          <span className="fl-label" style={{ color: "var(--text)" }}>
-            N&apos;afficher que les recettes sans dossier
-          </span>
-        </label>
-
+      <label className="searchbox">
+        <Search size={16} />
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher une recette…"
-          className="fl-input"
         />
+      </label>
 
-        {/* Chips des sélectionnées */}
-        {selected.size > 0 && (
-          <div
-            className="flex flex-wrap gap-1.5"
-            style={{
-              padding: "8px 10px",
-              background: "var(--surface)",
-              borderRadius: 6,
-              border: "1px dashed var(--border)",
-            }}
-          >
-            {Array.from(selected.values()).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => toggleSelect(opt)}
-                className="fl-tag"
-                style={{
-                  background: `${folder.color}33`,
-                  color: folder.color,
-                  borderColor: `${folder.color}88`,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-                title="Retirer"
-              >
-                {opt.name}
-                <span style={{ opacity: 0.7 }}>×</span>
-              </button>
-            ))}
+      {selected.size > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {Array.from(selected.values()).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => toggleSelect(opt)}
+              className="fl-chip"
+              aria-pressed="true"
+              title="Retirer de la sélection"
+            >
+              {opt.name}
+              <X size={13} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="fl-scroll" style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)", maxHeight: 300, overflowY: "auto" }}>
+        {loading ? (
+          <div style={{ padding: 12, color: "var(--muted)", fontSize: 13 }}>Chargement…</div>
+        ) : visibleOptions.length === 0 ? (
+          <div style={{ padding: 12, color: "var(--muted)", fontSize: 13 }}>
+            {query.trim()
+              ? "Aucune recette ne correspond."
+              : onlyNoFolder
+                ? "Toutes tes recettes sont déjà rangées dans un dossier."
+                : "Aucune autre recette à ranger ici."}
           </div>
-        )}
-
-        {/* Liste des recettes */}
-        <div
-          className="flex flex-col rounded-md"
-          style={{
-            border: "1px solid var(--border)",
-            maxHeight: 320,
-            overflowY: "auto",
-          }}
-        >
-          {loading ? (
-            <div
-              className="px-3 py-3 text-sm"
-              style={{ color: "var(--muted)" }}
+        ) : (
+          visibleOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => toggleSelect(opt)}
+              className="pdf-theme-opt"
+              style={{ margin: 0, borderRadius: 0, borderBottom: "1px solid var(--border)" }}
             >
-              Chargement…
-            </div>
-          ) : visibleOptions.length === 0 ? (
-            <div
-              className="px-3 py-3 text-sm"
-              style={{ color: "var(--muted)" }}
-            >
-              {query.trim()
-                ? "Aucune recette ne correspond."
-                : onlyNoFolder
-                  ? "Toutes tes recettes sont déjà rangées dans un dossier."
-                  : "Aucune autre recette à ranger ici."}
-            </div>
-          ) : (
-            visibleOptions.map((opt, idx) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => toggleSelect(opt)}
-                className="px-3 py-2 text-sm text-left transition-colors hover:bg-[color:var(--surface)] flex items-center justify-between gap-2"
-                style={{
-                  borderTop: idx === 0 ? "none" : "1px solid var(--border)",
-                }}
-              >
-                <span style={{ color: "var(--text)" }}>{opt.name}</span>
-                {opt.folder && (
-                  <span
-                    className="fl-tag"
-                    style={{
-                      background: `${opt.folder.color}1f`,
-                      color: opt.folder.color,
-                      borderColor: `${opt.folder.color}55`,
-                      fontSize: "0.55rem",
-                    }}
-                  >
-                    📁 {opt.folder.name}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-
-        {error && (
-          <p className="text-sm" style={{ color: "var(--danger)" }}>
-            {error}
-          </p>
+              <Plus size={15} style={{ color: "var(--muted)", flex: "none" }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.name}</span>
+              {opt.folder && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)", flex: "none" }}>
+                  <span className="dot" style={{ background: opt.folder.color }} />
+                  {opt.folder.name}
+                </span>
+              )}
+            </button>
+          ))
         )}
-
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="fl-btn"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={pending || selected.size === 0}
-            className="fl-btn fl-btn-primary"
-          >
-            {pending
-              ? "Rangement…"
-              : selected.size === 0
-                ? "Choisis au moins une recette"
-                : `Ranger ${selected.size} recette${selected.size > 1 ? "s" : ""} → 📁`}
-          </button>
-        </div>
       </div>
-    </div>
+
+      {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onClose} disabled={pending} className="fl-btn fl-btn-secondary">
+          Annuler
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={pending || selected.size === 0} className="fl-btn fl-btn-primary">
+          {pending
+            ? "Rangement…"
+            : selected.size === 0
+              ? "Choisis des recettes"
+              : `Ranger ${selected.size} recette${selected.size > 1 ? "s" : ""}`}
+        </button>
+      </div>
+    </ModalOverlay>
   );
 }
