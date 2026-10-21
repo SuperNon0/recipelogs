@@ -156,13 +156,12 @@ export function RecipeForm({
   const setUnit = (idx: number, unit: IngredientUnit) =>
     updateRow(idx, unit === "QS" ? { unit, quantity: "", quantityMax: "", range: false } : { unit });
 
-  const toggleRange = (idx: number, row: IngredientRow) =>
-    updateRow(
-      idx,
-      row.range
-        ? { range: false, quantityMax: "" }
-        : { range: true, quantityMax: row.quantity, unit: row.unit === "QS" ? "g" : row.unit },
-    );
+  const toggleRange = (idx: number, row: IngredientRow) => {
+    if (row.range) return updateRow(idx, { range: false, quantityMax: "" });
+    updateRow(idx, { range: true, quantityMax: "", unit: row.unit === "QS" ? "g" : row.unit });
+    // Place le curseur dans la nouvelle case « max ».
+    setTimeout(() => rowsRef.current?.querySelector<HTMLInputElement>(`[data-row="${idx}"] input[aria-label="Quantité max"]`)?.focus(), 50);
+  };
 
   const importFreeText = (append: boolean) => {
     const parsed = parseIngredientsText(freeText);

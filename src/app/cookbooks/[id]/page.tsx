@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft, Download } from "lucide-react";
 import { getCookbookDetail } from "@/lib/cookbooks";
-import {
-  CookbookEntriesTable,
-  type Entry,
-} from "@/components/CookbookEntriesTable";
+import { listPdfThemes } from "@/lib/pdfThemes";
+import { prisma } from "@/lib/prisma";
+import { CookbookEntriesTable, type Entry } from "@/components/CookbookEntriesTable";
 import { CookbookConfigForm } from "@/components/CookbookConfigForm";
 import { CookbookTabs } from "@/components/CookbookTabs";
-import { DeleteCookbookButton } from "@/components/DeleteCookbookButton";
+import { CookbookMoreButton } from "@/components/CookbookMenu";
 import { ShareButton } from "@/components/ShareButton";
 import { AddCookbookToShoppingListButton } from "@/components/AddCookbookToShoppingListButton";
 import { getActiveToken } from "@/lib/share";
 import { SHARE_ENABLED } from "@/lib/features";
-import { parseTheme } from "@/lib/pdf/theme";
+import { allPdfFontsHref, parseTheme } from "@/lib/pdf/theme";
 
 export const dynamic = "force-dynamic";
 
@@ -25,24 +25,37 @@ export default async function CookbookDetailPage({
   const cookbookId = Number(id);
   if (isNaN(cookbookId)) notFound();
 
-  const [cookbook, shareToken] = await Promise.all([
+  const [cookbook, shareToken, themes] = await Promise.all([
     getCookbookDetail(cookbookId),
     SHARE_ENABLED ? getActiveToken("cookbook", cookbookId) : null,
+    listPdfThemes(),
   ]);
 
   if (!cookbook) notFound();
 
+  // Photos des recettes (vignettes du tableau).
+  const photos = new Map(
+    (
+      await prisma.recipe.findMany({
+        where: { id: { in: cookbook.entries.map((e) => e.recipe.id) } },
+        select: { id: true, photoPath: true },
+      })
+    ).map((r) => [r.id, r.photoPath]),
+  );
+
   const recipeCount = cookbook.entries.length;
 
-  // Fusion des recettes et chapitres dans une liste ordonnée par position
+  // Recettes et chapitres partagent le même ordre (position).
   const entries: Entry[] = [
-    ...cookbook.entries.map(
-      (e): Entry => ({
+    ...cookbook.entries.map((e): Entry => {
+      const snap = e.snapshotData as { totalMassG?: number } | null;
+      return {
         type: "recipe",
         id: e.id,
         position: e.position,
         recipeId: e.recipe.id,
         recipeName: e.recipe.name,
+        photoPath: photos.get(e.recipe.id) ?? null,
         categories: e.recipe.categories.map((rc) => ({
           name: rc.category.name,
           color: rc.category.color,
@@ -51,8 +64,9 @@ export default async function CookbookDetailPage({
         subrecipeMode: e.subrecipeMode as "single" | "separate",
         sectionTitle: e.sectionTitle ?? null,
         snapshotDate: e.snapshotDate,
-      }),
-    ),
+        snapshotMassG: e.linkMode === "snapshot" && typeof snap?.totalMassG === "number" ? snap.totalMassG : null,
+      };
+    }),
     ...cookbook.chapters.map(
       (c): Entry => ({
         type: "chapter",
@@ -64,81 +78,38 @@ export default async function CookbookDetailPage({
     ),
   ].sort((a, b) => a.position - b.position);
 
+  const fonts = allPdfFontsHref();
+  const chapterCount = cookbook.chapters.length;
+
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <div>
-          <Link
-            href="/cookbooks"
-            className="fl-label hover:text-[color:var(--text)]"
-          >
-            ← Cahiers
-          </Link>
-          <h1 className="fl-title-serif mt-1" style={{ fontSize: "1.6rem" }}>
-            {cookbook.name}
-          </h1>
-          {cookbook.description && (
-            <p className="text-[color:var(--muted)] text-sm mt-1">
-              {cookbook.description}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-          <AddCookbookToShoppingListButton
-            cookbookId={cookbookId}
-            cookbookName={cookbook.name}
-            recipeCount={recipeCount}
-          />
-          {SHARE_ENABLED && (
-            <ShareButton
-              entityType="cookbook"
-              entityId={cookbookId}
-              existingToken={shareToken?.token ?? null}
-            />
-          )}
-          <a
-            href={`/cookbooks/${cookbookId}/pdf`}
-            className="fl-btn fl-btn-primary"
-            style={{ fontSize: "0.8rem" }}
-          >
-            ⬇ Télécharger PDF
-          </a>
-        </div>
+    <div>
+      {fonts && <link rel="stylesheet" href={fonts} />}
+      <Link href="/cookbooks" className="crumb">
+        <ChevronLeft size={14} /> Cahiers
+      </Link>
+      <div className="page-head">
+        <h1 style={{ minWidth: 180 }}>{cookbook.name}</h1>
+        <span className="desk-only">
+          <AddCookbookToShoppingListButton cookbookId={cookbookId} cookbookName={cookbook.name} recipeCount={recipeCount} />
+        </span>
+        {SHARE_ENABLED && (
+          <ShareButton entityType="cookbook" entityId={cookbookId} existingToken={shareToken?.token ?? null} />
+        )}
+        <a href={`/cookbooks/${cookbookId}/pdf`} className="fl-btn fl-btn-primary">
+          <Download size={16} /> <span className="desk-only">Télécharger le PDF</span>
+          <span className="mob-only">PDF</span>
+        </a>
+        <CookbookMoreButton id={cookbookId} name={cookbook.name} recipeCount={recipeCount} />
+        <p className="sub">
+          {recipeCount} recette{recipeCount > 1 ? "s" : ""}
+          {chapterCount > 0 ? ` · ${chapterCount} chapitre${chapterCount > 1 ? "s" : ""}` : ""} · {cookbook.format}
+          {cookbook.description ? ` · ${cookbook.description}` : ""}
+        </p>
       </div>
 
-      {/* 2 onglets : Recettes / Apparence */}
       <CookbookTabs
-        recipes={
-          <div className="flex flex-col gap-6">
-            <CookbookEntriesTable
-              cookbookId={cookbookId}
-              initial={entries}
-            />
-
-            <section>
-              <h2
-                className="fl-label mb-3"
-                style={{ fontSize: "0.9rem", color: "var(--danger)" }}
-              >
-                Zone dangereuse
-              </h2>
-              <div
-                className="fl-card"
-                style={{ borderColor: "var(--danger-muted, #3a1a1a)" }}
-              >
-                <p className="text-sm text-[color:var(--muted)] mb-3">
-                  La suppression du cahier est irréversible. Les recettes ne sont
-                  pas supprimées.
-                </p>
-                <DeleteCookbookButton
-                  cookbookId={cookbookId}
-                  cookbookName={cookbook.name}
-                />
-              </div>
-            </section>
-          </div>
-        }
+        recipeCount={recipeCount}
+        recipes={<CookbookEntriesTable cookbookId={cookbookId} initial={entries} />}
         apparence={
           <CookbookConfigForm
             cookbookId={cookbookId}
@@ -152,6 +123,14 @@ export default async function CookbookDetailPage({
               footer: cookbook.footer ?? "",
             }}
             defaultTheme={parseTheme(cookbook.coverConfig)}
+            themes={themes.map((t) => ({
+              id: t.id,
+              name: t.name,
+              description: t.description,
+              format: t.format,
+              isDefault: t.isDefault,
+              config: t.config,
+            }))}
           />
         }
       />

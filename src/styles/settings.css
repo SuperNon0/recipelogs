@@ -46,7 +46,7 @@
 }
 
 /* Rangée cliquable en entier (lien ou bouton) */
-.set-row {
+.fl-row.set-row {
   width: 100%;
   background: none;
   border-left: none;
@@ -62,7 +62,7 @@ button.set-row:first-child {
 }
 
 /* Rangée avec menu : zone cliquable + bouton « ⋯ » */
-.set-item {
+.fl-row.set-item {
   gap: 6px;
   padding: 0 10px 0 0;
   user-select: none;

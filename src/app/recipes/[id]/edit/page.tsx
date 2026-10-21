@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { RecipeForm } from "@/components/RecipeForm";
 import { updateRecipe } from "@/app/actions/recipes";
@@ -28,17 +29,12 @@ export default async function EditRecipePage({
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-baseline justify-between mb-5">
-        <h1 className="fl-title-serif" style={{ fontSize: "1.6rem" }}>
-          Éditer la recette
-        </h1>
-        <Link
-          href={`/recipes/${recipeId}`}
-          className="fl-label hover:text-[color:var(--text)]"
-        >
-          ← Retour
-        </Link>
+    <div>
+      <Link href={`/recipes/${recipeId}`} className="crumb">
+        <ChevronLeft size={14} /> {recipe.name}
+      </Link>
+      <div className="page-head">
+        <h1>Modifier la recette</h1>
       </div>
       <RecipeForm
         action={action}
@@ -59,6 +55,7 @@ export default async function EditRecipePage({
           ingredients: recipe.ingredients.map((i) => ({
             name: i.name ?? i.ingredientBase?.name ?? "",
             quantityG: Number(i.quantityG),
+            quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
             unit: i.unit ?? "g",
           })),
         }}

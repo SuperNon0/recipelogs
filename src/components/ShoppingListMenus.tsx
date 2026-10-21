@@ -27,7 +27,6 @@ export function ShoppingListRow({ list }: { list: ShoppingListRowData }) {
   const spec = (): MenuSpec => ({
     title: list.name,
     icon: ShoppingBasket,
-    quick: [open, pdf],
     items: [open, pdf, { separator: true }, del],
   });
   const done = list.total > 0 && list.checked === list.total;

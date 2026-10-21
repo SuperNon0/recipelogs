@@ -18,7 +18,7 @@ type Editing =
 /**
  * Liste de dossiers ou de catégories : pastille de couleur, nombre de
  * recettes, menu « ⋯ » / clic droit (ouvrir, renommer, couleur, supprimer…).
- * Le bouton « Nouveau » est rendu par `renderCreate` dans l'en-tête de page.
+ * Le bouton « Nouveau » est passé à `head`, qui rend l'en-tête de page.
  */
 export function ColoredItemList({
   items,

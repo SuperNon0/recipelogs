@@ -342,7 +342,7 @@
   color: var(--accent);
 }
 
-.sh-coef {
+.fl-tag.sh-coef {
   cursor: pointer;
   height: 26px;
   color: var(--accent);

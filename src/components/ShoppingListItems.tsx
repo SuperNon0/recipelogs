@@ -148,6 +148,7 @@ export function ShoppingListItems({
                 max), on garde le maximum pour acheter assez.
               </Help>
               <span style={{ flex: 1 }} />
+              <span className="sh-muted" style={{ fontSize: 12 }}>Unités</span>
               <Help
                 title="Unités"
                 example="2 pièces d'œuf et 100 g d'œuf restent sur deux lignes séparées."
