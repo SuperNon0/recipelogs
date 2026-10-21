@@ -62,7 +62,6 @@ export const STOP = {
   onTouchStart: stop,
   onTouchEnd: stop,
   onMouseDown: stop,
-  onKeyDown: stop,
 };
 
 // ─── Hook générique ──────────────────────────────────────────────────────────

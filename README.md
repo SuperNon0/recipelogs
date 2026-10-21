@@ -4,7 +4,7 @@
 
 Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les manques de Recipe Keeper : précision au gramme, multiplication (3 modes), sous-recettes et cahiers PDF.
 
-**Version actuelle : V1.9** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : V2.0** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la seule documentation du projet**. Il remplace l'ancien cahier des charges (`CDC.md`), le document de transmission (`HANDOFF.md`) et les guides `INSTALL.md` / `DEPLOYMENT.md`.
 
@@ -12,22 +12,70 @@ Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les 
 
 ## Sommaire
 
-1. [Mises à jour effectuées](#1--mises-à-jour-effectuées)
-2. [Mises à jour proposées](#2--mises-à-jour-proposées)
-3. [Problèmes connus restants](#3--problèmes-connus-restants)
-4. [Fonctionnalités](#4--fonctionnalités)
-5. [Règles de calcul](#5--règles-de-calcul)
-6. [Architecture technique](#6--architecture-technique)
-7. [Modèle de données](#7--modèle-de-données)
-8. [Design system](#8--design-system)
-9. [Installation (développement)](#9--installation-développement)
-10. [Production (Proxmox LXC)](#10--production-proxmox-lxc)
-11. [Historique des versions](#11--historique-des-versions)
-12. [Conventions](#12--conventions)
+1. [Mises à jour effectuées](#1-mises-à-jour-effectuées)
+2. [Mises à jour proposées](#2-mises-à-jour-proposées)
+3. [Problèmes connus restants](#3-problèmes-connus-restants)
+4. [Fonctionnalités](#4-fonctionnalités)
+5. [Règles de calcul](#5-règles-de-calcul)
+6. [Architecture technique](#6-architecture-technique)
+7. [Modèle de données](#7-modèle-de-données)
+8. [Design system](#8-design-system)
+9. [Installation (développement)](#9-installation-développement)
+10. [Production (Proxmox LXC)](#10-production-proxmox-lxc)
+11. [Historique des versions](#11-historique-des-versions)
+12. [Conventions](#12-conventions)
 
 ---
 
-## 1. 🆕 Mises à jour effectuées
+## 1. Mises à jour effectuées
+
+### V2.0 (21 octobre 2026) : nouveau design et thèmes PDF personnalisables
+
+**Nouveau design sur tout le site** (sombre, « Encre et ambre »)
+- Plus aucun emoji : des icônes partout.
+- **Ordinateur** : menu à gauche (recettes, favoris, cahiers, courses, ingrédients, dossiers avec leur nombre de recettes, thèmes PDF, réglages).
+- **Téléphone** : barre d'onglets en bas, bouton « + » flottant, fenêtres qui remontent du bas.
+- **Installable comme une application** (PWA) : sur téléphone, « Ajouter à l'écran d'accueil » ; sur ordinateur, l'icône d'installation dans la barre d'adresse de Chrome / Edge.
+- **Moins de boutons** : les actions d'une recette, d'un dossier, d'un cahier, d'une liste ou d'un thème sont dans un **menu** qui s'ouvre au **clic droit**, avec le **bouton ⋯**, ou par un **appui long** sur téléphone (avec de gros boutons d'actions rapides).
+- **Bulles d'aide « ? »** à côté de chaque information : ce que c'est, comment c'est calculé (avec les vrais chiffres de la recette) et un exemple.
+- **Recherche globale Ctrl K** (bouton loupe sur téléphone) : recettes, dossiers, ingrédients, cahiers, listes et actions rapides.
+
+**Fiche recette**
+- Onglets **Recette / Préparation / Notes et essais**.
+- Trois cartes : **masse totale** (sous-recettes comprises, avec le détail), **multiplicateur** (coefficient, masse ou ingrédient pivot, + / −, entiers), **base ×1**.
+- Tableau des ingrédients avec **% de la masse** et les **sous-recettes dépliables**. Chaque sous-recette a son menu : ouvrir la recette d'origine, suivre le multiplicateur ou **garder sa quantité** (verrouillée), régler la quantité, **monter / descendre**, retirer.
+- « Utilisée comme sous-recette dans… » : les recettes qui contiennent celle-ci.
+- Étapes affichées en étapes numérotées.
+
+**Thèmes PDF** (nouvelle page Thèmes PDF)
+- Les **7 thèmes fournis** sont prêts à l'emploi et **modifiables** ; « Revenir à l'original » les remet comme au départ.
+- **Créer, dupliquer, renommer, supprimer, réordonner** ses propres thèmes ; choisir le thème **par défaut**.
+- **Éditeur complet avec aperçu en direct** (le vrai PDF, régénéré pendant la modification, sur la recette de son choix) : modèle, couleurs, polices, taille, papier, décor, informations imprimées, couverture des cahiers.
+- **Nouvelles dispositions** : ingrédients **à gauche, à droite ou au-dessus**, largeur de la colonne, **alignement du titre**, titre en majuscules, style des intertitres, **espacement** (serré / normal / aéré), **photo en tête** pour tous les modèles.
+- **Télécharger le PDF d'une recette** : la liste des thèmes à gauche, l'**aperçu** de la recette à droite, puis Télécharger. Sur téléphone : la liste, puis l'aperçu en plein écran.
+- **Cahiers** : un clic applique un thème enregistré au cahier ; aperçu lisible aussi sur téléphone.
+- L'ancien réglage « PDF d'une recette » devient automatiquement le thème **« Mon style »** (thème par défaut).
+
+**Pages refaites** : accueil (tuiles des dossiers, filtres, tableau des recettes, sélection multiple), formulaire de recette (sections, masse en direct, menu par ingrédient, création de catégorie à la volée), cahiers, listes de courses (grosses cases à cocher, articles cochés regroupés en bas, ajout rapide), réglages et ingrédients.
+
+**Recettes importées réparées automatiquement**
+- Les quantités importées sur une ligne à part (« Abricots frais » 0 g puis « 800g ») sont recollées au bon ingrédient.
+- La ligne de total recopiée comme dernier ingrédient (« 500g ») est retirée : elle doublait la masse.
+- Les lignes à 0 g (titres de section comme « Levain ») ne vont plus dans les listes de courses.
+- La réparation se fait **toute seule au premier démarrage** après la mise à jour, et les prochains imports Recipe Keeper sont corrigés directement.
+
+**Bugs corrigés**
+| # | Avant | Maintenant |
+|---|---|---|
+| 1 | Ajouter une sous-recette en mode « ingrédient pivot » échouait toujours. | Le choix de l'ingrédient pivot est demandé. |
+| 2 | Dupliquer une recette perdait ses sous-recettes. | Elles sont copiées avec leurs réglages. |
+| 3 | Modifier une recette faisait disparaître ses fourchettes (« 72–84 g »). | Conservées. |
+| 4 | La saisie en lot mettait tout en grammes (« 3 oeufs » = 3 g, « 250 ml lait » = 0,25 g). | Unités et fourchettes reconnues conservées. |
+| 5 | « Ranger des recettes ici » ignorait le texte recherché. | Recherche prise en compte. |
+| 6 | Cahier : numéro de ligne identique partout, masse des recettes liées absente. | Corrigé. |
+| 7 | L'option « numéros de page » du PDF n'avait aucun effet. | Respectée (cahiers et recettes de plusieurs pages). |
+
+**Après la mise à jour** : rien à faire. La table des thèmes est créée par la migration, les 7 thèmes et « Mon style » apparaissent à la première ouverture, et la réparation des ingrédients se fait au démarrage.
 
 ### V1.9 (20 octobre 2026) : PDF plus rapides et plus beaux, mise à jour du site fiabilisée
 
@@ -115,7 +163,7 @@ Nettoyage : `ModalOverlay` dans son propre fichier, type `ActionResult` commun, 
 | 14 | **Renommer une catégorie ou un dossier** avec un nom déjà pris : page d'erreur. | Message « existe déjà ». |
 
 **Sécurité et serveur**
-- **Partage public désactivé** : le site est entièrement derrière Cloudflare, donc les liens de partage ne fonctionnaient pas pour un tiers. Le bouton « Partager » est masqué et `/share/...` répond « introuvable ». Le code est conservé pour plus tard (voir [Mises à jour proposées](#2--mises-à-jour-proposées)).
+- **Partage public désactivé** : le site est entièrement derrière Cloudflare, donc les liens de partage ne fonctionnaient pas pour un tiers. Le bouton « Partager » est masqué et `/share/...` répond « introuvable ». Le code est conservé pour plus tard (voir [Mises à jour proposées](#2-mises-à-jour-proposées)).
 - **Protection de `/share`** : même quand le partage sera réactivé, aucune action de modification ne pourra être lancée depuis cette adresse.
 - **PDF un par un** : plusieurs PDF demandés en même temps lançaient plusieurs Chromium et pouvaient faire planter le serveur (limité à 800 Mo). Ils sont maintenant générés l'un après l'autre.
 - **Sauvegarde** : `backup.sh` sauvegarde maintenant aussi les photos.
@@ -137,11 +185,11 @@ Nettoyage : `ModalOverlay` dans son propre fichier, type `ActionResult` commun, 
 
 ---
 
-## 2. 💡 Mises à jour proposées
+## 2. Mises à jour proposées
 
 Classées par intérêt. Chaque idée indique les options possibles.
 
-### 🔗 Partage qui fonctionne vraiment
+### Partage qui fonctionne vraiment
 Aujourd'hui tout le site est protégé par Cloudflare, donc un lien partagé est bloqué. Options :
 - **A. Bypass Cloudflare sur `/share/*`** (recommandé, le plus simple) : une règle Cloudflare Access « Bypass » limitée à ce chemin. Ensuite on passe `SHARE_ENABLED = true` dans `src/lib/features.ts`. La protection côté appli est déjà en place.
 - **B. Sous-domaine public dédié** (`partage.super-nono.cc`) qui ne sert que `/share/*` : plus cloisonné, un peu plus de configuration.
@@ -149,30 +197,30 @@ Aujourd'hui tout le site est protégé par Cloudflare, donc un lien partagé est
 
 À ajouter en même temps : bouton « Télécharger le PDF » sur la page partagée, date d'expiration du lien, partage d'une liste de courses.
 
-### 🖼️ Logo personnel sur les cahiers
+### Logo personnel sur les cahiers
 Option prévue en base mais sans interface. Options : envoi d'un logo dans Paramètres, puis affichage sur la couverture et/ou en pied de page.
 
-### 🧪 Variantes de recette
+### Variantes de recette
 Créer « v2, v3 » d'une recette en gardant le lien avec l'original, pour comparer les essais (la table existe déjà en base).
 
-### 💾 Export / import JSON complet
+### Export / import JSON complet
 Sauvegarde téléchargeable de toutes les données (recettes, dossiers, cahiers, listes), avec restauration. Options : bouton manuel dans Paramètres, et/ou envoi automatique vers un NAS ou S3 (cron).
 
-### 📸 Photos
+### Photos
 Ajouter / changer la photo depuis le formulaire de recette (aujourd'hui seulement via l'import Recipe Keeper), et une miniature sur les cartes de la liste.
 
-### 💰 Coût de revient
+### Coût de revient
 Prix au kilo dans la base d'ingrédients, puis coût total et par portion sur la fiche et dans le PDF.
 
-### 🛒 Liste de courses
+### Liste de courses
 Groupement par rayon (frais, sec, fruits…) en réutilisant les catégories d'ingrédients (base / fruit / préparation).
 
-### 📱 PWA (application installable)
+### PWA (application installable)
 Installation sur iPad / téléphone et consultation hors-ligne des recettes en cuisine.
 
 ---
 
-## 3. ⚠️ Problèmes connus restants
+## 3. Problèmes connus restants
 
 - **Variantes de recette** et **logo des cahiers** : prévus en base, pas encore développés (voir propositions).
 - **Gros composants** (`IngredientBaseManager`, `RecipeBody`, `CookbookConfigForm` : ~1 000 lignes chacun, beaucoup de styles en ligne) : fonctionnels, mais à découper si on les fait évoluer.
@@ -180,9 +228,9 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 
 ---
 
-## 4. ✅ Fonctionnalités
+## 4. Fonctionnalités
 
-### 🍰 Recettes
+### Recettes
 - Création / édition / suppression / duplication, suppression en lot (sélection multiple).
 - Ingrédients : saisie **liste** (autocomplétion depuis la base, 200 ms) ou **texte libre** (`200g farine`, `Farine\n- 200g`, `1kg sucre`, `2 cc vanille`, `3 oeufs`, `100-150g sucre`).
 - Unités : `g`, `L`, `cc` (≈ 5 g), `cs` (≈ 15 g), `pièce`, `QS`, et **fourchettes** min/max.
@@ -190,17 +238,17 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 - Tags libres, catégories colorées, note 1–5 étoiles, favori, source, notes & astuces, commentaires datés, photo (via import).
 - Rangement dans **un dossier** (0 ou 1).
 
-### 🗂️ Organisation
+### Organisation
 - Accueil en **vue explorateur** : cartes de dossiers, section « Sans dossier », « Tout afficher », fil d'Ariane.
 - Recherche globale sans accents + filtres tag / catégorie, page Favoris.
 
-### 🧮 Multiplication et sous-recettes
+### Multiplication et sous-recettes
 - 3 modes : **coefficient**, **masse totale cible**, **ingrédient pivot**.
 - Affichage en décimales ou en entiers (arrondi au supérieur) ; en masse cible, ajustement ±1 g pour tomber pile sur la masse demandée.
 - « Mettre à jour la recette » : enregistre les quantités affichées comme nouvelle base.
 - **Sous-recettes** (accordéon) : chacune a son mode / sa valeur, suit le coefficient global, ou reste fixe si **verrouillée 🔒**. Détection des boucles (A dans B dans A).
 
-### 📖 Cahiers PDF
+### Cahiers PDF
 - Recettes **liées 🔗** (toujours à jour) ou **figées 📌** (copie à une date, avec masse modifiable en 3 modes).
 - Glisser-déposer, chapitres, titres de section, filtre des recettes déjà présentes.
 - **4 mises en page** des recettes : Classique, Fiche technique (tableau + % de masse), Moderne, Magazine (photo).
@@ -208,27 +256,27 @@ Installation sur iPad / téléphone et consultation hors-ligne des recettes en c
 - Couverture personnalisable (layouts, couleurs, image), sommaire avec sous-recettes `↳` et **numéros de page exacts**, 1 page par recette et par sous-recette, numérotation à partir de la 1ʳᵉ recette, pied de page 3 zones, A4 / A5, aperçu sans enregistrer.
 - Bouton « Liste de courses » : ajoute toutes les recettes du cahier à une liste.
 
-### 📄 PDF d'une recette
+### PDF d'une recette
 Téléchargement depuis la fiche ; style réglable dans **Paramètres → PDF d'une recette** (styles prêts à l'emploi, mise en page, habillage, format, couleurs, polices, sections).
 
-### 🛒 Listes de courses
+### Listes de courses
 - Plusieurs listes, recettes avec coefficient, articles libres.
 - Fusion des ingrédients identiques **de même unité**, sous-recettes incluses, max des fourchettes.
 - Cases à cocher (conservées quand la liste est recalculée), « décocher tout », « supprimer les cochés », export PDF.
 
-### ⚙️ Paramètres
+### Paramètres
 - Dossiers, catégories (CRUD + couleur), rangement en masse.
 - **Base d'ingrédients** : classement (base / fruit / préparation / à classer), renommer (en cascade dans les recettes), fusionner, supprimer, sélection multiple, nettoyage des inutilisés, synchronisation.
 - Lien du logo, réglages PDF.
 - Import **Recipe Keeper** (ZIP/HTML avec photos, ou CSV) et **import JSON** (avec le prompt de conversion intégré pour une IA).
 - **🚀 Mettre à jour le site** : lance `deploy.sh` avec un écran de maintenance.
 
-### 🔗 Partage public
-**Désactivé en V1.7** (voir [Mises à jour proposées](#2--mises-à-jour-proposées)). Interrupteur : `SHARE_ENABLED` dans `src/lib/features.ts`.
+### Partage public
+**Désactivé en V1.7** (voir [Mises à jour proposées](#2-mises-à-jour-proposées)). Interrupteur : `SHARE_ENABLED` dans `src/lib/features.ts`.
 
 ---
 
-## 5. 📐 Règles de calcul
+## 5. Règles de calcul
 
 Toute la logique pure est dans **`src/lib/massAdjust.ts`**, importable côté client ET serveur : **ne jamais y importer Prisma**.
 
@@ -246,7 +294,7 @@ Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g �
 
 ---
 
-## 6. 🏗️ Architecture technique
+## 6. Architecture technique
 
 | Couche | Choix |
 |---|---|
@@ -307,7 +355,7 @@ src/
 
 ---
 
-## 7. 🗃️ Modèle de données
+## 7. Modèle de données
 
 Source de vérité : `prisma/schema.prisma`. Migrations versionnées dans `prisma/migrations/`.
 
@@ -330,7 +378,7 @@ Source de vérité : `prisma/schema.prisma`. Migrations versionnées dans `prism
 
 ---
 
-## 8. 🎨 Design system
+## 8. Design system
 
 RecipeLog reprend le design system **FuelLog** de l'écosystème super-nono.cc :
 - **Sombre uniquement** : fond `#0e0f11`, surfaces `#16181c`, cartes `#1c1f25`, bordures `#2a2d35`.
@@ -341,7 +389,7 @@ RecipeLog reprend le design system **FuelLog** de l'écosystème super-nono.cc :
 
 ---
 
-## 9. 💻 Installation (développement)
+## 9. Installation (développement)
 
 Prérequis : Node.js ≥ 20, pnpm ≥ 10, PostgreSQL ≥ 15 (ou Docker).
 
@@ -367,7 +415,7 @@ pnpm dev                      # http://localhost:3000
 
 ---
 
-## 10. 🚀 Production (Proxmox LXC)
+## 10. Production (Proxmox LXC)
 
 ### Installation initiale
 1. **Créer le container** sur l'hôte Proxmox :
@@ -433,7 +481,7 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 
 ---
 
-## 11. 📜 Historique des versions
+## 11. Historique des versions
 
 | Version | Contenu principal |
 |---|---|

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { listAllIngredientBases } from "@/lib/recipes";
 import { IngredientBaseManager } from "@/components/IngredientBaseManager";
+import { RepairIngredientsButton } from "@/components/RepairIngredientsButton";
 import { SyncIngredientsButton } from "@/components/SyncIngredientsButton";
 import { DeleteOrphanIngredientsButton } from "@/components/DeleteOrphanIngredientsButton";
 
@@ -24,6 +25,7 @@ export default async function IngredientsSettingsPage() {
         <h2>Entretien de la base</h2>
       </div>
       <div className="fl-list">
+        <RepairIngredientsButton />
         <SyncIngredientsButton />
         <DeleteOrphanIngredientsButton orphans={orphans} />
       </div>
