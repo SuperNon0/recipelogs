@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeLocalCoef } from "@/lib/subRecipes";
+import { computeSubRecipe } from "@/lib/subRecipeCalc";
 
 describe("computeLocalCoef", () => {
   describe("mode coefficient", () => {
@@ -41,5 +42,41 @@ describe("computeLocalCoef", () => {
     it("gère les fractions pivot", () => {
       expect(computeLocalCoef("pivot_ingredient", 50, 500, 200)).toBeCloseTo(0.25);
     });
+  });
+});
+
+describe("computeSubRecipe", () => {
+  const sr = {
+    calcMode: "mass_target" as const,
+    calcValue: 300,
+    pivotIngredientId: null,
+    isExact: false,
+    childIngredients: [
+      { id: 1, name: "Sucre", quantityG: 100, unit: "g" },
+      { id: 2, name: "Blancs", quantityG: 50, unit: "g" },
+    ],
+  };
+  it("suit le multiplicateur global quand elle n'est pas verrouillée", () => {
+    const r = computeSubRecipe(sr, 2, false);
+    expect(r.effectiveCoef).toBeCloseTo(4);
+    expect(r.min).toBe(600);
+  });
+  it("garde sa propre quantité quand elle est verrouillée", () => {
+    const r = computeSubRecipe(sr, 2, true);
+    expect(r.effectiveCoef).toBeCloseTo(2);
+    expect(r.min).toBe(300);
+  });
+  it("tombe pile sur la masse cible en mode exact", () => {
+    const r = computeSubRecipe({ ...sr, calcValue: 250, isExact: true, childIngredients: [
+      { id: 1, name: "A", quantityG: 33, unit: "g" },
+      { id: 2, name: "B", quantityG: 67, unit: "g" },
+    ] }, 1.3, false);
+    expect(r.min).toBe(325);
+  });
+  it("convertit les litres en grammes", () => {
+    const r = computeSubRecipe({ ...sr, calcMode: "coefficient", calcValue: 1, childIngredients: [
+      { id: 1, name: "Lait", quantityG: 0.5, unit: "L" },
+    ] }, 1, false);
+    expect(r.ingredients[0]).toMatchObject({ quantityG: 500, unit: "g" });
   });
 });

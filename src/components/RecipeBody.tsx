@@ -1,18 +1,37 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronRight,
+  Circle,
+  CircleDot,
+  ExternalLink,
+  Layers,
+  ListTree,
+  Lock,
+  Minus,
+  Plus,
+  RotateCcw,
+  Save,
+  SlidersHorizontal,
+  XCircle,
+} from "lucide-react";
 import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
-import { computeLocalCoef } from "@/lib/subRecipes";
+import { computeSubRecipe } from "@/lib/subRecipeCalc";
 import { adjustToTarget, ingMass, recipeMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
+  moveSubRecipe,
   removeSubRecipe,
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
 import { applyMultiplierToRecipe } from "@/app/actions/recipes";
-import { StepsContent } from "./StepsContent";
 import { ModalOverlay } from "./ModalOverlay";
+import { Help } from "./ui/Help";
+import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
+import { AddSubRecipeDialog, SUB_MODE_HELP } from "./AddSubRecipeModal";
 
 // ─────────────────────────────────────────────
 // Types
@@ -42,10 +61,17 @@ export type SubRecipeRow = {
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 
+const fmtNum = (n: number, max = 2) => n.toLocaleString("fr-FR", { maximumFractionDigits: max });
+
 // ─────────────────────────────────────────────
-// Composant principal
+// Composant principal : indicateurs + tableau
 // ─────────────────────────────────────────────
 
+/**
+ * Onglet « Recette » : masse totale, multiplicateur, base, puis le tableau des
+ * ingrédients avec les sous-recettes dépliables (menu « ⋯ » / clic droit sur
+ * chaque sous-recette).
+ */
 export function RecipeBody({
   recipeId,
   ingredients,
@@ -59,32 +85,31 @@ export function RecipeBody({
 
   const [mode, setMode] = useState<Mode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
-  const [massInput, setMassInput] = useState(
-    String(Math.round(baseTotalG)),
-  );
-  const [pivotId, setPivotId] = useState<number | null>(
-    ingredients[0]?.id ?? null,
-  );
-  const [pivotInput, setPivotInput] = useState(
-    ingredients[0]?.quantityG ? String(ingredients[0].quantityG) : "0",
-  );
+  const [massInput, setMassInput] = useState(String(Math.round(baseTotalG)));
+  const [pivotId, setPivotId] = useState<number | null>(ingredients[0]?.id ?? null);
+  const [pivotInput, setPivotInput] = useState(ingredients[0]?.quantityG ? String(ingredients[0].quantityG) : "0");
   const [decimals, setDecimals] = useState(true);
+  const [locks, setLocks] = useState<Record<number, boolean>>(() =>
+    Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
+  );
+  const [open, setOpen] = useState<Record<number, boolean>>({});
+  const [adding, setAdding] = useState(false);
+
+  const num = (s: string) => Number(s.replace(",", "."));
 
   const globalCoef = useMemo(() => {
     if (mode === "coefficient") {
-      const v = Number(coefInput);
+      const v = num(coefInput);
       return Number.isFinite(v) && v > 0 ? v : 1;
     }
     if (mode === "mass_target") {
-      const target = Number(massInput);
+      const target = num(massInput);
       if (!Number.isFinite(target) || target <= 0 || baseTotalG <= 0) return 1;
       return target / baseTotalG;
     }
-    // pivot
     const pivot = ingredients.find((i) => i.id === pivotId);
-    const target = Number(pivotInput);
-    if (!pivot || !Number.isFinite(target) || target <= 0) return 1;
-    if (pivot.quantityG <= 0) return 1;
+    const target = num(pivotInput);
+    if (!pivot || !Number.isFinite(target) || target <= 0 || pivot.quantityG <= 0) return 1;
     return target / pivot.quantityG;
   }, [mode, coefInput, massInput, pivotId, pivotInput, ingredients, baseTotalG]);
 
@@ -98,87 +123,361 @@ export function RecipeBody({
     }
   };
 
-  const { displayTotalMin, displayTotalMax, adjustedQties } = useMemo(() => {
+  // Quantités des ingrédients de la recette elle-même
+  const own = useMemo(() => {
     const r = decimals ? (x: number) => x : Math.ceil;
     const scaled: AdjIngredient[] = ingredients.map((ing) => {
-      const unit = scaledUnit(ing.unit);
-      const qty = ing.unit === "L" ? r(ing.quantityG * globalCoef * 1000) : r(ing.quantityG * globalCoef);
-      const qtyMax = ing.quantityGMax != null
-        ? (ing.unit === "L" ? r(ing.quantityGMax * globalCoef * 1000) : r(ing.quantityGMax * globalCoef))
-        : null;
-      return { name: ing.name, quantityG: qty, quantityGMax: qtyMax, unit };
+      const k = ing.unit === "L" ? globalCoef * 1000 : globalCoef;
+      return {
+        name: ing.name,
+        quantityG: r(ing.quantityG * k),
+        quantityGMax: ing.quantityGMax != null ? r(ing.quantityGMax * k) : null,
+        unit: scaledUnit(ing.unit),
+      };
     });
-
     if (mode === "mass_target" && !decimals) {
-      const target = Number(massInput);
+      const target = num(massInput);
       if (Number.isFinite(target) && target > 0) {
-        const { ingredients: adj, totalMassGMin, totalMassGMax } = adjustToTarget(scaled, target);
-        return { displayTotalMin: totalMassGMin, displayTotalMax: totalMassGMax, adjustedQties: adj };
+        const a = adjustToTarget(scaled, target);
+        return { rows: a.ingredients, min: a.totalMassGMin, max: a.totalMassGMax };
       }
     }
-
-    const tMin = scaled.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-    const tMax = scaled.reduce((s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0);
-    return { displayTotalMin: tMin, displayTotalMax: tMax, adjustedQties: null as AdjIngredient[] | null };
+    const min = scaled.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
+    const max = scaled.reduce((s, i) => s + ingMass(i.quantityGMax ?? i.quantityG, i.unit), 0);
+    return { rows: scaled, min, max };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingredients, globalCoef, decimals, mode, massInput]);
-  const displayTotalG = (displayTotalMin + displayTotalMax) / 2;
+
+  // Sous-recettes au multiplicateur courant, et à ×1 (pour la « base »)
+  const subs = useMemo(
+    () => subRecipes.map((sr) => ({ sr, calc: computeSubRecipe(sr, globalCoef, locks[sr.id] ?? sr.isLocked) })),
+    [subRecipes, globalCoef, locks],
+  );
+  const subBase = useMemo(
+    () => subRecipes.reduce((s, sr) => {
+      const c = computeSubRecipe(sr, 1, locks[sr.id] ?? sr.isLocked);
+      return s + (c.min + c.max) / 2;
+    }, 0),
+    [subRecipes, locks],
+  );
+
+  const ownAvg = (own.min + own.max) / 2;
+  const subsAvg = subs.reduce((s, x) => s + (x.calc.min + x.calc.max) / 2, 0);
+  const grandTotal = ownAvg + subsAvg;
+  const grandBase = baseTotalG + subBase;
+  const fmt = decimals ? formatGDecimal : formatG;
+  const pct = (g: number) => (grandTotal > 0 ? `${Math.round((g / grandTotal) * 100)} %` : "");
+
+  const massCalc = [
+    `Ingrédients ${formatCoef(globalCoef)}`.padEnd(26) + fmt(ownAvg),
+    ...subs.map((x) =>
+      `${x.sr.label}${locks[x.sr.id] ? " (fixe)" : ` ${formatCoef(x.calc.effectiveCoef)}`}`.slice(0, 25).padEnd(26) +
+      formatG((x.calc.min + x.calc.max) / 2),
+    ),
+    "─".repeat(32),
+    "Total".padEnd(26) + fmt(grandTotal),
+  ].join("\n");
 
   return (
-    <div className="flex flex-col gap-5">
-      <MultiplierPanel
-        recipeId={recipeId}
-        hasSubRecipes={subRecipes.length > 0}
-        mode={mode}
-        setMode={setMode}
-        coefInput={coefInput}
-        setCoefInput={setCoefInput}
-        massInput={massInput}
-        setMassInput={setMassInput}
-        pivotId={pivotId}
-        setPivotId={setPivotId}
-        pivotInput={pivotInput}
-        setPivotInput={setPivotInput}
-        ingredients={ingredients}
-        globalCoef={globalCoef}
-        effectiveTotalG={displayTotalG}
-        onReset={reset}
-        decimals={decimals}
-        setDecimals={setDecimals}
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="kpis">
+        <div className="kpi">
+          <div className="kpi-l">
+            Masse totale
+            <Help
+              title="Masse totale"
+              calc={massCalc}
+              example={<>Pièces (œufs entiers…) et « QS » ne sont pas comptés. 1 cc ≈ 5 g, 1 cs ≈ 15 g, 1 L = 1 000 g.</>}
+            >
+              Le poids de tout ce qui se pèse dans la recette, sous-recettes comprises, avec le
+              multiplicateur appliqué. Une sous-recette verrouillée garde sa quantité.
+            </Help>
+          </div>
+          <div className="kpi-v num">
+            {own.min !== own.max && subs.length === 0 ? (
+              <>
+                {fmt(own.min)}
+                <small>à {fmt(own.max)}</small>
+              </>
+            ) : (
+              fmt(grandTotal)
+            )}
+          </div>
+          {subs.length > 0 && (
+            <div className="kpi-s">
+              dont {fmt(ownAvg)} d&apos;ingrédients · {formatG(subsAvg)} de sous-recettes
+            </div>
+          )}
+        </div>
 
-      <IngredientsTable
-        ingredients={ingredients}
-        coef={globalCoef}
-        totalMinG={displayTotalMin}
-        totalMaxG={displayTotalMax}
-        decimals={decimals}
-        adjustedQties={adjustedQties}
-      />
+        <MultiplierCard
+          recipeId={recipeId}
+          hasSubRecipes={subRecipes.length > 0}
+          mode={mode}
+          setMode={setMode}
+          coefInput={coefInput}
+          setCoefInput={setCoefInput}
+          massInput={massInput}
+          setMassInput={setMassInput}
+          pivotId={pivotId}
+          setPivotId={setPivotId}
+          pivotInput={pivotInput}
+          setPivotInput={setPivotInput}
+          ingredients={ingredients}
+          globalCoef={globalCoef}
+          onReset={reset}
+          decimals={decimals}
+          setDecimals={setDecimals}
+        />
 
-      {subRecipes.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="fl-title-serif" style={{ fontSize: "1.2rem" }}>
-            Sous-recettes
-          </h2>
-          {subRecipes.map((sr) => (
-            <SubRecipeAccordion
-              key={sr.id}
-              parentId={recipeId}
-              subRecipe={sr}
-              globalCoef={globalCoef}
-            />
-          ))}
-        </section>
-      )}
+        <div className="kpi">
+          <div className="kpi-l">
+            Base (×1)
+            <Help title="Base de la recette" calc={`Ingrédients`.padEnd(26) + formatG(baseTotalG) + (subRecipes.length ? `\nSous-recettes`.padEnd(27) + formatG(subBase) : "")}>
+              La masse de la recette telle qu&apos;elle est enregistrée, sans multiplicateur. «
+              Enregistrer comme base » dans le multiplicateur remplace ces quantités.
+            </Help>
+          </div>
+          <div className="kpi-v num">{formatG(grandBase)}</div>
+          {globalCoef !== 1 && <div className="kpi-s">{formatCoef(globalCoef)} appliqué</div>}
+        </div>
+      </div>
+
+      <div className="itable">
+        <div className="irow ihead">
+          <span />
+          <span>Ingrédient</span>
+          <span className="q">Quantité</span>
+          <span className="p desk-only">
+            % masse
+            <Help title="% de la masse" calc="% = masse de la ligne ÷ masse totale × 100" example="300 g de purée dans une recette de 1 500 g → 20 %.">
+              La part de chaque ingrédient ou sous-recette dans la masse totale (sous-recettes
+              comprises). Pratique pour comparer deux recettes.
+            </Help>
+          </span>
+          <span />
+        </div>
+
+        {ingredients.length === 0 && subRecipes.length === 0 && (
+          <div className="irow">
+            <span />
+            <span style={{ color: "var(--muted)" }}>Aucun ingrédient.</span>
+          </div>
+        )}
+
+        {ingredients.map((ing, idx) => (
+          <OwnRow key={ing.id} ing={ing} adj={own.rows[idx]} decimals={decimals} pct={pct} />
+        ))}
+
+        {subs.map(({ sr, calc }, i) => (
+          <SubRows
+            key={sr.id}
+            parentId={recipeId}
+            sr={sr}
+            calc={calc}
+            locked={locks[sr.id] ?? sr.isLocked}
+            setLocked={(v) => setLocks((p) => ({ ...p, [sr.id]: v }))}
+            open={!!open[sr.id]}
+            setOpen={(v) => setOpen((p) => ({ ...p, [sr.id]: v }))}
+            pct={pct}
+            first={i === 0}
+            last={i === subs.length - 1}
+          />
+        ))}
+
+        <button type="button" className="irow iadd" onClick={() => setAdding(true)}>
+          <Plus size={15} />
+          <span>Ajouter une sous-recette</span>
+        </button>
+
+        <div className="irow itotal">
+          <span />
+          <span>Total</span>
+          <span className="q num">
+            {own.min !== own.max && subs.length === 0 ? `${fmt(own.min)} à ${fmt(own.max)}` : fmt(grandTotal)}
+          </span>
+          <span className="p desk-only" />
+          <span />
+        </div>
+      </div>
+
+      {adding && <AddSubRecipeDialog parentId={recipeId} onClose={() => setAdding(false)} />}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────
-// Multiplier panel
+// Ligne d'ingrédient
 // ─────────────────────────────────────────────
 
-function MultiplierPanel({
+function OwnRow({
+  ing,
+  adj,
+  decimals,
+  pct,
+}: {
+  ing: IngredientRow;
+  adj: AdjIngredient;
+  decimals: boolean;
+  pct: (g: number) => string;
+}) {
+  const show = (n: number) => (decimals ? fmtNum(n) : Math.ceil(n).toLocaleString("fr-FR"));
+  const spoon = ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+  const avg = (adj.quantityG + (adj.quantityGMax ?? adj.quantityG)) / 2;
+  const mass = ingMass(avg, adj.unit);
+  return (
+    <div className="irow">
+      <span />
+      <span className="n">{ing.name}</span>
+      <span className="q num">
+        {ing.unit === "QS" ? (
+          <b style={{ color: "var(--accent)" }}>QS</b>
+        ) : (
+          <>
+            {show(adj.quantityG)}
+            {adj.quantityGMax != null && <>–{show(adj.quantityGMax)}</>} <span className="u">{adj.unit}</span>
+            {spoon > 0 && <span className="u"> (≈ {fmtNum(avg * spoon, 0)} g)</span>}
+          </>
+        )}
+      </span>
+      <span className="p desk-only num">{mass > 0 ? pct(mass) : ""}</span>
+      <span />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Sous-recette : ligne + ingrédients dépliés + menu
+// ─────────────────────────────────────────────
+
+function SubRows({
+  parentId,
+  sr,
+  calc,
+  locked,
+  setLocked,
+  open,
+  setOpen,
+  pct,
+  first,
+  last,
+}: {
+  parentId: number;
+  sr: SubRecipeRow;
+  calc: ReturnType<typeof computeSubRecipe>;
+  locked: boolean;
+  setLocked: (v: boolean) => void;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  pct: (g: number) => string;
+  first: boolean;
+  last: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [, startTransition] = useTransition();
+  const avg = (calc.min + calc.max) / 2;
+  const mass = calc.min !== calc.max ? `${formatG(calc.min)}–${formatG(calc.max)}` : formatG(calc.min);
+  const pivotName = sr.pivotIngredientId ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)?.name : null;
+
+  const setLock = (v: boolean) => {
+    if (v === locked) return;
+    setLocked(v);
+    startTransition(() => toggleSubRecipeLock(sr.id, parentId));
+  };
+
+  const spec = (): MenuSpec => ({
+    title: `Sous-recette : ${sr.label}`,
+    icon: Layers,
+    head: (
+      <>
+        <span style={{ width: 44, height: 44, borderRadius: 11, flex: "none", display: "grid", placeItems: "center", background: "var(--accent-dim)", color: "var(--accent)" }}>
+          <Layers size={20} />
+        </span>
+        <div>
+          <b>{sr.label}</b>
+          <small>{sr.childName} · {mass}</small>
+        </div>
+      </>
+    ),
+    items: [
+      { label: "Ouvrir la recette d'origine", icon: ExternalLink, href: `/recipes/${sr.childId}` },
+      { label: open ? "Replier les ingrédients" : "Déplier les ingrédients", icon: ListTree, onSelect: () => setOpen(!open) },
+      { section: "Quand on change le multiplicateur" },
+      { label: "Suit le multiplicateur", icon: locked ? Circle : CircleDot, checked: !locked, onSelect: () => setLock(false) },
+      { label: "Garde sa quantité (verrouillée)", icon: locked ? CircleDot : Circle, checked: locked, onSelect: () => setLock(true) },
+      { separator: true },
+      { label: "Régler la quantité…", icon: SlidersHorizontal, onSelect: () => setEditing(true) },
+      { label: "Monter", icon: ArrowUp, disabled: first, onSelect: () => startTransition(async () => { await moveSubRecipe(sr.id, parentId, -1); }) },
+      { label: "Descendre", icon: ArrowDown, disabled: last, onSelect: () => startTransition(async () => { await moveSubRecipe(sr.id, parentId, 1); }) },
+      { separator: true },
+      {
+        label: "Retirer de la recette",
+        icon: XCircle,
+        danger: true,
+        onSelect: () => {
+          if (confirm(`Retirer la sous-recette « ${sr.label} » ? La recette d'origine n'est pas supprimée.`)) {
+            startTransition(() => removeSubRecipe(sr.id, parentId));
+          }
+        },
+      },
+    ],
+  });
+
+  const tag =
+    locked ? (
+      <span className="fl-tag" style={{ color: "var(--lock)", borderColor: "rgba(143,156,240,.35)", background: "rgba(143,156,240,.08)" }}>
+        <Lock size={11} /> fixe
+      </span>
+    ) : sr.calcMode === "pivot_ingredient" ? (
+      <span className="fl-tag" title={pivotName ? `Pivot : ${pivotName}` : undefined}>pivot</span>
+    ) : (
+      <span className="fl-tag num">{formatCoef(calc.effectiveCoef)}</span>
+    );
+
+  return (
+    <>
+      <ContextArea spec={spec} className={`irow isub${locked ? " locked" : ""}`}>
+        <button type="button" className="ichev" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Replier" : "Déplier"}>
+          <ChevronRight size={15} style={{ transform: open ? "rotate(90deg)" : undefined, transition: "transform 120ms" }} />
+        </button>
+        <span className="n" onClick={() => setOpen(!open)}>
+          <b>{sr.label}</b>
+          {sr.label !== sr.childName && <small className="desk-only">{sr.childName}</small>}
+          {tag}
+        </span>
+        <span className="q num">{mass}</span>
+        <span className="p desk-only num">{pct(avg)}</span>
+        <MoreButton spec={spec} label={`Actions pour la sous-recette ${sr.label}`} />
+      </ContextArea>
+      {open &&
+        calc.ingredients.map((ing, i) => (
+          <div className="irow ichild" key={i}>
+            <span />
+            <span className="n">{ing.name}</span>
+            <span className="q num">
+              {ing.unit === "QS" ? (
+                <b style={{ color: "var(--accent)" }}>QS</b>
+              ) : (
+                <>
+                  {ing.quantityG.toLocaleString("fr-FR")}
+                  {ing.quantityGMax != null && <>–{ing.quantityGMax.toLocaleString("fr-FR")}</>} <span className="u">{ing.unit}</span>
+                </>
+              )}
+            </span>
+            <span className="p desk-only" />
+            <span />
+          </div>
+        ))}
+      {editing && <EditSubRecipeModal subRecipe={sr} parentId={parentId} onClose={() => setEditing(false)} />}
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Multiplicateur
+// ─────────────────────────────────────────────
+
+function MultiplierCard({
   recipeId,
   hasSubRecipes,
   mode,
@@ -193,7 +492,6 @@ function MultiplierPanel({
   setPivotInput,
   ingredients,
   globalCoef,
-  effectiveTotalG,
   onReset,
   decimals,
   setDecimals,
@@ -212,610 +510,122 @@ function MultiplierPanel({
   setPivotInput: (v: string) => void;
   ingredients: IngredientRow[];
   globalCoef: number;
-  effectiveTotalG: number;
   onReset: () => void;
   decimals: boolean;
   setDecimals: (v: boolean) => void;
 }) {
-  const [savePending, startSaveTransition] = useTransition();
+  const [savePending, startSave] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
   const dirty = Math.abs(globalCoef - 1) > 1e-4;
 
+  const step = (d: number) => {
+    const cur = Number(coefInput.replace(",", "."));
+    const next = Math.max(0.1, Math.round(((Number.isFinite(cur) ? cur : 1) + d) * 100) / 100);
+    setCoefInput(String(next).replace(".", ","));
+  };
+
   const handleApply = () => {
     if (!dirty) return;
+    const k = globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
     const msg = hasSubRecipes
-      ? `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?\n\nLes sous-recettes liées NE SERONT PAS modifiées.`
-      : `Appliquer le coefficient ×${globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} et écrire ces nouvelles quantités comme nouvelle base ?`;
+      ? `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?\n\nLes sous-recettes liées ne sont pas modifiées.`
+      : `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?`;
     if (!confirm(msg)) return;
     setSaveError(null);
-    const targetG = mode === "mass_target" ? Number(massInput) : undefined;
-    startSaveTransition(async () => {
+    const targetG = mode === "mass_target" ? Number(massInput.replace(",", ".")) : undefined;
+    startSave(async () => {
       const r = await applyMultiplierToRecipe(recipeId, globalCoef, targetG);
-      if (!r.ok) {
-        setSaveError(r.error);
-        return;
-      }
+      if (!r.ok) return setSaveError(r.error);
       onReset();
     });
   };
 
   return (
-    <section className="fl-card flex flex-col gap-3">
-      <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h2 className="fl-title-serif" style={{ fontSize: "1.15rem" }}>
-          Multiplicateur
-        </h2>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={savePending}
-            className="fl-btn fl-btn-secondary"
-            style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-          >
-            Réinitialiser
-          </button>
-          <button
-            type="button"
-            onClick={handleApply}
-            disabled={!dirty || savePending}
-            className={dirty ? "fl-btn fl-btn-primary" : "fl-btn"}
-            style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-            title={
-              dirty
-                ? "Écrit les quantités affichées comme nouvelle base de la recette"
-                : "Modifie d'abord le coefficient, la masse totale ou un pivot"
-            }
-          >
-            {savePending ? "Mise à jour…" : "Mettre à jour la recette"}
-          </button>
-        </div>
-      </div>
-      {saveError && (
-        <p className="text-sm" style={{ color: "var(--danger)" }}>
-          {saveError}
-        </p>
-      )}
-
-      <ModeSwitcher mode={mode} setMode={setMode} />
-
-      {mode === "coefficient" && (
-        <Field label="Coefficient (×)">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            className="fl-input"
-            value={coefInput}
-            onChange={(e) => setCoefInput(e.target.value)}
-          />
-        </Field>
-      )}
-
-      {mode === "mass_target" && (
-        <>
-          <Field label="Masse totale cible (g)">
-            <input
-              type="number"
-              step="1"
-              min="0"
-              className="fl-input"
-              value={massInput}
-              onChange={(e) => setMassInput(e.target.value)}
-            />
-          </Field>
-          <p style={{
-            fontSize: "0.72rem", fontFamily: "var(--font-mono)",
-            color: "var(--muted)", margin: 0, paddingLeft: "0.25rem",
-          }}>
-            Masse exacte — ajuste ±1 g sur les plus gros ingrédients
-          </p>
-        </>
-      )}
-
-      {mode === "pivot_ingredient" && (
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Field label="Ingrédient pivot">
-            <select
-              className="fl-input"
-              value={pivotId ?? ""}
-              onChange={(e) => setPivotId(Number(e.target.value))}
-            >
-              {ingredients.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Quantité cible (g)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className="fl-input"
-              value={pivotInput}
-              onChange={(e) => setPivotInput(e.target.value)}
-            />
-          </Field>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 pt-2">
-        <button
-          type="button"
-          onClick={() => setDecimals(!decimals)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.4rem 0.75rem",
-            borderRadius: 8,
-            border: "1px solid",
-            borderColor: decimals ? "var(--accent-2)" : "var(--border)",
-            background: decimals ? "rgba(79, 192, 173,0.12)" : "transparent",
-            color: decimals ? "var(--accent-2)" : "var(--muted)",
-            fontSize: "0.75rem",
-            fontFamily: "var(--font-mono)",
-            cursor: "pointer",
-            fontWeight: decimals ? 600 : 400,
-          }}
+    <div className="kpi kpi-mult">
+      <div className="kpi-l">
+        Multiplicateur
+        <Help
+          title="Multiplicateur"
+          calc={"quantité affichée = quantité de base × multiplicateur"}
+          example={<>Masse : 1 400 g → 2 100 g donne ×1,5. Pivot : 300 g de purée → 450 g donne aussi ×1,5.</>}
         >
-          <span>{decimals ? "0,00" : "0"}</span>
-          {decimals ? "Décimales — valeurs exactes" : "Entiers — arrondis au supérieur"}
-        </button>
-      </div>
-
-      <div className="flex items-end justify-between pt-2 border-t border-[color:var(--border)]">
-        <div>
-          <div className="fl-label">Coefficient effectif</div>
-          <div
-            className="fl-value-serif"
-            style={{ fontSize: "1.4rem", color: "var(--accent-2)" }}
-          >
-            {formatCoef(globalCoef)}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="fl-label">Masse totale</div>
-          <div className="fl-value-serif" style={{ fontSize: "2rem" }}>
-            {decimals ? formatGDecimal(effectiveTotalG) : formatG(effectiveTotalG)}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ModeSwitcher({
-  mode,
-  setMode,
-}: {
-  mode: Mode;
-  setMode: (m: Mode) => void;
-}) {
-  const items: { key: Mode; label: string }[] = [
-    { key: "coefficient", label: "Coefficient" },
-    { key: "mass_target", label: "Masse totale" },
-    { key: "pivot_ingredient", label: "Pivot" },
-  ];
-  return (
-    <div
-      className="grid grid-cols-3 gap-1 p-1 rounded-lg"
-      style={{ background: "var(--bg)", border: "1px solid var(--border)" }}
-    >
-      {items.map((i) => {
-        const active = mode === i.key;
-        return (
-          <button
-            key={i.key}
-            type="button"
-            onClick={() => setMode(i.key)}
-            style={{
-              textAlign: "center",
-              padding: "0.55rem 0.5rem",
-              borderRadius: 6,
-              fontSize: "0.72rem",
-              fontFamily: "var(--font-mono)",
-              fontWeight: active ? 600 : 400,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              background: active
-                ? "rgba(240, 166, 74, 0.1)"
-                : "transparent",
-              color: active ? "var(--accent)" : "var(--muted)",
-              cursor: "pointer",
-              transition: "background 150ms ease, color 150ms ease",
-            }}
-          >
-            {i.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5 flex-1">
-      <span className="fl-label">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-// ─────────────────────────────────────────────
-// Helpers — arrondi ou décimales selon le mode
-// ─────────────────────────────────────────────
-
-function displayQty(qty: number, unit: string | undefined | null, coef: number, useDecimals: boolean): string {
-  const raw = unit === "L" ? qty * coef * 1000 : qty * coef;
-  if (useDecimals) {
-    return raw.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  }
-  return Math.ceil(raw).toLocaleString("fr-FR");
-}
-
-// ─────────────────────────────────────────────
-// Ingredient table
-// ─────────────────────────────────────────────
-
-function IngredientsTable({
-  ingredients,
-  coef,
-  totalMinG,
-  totalMaxG,
-  decimals,
-  adjustedQties,
-}: {
-  ingredients: IngredientRow[];
-  coef: number;
-  totalMinG: number;
-  totalMaxG: number;
-  decimals: boolean;
-  adjustedQties: AdjIngredient[] | null;
-}) {
-  const fmt = decimals ? formatGDecimal : formatG;
-  return (
-    <section className="fl-card">
-      <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
-        Ingrédients
-      </h2>
-      <table className="w-full">
-        <tbody>
-          {ingredients.map((ing, idx) => {
-            if (ing.unit === "QS") {
-              return (
-                <tr key={ing.id} style={{ background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
-                  <td className="py-1.5 pr-3 text-right" style={{ fontFamily: "var(--font-mono)", fontSize: "0.9rem", width: 150 }}>
-                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>QS</span>
-                  </td>
-                  <td className="py-1.5">{ing.name}</td>
-                </tr>
-              );
-            }
-
-            const adj = adjustedQties?.[idx];
-            const q = adj ? adj.quantityG : (ing.unit === "L" ? ing.quantityG * coef * 1000 : ing.quantityG * coef);
-            const qMax = adj
-              ? adj.quantityGMax
-              : (ing.quantityGMax != null ? (ing.unit === "L" ? ing.quantityGMax * coef * 1000 : ing.quantityGMax * coef) : null);
-            const u = adj ? adj.unit : scaledUnit(ing.unit);
-            const fq = adj ? adj.quantityG.toLocaleString("fr-FR") : displayQty(ing.quantityG, ing.unit, coef, decimals);
-            const fqMax = adj
-              ? (adj.quantityGMax?.toLocaleString("fr-FR") ?? null)
-              : (ing.quantityGMax != null ? displayQty(ing.quantityGMax, ing.unit, coef, decimals) : null);
-
-            return (
-              <tr key={ing.id} style={{ background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}>
-                <td className="py-1.5 pr-3 text-right" style={{ fontFamily: "var(--font-mono)", fontSize: "0.9rem", width: 150 }}>
-                  {ing.quantityGMax != null ? (
-                    <span>
-                      {fq}<span style={{ color: "var(--muted)" }}>/</span>{fqMax}
-                      {" "}<span style={{ color: "var(--muted)" }}>{u}</span>
-                      {(ing.unit === "cc" || ing.unit === "cs") && (
-                        <span style={{ color: "var(--muted)", fontSize: "0.8em" }}>
-                          {" "}(≈{fmt(((q + (qMax ?? q)) / 2) * (ing.unit === "cc" ? 5 : 15))})
-                        </span>
-                      )}
-                    </span>
-                  ) : (ing.unit === "cc" || ing.unit === "cs") ? (
-                    <>
-                      {fq}{" "}<span style={{ color: "var(--muted)" }}>{u}</span>
-                      <span style={{ color: "var(--muted)", fontSize: "0.75em" }}>
-                        {" "}(≈{fmt(q * (ing.unit === "cc" ? 5 : 15))})
-                      </span>
-                    </>
-                  ) : (
-                    <>{fq}{" "}<span style={{ color: "var(--muted)" }}>{u}</span></>
-                  )}
-                </td>
-                <td className="py-1.5">{ing.name}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td
-              className="pt-3 text-right fl-value-serif"
-              style={{ fontSize: "1.1rem" }}
-            >
-              {totalMinG !== totalMaxG ? (
-                <>{fmt(totalMinG)}<span style={{ color: "var(--muted)" }}>/</span>{fmt(totalMaxG)}</>
-              ) : fmt(totalMinG)}
-            </td>
-            <td className="pt-3 fl-label">Total</td>
-          </tr>
-        </tfoot>
-      </table>
-    </section>
-  );
-}
-
-// ─────────────────────────────────────────────
-// Sub-recipe accordion
-// ─────────────────────────────────────────────
-
-function SubRecipeAccordion({
-  parentId,
-  subRecipe,
-  globalCoef,
-}: {
-  parentId: number;
-  subRecipe: SubRecipeRow;
-  globalCoef: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [, startTransition] = useTransition();
-  const [lockedOptimistic, setLockedOptimistic] = useState(subRecipe.isLocked);
-
-  const childBaseTotalG = useMemo(
-    () => recipeMass(subRecipe.childIngredients).avg,
-    [subRecipe.childIngredients],
-  );
-
-  const pivotBaseQty = subRecipe.pivotIngredientId
-    ? subRecipe.childIngredients.find(
-        (i) => i.id === subRecipe.pivotIngredientId,
-      )?.quantityG ?? null
-    : null;
-
-  const localCoef = computeLocalCoef(
-    subRecipe.calcMode,
-    subRecipe.calcValue,
-    childBaseTotalG,
-    pivotBaseQty,
-  );
-
-  const effectiveCoef = lockedOptimistic
-    ? localCoef
-    : localCoef * globalCoef;
-
-  const adjustedIngredients = useMemo(() => {
-    const scaled = subRecipe.childIngredients.map((ing) => {
-      const unit = ing.unit === "L" ? "g" : (ing.unit ?? "g");
-      const qg = ing.unit === "L"
-        ? Math.ceil(ing.quantityG * effectiveCoef * 1000)
-        : Math.ceil(ing.quantityG * effectiveCoef);
-      const qgMax = ing.quantityGMax != null
-        ? (ing.unit === "L"
-          ? Math.ceil(ing.quantityGMax * effectiveCoef * 1000)
-          : Math.ceil(ing.quantityGMax * effectiveCoef))
-        : null;
-      return { name: ing.name, quantityG: qg, quantityGMax: qgMax, unit };
-    });
-    if (subRecipe.isExact && subRecipe.calcMode === "mass_target") {
-      const target = Math.round(subRecipe.calcValue * (lockedOptimistic ? 1 : globalCoef));
-      return adjustToTarget(scaled, target).ingredients;
-    }
-    return scaled;
-  }, [subRecipe.childIngredients, subRecipe.isExact, subRecipe.calcMode, subRecipe.calcValue, effectiveCoef, lockedOptimistic, globalCoef]);
-
-  const [roundedChildMin, roundedChildMax] = useMemo(() => {
-    const min = adjustedIngredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-    const max = adjustedIngredients.reduce(
-      (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit), 0,
-    );
-    return [min, max];
-  }, [adjustedIngredients]);
-
-  return (
-    <div
-      className="fl-card"
-      style={{
-        padding: 0,
-        overflow: "hidden",
-        borderColor: lockedOptimistic
-          ? "rgba(143, 156, 240, 0.5)"
-          : "var(--border)",
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left"
-        style={{ background: "transparent" }}
-      >
-        <span
-          style={{
-            color: "var(--muted)",
-            fontSize: "1.1rem",
-            transform: open ? "rotate(90deg)" : "none",
-            transition: "transform 120ms ease",
-          }}
-        >
-          ›
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span
-              className="fl-title-serif"
-              style={{ fontSize: "1rem" }}
-            >
-              {subRecipe.label}
-            </span>
-            <span className="fl-label truncate">
-              {subRecipe.childName}
-            </span>
-          </div>
-          <div className="flex gap-3 mt-0.5 text-[0.7rem] text-[color:var(--muted)]">
-            <span>{roundedChildMin !== roundedChildMax
-              ? `${formatG(roundedChildMin)}/${formatG(roundedChildMax)}`
-              : formatG(roundedChildMin)}</span>
-            <span>{formatCoef(effectiveCoef)}</span>
-          </div>
-        </div>
-        {lockedOptimistic && (
-          <span
-            className="fl-tag"
-            style={{
-              background: "rgba(143, 156, 240, 0.15)",
-              color: "var(--pending)",
-              borderColor: "rgba(143, 156, 240, 0.4)",
-            }}
-          >
-            🔒 Verrouillé
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="px-4 pb-4 flex flex-col gap-3 border-t border-[color:var(--border)]">
-          <div className="flex flex-wrap gap-2 pt-3">
-            <Link
-              href={`/recipes/${subRecipe.childId}`}
-              className="fl-btn fl-btn-secondary"
-              style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-            >
-              🔗 Voir la fiche
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !lockedOptimistic;
-                setLockedOptimistic(next);
-                startTransition(() => toggleSubRecipeLock(subRecipe.id, parentId));
-              }}
-              className={
-                lockedOptimistic ? "fl-btn fl-btn-pending" : "fl-btn fl-btn-secondary"
-              }
-              style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-            >
-              {lockedOptimistic ? "🔓 Déverrouiller" : "🔒 Verrouiller"}
+          Agrandit ou réduit toute la recette sans la modifier. Trois façons de le régler :
+          <br />• <b>Coef.</b> : tu tapes le multiplicateur.
+          <br />• <b>Masse</b> : tu tapes la masse voulue des ingrédients
+          {hasSubRecipes ? " (hors sous-recettes)" : ""}.
+          <br />• <b>Pivot</b> : tu fixes la quantité d&apos;un ingrédient.
+          <br />
+          <br />
+          <b>Entiers</b> arrondit chaque quantité au gramme supérieur ; en mode Masse, l&apos;écart
+          est réparti pour tomber pile sur la masse voulue.
+        </Help>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+          {dirty && (
+            <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" style={{ width: 28, height: 28 }} onClick={onReset} title="Revenir à ×1" aria-label="Revenir à ×1">
+              <RotateCcw size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="fl-btn fl-btn-edit"
-              style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-            >
-              ✎ Ajuster
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm(`Retirer la sous-recette « ${subRecipe.label} » ?`)) {
-                  startTransition(() =>
-                    removeSubRecipe(subRecipe.id, parentId),
-                  );
-                }
-              }}
-              className="fl-btn fl-btn-danger"
-              style={{ padding: "0.4rem 0.75rem", fontSize: "0.68rem" }}
-            >
-              Retirer
-            </button>
-          </div>
-
-          <table className="w-full">
-            <tbody>
-              {adjustedIngredients.map((ing, idx) => (
-                <tr
-                  key={idx}
-                  style={{
-                    background:
-                      idx % 2 === 0
-                        ? "transparent"
-                        : "rgba(255,255,255,0.015)",
-                  }}
-                >
-                  <td
-                    className="py-1 pr-3 text-right"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.85rem",
-                      width: 140,
-                    }}
-                  >
-                    {ing.quantityGMax != null ? (
-                      <span>
-                        {ing.quantityG}
-                        <span style={{ color: "var(--muted)" }}>/</span>
-                        {ing.quantityGMax}
-                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
-                      </span>
-                    ) : (
-                      <>
-                        {ing.quantityG}
-                        {" "}<span style={{ color: "var(--muted)" }}>{ing.unit}</span>
-                      </>
-                    )}
-                  </td>
-                  <td className="py-1">{ing.name}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td
-                  className="pt-2 text-right fl-value-serif"
-                  style={{ fontSize: "0.95rem" }}
-                >
-                  {roundedChildMin !== roundedChildMax
-                    ? `${formatG(roundedChildMin)}/${formatG(roundedChildMax)}`
-                    : formatG(roundedChildMin)}
-                </td>
-                <td className="pt-2 fl-label">Total</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          {subRecipe.childSteps && (
-            <details className="pt-2">
-              <summary
-                className="fl-label cursor-pointer"
-                style={{ marginBottom: 8 }}
-              >
-                Étapes
-              </summary>
-              <StepsContent content={subRecipe.childSteps} fontSize="0.82rem" />
-            </details>
           )}
+        </span>
+      </div>
+      <div className="mrow">
+        <div className="fl-seg">
+          {(["coefficient", "mass_target", "pivot_ingredient"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} disabled={m === "pivot_ingredient" && ingredients.length === 0}>
+              {m === "coefficient" ? "Coef." : m === "mass_target" ? "Masse" : "Pivot"}
+            </button>
+          ))}
+        </div>
+        {mode === "coefficient" && (
+          <div className="stepper">
+            <button type="button" onClick={() => step(-0.1)} aria-label="Diminuer">
+              <Minus size={14} />
+            </button>
+            <span className="x">×</span>
+            <input value={coefInput} inputMode="decimal" onChange={(e) => setCoefInput(e.target.value)} aria-label="Multiplicateur" />
+            <button type="button" onClick={() => step(0.1)} aria-label="Augmenter">
+              <Plus size={14} />
+            </button>
+          </div>
+        )}
+        {mode === "mass_target" && (
+          <div className="stepper" style={{ minWidth: 150 }}>
+            <input value={massInput} inputMode="numeric" onChange={(e) => setMassInput(e.target.value)} aria-label="Masse voulue en grammes" style={{ width: 90 }} />
+            <span className="x">g</span>
+          </div>
+        )}
+      </div>
+      {mode === "pivot_ingredient" && (
+        <div className="mrow" style={{ marginTop: 8 }}>
+          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => setPivotId(Number(e.target.value))} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
+            {ingredients.map((i) => (
+              <option key={i.id} value={i.id}>{i.name}</option>
+            ))}
+          </select>
+          <div className="stepper" style={{ flex: "1 1 100px" }}>
+            <input value={pivotInput} inputMode="decimal" onChange={(e) => setPivotInput(e.target.value)} aria-label="Quantité voulue" style={{ width: "100%" }} />
+            <span className="x">g</span>
+          </div>
         </div>
       )}
-
-      {editing && (
-        <EditSubRecipeModal
-          subRecipe={subRecipe}
-          parentId={parentId}
-          onClose={() => setEditing(false)}
-        />
-      )}
+      <div className="mrow" style={{ marginTop: 10, justifyContent: "space-between" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--soft)" }}>
+          <button type="button" role="switch" aria-checked={!decimals} className="fl-switch" onClick={() => setDecimals(!decimals)} aria-label="Arrondir au gramme supérieur" />
+          Entiers
+        </label>
+        <span className="num" style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>{formatCoef(globalCoef)}</span>
+        {dirty && (
+          <button type="button" className="fl-btn fl-btn-edit" style={{ height: 30, fontSize: 12.5, padding: "0 10px" }} onClick={handleApply} disabled={savePending} title="Écrit les quantités affichées comme nouvelle base de la recette">
+            <Save size={14} /> {savePending ? "…" : "Enregistrer comme base"}
+          </button>
+        )}
+      </div>
+      {saveError && <p style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 6 }}>{saveError}</p>}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────
-// Edit sub-recipe modal
+// Réglage d'une sous-recette
 // ─────────────────────────────────────────────
 
 function EditSubRecipeModal({
@@ -829,10 +639,9 @@ function EditSubRecipeModal({
 }) {
   const [label, setLabel] = useState(subRecipe.label);
   const [calcMode, setCalcMode] = useState<Mode>(subRecipe.calcMode);
-  const [calcValue, setCalcValue] = useState(String(subRecipe.calcValue));
-  const [pivotId, setPivotId] = useState<number | null>(
-    subRecipe.pivotIngredientId,
-  );
+  const [calcValue, setCalcValue] = useState(String(subRecipe.calcValue).replace(".", ","));
+  const usable = subRecipe.childIngredients.filter((i) => i.unit !== "QS" && i.quantityG > 0);
+  const [pivotId, setPivotId] = useState<number | null>(subRecipe.pivotIngredientId ?? usable[0]?.id ?? null);
   const [isExact, setIsExact] = useState(subRecipe.isExact);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -844,11 +653,9 @@ function EditSubRecipeModal({
     const fd = new FormData();
     fd.set("label", label);
     fd.set("calcMode", calcMode);
-    fd.set("calcValue", calcValue);
+    fd.set("calcValue", calcValue.replace(",", "."));
     fd.set("isExact", String(isExact));
-    if (calcMode === "pivot_ingredient" && pivotId) {
-      fd.set("pivotIngredientId", String(pivotId));
-    }
+    if (calcMode === "pivot_ingredient" && pivotId) fd.set("pivotIngredientId", String(pivotId));
     const res = await updateSubRecipe(subRecipe.id, parentId, fd);
     setSubmitting(false);
     if (res.ok) onClose();
@@ -856,118 +663,66 @@ function EditSubRecipeModal({
   };
 
   return (
-    <ModalOverlay onClose={onClose}>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <h3 className="fl-title-serif" style={{ fontSize: "1.15rem" }}>
-          Ajuster {subRecipe.label}
-        </h3>
-
-        <Field label="Label">
-          <input
-            className="fl-input"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            required
-          />
-        </Field>
-
-        <Field label="Mode de calcul">
-          <select
-            className="fl-input"
-            value={calcMode}
-            onChange={(e) => setCalcMode(e.target.value as Mode)}
-          >
-            <option value="coefficient">Coefficient (×)</option>
-            <option value="mass_target">Masse totale cible (g)</option>
-            <option value="pivot_ingredient">Ingrédient pivot (g)</option>
-          </select>
-        </Field>
-
-        <Field label="Valeur">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            className="fl-input"
-            value={calcValue}
-            onChange={(e) => setCalcValue(e.target.value)}
-            required
-          />
-        </Field>
-
+    <ModalOverlay
+      onClose={onClose}
+      title={
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <SlidersHorizontal size={18} style={{ color: "var(--accent)" }} /> {subRecipe.label}
+        </span>
+      }
+    >
+      <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <p style={{ color: "var(--muted)", marginTop: -6 }}>Recette d&apos;origine : {subRecipe.childName}</p>
+        <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <span className="fl-label">Nom dans cette recette</span>
+          <input className="fl-input" value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={200} />
+        </label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <span className="fl-label">Quantité</span>
+          <div className="fl-seg" style={{ alignSelf: "flex-start" }}>
+            {(["mass_target", "coefficient", "pivot_ingredient"] as const).map((m) => (
+              <button key={m} type="button" aria-pressed={calcMode === m} onClick={() => setCalcMode(m)} disabled={m === "pivot_ingredient" && usable.length === 0}>
+                {m === "mass_target" ? "Masse cible" : m === "coefficient" ? "Coefficient" : "Pivot"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {calcMode === "pivot_ingredient" && (
+              <select className="fl-input" style={{ flex: "2 1 200px" }} value={pivotId ?? ""} onChange={(e) => setPivotId(Number(e.target.value))} aria-label="Ingrédient pivot">
+                {usable.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name} ({fmtNum(i.quantityG)} {i.unit ?? "g"})</option>
+                ))}
+              </select>
+            )}
+            <div style={{ position: "relative", flex: "1 1 120px" }}>
+              <input type="text" inputMode="decimal" className="fl-input" value={calcValue} onChange={(e) => setCalcValue(e.target.value)} required style={{ paddingRight: 34 }} aria-label="Valeur" />
+              <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13 }}>
+                {calcMode === "coefficient" ? "×" : "g"}
+              </span>
+            </div>
+          </div>
+          <p style={{ color: "var(--muted)", fontSize: 12.5 }}>{SUB_MODE_HELP[calcMode]}</p>
+        </div>
         {calcMode === "mass_target" && (
-          <button
-            type="button"
-            onClick={() => setIsExact((v) => !v)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.4rem 0.75rem",
-              borderRadius: 8,
-              border: "1px solid",
-              borderColor: isExact ? "var(--accent)" : "var(--border)",
-              background: isExact ? "rgba(240, 166, 74,0.12)" : "transparent",
-              color: isExact ? "var(--accent)" : "var(--muted)",
-              fontSize: "0.75rem",
-              fontFamily: "var(--font-mono)",
-              cursor: "pointer",
-              fontWeight: isExact ? 600 : 400,
-            }}
-          >
-            <span>{isExact ? "⚖️" : "≈"}</span>
-            Masse exacte — ajuste ±1 g sur les plus gros ingrédients
-          </button>
-        )}
-
-        {calcMode === "pivot_ingredient" && (
-          <Field label="Ingrédient pivot">
-            <select
-              className="fl-input"
-              value={pivotId ?? ""}
-              onChange={(e) => setPivotId(Number(e.target.value))}
-            >
-              <option value="">—</option>
-              {subRecipe.childIngredients.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-
-        {error && (
-          <div
-            className="fl-card"
-            style={{
-              background: "rgba(239, 125, 107, 0.08)",
-              borderColor: "rgba(239, 125, 107, 0.4)",
-              color: "var(--danger)",
-              padding: "0.6rem 0.8rem",
-            }}
-          >
-            {error}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button type="button" role="switch" aria-checked={isExact} className="fl-switch" onClick={() => setIsExact(!isExact)} aria-label="Masse exacte" />
+            <span style={{ fontSize: 13.5, color: "var(--soft)", display: "flex", alignItems: "center" }}>
+              Masse exacte
+              <Help title="Masse exacte" example="Cible 250 g : sans masse exacte, les arrondis donnent 252 g ; avec, 250 g pile.">
+                Les quantités sont arrondies au gramme supérieur, ce qui peut dépasser un peu la
+                cible. Avec la masse exacte, l&apos;écart est retiré des plus gros ingrédients pour
+                tomber pile.
+              </Help>
+            </span>
           </div>
         )}
-
-        <div className="flex gap-2 pt-1">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="fl-btn fl-btn-primary"
-          >
-            {submitting ? "…" : "Enregistrer"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="fl-btn fl-btn-secondary"
-          >
-            Annuler
-          </button>
+        {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">Annuler</button>
+          <button type="submit" disabled={submitting} className="fl-btn fl-btn-primary">{submitting ? "…" : "Enregistrer"}</button>
         </div>
       </form>
     </ModalOverlay>
   );
 }
+

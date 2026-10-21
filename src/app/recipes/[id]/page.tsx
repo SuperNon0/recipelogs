@@ -1,17 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getRecipeDetail } from "@/lib/recipes";
-import { RecipeActions } from "@/components/RecipeActions";
-import { CommentsSection } from "@/components/CommentsSection";
-import { RecipeBody, type SubRecipeRow } from "@/components/RecipeBody";
-import { AddSubRecipeButton } from "@/components/AddSubRecipeModal";
-import { AddToCookbookButton } from "@/components/AddToCookbookModal";
-import { AddToShoppingListButton } from "@/components/AddToShoppingListModal";
-import { ShareButton } from "@/components/ShareButton";
-import { getActiveToken } from "@/lib/share";
-import { SHARE_ENABLED } from "@/lib/features";
+import { getRecipeDetail, listAllFolders } from "@/lib/recipes";
+import { listPdfThemes } from "@/lib/pdfThemes";
 import { recipeMass } from "@/lib/massAdjust";
-import { StepsContent } from "@/components/StepsContent";
+import type { SubRecipeRow } from "@/components/RecipeBody";
+import { RecipeView } from "@/components/recipe/RecipeView";
+import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +17,23 @@ export default async function RecipePage({
 }) {
   const { id } = await params;
   const { from } = await searchParams;
-  const backHref = from && from.startsWith("/") ? from : "/";
-  const backLabel = from?.includes("folder=") ? "← Dossier" : "← Recettes";
   const recipeId = Number(id);
-  if (!Number.isFinite(recipeId)) notFound();
+  if (!Number.isInteger(recipeId)) notFound();
 
-  const [recipe, shareToken] = await Promise.all([
+  const [recipe, folders, themes] = await Promise.all([
     getRecipeDetail(recipeId),
-    SHARE_ENABLED ? getActiveToken("recipe", recipeId) : null,
+    listAllFolders(),
+    listPdfThemes(),
   ]);
   if (!recipe) notFound();
+
+  // Retour : vers la liste d'où l'on vient, sinon vers le dossier de la recette.
+  const back =
+    from && from.startsWith("/")
+      ? { href: from, label: from.includes("folder=") ? recipe.folder?.name ?? "Dossier" : "Recettes" }
+      : recipe.folder
+        ? { href: `/?folder=${recipe.folder.id}`, label: recipe.folder.name }
+        : { href: "/", label: "Recettes" };
 
   const ingredients = recipe.ingredients.map((i) => ({
     id: i.id,
@@ -64,151 +64,32 @@ export default async function RecipePage({
   }));
 
   return (
-    <article className="flex flex-col gap-5 max-w-3xl mx-auto">
-      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <Link href={backHref} className="fl-label hover:text-[color:var(--text)]">
-          {backLabel}
-        </Link>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <a
-            href={`/recipes/${recipe.id}/pdf`}
-            className="fl-btn fl-btn-secondary"
-            style={{ fontSize: "0.8rem" }}
-          >
-            ⬇ PDF
-          </a>
-          <AddToShoppingListButton recipeId={recipe.id} />
-          {SHARE_ENABLED && (
-            <ShareButton
-              entityType="recipe"
-              entityId={recipe.id}
-              existingToken={shareToken?.token ?? null}
-            />
-          )}
-          <AddToCookbookButton
-            recipeId={recipe.id}
-            totalMassG={recipeMass(ingredients).avg}
-            ingredients={ingredients.map((i) => ({ name: i.name, quantityG: i.quantityG }))}
-          />
-          <RecipeActions recipeId={recipe.id} favorite={recipe.favorite} />
-        </div>
-      </div>
-
-      <header className="flex flex-col gap-3">
-        {recipe.photoPath && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={recipe.photoPath}
-            alt={recipe.name}
-            style={{
-              width: "100%",
-              maxHeight: 320,
-              objectFit: "cover",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-            }}
-          />
-        )}
-        <div className="flex items-start gap-3">
-          <h1
-            className="fl-title-serif flex-1"
-            style={{ fontSize: "2rem", color: "var(--accent)" }}
-          >
-            {recipe.name}
-          </h1>
-          {recipe.favorite && (
-            <span style={{ color: "var(--accent)", fontSize: "1.5rem" }}>
-              ★
-            </span>
-          )}
-        </div>
-
-        {(recipe.categories.length > 0 || recipe.tags.length > 0) && (
-          <div className="flex flex-wrap gap-1.5">
-            {recipe.categories.map((c) => (
-              <span
-                key={c.categoryId}
-                className="fl-tag"
-                style={{
-                  background: `${c.category.color}22`,
-                  color: c.category.color,
-                  borderColor: `${c.category.color}55`,
-                }}
-              >
-                {c.category.name}
-              </span>
-            ))}
-            {recipe.tags.map((t) => (
-              <span key={t.id} className="fl-tag">
-                #{t.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {recipe.rating && (
-          <div style={{ color: "var(--accent)", fontSize: "1.1rem" }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <span
-                key={i}
-                style={{ opacity: i < (recipe.rating ?? 0) ? 1 : 0.2 }}
-              >
-                ★
-              </span>
-            ))}
-          </div>
-        )}
-      </header>
-
-      <RecipeBody
-        recipeId={recipe.id}
+    <RecipeMenuProvider folders={folders.map((f) => ({ id: f.id, name: f.name, color: f.color }))} themes={themes}>
+      {/* `key` : repart d'un état neuf (multiplicateur, verrous) après chaque modification. */}
+      <RecipeView
+        key={recipe.updatedAt.toISOString() + recipe.parentLinks.map((l) => `${l.id}:${l.calcMode}:${l.calcValue}:${l.label}`).join(",")}
+        back={back}
+        recipe={{
+          id: recipe.id,
+          name: recipe.name,
+          photoPath: recipe.photoPath,
+          favorite: recipe.favorite,
+          rating: recipe.rating,
+          source: recipe.source,
+          notesTips: recipe.notesTips,
+          steps: recipe.stepsBlock?.content ?? null,
+          folder: recipe.folder ? { id: recipe.folder.id, name: recipe.folder.name, color: recipe.folder.color } : null,
+          categories: recipe.categories.map((c) => ({ id: c.category.id, name: c.category.name, color: c.category.color })),
+          tags: recipe.tags.map((t) => t.name),
+          createdAt: recipe.createdAt.toISOString(),
+          updatedAt: recipe.updatedAt.toISOString(),
+          totalMassG: recipeMass(ingredients).avg,
+        }}
         ingredients={ingredients}
         subRecipes={subRecipes}
+        comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
+        usedIn={recipe.childLinks.map((l) => ({ id: l.parent.id, name: l.parent.name, label: l.label }))}
       />
-
-      <div className="flex">
-        <AddSubRecipeButton parentId={recipe.id} />
-      </div>
-
-      {recipe.stepsBlock?.content && (
-        <section className="fl-card">
-          <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
-            Étapes
-          </h2>
-          <StepsContent content={recipe.stepsBlock.content} />
-        </section>
-      )}
-
-      {recipe.notesTips && (
-        <section className="fl-card">
-          <h2 className="fl-title-serif mb-3" style={{ fontSize: "1.1rem" }}>
-            Notes & astuces
-          </h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{recipe.notesTips}</p>
-        </section>
-      )}
-
-      {recipe.source && (
-        <section className="fl-card flex items-center gap-3">
-          <span className="fl-label">Source</span>
-          <span>{recipe.source}</span>
-        </section>
-      )}
-
-      <CommentsSection
-        recipeId={recipe.id}
-        comments={recipe.comments.map((c) => ({
-          id: c.id,
-          content: c.content,
-          createdAt: c.createdAt,
-        }))}
-      />
-
-      <footer className="fl-label text-center pt-2">
-        Créée le{" "}
-        {new Date(recipe.createdAt).toLocaleDateString("fr-FR")} · Modifiée le{" "}
-        {new Date(recipe.updatedAt).toLocaleDateString("fr-FR")}
-      </footer>
-    </article>
+    </RecipeMenuProvider>
   );
 }

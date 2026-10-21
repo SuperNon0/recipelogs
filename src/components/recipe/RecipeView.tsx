@@ -1,0 +1,213 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, FileDown, Layers, Library, Pencil, Star } from "lucide-react";
+import { MoreButton } from "@/components/ui/Menu";
+import { Help } from "@/components/ui/Help";
+import { RecipeBody, type IngredientRow, type SubRecipeRow } from "@/components/RecipeBody";
+import { StepsContent } from "@/components/StepsContent";
+import { CommentsSection } from "@/components/CommentsSection";
+import { toggleFavorite } from "@/app/actions/recipes";
+import { useRecipeMenu } from "./RecipeMenu";
+
+type Props = {
+  recipe: {
+    id: number;
+    name: string;
+    photoPath: string | null;
+    favorite: boolean;
+    rating: number | null;
+    source: string | null;
+    notesTips: string | null;
+    steps: string | null;
+    folder: { id: number; name: string; color: string } | null;
+    categories: { id: number; name: string; color: string }[];
+    tags: string[];
+    createdAt: string;
+    updatedAt: string;
+    totalMassG: number;
+  };
+  ingredients: IngredientRow[];
+  subRecipes: SubRecipeRow[];
+  comments: { id: number; content: string; createdAt: string }[];
+  usedIn: { id: number; name: string; label: string }[];
+  back: { href: string; label: string };
+};
+
+type Tab = "recipe" | "steps" | "notes";
+
+/** Fiche recette : en-tête, actions, onglets Recette / Préparation / Notes. */
+export function RecipeView({ recipe, ingredients, subRecipes, comments, usedIn, back }: Props) {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("recipe");
+  const [fav, setFav] = useState(recipe.favorite);
+  const [, startTransition] = useTransition();
+  const menu = useRecipeMenu(
+    {
+      id: recipe.id,
+      name: recipe.name,
+      favorite: fav,
+      folderId: recipe.folder?.id ?? null,
+      totalMassG: recipe.totalMassG,
+      color: recipe.folder?.color,
+    },
+    { onPage: true },
+  );
+
+  const subSteps = subRecipes.filter((s) => s.childSteps);
+  const notesCount = comments.length + (recipe.notesTips ? 1 : 0);
+
+  return (
+    <article>
+      <Link href={back.href} className="crumb">
+        <ChevronLeft size={14} /> {back.label}
+      </Link>
+
+      <div className="rhd">
+        {recipe.photoPath && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={recipe.photoPath} alt="" className="rhd-photo" />
+        )}
+        <h1>{recipe.name}</h1>
+        <div className="rhd-actions">
+          <button
+            type="button"
+            className="fl-btn fl-btn-secondary fl-btn-icon desk-only"
+            aria-pressed={fav}
+            aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+            title={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+            onClick={() => {
+              setFav(!fav);
+              startTransition(async () => {
+                await toggleFavorite(recipe.id);
+                router.refresh();
+              });
+            }}
+          >
+            <Star size={17} fill={fav ? "var(--accent)" : "none"} style={{ color: fav ? "var(--accent)" : undefined }} />
+          </button>
+          <button type="button" className="fl-btn fl-btn-secondary desk-only" onClick={() => menu.openDialog("pdf")}>
+            <FileDown size={16} /> PDF
+          </button>
+          <Link href={`/recipes/${recipe.id}/edit`} className="fl-btn fl-btn-secondary desk-only">
+            <Pencil size={15} /> Modifier
+          </Link>
+          <MoreButton spec={menu.getSpec} label="Plus d'actions" horizontal className="fl-btn fl-btn-secondary fl-btn-icon" />
+          <button type="button" className="fl-btn fl-btn-primary" onClick={() => menu.openDialog("cookbook")} aria-label="Ajouter à un cahier">
+            <Library size={16} />
+            <span className="desk-only">Ajouter au cahier</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="rmeta">
+        {recipe.folder && (
+          <Link href={`/?folder=${recipe.folder.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--soft)" }}>
+            <span className="dot" style={{ background: recipe.folder.color }} />
+            {recipe.folder.name}
+          </Link>
+        )}
+        {recipe.categories.map((c) => (
+          <span key={c.id} className="fl-tag" style={{ color: c.color, borderColor: `${c.color}55`, background: `${c.color}14` }}>
+            {c.name}
+          </span>
+        ))}
+        {recipe.tags.map((t) => (
+          <span key={t} className="fl-tag">#{t}</span>
+        ))}
+        {recipe.rating ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 2, color: "var(--accent)" }} aria-label={`Note ${recipe.rating} sur 5`}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} size={13} fill={i < (recipe.rating ?? 0) ? "currentColor" : "none"} style={{ opacity: i < (recipe.rating ?? 0) ? 1 : 0.35 }} />
+            ))}
+          </span>
+        ) : null}
+        {fav && (
+          <span className="mob-only" style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent)" }}>
+            <Star size={13} fill="currentColor" /> Favori
+          </span>
+        )}
+      </div>
+
+      <div className="fl-tabs" role="tablist" style={{ marginBottom: 16 }}>
+        <button type="button" role="tab" aria-selected={tab === "recipe"} onClick={() => setTab("recipe")}>
+          Recette
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "steps"} onClick={() => setTab("steps")}>
+          Préparation
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "notes"} onClick={() => setTab("notes")}>
+          Notes et essais{notesCount ? ` · ${notesCount}` : ""}
+        </button>
+      </div>
+
+      {tab === "recipe" && (
+        <>
+          <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} />
+          {usedIn.length > 0 && (
+            <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Layers size={16} style={{ color: "var(--accent)" }} />
+              <span style={{ color: "var(--soft)", fontSize: 13.5, display: "flex", alignItems: "center" }}>
+                Utilisée comme sous-recette dans
+                <Help title="Utilisée comme sous-recette">
+                  Ces recettes contiennent celle-ci. Si tu la modifies, elles suivent
+                  automatiquement (les quantités sont recalculées selon leur réglage).
+                </Help>
+              </span>
+              {usedIn.map((u) => (
+                <Link key={u.id} href={`/recipes/${u.id}`} className="fl-tag" style={{ color: "var(--accent)" }}>
+                  {u.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === "steps" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <section className="fl-card">
+            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{recipe.name}</h2>
+            {recipe.steps ? <StepsContent content={recipe.steps} /> : <p style={{ color: "var(--muted)" }}>Pas encore d&apos;étapes. Ajoute-les avec « Modifier ».</p>}
+          </section>
+          {subSteps.map((s) => (
+            <section className="fl-card" key={s.id}>
+              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                <Layers size={15} style={{ color: "var(--accent)" }} />
+                {s.label}
+                {s.label !== s.childName && <small style={{ color: "var(--muted)", fontWeight: 400 }}>{s.childName}</small>}
+              </h2>
+              <StepsContent content={s.childSteps!} />
+            </section>
+          ))}
+        </div>
+      )}
+
+      {tab === "notes" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {recipe.notesTips && (
+            <section className="fl-card">
+              <h2 className="fl-label" style={{ marginBottom: 8 }}>Notes et astuces</h2>
+              <p style={{ whiteSpace: "pre-wrap", color: "var(--soft)", lineHeight: 1.6 }}>{recipe.notesTips}</p>
+            </section>
+          )}
+          <CommentsSection recipeId={recipe.id} comments={comments} />
+          {recipe.source && (
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>
+              Source : <span style={{ color: "var(--soft)" }}>{recipe.source}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      <p style={{ color: "var(--muted)", fontSize: 12, textAlign: "center", marginTop: 24 }}>
+        Créée le {new Date(recipe.createdAt).toLocaleDateString("fr-FR")} · modifiée le{" "}
+        {new Date(recipe.updatedAt).toLocaleDateString("fr-FR")}
+      </p>
+
+      {menu.dialogs}
+    </article>
+  );
+}
