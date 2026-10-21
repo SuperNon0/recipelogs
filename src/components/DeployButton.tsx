@@ -99,7 +99,7 @@ export function DeployButton() {
           style={{
             color: "var(--danger)",
             padding: "10px 14px",
-            background: "rgba(232, 92, 71, 0.08)",
+            background: "rgba(239, 125, 107, 0.08)",
             border: "1px solid var(--danger)",
             borderRadius: 8,
           }}

@@ -1,37 +1,39 @@
 import { NextResponse } from "next/server";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
-import { buildSingleRecipeHtml } from "@/lib/pdf/template";
-import { renderHtmlToPdf } from "@/lib/pdf/renderer";
-import { getRecipePdfSettings } from "@/app/actions/settings";
-import { recipePdfSettingsToTheme } from "@/lib/pdf/theme";
-import { photoDataUri } from "@/lib/uploads";
-import { decoratePdf } from "@/lib/pdf/decorate";
+import { renderRecipePdf } from "@/lib/pdf/recipePdf";
+import { getDefaultPdfTheme, getPdfTheme } from "@/lib/pdfThemes";
 
+/**
+ * PDF d'une recette.
+ *  - ?theme=ID : thème à utiliser (sinon le thème par défaut)
+ *  - ?inline=1 : affichage dans la page (aperçu) au lieu d'un téléchargement
+ */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const recipeId = Number(id);
-  if (isNaN(recipeId)) {
+  if (!Number.isInteger(recipeId)) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const url = new URL(req.url);
+  const themeId = Number(url.searchParams.get("theme"));
+  const inline = url.searchParams.get("inline") === "1";
 
   const snap = await buildRecipeSnapshot(recipeId);
   if (!snap) return new NextResponse("Not found", { status: 404 });
 
-  const settings = await getRecipePdfSettings();
-  const theme = recipePdfSettingsToTheme(settings);
-
-  const photo = theme.recipeLayout === "magazine" ? await photoDataUri(snap.photoPath) : null;
-  const html = buildSingleRecipeHtml({ ...snap, photoPath: photo }, settings.format, theme);
-  const pdf = await decoratePdf(await renderHtmlToPdf(html, settings.format), theme);
+  const theme = (Number.isInteger(themeId) && themeId > 0 ? await getPdfTheme(themeId) : null)
+    ?? (await getDefaultPdfTheme());
+  const pdf = await renderRecipePdf(snap, theme.config, theme.format);
 
   const filename = `${snap.name.replace(/[^a-z0-9\-]/gi, "_")}.pdf`;
   return new NextResponse(pdf.buffer as ArrayBuffer, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${filename}"`,
+      "Cache-Control": "no-store",
     },
   });
 }

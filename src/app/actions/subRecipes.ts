@@ -121,3 +121,25 @@ export async function toggleSubRecipeLock(id: number, parentId: number) {
     data: { isLocked: !current.isLocked },
   });
 }
+
+/** Monte (-1) ou descend (+1) une sous-recette dans la liste de sa recette parente. */
+export async function moveSubRecipe(
+  id: number,
+  parentId: number,
+  dir: -1 | 1,
+): Promise<SubRecipeActionResult> {
+  const list = await prisma.subRecipe.findMany({
+    where: { parentId },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  const i = list.findIndex((s) => s.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return { ok: true };
+  [list[i], list[j]] = [list[j], list[i]];
+  await prisma.$transaction(
+    list.map((s, k) => prisma.subRecipe.update({ where: { id: s.id }, data: { position: k } })),
+  );
+  revalidatePath(`/recipes/${parentId}`);
+  return { ok: true };
+}

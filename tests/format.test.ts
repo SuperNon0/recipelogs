@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatG, formatCoef, formatQty } from "@/lib/format";
+import { formatG, formatCoef, formatQty, formatRelativeDate } from "@/lib/format";
 
 describe("formatG", () => {
   it("affiche les grammes < 1000 avec une décimale", () => {
@@ -43,5 +43,21 @@ describe("formatQty", () => {
   it("autres unités avec décimales", () => {
     expect(formatQty(0.5, "L")).toBe("0,5 L");
     expect(formatQty(2, "cc")).toBe("2 cc");
+  });
+});
+
+describe("formatRelativeDate", () => {
+  const now = new Date("2026-10-21T12:00:00Z");
+  const ago = (d: number) => new Date(now.getTime() - d * 86_400_000);
+  it("parle en jours, semaines, mois puis années", () => {
+    expect(formatRelativeDate(ago(0), now)).toBe("aujourd'hui");
+    expect(formatRelativeDate(ago(1), now)).toBe("hier");
+    expect(formatRelativeDate(ago(3), now)).toBe("il y a 3 j");
+    expect(formatRelativeDate(ago(15), now)).toBe("2 sem.");
+    expect(formatRelativeDate(ago(65), now)).toBe("2 mois");
+    expect(formatRelativeDate(ago(800), now)).toBe("2 ans");
+  });
+  it("accepte une date en texte (ISO)", () => {
+    expect(formatRelativeDate(ago(3).toISOString(), now)).toBe("il y a 3 j");
   });
 });

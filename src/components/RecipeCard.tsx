@@ -123,7 +123,7 @@ export function RecipeCard({ recipe, from }: { recipe: RecipeListItem; from?: st
         className="fl-card flex flex-col gap-3 text-left transition-colors"
         style={{
           borderColor: selected ? "var(--accent)" : undefined,
-          background: selected ? "rgba(232,197,71,0.08)" : undefined,
+          background: selected ? "rgba(240, 166, 74,0.08)" : undefined,
           cursor: "pointer",
         }}
         aria-pressed={selected}

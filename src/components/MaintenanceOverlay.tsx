@@ -230,7 +230,7 @@ export function MaintenanceOverlay({
             style={{
               padding: 12,
               borderRadius: 8,
-              background: "rgba(232, 92, 71, 0.1)",
+              background: "rgba(239, 125, 107, 0.1)",
               border: "1px solid var(--danger)",
               color: "var(--danger)",
               fontSize: "0.85rem",

@@ -2,7 +2,7 @@ import { buildRecipeSnapshot, type RecipeSnapshot, getCookbookDetail } from "@/l
 import { buildCoverTocHtml, buildRecipesHtml, TOC_ANCHOR_PREFIX, type CookbookEntryUnion } from "./template";
 import { renderHtmlToPdf, mergePdfs, readAnchorPages } from "./renderer";
 import { decoratePdf } from "./decorate";
-import type { CookbookTheme } from "./theme";
+import { themeShowsPhoto, type CookbookTheme } from "./theme";
 import { photoDataUri } from "@/lib/uploads";
 
 type CookbookDetail = NonNullable<Awaited<ReturnType<typeof getCookbookDetail>>>;
@@ -66,7 +66,7 @@ export async function renderCookbookPdf(opts: {
   entries: CookbookEntryUnion[];
 }): Promise<Uint8Array | null> {
   const { format, theme } = opts;
-  const entries = theme.recipeLayout === "magazine" ? await withInlinePhotos(opts.entries) : opts.entries;
+  const entries = themeShowsPhoto(theme) ? await withInlinePhotos(opts.entries) : opts.entries;
 
   // Les recettes sont rendues EN PREMIER : on relit dans ce PDF la page réelle
   // de chaque entrée pour que le sommaire soit exact.

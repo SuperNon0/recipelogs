@@ -1,47 +1,74 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { AppNav } from "@/components/AppNav";
+import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/AppNav";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { getSiteUrl } from "@/app/actions/settings";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
+  appleWebApp: { capable: true, title: "RecipeLog", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#0e0f11",
+  themeColor: "#0b0f17",
 };
+
+async function loadNavCounts(): Promise<NavCounts> {
+  const [recipes, favorites, cookbooks, lists, noFolder, folders] = await Promise.all([
+    prisma.recipe.count(),
+    prisma.recipe.count({ where: { favorite: true } }),
+    prisma.cookbook.count(),
+    prisma.shoppingList.count(),
+    prisma.recipe.count({ where: { folderId: null } }),
+    prisma.folder.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true, _count: { select: { recipes: true } } },
+    }),
+  ]);
+  return {
+    recipes,
+    favorites,
+    cookbooks,
+    lists,
+    noFolder,
+    folders: folders.map((f) => ({ id: f.id, name: f.name, color: f.color, count: f._count.recipes })),
+  };
+}
 
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const siteUrl = await getSiteUrl();
+  const [siteUrl, counts] = await Promise.all([getSiteUrl(), loadNavCounts()]);
 
   return (
     <html lang="fr">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap"
           rel="stylesheet"
         />
       </head>
       <body>
-        <header className="sticky top-0 z-40" style={{ background: "var(--surface)" }}>
-          <AppNav siteUrl={siteUrl} />
-        </header>
-        <main className="max-w-5xl mx-auto px-4 py-6 pb-28">{children}</main>
+        <div className="app">
+          <AppSidebar siteUrl={siteUrl} counts={counts} />
+          <div style={{ minWidth: 0 }}>
+            <AppTopBar />
+            <main className="app-main">
+              <div className="app-content">{children}</div>
+            </main>
+          </div>
+        </div>
+        <AppTabBar />
+        <CommandPalette />
       </body>
     </html>
   );

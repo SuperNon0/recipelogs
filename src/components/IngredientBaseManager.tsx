@@ -251,7 +251,7 @@ export function IngredientBaseManager({
                     borderRadius: 6,
                     border: "1px solid",
                     borderColor: isActive ? "var(--accent)" : "var(--border)",
-                    background: isActive ? "rgba(232,197,71,0.12)" : "transparent",
+                    background: isActive ? "rgba(240, 166, 74,0.12)" : "transparent",
                     color: isActive ? "var(--accent)" : "var(--muted)",
                     cursor: "pointer",
                     fontWeight: isActive ? 600 : 400,
@@ -276,7 +276,7 @@ export function IngredientBaseManager({
                 borderRadius: 6,
                 border: "1px solid",
                 borderColor: selectionMode ? "var(--accent)" : "var(--border)",
-                background: selectionMode ? "rgba(232,197,71,0.12)" : "transparent",
+                background: selectionMode ? "rgba(240, 166, 74,0.12)" : "transparent",
                 color: selectionMode ? "var(--accent)" : "var(--muted)",
                 cursor: "pointer",
                 fontWeight: selectionMode ? 600 : 400,
@@ -493,7 +493,7 @@ function BulkActionBar({
                     borderRadius: 5,
                     border: "1px solid",
                     borderColor: bulkMergeTargetId === opt.id ? "var(--accent)" : "var(--border)",
-                    background: bulkMergeTargetId === opt.id ? "rgba(232,197,71,0.1)" : "transparent",
+                    background: bulkMergeTargetId === opt.id ? "rgba(240, 166, 74,0.1)" : "transparent",
                     color: "var(--text)",
                     fontFamily: "var(--font-mono)",
                     fontSize: "0.75rem",
@@ -692,7 +692,7 @@ function CategoryColumn({
               borderRadius: 5,
               border: "1px solid",
               borderColor: allSelected ? "var(--accent)" : "var(--border)",
-              background: allSelected ? "rgba(232,197,71,0.12)" : "transparent",
+              background: allSelected ? "rgba(240, 166, 74,0.12)" : "transparent",
               color: allSelected ? "var(--accent)" : "var(--muted)",
               cursor: "pointer",
             }}
@@ -836,7 +836,7 @@ function IngredientRow({
       className="flex flex-col gap-1.5 px-3 py-2"
       style={{
         borderBottom: "1px solid rgba(255,255,255,0.03)",
-        background: selectionMode && isSelected ? "rgba(232,197,71,0.08)" : undefined,
+        background: selectionMode && isSelected ? "rgba(240, 166, 74,0.08)" : undefined,
         cursor: selectionMode ? "pointer" : undefined,
       }}
       onClick={selectionMode ? () => onToggleSelected(ing.id) : undefined}
@@ -1106,7 +1106,7 @@ function IngredientRow({
                     borderRadius: 4,
                     border: "1px solid",
                     borderColor: mergeTargetId === opt.id ? "var(--accent)" : "var(--border)",
-                    background: mergeTargetId === opt.id ? "rgba(232,197,71,0.1)" : "transparent",
+                    background: mergeTargetId === opt.id ? "rgba(240, 166, 74,0.1)" : "transparent",
                     color: "var(--text)",
                     fontFamily: "var(--font-mono)",
                     fontSize: "0.72rem",

@@ -315,6 +315,7 @@ export async function duplicateRecipe(id: number) {
       tags: true,
       categories: true,
       stepsBlock: true,
+      parentLinks: true,
     },
   });
   if (!source) throw new Error("Recette introuvable");
@@ -345,6 +346,20 @@ export async function duplicateRecipe(id: number) {
       stepsBlock: source.stepsBlock
         ? { create: { content: source.stepsBlock.content } }
         : undefined,
+      // Les sous-recettes sont reprises avec leurs réglages. L'ingrédient pivot
+      // appartient à la sous-recette (pas à la copie) : l'identifiant reste valable.
+      parentLinks: {
+        create: source.parentLinks.map((l) => ({
+          childId: l.childId,
+          label: l.label,
+          calcMode: l.calcMode,
+          calcValue: l.calcValue,
+          pivotIngredientId: l.pivotIngredientId,
+          isLocked: l.isLocked,
+          isExact: l.isExact,
+          position: l.position,
+        })),
+      },
     },
   });
 

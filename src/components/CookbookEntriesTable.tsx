@@ -546,7 +546,7 @@ function ChapterRow({
     <div
       className="px-3 py-3 flex items-start gap-2"
       style={{
-        background: "rgba(232, 197, 71, 0.06)",
+        background: "rgba(240, 166, 74, 0.06)",
         borderLeft: "3px solid var(--accent)",
       }}
     >

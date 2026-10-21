@@ -150,7 +150,7 @@ export function IngredientDetailClient({
                         padding: "0.45rem 0.8rem",
                         fontSize: "0.85rem",
                         fontFamily: "var(--font-mono)",
-                        background: mergeTarget === String(b.id) ? "rgba(232,197,71,0.12)" : "transparent",
+                        background: mergeTarget === String(b.id) ? "rgba(240, 166, 74,0.12)" : "transparent",
                         color: mergeTarget === String(b.id) ? "var(--accent)" : "var(--text)",
                         border: "none",
                         borderBottom: "1px solid var(--border)",

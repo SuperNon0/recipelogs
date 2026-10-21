@@ -110,8 +110,8 @@ export function JsonRecipeImport() {
         <div
           className="fl-card"
           style={{
-            background: result.ok ? "rgba(100,200,100,0.06)" : "rgba(232,92,71,0.08)",
-            borderColor: result.ok ? "rgba(100,200,100,0.3)" : "rgba(232,92,71,0.4)",
+            background: result.ok ? "rgba(100,200,100,0.06)" : "rgba(239, 125, 107,0.08)",
+            borderColor: result.ok ? "rgba(100,200,100,0.3)" : "rgba(239, 125, 107,0.4)",
             padding: "0.8rem 1rem",
           }}
         >

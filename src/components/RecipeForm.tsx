@@ -425,8 +425,8 @@ export function RecipeForm({
         <div
           className="fl-card"
           style={{
-            background: "rgba(232, 92, 71, 0.08)",
-            borderColor: "rgba(232, 92, 71, 0.4)",
+            background: "rgba(239, 125, 107, 0.08)",
+            borderColor: "rgba(239, 125, 107, 0.4)",
             color: "var(--danger)",
             padding: "0.8rem 1rem",
           }}

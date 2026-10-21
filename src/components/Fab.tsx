@@ -20,11 +20,11 @@ export function Fab({
         width: 64,
         height: 64,
         background: "var(--pending)",
-        color: "#0e0f11",
+        color: "var(--accent-ink)",
         borderRadius: 20,
         fontSize: "2rem",
         fontWeight: 700,
-        boxShadow: "0 4px 16px rgba(167, 139, 250, 0.35)",
+        boxShadow: "0 4px 16px rgba(143, 156, 240, 0.35)",
       }}
     >
       {children}

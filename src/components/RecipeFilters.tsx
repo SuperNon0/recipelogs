@@ -2,7 +2,12 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { Hash, Search, X } from "lucide-react";
 
+/**
+ * Recherche par nom + filtres catégorie / tag, gardés dans l'adresse (?q=,
+ * ?category=, ?tag=) pour pouvoir revenir en arrière ou partager le lien.
+ */
 export function RecipeFilters({
   allTags,
   allCategories,
@@ -38,39 +43,43 @@ export function RecipeFilters({
     const t = setTimeout(() => {
       typingRef.current = false;
       if ((sp.get("q") ?? "") !== q) setParam("q", q || null);
-    }, 400);
+    }, 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   return (
-    <div className="flex flex-col gap-3 mb-5">
-      <input
-        className="fl-input"
-        placeholder="Rechercher une recette..."
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        spellCheck={false}
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+      <label className="searchbox">
+        <Search size={16} />
+        <input
+          placeholder="Filtrer par nom de recette…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-label="Filtrer les recettes par nom"
+        />
+        {q && (
+          <button type="button" onClick={() => setQ("")} aria-label="Effacer" style={{ background: "none", border: "none", color: "var(--muted)", display: "grid" }}>
+            <X size={16} />
+          </button>
+        )}
+      </label>
 
-      {allCategories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto fl-scroll-hidden pb-1">
+      {(allCategories.length > 0 || allTags.length > 0) && (
+        <div className="chips" role="toolbar" aria-label="Filtres">
           <button
             type="button"
-            onClick={() => setParam("category", null)}
-            className="fl-tag"
-            style={{
-              background: activeCategory
-                ? "transparent"
-                : "rgba(232, 197, 71, 0.15)",
-              color: activeCategory ? "var(--muted)" : "var(--accent)",
-              borderColor: activeCategory
-                ? "var(--border)"
-                : "rgba(232, 197, 71, 0.4)",
-              cursor: "pointer",
+            className="fl-chip"
+            aria-pressed={!activeCategory && !activeTag}
+            onClick={() => {
+              const next = new URLSearchParams(sp.toString());
+              next.delete("category");
+              next.delete("tag");
+              startTransition(() => router.push(`${pathname}?${next.toString()}`));
             }}
           >
             Toutes
@@ -81,46 +90,27 @@ export function RecipeFilters({
               <button
                 key={c.id}
                 type="button"
-                onClick={() =>
-                  setParam("category", active ? null : String(c.id))
-                }
-                className="fl-tag"
-                style={{
-                  background: active ? `${c.color}33` : "transparent",
-                  color: active ? c.color : "var(--muted)",
-                  borderColor: active ? `${c.color}88` : "var(--border)",
-                  cursor: "pointer",
-                }}
+                className="fl-chip"
+                aria-pressed={active}
+                onClick={() => setParam("category", active ? null : String(c.id))}
               >
+                <span className="dot" style={{ background: c.color }} />
                 {c.name}
               </button>
             );
           })}
-        </div>
-      )}
-
-      {allTags.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto fl-scroll-hidden pb-1">
           {allTags.slice(0, 30).map((t) => {
             const active = activeTag === t;
             return (
               <button
                 key={t}
                 type="button"
+                className="fl-chip"
+                aria-pressed={active}
                 onClick={() => setParam("tag", active ? null : t)}
-                className="fl-tag"
-                style={{
-                  background: active
-                    ? "rgba(79, 195, 161, 0.15)"
-                    : "transparent",
-                  color: active ? "var(--accent-2)" : "var(--muted)",
-                  borderColor: active
-                    ? "rgba(79, 195, 161, 0.4)"
-                    : "var(--border)",
-                  cursor: "pointer",
-                }}
               >
-                #{t}
+                <Hash size={12} />
+                {t}
               </button>
             );
           })}

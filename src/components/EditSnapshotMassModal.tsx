@@ -266,7 +266,7 @@ export function EditSnapshotMassModal({
                     borderRadius: 8,
                     border: "1px solid",
                     borderColor: forceExact ? "var(--accent)" : "var(--border)",
-                    background: forceExact ? "rgba(232,197,71,0.12)" : "transparent",
+                    background: forceExact ? "rgba(240, 166, 74,0.12)" : "transparent",
                     color: forceExact ? "var(--accent)" : "var(--muted)",
                     fontSize: "0.75rem",
                     fontFamily: "var(--font-mono)",

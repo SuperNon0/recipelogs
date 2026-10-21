@@ -211,7 +211,7 @@ export function AddCookbookToShoppingListButton({
                           color: "var(--text)",
                           background:
                             selectedListId === l.id
-                              ? "rgba(232,197,71,0.12)"
+                              ? "rgba(240, 166, 74,0.12)"
                               : "transparent",
                           borderTop:
                             idx === 0 ? "none" : "1px solid var(--border)",

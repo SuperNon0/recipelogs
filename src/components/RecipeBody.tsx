@@ -353,7 +353,7 @@ function MultiplierPanel({
             borderRadius: 8,
             border: "1px solid",
             borderColor: decimals ? "var(--accent-2)" : "var(--border)",
-            background: decimals ? "rgba(79,195,161,0.12)" : "transparent",
+            background: decimals ? "rgba(79, 192, 173,0.12)" : "transparent",
             color: decimals ? "var(--accent-2)" : "var(--muted)",
             fontSize: "0.75rem",
             fontFamily: "var(--font-mono)",
@@ -421,7 +421,7 @@ function ModeSwitcher({
               letterSpacing: "0.06em",
               textTransform: "uppercase",
               background: active
-                ? "rgba(232, 197, 71, 0.1)"
+                ? "rgba(240, 166, 74, 0.1)"
                 : "transparent",
               color: active ? "var(--accent)" : "var(--muted)",
               cursor: "pointer",
@@ -635,7 +635,7 @@ function SubRecipeAccordion({
         padding: 0,
         overflow: "hidden",
         borderColor: lockedOptimistic
-          ? "rgba(167, 139, 250, 0.5)"
+          ? "rgba(143, 156, 240, 0.5)"
           : "var(--border)",
       }}
     >
@@ -678,9 +678,9 @@ function SubRecipeAccordion({
           <span
             className="fl-tag"
             style={{
-              background: "rgba(167, 139, 250, 0.15)",
+              background: "rgba(143, 156, 240, 0.15)",
               color: "var(--pending)",
-              borderColor: "rgba(167, 139, 250, 0.4)",
+              borderColor: "rgba(143, 156, 240, 0.4)",
             }}
           >
             🔒 Verrouillé
@@ -907,7 +907,7 @@ function EditSubRecipeModal({
               borderRadius: 8,
               border: "1px solid",
               borderColor: isExact ? "var(--accent)" : "var(--border)",
-              background: isExact ? "rgba(232,197,71,0.12)" : "transparent",
+              background: isExact ? "rgba(240, 166, 74,0.12)" : "transparent",
               color: isExact ? "var(--accent)" : "var(--muted)",
               fontSize: "0.75rem",
               fontFamily: "var(--font-mono)",
@@ -941,8 +941,8 @@ function EditSubRecipeModal({
           <div
             className="fl-card"
             style={{
-              background: "rgba(232, 92, 71, 0.08)",
-              borderColor: "rgba(232, 92, 71, 0.4)",
+              background: "rgba(239, 125, 107, 0.08)",
+              borderColor: "rgba(239, 125, 107, 0.4)",
               color: "var(--danger)",
               padding: "0.6rem 0.8rem",
             }}
