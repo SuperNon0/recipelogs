@@ -211,9 +211,14 @@ button.set-row:first-child {
   max-width: 46%;
 }
 
+@media (min-width: 700px) {
+  .set-toolbar select.fl-input {
+    width: 240px;
+  }
+}
+
 .set-catchips {
   align-items: center;
-  margin-bottom: 14px;
 }
 
 .set-catchips .fl-chip b {
@@ -226,6 +231,7 @@ button.set-row:first-child {
 }
 
 .set-meta {
+  padding-top: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -650,4 +656,14 @@ button.set-row:first-child {
   max-width: 420px;
   color: var(--muted);
   font-size: 13.5px;
+}
+
+/* Téléphone : sous-titres sur deux lignes au lieu d'être coupés */
+@media (max-width: 699px) {
+  .set-tx small {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }

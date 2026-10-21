@@ -126,12 +126,12 @@ export function parseIngredientsText(raw: string): ParsedIngredient[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Ligne de quantité seule (commence par - ou ·) → l'attacher à la précédente
-    const qtyOnly = line.match(/^[-·•]\s*(\d.*)/);
-    if (qtyOnly && result.length > 0) {
+    // Ligne de quantité seule (« - 200g », « 800g ») → l'attacher à l'ingrédient
+    // précédent s'il n'avait pas encore de quantité (format Recipe Keeper).
+    if (isQuantityOnly(line) && result.length > 0) {
       const last = result[result.length - 1];
-      const qty = extractQuantityAndUnit(qtyOnly[1]);
-      if (qty.quantityG > 0 && last.quantityG === 0) {
+      const qty = extractQuantityAndUnit(line.replace(/^[-·•]\s*/, ""));
+      if (qty.quantityG > 0 && last.quantityG === 0 && last.quantityGMax == null) {
         last.quantityG = qty.quantityG;
         last.quantityGMax = qty.quantityGMax;
         last.unit = qty.unit;
@@ -145,6 +145,14 @@ export function parseIngredientsText(raw: string): ParsedIngredient[] {
   }
 
   return result;
+}
+
+/**
+ * Vrai si le texte n'est qu'une quantité, sans nom d'ingrédient :
+ * « 800g », « - 200 g », « 1,5 kg », « 100-200g », « 250 ml ».
+ */
+export function isQuantityOnly(text: string): boolean {
+  return /^\s*[-·•]?\s*\d+(?:[.,]\d+)?(?:\s*[-–à]\s*\d+(?:[.,]\d+)?)?\s*(?:kg|g|mg|ml|cl|l|cc|cs)?\.?\s*$/i.test(text);
 }
 
 /** Enlève la quantité en début/fin de ligne pour ne garder que le nom. */

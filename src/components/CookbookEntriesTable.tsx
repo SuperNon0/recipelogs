@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   DndContext,
@@ -109,6 +109,8 @@ export function CookbookEntriesTable({
   const [pending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const closeDialog = useCallback(() => setDialog(null), []);
+  // Identifiant stable : évite l'écart serveur / navigateur des attributs dnd-kit.
+  const dndId = useId();
 
   // Reprend l'état du serveur après chaque revalidation.
   useEffect(() => {
@@ -149,17 +151,15 @@ export function CookbookEntriesTable({
 
   const run = (fn: () => Promise<unknown>) => startTransition(async () => void (await fn()));
 
-  const recipeCount = entries.filter((e) => e.type === "recipe").length;
-  const chapterCount = entries.length - recipeCount;
-  let recipeNo = 0;
+  // Numéro de chaque recette dans le cahier (les chapitres ne comptent pas).
+  const numbers = new Map<string, number>();
+  entries.filter((e) => e.type === "recipe").forEach((e, i) => numbers.set(DND_ID(e), i + 1));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <p style={{ color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", marginRight: "auto" }}>
-          {recipeCount} recette{recipeCount > 1 ? "s" : ""}
-          {chapterCount > 0 && ` · ${chapterCount} chapitre${chapterCount > 1 ? "s" : ""}`}
-          {pending && " · enregistrement…"}
+          {pending ? "Enregistrement…" : "Dans l'ordre du PDF"}
           <Help title="Chapitres et sections">
             <b>Chapitre</b> : une page à part entière dans le PDF (titre et texte d&apos;introduction),
             qui ouvre une partie du cahier. Il apparaît dans le sommaire.
@@ -190,6 +190,7 @@ export function CookbookEntriesTable({
         </div>
       ) : (
         <DndContext
+          id={dndId}
           sensors={sensors}
           collisionDetection={closestCenter}
           modifiers={[restrictToVerticalAxis, restrictToParentElement]}
@@ -215,14 +216,13 @@ export function CookbookEntriesTable({
                 </span>
               </div>
               {entries.map((entry, idx) => {
-                if (entry.type === "recipe") recipeNo++;
                 return (
                   <SortableItem key={DND_ID(entry)} id={DND_ID(entry)}>
                     {(handle) =>
                       entry.type === "recipe" ? (
                         <RecipeRow
                           entry={entry}
-                          no={recipeNo}
+                          no={numbers.get(DND_ID(entry)) ?? 0}
                           cookbookId={cookbookId}
                           handle={handle}
                           canUp={idx > 0}

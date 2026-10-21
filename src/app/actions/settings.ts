@@ -406,3 +406,18 @@ export async function assignRecipesToFolder(
   revalidatePath("/settings");
   return { ok: true, count: result.count };
 }
+
+/** Relance la réparation des ingrédients importés (quantité sur une ligne à part). */
+export async function repairImportedIngredientsAction(): Promise<
+  { ok: true; recipes: number; fixed: number; basesRemoved: number } | { ok: false; error: string }
+> {
+  try {
+    const { repairImportedIngredients } = await import("@/lib/ingredientRepairDb");
+    const r = await repairImportedIngredients();
+    revalidatePath("/");
+    revalidatePath("/settings/ingredients");
+    return { ok: true, ...r };
+  } catch {
+    return { ok: false, error: "La réparation a échoué. Réessaie dans un instant." };
+  }
+}

@@ -16,7 +16,7 @@ import { deleteRecipes } from "@/app/actions/recipes";
  * Sélection multiple de recettes + suppression en lot.
  *
  * Le contexte est posé tout en haut de la page d'accueil (et des favoris),
- * si bien que TOUTES les RecipeCard — quelle que soit la vue (explorateur,
+ * si bien que TOUTES les lignes de recettes — quelle que soit la vue (explorateur,
  * dossier ouvert, « tout afficher » groupé par dossier, résultats de
  * recherche) — partagent le même état de sélection.
  *

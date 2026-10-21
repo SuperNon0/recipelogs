@@ -72,3 +72,15 @@ describe("aggregateIngredients", () => {
     expect(result[0].recipeId).toBe(5);
   });
 });
+
+describe("aggregateIngredients — titres de section", () => {
+  it("ignore les lignes à 0 g (rien à acheter)", () => {
+    const out = aggregateIngredients([
+      { recipeId: 1, ingredients: [
+        { name: "Levain", quantityG: 0, unit: "g" },
+        { name: "Levure", quantityG: 19, unit: "g" },
+      ] },
+    ]);
+    expect(out.map((i) => i.name)).toEqual(["Levure"]);
+  });
+});
