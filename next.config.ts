@@ -1,10 +1,29 @@
+import { execSync } from "node:child_process";
 import type { NextConfig } from "next";
+import { parseGitLog } from "./src/lib/pr-log";
+
+// Liste des PR fusionnées, lue dans git au moment du build et affichée dans
+// Réglages → « Version et nouveautés ». Sans git (archive, Docker) : liste vide.
+function mergedPrs(): string {
+  try {
+    const raw = execSync("git log --first-parent -200 --format=%cs%x1f%s%x1f%b%x1e", {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return JSON.stringify(parseGitLog(raw));
+  } catch {
+    return "[]";
+  }
+}
 
 const nextConfig: NextConfig = {
   // deploy.sh construit dans un dossier à part (NEXT_DIST_DIR=.next-build)
   // puis l'échange avec .next : un build raté ne casse plus le site en ligne.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_MERGED_PRS: mergedPrs(),
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "12mb",
