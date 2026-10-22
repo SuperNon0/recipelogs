@@ -69,7 +69,9 @@ export async function handleMcpMessage(msg: unknown, tools: McpTool[]): Promise<
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
         instructions:
-          "Accès à RecipeLog, l'application de recettes de pâtisserie de Noë. Réponds en français.",
+          "Accès à RecipeLog, l'application de recettes de pâtisserie de Noë. Réponds en français. " +
+          "Les quantités sont en grammes sauf unité contraire. Avant de modifier une recette, relis-la avec lire_recette. " +
+          "Demande toujours confirmation avant une suppression ou une mise à jour du site.",
       });
     }
     case "ping":

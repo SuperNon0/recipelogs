@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Copy, KeyRound, Power, RefreshCw, Wrench } from "lucide-react";
+import { Check, Copy, Eye, KeyRound, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
 import { disableMcpAccess, regenerateMcpAccess } from "@/app/actions/mcp";
 import { Help } from "@/components/ui/Help";
 
-type ToolInfo = { name: string; description: string };
+type ToolInfo = { name: string; description: string; kind: "read" | "write" | "delete" };
+export type ToolGroupInfo = { title: string; tools: ToolInfo[] };
+
+const KIND = {
+  read: { icon: Eye, label: "Lecture seule", color: "var(--muted)" },
+  write: { icon: Pencil, label: "Modifie", color: "var(--accent)" },
+  delete: { icon: Trash2, label: "Supprime", color: "var(--danger)" },
+} as const;
 
 /** Réglages → Accès MCP : activer, copier l'adresse, changer la clé, couper. */
-export function McpAccess({ token, tools }: { token: string | null; tools: ToolInfo[] }) {
+export function McpAccess({ token, groups }: { token: string | null; groups: ToolGroupInfo[] }) {
   const [pending, startTransition] = useTransition();
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
@@ -97,40 +104,69 @@ export function McpAccess({ token, tools }: { token: string | null; tools: ToolI
       </div>
 
       <div className="sect-title">
-        <h2>Ajouter RecipeLog dans Claude</h2>
+        <h2>Mise en place, une seule fois</h2>
       </div>
-      <ol className="set-note" style={{ paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+      <ol className="set-note" style={{ paddingLeft: 18, display: "flex", flexDirection: "column", gap: 10 }}>
         <li>
-          Dans Cloudflare Zero Trust, ajoute une règle Access « Bypass » limitée au chemin{" "}
-          <code>/api/mcp/*</code> (sinon Claude se heurte à la page de connexion Cloudflare).
+          <b>Active l&apos;accès</b> ci-dessus et copie l&apos;adresse.
         </li>
         <li>
-          Sur claude.ai : Réglages → Connecteurs → Ajouter un connecteur personnalisé, puis colle
-          l&apos;adresse ci-dessus.
+          <b>Ouvre ce chemin dans Cloudflare.</b> Le site est derrière Cloudflare Zero Trust, qui
+          demande de se connecter : Claude, lui, ne sait pas le faire. Dans le tableau de bord
+          Cloudflare : Zero Trust → Access → Applications → <i>Add an application</i> →{" "}
+          <i>Self-hosted</i>. Nom : « RecipeLog MCP ». Domaine : celui du site, avec le chemin{" "}
+          <code>api/mcp</code>. Dans la règle (policy), choisis l&apos;action <b>Bypass</b> et
+          « Everyone ». Enregistre. Le reste du site reste protégé comme avant : Cloudflare applique
+          la règle la plus précise, et seul <code>/api/mcp/…</code> est ouvert.
         </li>
         <li>
-          Avec Claude Code : <code>claude mcp add --transport http recipelog &lt;adresse&gt;</code>
+          <b>Vérifie.</b> Colle l&apos;adresse dans une fenêtre de navigation privée : tu dois voir
+          « Method not allowed » (c&apos;est normal, Claude n&apos;utilise pas cette méthode). Si tu
+          vois la page de connexion Cloudflare, la règle de l&apos;étape 2 ne s&apos;applique pas encore.
+        </li>
+        <li>
+          <b>Ajoute RecipeLog dans Claude.</b> Sur claude.ai (ordinateur) : Paramètres → Connecteurs →{" "}
+          <i>Ajouter un connecteur personnalisé</i>. Nom : « RecipeLog », URL : l&apos;adresse copiée.
+          Le connecteur marche ensuite aussi sur l&apos;application mobile. Avec Claude Code :{" "}
+          <code>claude mcp add --transport http recipelog &lt;adresse&gt;</code>
+        </li>
+        <li>
+          <b>Utilise-le.</b> Dans une conversation, active RecipeLog dans le menu des outils, puis
+          demande par exemple « classe mes ingrédients à classer ». Claude te demande ton accord avant
+          d&apos;utiliser un outil qui modifie ou supprime.
         </li>
       </ol>
+      <p className="set-note" style={{ marginTop: 10 }}>
+        Sécurité : sans la clé, l&apos;adresse répond « introuvable ». Si tu penses qu&apos;elle a
+        fuité, change la clé ci-dessus puis colle la nouvelle adresse dans Claude. « Couper » ferme
+        tout de suite l&apos;accès.
+      </p>
 
-      <div className="sect-title">
-        <h2>Outils disponibles</h2>
-      </div>
-      <div className="fl-list">
-        {tools.map((t) => (
-          <div key={t.name} className="fl-row">
-            <span className="ic">
-              <Wrench size={17} />
-            </span>
-            <span className="set-tx">
-              <b>
-                <span>{t.name}</span>
-              </b>
-              <small>{t.description}</small>
-            </span>
+      {groups.map((g) => (
+        <div key={g.title}>
+          <div className="sect-title">
+            <h2>{g.title}</h2>
           </div>
-        ))}
-      </div>
+          <div className="fl-list">
+            {g.tools.map((t) => {
+              const k = KIND[t.kind];
+              return (
+                <div key={t.name} className="fl-row">
+                  <span className="ic" style={{ color: k.color }} title={k.label}>
+                    <k.icon size={17} aria-label={k.label} />
+                  </span>
+                  <span className="set-tx">
+                    <b>
+                      <span>{t.name}</span>
+                    </b>
+                    <small>{t.description}</small>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </>
   );
 }

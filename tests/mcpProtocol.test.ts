@@ -71,3 +71,14 @@ describe("serveur MCP", () => {
     expect(bad.error.code).toBe(-32700);
   });
 });
+
+describe("repérage des doublons d'ingrédients", () => {
+  it("ignore la casse, les accents et le pluriel", async () => {
+    const { duplicateKey } = await import("@/lib/mcp/duplicates");
+    expect(duplicateKey("Œufs")).toBe(duplicateKey("oeuf"));
+    expect(duplicateKey("Crème fraîche")).toBe(duplicateKey("creme fraiche"));
+    expect(duplicateKey("Amandes")).toBe(duplicateKey("amande"));
+    expect(duplicateKey("Noix")).toBe(duplicateKey("noix"));
+    expect(duplicateKey("Gros sel")).toBe(duplicateKey("gros sel"));
+  });
+});
