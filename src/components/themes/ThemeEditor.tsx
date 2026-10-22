@@ -152,10 +152,9 @@ export function ThemeEditor({ theme, recipes }: Props) {
       } else setMsg({ ok: false, text: r.error });
     });
 
-  // Réglages sans effet avec le modèle choisi : masqués (cf. template.ts).
+  // Les réglages sans effet avec le modèle choisi sont simplement masqués (cf. template.ts).
   const layout = c.recipeLayout;
   const sideBySide = layout === "classique" || layout === "magazine";
-  const hidden = HIDDEN_BY_LAYOUT[layout];
 
   return (
     <div>
@@ -224,11 +223,6 @@ export function ThemeEditor({ theme, recipes }: Props) {
               options={RECIPE_LAYOUTS.map((v) => ({ value: v, label: RECIPE_LAYOUT_LABELS[v], thumb: <LayoutThumb layout={v} /> }))}
               hint={RECIPE_LAYOUT_HINTS[layout]}
             />
-            {hidden.length > 0 && (
-              <p style={{ color: "var(--muted)", fontSize: 12.5, marginTop: -8 }}>
-                Avec ce modèle, ces réglages n&apos;ont pas d&apos;effet et sont masqués : {hidden.join(", ")}.
-              </p>
-            )}
             {sideBySide ? (
               <VisualChoice
                 label="Place des ingrédients"
@@ -511,19 +505,6 @@ export function ThemeEditor({ theme, recipes }: Props) {
     </div>
   );
 }
-
-/** Réglages masqués selon le modèle, parce qu'il ne les utilise pas. */
-const HIDDEN_BY_LAYOUT: Record<CookbookTheme["recipeLayout"], string[]> = {
-  classique: [],
-  "fiche-technique": [
-    "largeur de la colonne ingrédients",
-    "cartouche d'infos (toujours affiché)",
-    "titre en majuscules (toujours en majuscules)",
-    "liste d'ingrédients, lignes zébrées et colonnes d'ingrédients (toujours un tableau)",
-  ],
-  moderne: ["largeur de la colonne ingrédients"],
-  magazine: ["numéros des étapes (le magazine met une lettrine)", "liste « Encadré » (déjà encadrée)"],
-};
 
 /** Oui / non sous forme de choix à schémas. */
 const onOff = (v: boolean) => (v ? ("on" as const) : ("off" as const));
