@@ -1,0 +1,1176 @@
+[
+  {
+    "name": "Sablé Breton",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 4250, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 3600, "unit": "g" },
+      { "name": "farine", "quantity": 7600, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 450, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 1900, "unit": "g" },
+      { "name": "sel", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Biscuit Chocolat sans Farine",
+    "yield": null,
+    "ingredients": [
+      { "name": "blanc d'œuf", "quantity": 2500, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 2000, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 1650, "unit": "g" },
+      { "name": "sucre glace", "quantity": 580, "unit": "g" },
+      { "name": "cacao poudre", "quantity": 675, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Pâte Sablée",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 230, "unit": "g" },
+      { "name": "sucre cassonade", "quantity": 106, "unit": "g" },
+      { "name": "sel", "quantity": 3, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 24, "unit": "g" },
+      { "name": "poudre de noisette", "quantity": 160, "unit": "g" },
+      { "name": "farine", "quantity": 130, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 10, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "Remplacez la poudre de noisette par de la farine pour obtenir une pâte neutre.",
+    "source": ""
+  },
+  {
+    "name": "Brioche Salée",
+    "yield": null,
+    "ingredients": [
+      { "name": "farine gruau", "quantity": 1000, "unit": "g" },
+      { "name": "miel", "quantity": 20, "unit": "g" },
+      { "name": "sel", "quantity": 28, "unit": "g" },
+      { "name": "levure", "quantity": 65, "unit": "g" },
+      { "name": "œufs", "quantity": 400, "unit": "g" },
+      { "name": "levain", "quantity": 300, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 20, "unit": "g" },
+      { "name": "beurre motte", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "Recette adaptée pour navettes salées. Le sucre (20 g) et le miel (20 g) sont conservés en petite quantité uniquement pour activer la levure et assurer une belle coloration. Le sel est augmenté à 28 g pour relever le goût.",
+    "source": ""
+  },
+  {
+    "name": "Pâte à Babas",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème à 35%", "quantity": 50, "unit": "g" },
+      { "name": "lait", "quantity": 95, "unit": "g" },
+      { "name": "sel", "quantity": 4, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 23, "unit": "g" },
+      { "name": "levure", "quantity": 25, "unit": "g" },
+      { "name": "farine T45", "quantity": 305, "unit": "g" },
+      { "name": "œufs", "quantity": 150, "unit": "g" },
+      { "name": "beurre fondu", "quantity": 90, "unit": "g" }
+    ],
+    "steps": "Tiédir le lait et la crème à 30 °C, y dissoudre la levure, le sel et le sucre.\n\nIncorporer la farine, ajouter les 3/4 des œufs.\n\nPétrir légèrement sans donner trop de corps à la pâte.\n\nAjouter le reste des œufs puis mélanger jusqu'à leur absorption.\n\nFondre le beurre chaud et le verser sur la masse, couvrir sans mélanger.\n\nPlacer à l'étuve à 27/28 °C environ 15 min jusqu'à ce que le beurre tombe sous la pâte.\n\nHomogénéiser la pâte à la maryse et garnir les moules.\n\nLaisser pousser une seconde fois.\n\nEnfourner à 200 °C quelques minutes pour démarrer la pousse régulière, puis baisser à 170/175 °C environ 8 à 10 min.",
+    "notes": "",
+    "source": "C'est ma fournée !"
+  },
+  {
+    "name": "Pâte à Langues de Chat",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre", "quantity": 60, "unit": "g" },
+      { "name": "farine", "quantity": 60, "unit": "g" },
+      { "name": "sucre en poudre", "quantity": 60, "unit": "g" },
+      { "name": "blanc d'œuf", "quantity": 2, "unit": "pièce" },
+      { "name": "vanille", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Travailler le beurre pour le rendre crémeux.\n\nAjouter le sucre, la vanille et la farine. Bien mélanger.\n\nIncorporer les blancs d'œufs.\n\nBeurrer et fariner la plaque. Dresser des bâtonnets à la poche à douille, suffisamment espacés.\n\nFaire cuire 7 à 8 min à 200 °C. Décoller aussitôt et laisser refroidir.",
+    "notes": "2 gouttes d'extrait de vanille ou 1 sachet de sucre vanillé.",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Biscuit Pain de Gênes",
+    "yield": null,
+    "ingredients": [
+      { "name": "pâte d'amande 50%", "quantity": 400, "unit": "g" },
+      { "name": "œufs", "quantity": 550, "unit": "g" },
+      { "name": "farine", "quantity": 85, "unit": "g" },
+      { "name": "sel", "quantity": 3, "unit": "g" },
+      { "name": "beurre motte", "quantity": 150, "unit": "g" },
+      { "name": "poudre à lever", "quantity": 4, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Streusel",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre", "quantity": 125, "unit": "g" },
+      { "name": "sucre roux", "quantity": 125, "unit": "g" },
+      { "name": "farine T45", "quantity": 125, "unit": "g" },
+      { "name": "poudre de noisette", "quantity": 125, "unit": "g" },
+      { "name": "sel", "quantity": 0, "unit": "QS" },
+      { "name": "cannelle", "quantity": 3, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Crème Pâtissière",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 2042, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nIncorporer le beurre en morceaux et lisser au fouet.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "20% de chocolat noir.",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Praliné",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "praliné", "quantity": 1531, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer le praliné dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "15% de praliné.",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "pâte de café", "quantity": 204, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de café dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Pâtissière Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 6000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule (appareil)", "quantity": 300, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 600, "unit": "g" },
+      { "name": "œufs", "quantity": 1800, "unit": "g" },
+      { "name": "beurre", "quantity": 509, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 1225, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec le premier sucre (1 000 g).\n\nMélanger le second sucre (300 g) avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire à feu moyen en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le beurre en morceaux et lisser au fouet.\n\nIncorporer la pâte de pistaches dans la crème tiédie et mélanger jusqu'à homogénéité.\n\nFilmer au contact et refroidir rapidement.",
+    "notes": "12% de pâte de pistaches.",
+    "source": "Enzo Dusfour"
+  },
+  {
+    "name": "Crème Mousseline",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte (à température ambiante) progressivement jusqu'à obtenir une crème légère et homogène.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 384, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement jusqu'à obtenir une crème légère et homogène.",
+    "notes": "20% de chocolat noir.",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Praliné",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "praliné", "quantity": 288, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis le praliné jusqu'à obtenir une crème légère et homogène.",
+    "notes": "15% de praliné.",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "pâte de café", "quantity": 38, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de café jusqu'à obtenir une crème légère et homogène.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
+    "source": ""
+  },
+  {
+    "name": "Crème Mousseline Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 1000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 350, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 150, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 120, "unit": "g" },
+      { "name": "poudre vanille", "quantity": 2, "unit": "g" },
+      { "name": "beurre motte", "quantity": 300, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 231, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nBlanchir les jaunes avec le reste du sucre, ajouter la poudre à crème et la poudre vanille.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nDébarrasser dans un cul-de-poule, filmer au contact et laisser tiédir à environ 40 °C.\n\nAu batteur, incorporer le beurre motte progressivement puis la pâte de pistaches jusqu'à obtenir une crème légère et homogène.",
+    "notes": "12% de pâte de pistaches.",
+    "source": ""
+  },
+  {
+    "name": "Crème Légère",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème pâtissière refroidie à la maryse.",
+    "notes": "",
+    "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Légère Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer le chocolat noir fondu et mélanger jusqu'à homogénéité.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème chocolat refroidie à la maryse.",
+    "notes": "25% de chocolat noir.",
+    "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Légère Pistache",
+    "yield": null,
+    "ingredients": [
+      { "name": "lait", "quantity": 362, "unit": "g" },
+      { "name": "poudre à crème", "quantity": 29, "unit": "g" },
+      { "name": "sucre", "quantity": 72, "unit": "g" },
+      { "name": "œufs", "quantity": 36, "unit": "g" },
+      { "name": "crème 35%", "quantity": 500, "unit": "g" },
+      { "name": "pâte de pistaches", "quantity": 120, "unit": "g" }
+    ],
+    "steps": "Porter le lait à ébullition avec la moitié du sucre.\n\nMélanger le reste du sucre avec la poudre à crème et les œufs jusqu'à obtenir un appareil homogène.\n\nVerser le lait bouillant sur l'appareil en fouettant, puis remettre sur le feu.\n\nCuire en fouettant sans arrêt jusqu'à épaississement et premier bouillon.\n\nHors du feu, incorporer la pâte de pistaches et mélanger jusqu'à homogénéité.\n\nFilmer au contact et laisser refroidir complètement.\n\nMonter la crème 35% en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la crème pistache refroidie à la maryse.",
+    "notes": "12% de pâte de pistaches.",
+    "source": "Les Friand's"
+  },
+  {
+    "name": "Crème Amandes",
+    "yield": null,
+    "ingredients": [
+      { "name": "beurre motte", "quantity": 2000, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 2000, "unit": "g" },
+      { "name": "poudre amande", "quantity": 2000, "unit": "g" },
+      { "name": "farine", "quantity": 200, "unit": "g" },
+      { "name": "œufs", "quantity": 2, "unit": "L" },
+      { "name": "rhum", "quantity": 150, "unit": "g" }
+    ],
+    "steps": "",
+    "notes": "Variantes : remplacez la poudre d'amande par de la poudre de noisette pour une crème noisette, ou par de la poudre de pistache pour une crème pistache.",
+    "source": ""
+  },
+  {
+    "name": "Frangipane",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème amande", "quantity": 900, "unit": "g" },
+      { "name": "crème pâtissière Friand's", "quantity": 300, "unit": "g" }
+    ],
+    "steps": "Mélanger la crème amande et la crème pâtissière jusqu'à obtenir un appareil homogène.",
+    "notes": "Ratio 3/4 crème amande — 1/4 crème pâtissière.",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne",
+    "yield": null,
+    "ingredients": [
+      { "name": "sucre semoule", "quantity": 4000, "unit": "g" },
+      { "name": "eau", "quantity": 1.2, "unit": "L" },
+      { "name": "blanc d'œuf", "quantity": 2, "unit": "L" },
+      { "name": "beurre motte", "quantity": 4000, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C.\n\nMonter les blancs d'œufs en neige ferme au batteur.\n\nVerser le sirop chaud en filet sur les blancs montés tout en fouettant pour réaliser la meringue italienne.\n\nLaisser refroidir la meringue à environ 40 °C en continuant de fouetter.\n\nIncorporer le beurre motte (à température ambiante) progressivement en fouettant jusqu'à obtenir une crème lisse et homogène.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Faire fondre le chocolat noir et le laisser tiédir à environ 35 °C.\n\nIncorporer le chocolat fondu progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "10% de chocolat noir.",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Grand Marnier",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "Grand Marnier", "quantity": 75, "unit": "g" }
+    ],
+    "steps": "Incorporer le Grand Marnier progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "3% de Grand Marnier.",
+    "source": ""
+  },
+  {
+    "name": "Crème au Beurre Meringue Italienne Café",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème au beurre meringue italienne", "quantity": 2500, "unit": "g" },
+      { "name": "pâte de café", "quantity": 50, "unit": "g" }
+    ],
+    "steps": "Incorporer la pâte de café progressivement à la crème au beurre en fouettant jusqu'à homogénéité.",
+    "notes": "2% de pâte de café. Ajuster selon l'intensité souhaitée.",
+    "source": ""
+  },
+  {
+    "name": "Crème Brûlée Classique",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
+      { "name": "lait", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Faire bouillir le lait. Hors du feu, ajouter la crème et le sucre, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Crème Brûlée Chocolat Noir",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" }
+    ],
+    "steps": "Faire fondre le chocolat noir et réserver.\n\nFaire bouillir le lait. Hors du feu, ajouter la crème, le sucre et le chocolat fondu, bien mélanger.\n\nAjouter les jaunes d'œufs et incorporer délicatement sans fouetter pour éviter les bulles.\n\nRemettre à chauffer très doucement sans faire bouillir, puis verser dans des ramequins individuels.\n\nCuire au four au bain-marie à 180 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "20% de chocolat noir. Sucre réduit à 150 g (au lieu de 200 g) pour compenser l'apport en sucre du chocolat.",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Crème Brûlée Passion",
+    "yield": "Pour 8 personnes",
+    "ingredients": [
+      { "name": "sucre", "quantity": 175, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 6, "unit": "pièce" },
+      { "name": "crème liquide", "quantity": 400, "unit": "g" },
+      { "name": "purée de fruit de la passion", "quantity": 250, "unit": "g" }
+    ],
+    "steps": "Chauffer doucement la crème avec le sucre sans faire bouillir.\n\nAjouter la purée de passion et mélanger.\n\nIncorporer les jaunes d'œufs délicatement sans fouetter pour éviter les bulles.\n\nVerser dans des ramequins individuels.\n\nCuire au four au bain-marie à 160 °C environ 50 min.\n\nLaisser refroidir complètement, saupoudrer de sucre roux et caraméliser au chalumeau.",
+    "notes": "La purée de passion remplace le lait. Sucre réduit à 175 g pour compenser l'apport sucrant de la purée. Cuisson à 160 °C (plutôt que 180 °C) pour préserver la texture face à l'acidité du fruit. Adaptable avec toute autre purée de fruit.",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Mousse Chocolat (Noir & Lait)",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 3, "unit": "L" },
+      { "name": "chocolat noir", "quantity": 3000, "unit": "g" },
+      { "name": "chocolat lait", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 6, "unit": "L" }
+    ],
+    "steps": "Chauffer la première crème et la verser sur les deux chocolats. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Noir",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 1.5, "unit": "L" },
+      { "name": "chocolat noir", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 3, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat noir. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 0,5 L par kg. Crème froide = 2× crème chaude.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat au Lait",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 1.5, "unit": "L" },
+      { "name": "chocolat lait", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 3, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat au lait. Mélanger jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 35 °C.\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 0,5 L par kg. Crème froide = 2× crème chaude.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Blanc",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 3, "unit": "L" },
+      { "name": "chocolat blanc", "quantity": 3000, "unit": "g" },
+      { "name": "crème froide", "quantity": 6, "unit": "L" }
+    ],
+    "steps": "Chauffer la crème chaude et la verser sur le chocolat blanc. Mélanger délicatement jusqu'à obtenir une ganache lisse et homogène.\n\nLaisser la ganache tiédir à environ 30 °C (le chocolat blanc est plus sensible à la chaleur).\n\nMonter la crème froide en crème fouettée souple au batteur.\n\nIncorporer délicatement la ganache à la crème montée en plusieurs fois à la maryse.",
+    "notes": "Ratio crème chaude/chocolat : 1:1 (le chocolat blanc émulsionne moins facilement). Crème froide = 2× crème chaude.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Noir Pâte à Bombes",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème", "quantity": 4, "unit": "L" },
+      { "name": "chocolat noir", "quantity": 2000, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 650, "unit": "g" },
+      { "name": "eau", "quantity": 1.3, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 650, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nFaire fondre le chocolat noir et le laisser tiédir à 35 °C.\n\nIncorporer le chocolat fondu à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en poches et réserver au froid minimum 4 heures.",
+    "notes": "Ratio crème/chocolat : 2:1. Pâte à bombes identique pour toutes les variations chocolat.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat au Lait Pâte à Bombes",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème", "quantity": 6, "unit": "L" },
+      { "name": "chocolat lait", "quantity": 2000, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 650, "unit": "g" },
+      { "name": "eau", "quantity": 1.3, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 650, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nFaire fondre le chocolat au lait et le laisser tiédir à 35 °C.\n\nIncorporer le chocolat fondu à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en poches et réserver au froid minimum 4 heures.",
+    "notes": "Ratio crème/chocolat : 3:1. Plus de crème pour équilibrer la douceur du chocolat au lait.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Chocolat Blanc Pâte à Bombes",
+    "yield": null,
+    "ingredients": [
+      { "name": "crème", "quantity": 8, "unit": "L" },
+      { "name": "chocolat blanc", "quantity": 2000, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 650, "unit": "g" },
+      { "name": "eau", "quantity": 1.3, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 650, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nFaire fondre le chocolat blanc et le laisser tiédir à 30 °C (le chocolat blanc est plus sensible à la chaleur).\n\nIncorporer le chocolat fondu à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en poches et réserver au froid minimum 4 heures.",
+    "notes": "Ratio crème/chocolat : 4:1. Maximum de crème pour contrebalancer la sucrosité du chocolat blanc. Température d'incorporation du chocolat abaissée à 30 °C.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Fruit (base coco)",
+    "yield": null,
+    "ingredients": [
+      { "name": "purée coco", "quantity": 1, "unit": "L" },
+      { "name": "crème montée", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 85, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 130, "unit": "g" }
+    ],
+    "steps": "Chauffer la purée de coco avec le sucre jusqu'à dissolution.\n\nAjouter la masse gélatine et mélanger jusqu'à fonte complète.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à l'appareil purée/gélatine à la maryse en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Adaptable avec toute purée de fruit. Ratio purée:crème = 1:1.",
+    "source": ""
+  },
+  {
+    "name": "Mousse Framboise Intense",
+    "yield": null,
+    "ingredients": [
+      { "name": "purée framboise", "quantity": 1, "unit": "L" },
+      { "name": "crème montée", "quantity": 1, "unit": "L" },
+      { "name": "sucre semoule", "quantity": 50, "unit": "g" },
+      { "name": "jus de citron", "quantity": 12, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 140, "unit": "g" }
+    ],
+    "steps": "Chauffer 1,3 L de purée framboise à 70 °C minimum et réduire à feu doux jusqu'à obtenir 1 L concentré. Cette étape désactive les enzymes qui bloquent la gélatine et concentre les arômes.\n\nAjouter le sucre et le jus de citron à la purée chaude, mélanger.\n\nAjouter la masse gélatine et mélanger jusqu'à fonte complète.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en soulevant la masse, sans trop mélanger pour préserver les arômes volatils de la framboise.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "La purée est réduite depuis 1,3 L pour concentrer les arômes. Le citron (12 g) rehausse naturellement la perception fruitée sans se sentir. Sucre réduit à 50 g car la purée concentrée est plus sucrée.",
+    "source": ""
+  },
+  {
+    "name": "Bavaroise Caramel",
+    "yield": null,
+    "ingredients": [
+      { "name": "sucre", "quantity": 100, "unit": "g" },
+      { "name": "sucre (appareil jaunes)", "quantity": 25, "unit": "g" },
+      { "name": "crème fleurette (caramel)", "quantity": 180, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 3, "unit": "pièce" },
+      { "name": "gélatine", "quantity": 3, "unit": "pièce" },
+      { "name": "crème fleurette (montée)", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "Faire cuire 100 g de sucre à sec jusqu'à caramélisation.\n\nFaire bouillir les 180 g de crème fleurette et la verser sur le caramel pour le décuire et le rendre souple.\n\nBattre les jaunes d'œufs avec les 25 g de sucre jusqu'à blanchiment, puis les incorporer à la crème caramel. Faire cuire doucement à 82 °C sans bouillir (à la nappe).\n\nRamollir les feuilles de gélatine dans de l'eau froide, les égoutter et les ajouter à la préparation chaude. Bien mélanger jusqu'à dissolution.\n\nLaisser refroidir à environ 25 °C.\n\nMonter les 350 g de crème fleurette en crème fouettée ferme.\n\nIncorporer délicatement la crème fouettée à la préparation au caramel à la maryse.\n\nVerser dans des verrines ou moules et laisser prendre au réfrigérateur minimum 3 heures.",
+    "notes": "",
+    "source": "marmiton.org"
+  },
+  {
+    "name": "Bavaroise Noisette",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de noisette (ou praliné noisette 50%)", "quantity": 250, "unit": "g" },
+      { "name": "lait entier", "quantity": 125, "unit": "g" },
+      { "name": "crème liquide (anglaise)", "quantity": 125, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 60, "unit": "g" },
+      { "name": "sucre", "quantity": 50, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 70, "unit": "g" },
+      { "name": "crème montée", "quantity": 350, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème liquide ensemble jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le mélange lait/crème chaud sur les jaunes en fouettant, puis remettre sur feu doux. Cuire à 82 °C en remuant sans arrêt jusqu'à ce que la crème nappe la cuillère.\n\nHors du feu, ajouter la masse gélatine et la pâte de noisette. Mixer au mixeur plongeant jusqu'à homogénéité parfaite.\n\nLaisser refroidir à environ 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois, en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser un praliné noisette 70% pour une saveur plus intense et moins sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse Café",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de café", "quantity": 80, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer la pâte de café à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Ajuster la quantité de pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse Praliné",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "praliné noisette/amande", "quantity": 200, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer le praliné à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser un praliné 70% noisette pour une saveur plus intense.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse Pistache",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "pâte de pistaches", "quantity": 200, "unit": "g" },
+      { "name": "eau", "quantity": 100, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 100, "unit": "g" },
+      { "name": "crème", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Cuire l'eau et le sucre à 121 °C pour réaliser le sirop.\n\nMonter les jaunes d'œufs au batteur. Verser le sirop chaud en filet sur les jaunes tout en fouettant à vitesse maximale.\n\nContinuer à fouetter jusqu'au complet refroidissement — la pâte à bombes doit être mousseuse et former un ruban.\n\nIncorporer la pâte de pistaches à la pâte à bombes et mélanger délicatement jusqu'à homogénéité.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer la crème fouettée en trois fois à la maryse en soulevant la masse, sans faire retomber la mousse.\n\nCouler en moules ou en verrines et réserver au froid minimum 4 heures.",
+    "notes": "Utiliser une pâte de pistaches pure sans sucre ajouté pour une saveur plus nette.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Vanille",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 120, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer le lait avec les gousses et les graines jusqu'à frémissement. Laisser infuser 10 min hors du feu.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud (filtré) sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C en remuant sans arrêt jusqu'à ce que la crème nappe la cuillère.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution complète.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois, en soulevant la masse.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Chocolat",
+    "yield": "Environ 1,5 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine puis le chocolat noir haché. Mélanger jusqu'à fonte complète et homogénéité. Mixer au mixeur plongeant.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre réduit à 80 g pour compenser l'apport sucrant du chocolat noir.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Framboise",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "purée de framboise", "quantity": 250, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 100, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer la purée de framboise et mélanger.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Gélatine légèrement augmentée (91 g) pour compenser l'acidité et l'eau de la purée. Sucre réduit à 100 g si la purée est déjà sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Fraise",
+    "yield": "Environ 1,3 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "purée de fraise", "quantity": 250, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 100, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer la purée de fraise et mélanger.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Gélatine légèrement augmentée (91 g) pour compenser l'acidité et l'eau de la purée. Sucre réduit à 100 g si la purée est déjà sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Praliné",
+    "yield": "Environ 1,4 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Incorporer le praliné et mixer au mixeur plongeant jusqu'à homogénéité.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre réduit à 80 g car le praliné est déjà sucré. Préférer un praliné 70% pour plus d'intensité.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Café",
+    "yield": "Environ 1,4 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 500, "unit": "g" },
+      { "name": "pâte de café", "quantity": 50, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 120, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 84, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de café. Mélanger jusqu'à dissolution et homogénéité complètes.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Ajuster la quantité de pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Bavarois Citron",
+    "yield": "Environ 1,2 kg",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "jus de citron", "quantity": 100, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "jaune d'œuf", "quantity": 120, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 140, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 91, "unit": "g" },
+      { "name": "crème montée", "quantity": 500, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait avec les zestes de citron jusqu'à frémissement. Laisser infuser 5 min hors du feu, filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution. Laisser tiédir à 35 °C puis incorporer le jus de citron froid — ne jamais ajouter le jus à chaud pour éviter la coagulation.\n\nLaisser refroidir à 25 °C.\n\nMonter la crème en crème fouettée souple.\n\nIncorporer délicatement la crème fouettée à la maryse en trois fois.\n\nCouler en moules et réserver au froid minimum 4 heures.",
+    "notes": "Sucre augmenté à 140 g pour équilibrer l'acidité du citron. Gélatine augmentée à 91 g car l'acidité fragilise la prise. Le jus de citron s'ajoute obligatoirement hors du feu et tiédi pour ne pas faire cailler la crème.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Noisette",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "pâte de noisette", "quantity": 100, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 60, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de noisette. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "L'émulsion au beurre à 45 °C est essentielle pour obtenir la texture onctueuse caractéristique du crémeux.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Praliné",
+    "yield": "Environ 950 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 50, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et le praliné. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "Sucre réduit à 50 g car le praliné est déjà sucré. Préférer un praliné 70% pour plus d'intensité.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Cacahuètes",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "pâte de cacahuètes", "quantity": 120, "unit": "g" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 60, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Chauffer le lait et la crème jusqu'à frémissement.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et la pâte de cacahuètes. Mélanger jusqu'à homogénéité.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "Utiliser une pâte de cacahuètes pure (100% cacahuètes) sans sucre ajouté pour mieux maîtriser la sucrosité finale.",
+    "source": "IA"
+  },
+  {
+    "name": "Crémeux Vanille",
+    "yield": "Environ 850 g",
+    "ingredients": [
+      { "name": "lait", "quantity": 250, "unit": "g" },
+      { "name": "crème liquide", "quantity": 250, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "jaune d'œuf", "quantity": 80, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 80, "unit": "g" },
+      { "name": "masse gélatine", "quantity": 42, "unit": "g" },
+      { "name": "beurre", "quantity": 80, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer le lait et la crème avec les gousses et les graines jusqu'à frémissement. Laisser infuser 10 min hors du feu puis filtrer.\n\nBlanchir les jaunes d'œufs avec le sucre.\n\nVerser le lait/crème chaud sur les jaunes en fouettant, remettre sur feu doux et cuire à 82 °C à la nappe.\n\nHors du feu, ajouter la masse gélatine et mélanger jusqu'à dissolution complète.\n\nLaisser tiédir à 45 °C puis ajouter le beurre en morceaux. Mixer au mixeur plongeant 2 min pour obtenir une émulsion lisse et brillante.\n\nFilmer au contact et réserver au froid minimum 4 heures avant utilisation.",
+    "notes": "L'infusion à froid prolongée (une nuit au réfrigérateur) intensifie davantage le parfum vanille.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Enrobage / Truffes",
+    "yield": "Environ 670 g (base chocolat noir)",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 200, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "chocolat noir 70%", "quantity": 400, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Hacher finement le chocolat et le placer dans un cul-de-poule.\n\nChauffer la crème avec le glucose jusqu'à frémissement.\n\nVerser la crème chaude sur le chocolat en trois fois, en émulsionnant depuis le centre à la maryse jusqu'à obtenir une ganache lisse et brillante.\n\nLaisser tiédir à 35 °C puis incorporer le beurre en morceaux. Mixer au mixeur plongeant.\n\nCouler dans un cadre ou une poche. Laisser cristalliser à 17 °C pendant 12 heures minimum avant utilisation.",
+    "notes": "ADAPTATIONS — mêmes quantités de crème et beurre, seul le chocolat change :\n• Chocolat au lait : 500 g (ratio 1:2,5 — le lait est plus souple, il faut plus de chocolat pour tenir)\n• Chocolat blanc : 600 g (ratio 1:3 — le blanc est très doux, maximum de chocolat pour la tenue)\nLe glucose apporte souplesse et allonge la durée de conservation.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Chocolat",
+    "yield": "Environ 800 g (base chocolat noir)",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "chocolat noir 70%", "quantity": 200, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement.\n\nVerser sur le chocolat haché en trois fois, en émulsionnant depuis le centre jusqu'à obtenir une ganache lisse.\n\nAjouter la crème froide et mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures (idéalement une nuit).\n\nMonter au batteur à vitesse moyenne jusqu'à obtenir une texture légère et pochable. Ne pas trop monter pour éviter le graining.",
+    "notes": "ADAPTATIONS — même quantité de crème chaude et froide, seul le chocolat change :\n• Chocolat au lait : 300 g (plus souple, besoin de plus de chocolat pour tenir)\n• Chocolat blanc : 400 g (très souple, ratio maximum)\nAttention : ne pas trop monter, surtout avec le chocolat blanc — s'arrêter dès que la texture est pochable.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Vanille",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 2, "unit": "pièce" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter les gousses de vanille. Chauffer la crème chaude avec les gousses et les graines. Laisser infuser 15 min hors du feu. Filtrer.\n\nRéchauffer la crème infusée, la verser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Pour une intensité maximale, réaliser l'infusion la veille à froid (laisser macérer gousses + crème une nuit au réfrigérateur avant de chauffer).",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Café",
+    "yield": "Environ 900 g",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "pâte de café", "quantity": 30, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 300, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement. Incorporer la pâte de café et mélanger.\n\nVerser sur le chocolat au lait haché en trois fois, en émulsionnant depuis le centre.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Le chocolat au lait s'associe mieux au café que le blanc (accord naturel). Ajuster la pâte de café selon l'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Praliné",
+    "yield": "Environ 950 g",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 200, "unit": "g" },
+      { "name": "praliné noisette/amande", "quantity": 150, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude jusqu'à frémissement.\n\nVerser sur le chocolat au lait haché en trois fois, en émulsionnant depuis le centre. Ajouter le praliné et mixer au mixeur plongeant.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Préférer un praliné 70% noisette pour une ganache plus intense et moins sucrée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Framboise",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 150, "unit": "g" },
+      { "name": "purée de framboise", "quantity": 100, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec la purée de framboise jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "La purée remplace une partie de la crème chaude — ne pas dépasser 40% de purée pour préserver la tenue après montage.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Citron",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 200, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "jus de citron", "quantity": 50, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec les zestes de citron. Laisser infuser 10 min hors du feu. Filtrer et réchauffer.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, puis incorporer le jus de citron froid — ne jamais ajouter le jus à chaud.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "Le jus de citron s'ajoute obligatoirement tiédi pour éviter la coagulation de la crème. L'acidité peut légèrement liquéfier — bien respecter le temps de repos au froid.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Montée Passion",
+    "yield": "Environ 1 kg",
+    "ingredients": [
+      { "name": "crème chaude", "quantity": 150, "unit": "g" },
+      { "name": "purée de fruit de la passion", "quantity": 80, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "crème froide", "quantity": 400, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème chaude avec la purée de passion jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nAjouter la crème froide, mélanger. Filmer au contact et réserver au réfrigérateur minimum 6 heures.\n\nMonter au batteur à vitesse moyenne jusqu'à texture légère et pochable.",
+    "notes": "La passion est très acide et aromatique — 80 g suffisent pour une ganache bien marquée. Augmenter jusqu'à 120 g maximum si plus d'intensité souhaitée.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Citron",
+    "yield": "Environ 700 g",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 150, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "zeste de citron", "quantity": 0, "unit": "QS" },
+      { "name": "chocolat blanc", "quantity": 400, "unit": "g" },
+      { "name": "jus de citron", "quantity": 60, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose et les zestes. Laisser infuser 10 min, filtrer et réchauffer.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le jus de citron puis le beurre en morceaux. Mixer au mixeur plongeant.\n\nCouler en cadre ou en moules à bonbons. Laisser cristalliser à 17 °C minimum 12 heures.\n\nCouper et enrober de chocolat blanc tempéré.",
+    "notes": "Ganache ferme pour intérieur de bonbons. Le jus de citron s'incorpore obligatoirement tiédi. Le glucose assure la souplesse et la conservation.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Praliné",
+    "yield": "Environ 570 g",
+    "ingredients": [
+      { "name": "praliné noisette/amande", "quantity": 200, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 200, "unit": "g" },
+      { "name": "crème liquide", "quantity": 100, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose jusqu'à frémissement.\n\nVerser sur le chocolat noir haché, émulsionner depuis le centre. Ajouter le praliné et mixer au mixeur plongeant.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer à nouveau.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober.",
+    "notes": "Utiliser un praliné 70% pour plus d'intensité. La combinaison praliné + chocolat noir évite l'excès de sucre.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Caramel",
+    "yield": "Environ 630 g",
+    "ingredients": [
+      { "name": "sucre semoule", "quantity": 150, "unit": "g" },
+      { "name": "crème liquide", "quantity": 200, "unit": "g" },
+      { "name": "glucose", "quantity": 30, "unit": "g" },
+      { "name": "chocolat au lait", "quantity": 200, "unit": "g" },
+      { "name": "beurre", "quantity": 50, "unit": "g" },
+      { "name": "fleur de sel", "quantity": 3, "unit": "g" }
+    ],
+    "steps": "Réaliser un caramel à sec avec le sucre jusqu'à coloration ambrée.\n\nDécuire avec la crème chaude (avec le glucose) versée en filet, en remuant sans cesse. Cuire à 107 °C.\n\nVerser le caramel chaud sur le chocolat au lait haché, émulsionner depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le beurre et la fleur de sel. Mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober.",
+    "notes": "Cuire le caramel à 107 °C pour un intérieur souple mais stable. La fleur de sel rehausse le caramel — indispensable.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Café",
+    "yield": "Environ 570 g",
+    "ingredients": [
+      { "name": "crème liquide", "quantity": 150, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "pâte de café", "quantity": 25, "unit": "g" },
+      { "name": "chocolat noir", "quantity": 300, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" }
+    ],
+    "steps": "Chauffer la crème avec le glucose et la pâte de café jusqu'à frémissement. Bien mélanger pour dissoudre.\n\nVerser sur le chocolat noir haché en trois fois, en émulsionnant depuis le centre.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober de chocolat noir.",
+    "notes": "Le chocolat noir amplifie l'amertume du café pour un bonbon intense. Réduire à 200 g de chocolat noir + 100 g de chocolat lait pour un résultat plus rond.",
+    "source": "IA"
+  },
+  {
+    "name": "Ganache Bonbons Passion",
+    "yield": "Environ 580 g",
+    "ingredients": [
+      { "name": "purée de fruit de la passion", "quantity": 100, "unit": "g" },
+      { "name": "crème liquide", "quantity": 80, "unit": "g" },
+      { "name": "glucose", "quantity": 25, "unit": "g" },
+      { "name": "chocolat blanc", "quantity": 350, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" }
+    ],
+    "steps": "Chauffer la purée de passion, la crème et le glucose jusqu'à frémissement.\n\nVerser sur le chocolat blanc haché en trois fois, en émulsionnant depuis le centre jusqu'à texture lisse.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer au mixeur plongeant.\n\nCouler en cadre. Laisser cristalliser à 17 °C minimum 12 heures avant de détailler et enrober de chocolat blanc ou lait.",
+    "notes": "La passion est naturellement acide — bien vérifier la cristallisation avant d'enrober. Le chocolat blanc équilibre l'acidité du fruit.",
+    "source": "IA"
+  },
+  {
+    "name": "Pâtes de Fruits",
+    "yield": "Environ 900 g — cadre 20×20 cm, 2 cm d'épaisseur",
+    "ingredients": [
+      { "name": "purée de fruit (framboise, fraise, passion, mangue, abricot ou griotte)", "quantity": 500, "unit": "g" },
+      { "name": "sucre semoule", "quantity": 450, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" },
+      { "name": "pectine NH", "quantity": 10, "unit": "g" },
+      { "name": "acide citrique", "quantity": 5, "unit": "g" },
+      { "name": "eau", "quantity": 5, "unit": "g" },
+      { "name": "sucre cristal (pour enrobage)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Dissoudre l'acide citrique dans les 5 g d'eau pour préparer la solution. Réserver.\n\nMélanger la pectine NH avec 50 g du sucre semoule. Réserver.\n\nDans une casserole, mélanger la purée de fruit avec les 400 g de sucre semoule restants et le glucose. Chauffer jusqu'à 50 °C en remuant.\n\nVerser le mélange pectine-sucre en pluie fine sur la purée chaude en fouettant énergiquement pour éviter les grumeaux.\n\nPorter à ébullition, puis cuire en remuant constamment jusqu'à 107 °C (thermomètre à sucre indispensable).\n\nHors du feu, ajouter immédiatement la solution d'acide citrique et mélanger rapidement — la masse prend en quelques secondes.\n\nCouler sans attendre dans un cadre légèrement huilé posé sur un tapis silicone. Lisser à la palette.\n\nLaisser refroidir à température ambiante 12 à 24 h sans couvrir.\n\nDémouler, détailler en cubes ou losanges. Rouler chaque pièce dans le sucre cristal et laisser sécher 1 h.",
+    "notes": "Adaptations par fruit :\n— Fraise : même recette, cuire à 107 °C.\n— Passion : purée très acide — réduire l'acide citrique à 3 g (+ 3 g eau). Cuire à 108 °C.\n— Mangue : même recette, cuire à 108 °C.\n— Abricot : même recette, cuire à 107 °C.\n— Griotte : ajouter 15 g de kirsch hors du feu avant la solution acide citrique.\n\nConservation : 3 à 4 semaines dans une boîte hermétique à 17 °C, entre feuilles de papier sulfurisé.",
+    "source": "IA"
+  },
+  {
+    "name": "Caramels Mous",
+    "yield": "Environ 600 g — cadre 20×20 cm, 1,5 cm d'épaisseur",
+    "ingredients": [
+      { "name": "crème liquide entière", "quantity": 200, "unit": "g" },
+      { "name": "beurre", "quantity": 60, "unit": "g" },
+      { "name": "gousse de vanille", "quantity": 1, "unit": "pièce" },
+      { "name": "sucre semoule", "quantity": 300, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" }
+    ],
+    "steps": "Fendre et gratter la gousse de vanille. Chauffer la crème avec la vanille jusqu'à frémissement. Laisser infuser 10 min hors du feu. Retirer la gousse.\n\nDans une casserole à fond épais, cuire le sucre semoule et le glucose à sec jusqu'à caramel brun doré (175–180 °C).\n\nHors du feu, décuire avec la crème chaude en trois fois, en mélangeant énergiquement entre chaque ajout (attention aux projections).\n\nRemettre sur feu moyen et cuire en remuant jusqu'à 121 °C (stade du caramel mou au boulé).\n\nHors du feu, incorporer le beurre en morceaux en mélangeant jusqu'à homogénéité complète.\n\nCouler dans un cadre légèrement huilé. Laisser refroidir 12 h à température ambiante.\n\nDétailler en cubes ou rectangles. Emballer dans des carrés de cellophane.",
+    "notes": "Variantes :\n— Chocolat : ajouter 80 g de chocolat noir 70 % haché hors du feu, après le beurre, en mélangeant jusqu'à fusion complète.\n— Caramel beurre salé : remplacer le beurre par 80 g de beurre demi-sel, supprimer la vanille, et ajouter 3 g de fleur de sel hors du feu avec le beurre.\n\nConservation : 3 semaines à température ambiante (< 20 °C) dans une boîte hermétique.",
+    "source": "IA"
+  },
+  {
+    "name": "Pâtes d'Amandes Confiserie",
+    "yield": "Environ 1 000 g (recette confiseur 50 %)",
+    "ingredients": [
+      { "name": "amandes mondées", "quantity": 500, "unit": "g" },
+      { "name": "sucre glace", "quantity": 400, "unit": "g" },
+      { "name": "glucose", "quantity": 100, "unit": "g" },
+      { "name": "eau de fleur d'oranger", "quantity": 0, "unit": "QS" },
+      { "name": "arôme amande amère", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Torréfier légèrement les amandes mondées à 150 °C pendant 8 min. Laisser refroidir complètement — ne pas broyer à chaud.\n\nMixer les amandes seules dans un robot-coupe en pulsant jusqu'à poudre très fine. Ne pas dépasser ce stade pour éviter de faire rendre l'huile.\n\nAjouter le sucre glace tamisé et mixer par impulsions brèves jusqu'à mélange homogène.\n\nIncorporer le glucose, puis quelques gouttes d'eau de fleur d'oranger ou d'arôme amande amère si souhaité. Mixer jusqu'à pâte souple et homogène.\n\nAjuster la texture si besoin : quelques gouttes d'eau si trop sèche, un peu de sucre glace si trop collante.\n\nFilmer au contact et laisser reposer 1 h au réfrigérateur avant utilisation.",
+    "notes": "Ratios selon la qualité :\n— Confiseur 50 % : 500 g amandes / 400 g sucre glace / 100 g glucose (recette ci-dessus)\n— Supérieure 60 % : 600 g amandes / 320 g sucre glace / 80 g glucose\n— Extra 66 % : 660 g amandes / 280 g sucre glace / 60 g glucose\n\nConservation : jusqu'à 1 mois au réfrigérateur filmée, ou 3 mois au congélateur.",
+    "source": "IA"
+  },
+  {
+    "name": "Fruits Déguisés",
+    "yield": "Environ 40 à 50 pièces",
+    "ingredients": [
+      { "name": "pâte d'amandes confiserie 60 %", "quantity": 500, "unit": "g" },
+      { "name": "colorants alimentaires gel", "quantity": 0, "unit": "QS" },
+      { "name": "sucre cristal (pour enrobage)", "quantity": 0, "unit": "QS" },
+      { "name": "glucose (pour lustrer)", "quantity": 0, "unit": "QS" },
+      { "name": "clous de girofle (tiges décoratives)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Diviser la pâte d'amandes en portions selon les couleurs souhaitées : rouge (fraise, griotte), orange (orange, abricot), jaune (citron, banane), vert (citron vert, poire).\n\nIncorporer le colorant gel à chaque portion en pétrissant jusqu'à couleur uniforme. Porter des gants pour éviter de teindre les mains.\n\nFaçonner chaque portion : boules légèrement aplaties pour orange, forme pointue en cœur pour fraise, cylindre courbé pour banane, ovale pour abricot. Travailler avec les paumes pour rouler et affiner les formes.\n\nPiquer un clou de girofle en tête de chaque fruit pour figurer le pédoncule.\n\nPour un aspect givré : rouler chaque pièce dans le sucre cristal. Pour un aspect brillant : badigeonner au pinceau de glucose légèrement dilué à l'eau chaude.\n\nDisposer sur papier sulfurisé et laisser sécher 12 à 24 h à l'air libre avant de conditionner.",
+    "notes": "Préférer la pâte d'amandes supérieure (60 %) ou extra (66 %) pour un meilleur goût et une pâte plus souple à façonner.\n\nConservation : 3 à 4 semaines dans une boîte hermétique à 12–16 °C, à l'abri de l'humidité.",
+    "source": "IA"
+  },
+  {
+    "name": "Intérieurs Liqueur (Sucre Candi)",
+    "yield": "Environ 40 à 50 bonbons",
+    "ingredients": [
+      { "name": "fondant pâtissier", "quantity": 400, "unit": "g" },
+      { "name": "glucose", "quantity": 40, "unit": "g" },
+      { "name": "liqueur (rhum, kirsch, Grand Marnier…)", "quantity": 60, "unit": "g" },
+      { "name": "colorant alimentaire gel", "quantity": 0, "unit": "QS" },
+      { "name": "sucre semoule (pour sirop candi)", "quantity": 500, "unit": "g" },
+      { "name": "eau (pour sirop candi)", "quantity": 200, "unit": "g" }
+    ],
+    "steps": "Préparer les intérieurs : chauffer le fondant et le glucose à 55–60 °C en mélangeant jusqu'à consistance souple et lisse. Hors du feu, incorporer la liqueur rapidement en remuant. Ajouter le colorant si souhaité.\n\nCouler la masse dans des moules en silicone demi-sphères ou façonner à la poche en dômes sur papier sulfurisé. Laisser figer 1 h au réfrigérateur.\n\nPréparer le sirop candi : chauffer l'eau et le sucre sans remuer jusqu'à 115–120 °C. Verser délicatement dans un plat profond légèrement humide. Laisser tiédir jusqu'à 80 °C.\n\nImmerger les intérieurs (piqués sur cure-dents ou posés sur grille) dans le sirop à 80 °C pendant 2 à 3 secondes. Déposer sur une grille.\n\nLaisser cristalliser à température ambiante (18–20 °C) pendant 24 à 48 h, à l'abri des courants d'air. Une croûte de sucre candi se forme progressivement autour de l'intérieur liquide.\n\nEnrober optionnellement en chocolat noir tempéré pour une finition classique.",
+    "notes": "La liqueur doit titrer au minimum 30° d'alcool pour que l'intérieur reste liquide sur la durée.\n\nCristallisation : minimum 24 h à 18–20 °C. Une croûte trop fine s'écrase à l'enrobage — attendre 48 h pour plus de résistance.\n\nConservation : 3 semaines à 16–18 °C dans une boîte hermétique.",
+    "source": "IA"
+  },
+  {
+    "name": "Truffes Chocolat",
+    "yield": "Environ 40 truffes",
+    "ingredients": [
+      { "name": "chocolat noir 70 %", "quantity": 300, "unit": "g" },
+      { "name": "crème liquide entière", "quantity": 150, "unit": "g" },
+      { "name": "beurre", "quantity": 30, "unit": "g" },
+      { "name": "glucose", "quantity": 20, "unit": "g" },
+      { "name": "cacao en poudre non sucré", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Hacher finement le chocolat noir. Réserver dans un cul-de-poule.\n\nChauffer la crème avec le glucose jusqu'à frémissement. Verser sur le chocolat haché en trois fois, en émulsionnant depuis le centre avec une spatule jusqu'à ganache lisse et brillante.\n\nLaisser tiédir à 35 °C, incorporer le beurre en morceaux et mixer 1 min au mixeur plongeant pour parfaire l'émulsion.\n\nFilmer au contact. Laisser cristalliser au réfrigérateur 4 h minimum (idéalement une nuit).\n\nFaçonner des boules à l'aide d'une cuillère parisienne ou d'une poche à douille. Rouler rapidement entre les paumes légèrement farinées de cacao.\n\nPour truffes nature : rouler immédiatement dans le cacao en poudre. Pour truffes enrobées : tremper dans du chocolat noir tempéré, laisser prendre 30 secondes sur grille, puis rouler dans le cacao.",
+    "notes": "Variantes :\n— Rhum : incorporer 20 g de rhum brun hors du feu, avant le beurre.\n— Praliné : remplacer 80 g de chocolat noir par 80 g de praliné noisette.\n— Framboise : remplacer 50 g de crème par 50 g de purée de framboise.\n\nConservation : 2 semaines au réfrigérateur dans une boîte hermétique. Sortir 30 min avant dégustation.",
+    "source": "IA"
+  },
+  {
+    "name": "Glaçage Velours Pistolet",
+    "yield": "Environ 400 g — pour 1 à 2 entremets",
+    "ingredients": [
+      { "name": "chocolat noir 70 %", "quantity": 200, "unit": "g" },
+      { "name": "beurre de cacao", "quantity": 200, "unit": "g" }
+    ],
+    "steps": "Hacher finement le chocolat noir et le beurre de cacao séparément.\n\nFaire fondre chacun au bain-marie ou au micro-ondes par intervalles de 30 secondes, jusqu'à 45 °C.\n\nMélanger les deux ensemble. Laisser tiédir en remuant jusqu'à 30–32 °C — température d'utilisation idéale pour le chocolat noir.\n\nVerser le mélange dans la cuve du pistolet à chocolat. S'assurer que la cuve est préchauffée (30–35 °C).\n\nSortir l'entremets du congélateur (minimum −18 °C). Travailler rapidement : positionner le pistolet à 20–30 cm de la surface et pulvériser en mouvements circulaires réguliers.\n\nRemettre immédiatement au congélateur ou au réfrigérateur selon le montage prévu.",
+    "notes": "Variantes :\n— Chocolat au lait : remplacer le chocolat noir par 200 g de chocolat au lait. Utiliser à 30–32 °C.\n— Chocolat blanc : remplacer le chocolat noir par 200 g de chocolat blanc. Utiliser à 28–30 °C (plus sensible à la chaleur).\n— Coloré : utiliser 400 g de beurre de cacao seul (sans chocolat) + colorant liposoluble QS. Utiliser à 30 °C. Pour plus d'opacité, incorporer 50 g de chocolat blanc fondu.\n\nL'entremets doit être congelé à −18 °C minimum : c'est le choc thermique entre la masse grasse chaude et la surface glacée qui cristallise instantanément le mélange et crée l'effet velours.\n\nLe mélange se conserve filmé au réfrigérateur jusqu'à 1 mois — réchauffer à 40 °C et ramener à température d'utilisation avant de s'en servir à nouveau.",
+    "source": "IA"
+  },
+  {
+    "name": "Gougères",
+    "yield": "Environ 40 à 50 pièces",
+    "ingredients": [
+      { "name": "eau", "quantity": 125, "unit": "g" },
+      { "name": "lait", "quantity": 125, "unit": "g" },
+      { "name": "beurre", "quantity": 100, "unit": "g" },
+      { "name": "sel fin", "quantity": 5, "unit": "g" },
+      { "name": "farine T55", "quantity": 150, "unit": "g" },
+      { "name": "œufs entiers", "quantity": 4, "unit": "pièce" },
+      { "name": "comté râpé (dans la pâte)", "quantity": 100, "unit": "g" },
+      { "name": "comté râpé (pour saupoudrer)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Porter l'eau, le lait, le beurre et le sel à ébullition dans une casserole.\n\nHors du feu, incorporer la farine en une seule fois. Mélanger énergiquement à la spatule, puis remettre sur feu doux et dessécher la pâte en remuant sans arrêt 2 min, jusqu'à ce qu'elle se décolle des parois.\n\nTransférer dans la cuve du batteur. Incorporer les œufs un par un à la feuille, en attendant que chaque œuf soit bien absorbé avant d'ajouter le suivant. La pâte doit être lisse, souple et former un ruban.\n\nIncorporer les 100 g de comté râpé à la spatule.\n\nPocher des boules de 3–4 cm sur plaque recouverte de papier sulfurisé. Saupoudrer de comté râpé.\n\nCuire à 180 °C (chaleur tournante) pendant 20 à 25 min sans ouvrir le four. Les gougères doivent être gonflées et dorées.\n\nDéguster tièdes ou à température ambiante.",
+    "notes": "Variantes de fromage : gruyère, emmental, mimolette, parmesan — ou mélange de deux fromages.\n\nPour des gougères garnies : laisser refroidir complètement et garnir à la poche d'une mousse salée (saumon fumé, foie gras, chèvre-herbes).\n\nSe congèlent très bien crus ou cuits.",
+    "source": "IA"
+  },
+  {
+    "name": "Tuiles Parmesan",
+    "yield": "Environ 30 à 40 pièces",
+    "ingredients": [
+      { "name": "parmesan râpé", "quantity": 200, "unit": "g" },
+      { "name": "thym effeuillé", "quantity": 0, "unit": "QS" },
+      { "name": "poivre noir du moulin", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Préchauffer le four à 180 °C.\n\nDisposer des petits tas de parmesan râpé (environ 10 g chacun) sur plaque recouverte de papier sulfurisé ou tapis silicone, bien espacés — ils s'étalent à la cuisson.\n\nSaupoudrer de thym et d'un tour de poivre.\n\nEnfourner 5 à 7 min jusqu'à ce que les tuiles soient dorées et légèrement bullées.\n\nLaisser refroidir 1 min sur la plaque, puis déposer immédiatement sur un rouleau à pâtisserie ou dans le creux d'une cuillère pour former la courbure. Elles durcissent en refroidissant.\n\nConserver dans une boîte hermétique à l'abri de l'humidité.",
+    "notes": "Variantes : parmesan + graines de sésame / parmesan + piment d'Espelette / parmesan + romarin haché.\n\nFormer des cornets en enroulant la tuile encore chaude autour d'un cône en métal — garnir à la poche de mousse de saumon ou de foie gras.",
+    "source": "IA"
+  },
+  {
+    "name": "Sablés Parmesan",
+    "yield": "Environ 40 pièces",
+    "ingredients": [
+      { "name": "beurre pommade", "quantity": 120, "unit": "g" },
+      { "name": "parmesan râpé", "quantity": 80, "unit": "g" },
+      { "name": "farine T55", "quantity": 150, "unit": "g" },
+      { "name": "sel fin", "quantity": 3, "unit": "g" },
+      { "name": "poivre noir du moulin", "quantity": 0, "unit": "QS" },
+      { "name": "piment d'Espelette", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Mélanger le beurre pommade et le parmesan râpé à la feuille jusqu'à consistance crémeuse.\n\nAjouter la farine tamisée, le sel, le poivre et le piment d'Espelette. Sabler sans trop travailler la pâte.\n\nFormer un ou deux boudins de 3 cm de diamètre dans du film alimentaire. Réserver au réfrigérateur 1 h minimum (ou 20 min au congélateur).\n\nTrancher en rondelles de 5 mm. Disposer sur plaque recouverte de papier sulfurisé.\n\nCuire à 170 °C pendant 12 à 15 min jusqu'à légère coloration dorée.\n\nLaisser refroidir complètement sur grille — les sablés durcissent en refroidissant.",
+    "notes": "Variantes : remplacer le parmesan par du comté affiné, de la mimolette, ou mixer parmesan + herbes séchées.\n\nLa pâte en boudin se conserve 5 jours au réfrigérateur ou 1 mois au congélateur, prête à trancher et cuire à la demande.",
+    "source": "IA"
+  },
+  {
+    "name": "Crackers Herbes & Fleur de Sel",
+    "yield": "Environ 50 pièces",
+    "ingredients": [
+      { "name": "farine T55", "quantity": 200, "unit": "g" },
+      { "name": "eau froide", "quantity": 80, "unit": "g" },
+      { "name": "huile d'olive", "quantity": 40, "unit": "g" },
+      { "name": "sel fin", "quantity": 5, "unit": "g" },
+      { "name": "herbes de Provence", "quantity": 8, "unit": "g" },
+      { "name": "fleur de sel (pour finition)", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Mélanger la farine, le sel fin et les herbes de Provence. Ajouter l'huile d'olive et sabler du bout des doigts.\n\nIncorporer l'eau froide progressivement et mélanger jusqu'à pâte homogène, sans trop pétrir. Filmer et laisser reposer 30 min au réfrigérateur.\n\nÉtaler la pâte très finement (1–2 mm) au laminoir ou au rouleau sur papier sulfurisé légèrement fariné.\n\nDécouper en rectangles ou formes libres. Disposer sur plaque. Piquer à la fourchette pour éviter le gonflement. Saupoudrer de fleur de sel.\n\nCuire à 160 °C pendant 15 à 18 min jusqu'à légère coloration et texture croustillante.\n\nLaisser refroidir complètement sur grille.",
+    "notes": "Variantes : incorporer des graines (sésame, pavot, lin, tournesol) dans la pâte ou sur le dessus avant cuisson. Remplacer les herbes de Provence par du thym seul, du romarin haché fin, ou du za'atar.\n\nConservation : jusqu'à 2 semaines dans une boîte hermétique.",
+    "source": "IA"
+  },
+  {
+    "name": "Duxelles de Champignons",
+    "yield": "Environ 350 à 400 g",
+    "ingredients": [
+      { "name": "champignons de Paris", "quantity": 500, "unit": "g" },
+      { "name": "échalote", "quantity": 80, "unit": "g" },
+      { "name": "beurre", "quantity": 40, "unit": "g" },
+      { "name": "persil haché", "quantity": 0, "unit": "QS" },
+      { "name": "sel, poivre", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Nettoyer les champignons et les hacher très finement au couteau ou au robot-coupe. Ne pas les laver pour éviter d'ajouter de l'eau.\n\nÉplucher et ciseler finement les échalotes.\n\nFaire suer les échalotes dans le beurre à feu moyen jusqu'à translucidité, sans coloration.\n\nAjouter les champignons hachés. Mélanger et cuire à feu vif en remuant régulièrement jusqu'à évaporation complète de toute l'eau rendue. La duxelles doit être sèche et homogène.\n\nAssaisonner sel et poivre. Incorporer le persil haché hors du feu.\n\nLaisser refroidir avant utilisation.",
+    "notes": "Utilisations : feuilletés, fonds de tarte, choux salés, éclairs, filets en croûte.\n\nVariante liée : incorporer 50 g de crème liquide en fin de cuisson pour une duxelles plus souple et fondante.\n\nConservation : 3 jours au réfrigérateur filmée, ou 1 mois au congélateur.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse de Saumon Fumé",
+    "yield": "Environ 500 g",
+    "ingredients": [
+      { "name": "saumon fumé", "quantity": 200, "unit": "g" },
+      { "name": "fromage frais (type Philadelphia)", "quantity": 150, "unit": "g" },
+      { "name": "crème liquide entière froide", "quantity": 120, "unit": "g" },
+      { "name": "jus de citron", "quantity": 15, "unit": "g" },
+      { "name": "aneth frais", "quantity": 0, "unit": "QS" },
+      { "name": "poivre blanc", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Mixer le saumon fumé et le fromage frais ensemble jusqu'à pâte lisse. Ajouter le jus de citron et l'aneth haché. Poivrer. Goûter avant de saler — le saumon est déjà salé.\n\nMonter la crème bien froide en crème montée souple (pas trop ferme).\n\nIncorporer délicatement la crème montée au mélange saumon en deux fois, par mouvements enveloppants, pour préserver la légèreté.\n\nPocher immédiatement ou réserver au réfrigérateur filmée au contact jusqu'à utilisation.",
+    "notes": "Utilisations : garnissage de gougères, éclairs salés, verrines, canapés, cornets de tuiles parmesan.\n\nVariante : remplacer l'aneth par de la ciboulette, ou ajouter 5 g de wasabi pour une version plus relevée.\n\nConservation : 48 h au réfrigérateur filmée au contact.",
+    "source": "IA"
+  },
+  {
+    "name": "Mousse de Foie Gras",
+    "yield": "Environ 400 g",
+    "ingredients": [
+      { "name": "foie gras mi-cuit", "quantity": 200, "unit": "g" },
+      { "name": "beurre pommade", "quantity": 50, "unit": "g" },
+      { "name": "crème liquide entière froide", "quantity": 120, "unit": "g" },
+      { "name": "cognac", "quantity": 10, "unit": "g" },
+      { "name": "sel, poivre", "quantity": 0, "unit": "QS" }
+    ],
+    "steps": "Sortir le foie gras et le beurre à température ambiante 30 min à l'avance.\n\nMixer le foie gras mi-cuit avec le beurre pommade et le cognac jusqu'à pâte très lisse et homogène. Assaisonner sel et poivre.\n\nMonter la crème bien froide en crème montée souple.\n\nIncorporer délicatement la crème montée au mélange foie gras en deux fois, par mouvements enveloppants.\n\nPocher immédiatement dans les préparations prévues, ou réserver au réfrigérateur filmée au contact jusqu'à utilisation.",
+    "notes": "Utilisations : garnissage de gougères, éclairs salés, verrines, canapés sur pain brioché toasté.\n\nPour une finition raffinée : ajouter une pointe de fleur de sel et une lamelle de truffe noire ou une lamelle de figue confite au service.\n\nConservation : 48 h au réfrigérateur filmée. Ne pas congeler — la crème montée se déstabilise.",
+    "source": "IA"
+  }
+]
