@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Le moteur d'aperçu PDF (pdf.js) charge un « worker » publié par défaut en
+  // .mjs. nginx ne connaît pas cette extension et l'envoie comme un fichier
+  // binaire : le navigateur refuse alors de l'exécuter et l'aperçu échoue.
+  // On le publie donc en .js, extension que tous les serveurs servent bien.
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /pdf\.worker\.min\.mjs$/,
+      type: "asset/resource",
+      generator: { filename: "static/media/[name].[hash].js" },
+    });
+    return config;
+  },
 };
 
 export default nextConfig;
