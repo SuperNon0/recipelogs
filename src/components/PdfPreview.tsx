@@ -75,7 +75,9 @@ export function PdfPreview({
         setTotal(doc.numPages);
         setRenderError(null);
         doc.destroy();
-      } catch {
+      } catch (e) {
+        // Détail dans la console du navigateur (F12) pour comprendre la panne.
+        console.error("Aperçu PDF :", e);
         if (!cancelled) setRenderError("L'aperçu n'a pas pu être affiché.");
       }
     })();
