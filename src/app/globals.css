@@ -72,7 +72,10 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  /* « clip » plutôt que « hidden » : hidden fait de html/body des zones de
+     défilement, ce qui casse les éléments collants (aperçu des thèmes). */
   overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100%;
@@ -1094,6 +1097,12 @@ button.fl-row:hover {
   }
   .modal.wide {
     max-width: 1040px;
+  }
+  .modal.full {
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    max-height: none;
   }
 }
 
