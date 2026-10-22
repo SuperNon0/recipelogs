@@ -66,10 +66,6 @@ export function RecipeView({ recipe, ingredients, subRecipes, comments, usedIn, 
       </Link>
 
       <div className="rhd">
-        {recipe.photoPath && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.photoPath} alt="" className="rhd-photo" />
-        )}
         <h1>{recipe.name}</h1>
         <div className="rhd-actions">
           <button

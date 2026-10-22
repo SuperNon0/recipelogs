@@ -54,7 +54,7 @@ export function RecipeKeeperImport() {
   const helpText =
     mode === "csv"
       ? "Dans Recipe Keeper : Exporter, puis CSV."
-      : "Dans Recipe Keeper : Sauvegarde, puis Recettes au format HTML. Tu obtiens un dossier : compresse-le en .zip et choisis-le ici (ou un seul fichier .html si tu n'as pas le zip). Les photos sont récupérées et rattachées aux recettes.";
+      : "Dans Recipe Keeper : Sauvegarde, puis Recettes au format HTML. Tu obtiens un dossier : compresse-le en .zip et choisis-le ici (ou un seul fichier .html si tu n'as pas le zip).";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -63,7 +63,7 @@ export function RecipeKeeperImport() {
           <span className="fl-label" style={{ display: "flex", alignItems: "center" }}>
             Format du fichier
             <Help title="Quel format choisir ?">
-              Le format ZIP / HTML est le plus complet : il garde les photos des recettes. Le
+              Le format ZIP / HTML est le plus complet : il garde catégories, favoris et notes. Le
               format CSV ne contient que le texte (nom, ingrédients, étapes, notes).
             </Help>
           </span>
@@ -120,8 +120,6 @@ export function RecipeKeeperImport() {
                   importée{result.imported > 1 ? "s" : ""}
                   {result.skipped > 0 &&
                     ` · ${result.skipped} ignorée${result.skipped > 1 ? "s" : ""} (déjà existante${result.skipped > 1 ? "s" : ""})`}
-                  {!!result.photosRestored &&
-                    ` · ${result.photosRestored} photo${result.photosRestored > 1 ? "s" : ""} rattachée${result.photosRestored > 1 ? "s" : ""}`}
                 </span>
               </>
             ) : (

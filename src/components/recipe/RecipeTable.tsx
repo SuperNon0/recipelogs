@@ -92,12 +92,7 @@ function RecipeRow({
   const cells = (
     <>
       <span className="rthumb" style={{ "--c": color } as React.CSSProperties}>
-        {r.photoPath ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={r.photoPath} alt="" loading="lazy" />
-        ) : r.subCount > 0 ? (
-          <Layers size={16} />
-        ) : null}
+        {r.subCount > 0 && <Layers size={16} />}
         {selectionMode && (
           <span className="rcheck" data-on={selected ? "true" : undefined}>
             {selected && <Check size={14} />}
