@@ -5,6 +5,13 @@
  */
 import type {
   Density,
+  HAlign,
+  HeaderMode,
+  IngColumns,
+  PageMargins,
+  QtyPosition,
+  StepsColumns,
+  TitleScale,
   IngredientRatio,
   IngredientStyle,
   PageFrame,
@@ -419,5 +426,199 @@ export function FormatThumb({ format }: { format: "A4" | "A5" }) {
         {format}
       </text>
     </svg>
+  );
+}
+
+// ─── Nouvelles options : marges, en-tête, pied, titre, ingrédients, étapes ───
+
+/** Marges de la page : zone de texte plus ou moins grande. */
+export function MarginsThumb({ margins }: { margins: PageMargins }) {
+  const m = margins === "narrow" ? 4 : margins === "normal" ? 8 : 13;
+  return (
+    <Page>
+      <rect x={m} y={m} width={W - 2 * m} height={H - 2 * m} fill="none" stroke={ACC} strokeWidth={0.6} strokeDasharray="1.5 1.5" />
+      <TitleBar y={m + 3} w={W - 2 * m - 16} />
+      <Lines x={m + 2} y={m + 12} w={W - 2 * m - 4} n={Math.floor((H - 2 * m - 14) / 4)} />
+    </Page>
+  );
+}
+
+/** Petit texte gris en haut ou en bas de page, à gauche, au centre ou à droite. */
+function Band({ y, align, w = 14, accent = false }: { y: number; align: HAlign; w?: number; accent?: boolean }) {
+  const x = align === "left" ? 6 : align === "right" ? W - 6 - w : (W - w) / 2;
+  return <line x1={x} y1={y} x2={x + w} y2={y} stroke={accent ? ACC : INK} strokeWidth={1.8} strokeLinecap="round" />;
+}
+
+/** En-tête répété : aucun / nom / texte libre. */
+export function HeaderModeThumb({ mode }: { mode: HeaderMode }) {
+  return (
+    <Page>
+      {mode !== "none" && (
+        <>
+          <Band y={5} align="left" w={mode === "name" ? 20 : 12} accent />
+          <line x1={5} y1={8.5} x2={W - 5} y2={8.5} stroke="var(--border2)" strokeWidth={0.5} />
+        </>
+      )}
+      {mode === "custom" && (
+        <text x={W - 6} y={7} textAnchor="end" fontSize={5.5} fill={ACC} fontWeight={700}>
+          Aa
+        </text>
+      )}
+      <TitleBar y={14} />
+      <Lines x={7} y={24} w={46} n={11} />
+    </Page>
+  );
+}
+
+/** Place d'un texte d'en-tête (en haut) ou d'un numéro / texte de pied de page (en bas). */
+export function BandAlignThumb({ align, where, label }: { align: HAlign; where: "top" | "bottom"; label?: string }) {
+  const y = where === "top" ? 5 : H - 5;
+  const x = align === "left" ? 7 : align === "right" ? W - 7 : W / 2;
+  const anchor = align === "left" ? "start" : align === "right" ? "end" : "middle";
+  return (
+    <Page>
+      {label ? (
+        <text x={x} y={y + 2} textAnchor={anchor} fontSize={6.5} fontWeight={700} fill={ACC}>
+          {label}
+        </text>
+      ) : (
+        <Band y={y} align={align} accent />
+      )}
+      <TitleBar y={where === "top" ? 13 : 7} />
+      <Lines x={7} y={where === "top" ? 23 : 17} w={46} n={11} />
+    </Page>
+  );
+}
+
+/** Taille du titre de la recette. */
+export function TitleScaleThumb({ scale }: { scale: TitleScale }) {
+  const f = scale === "small" ? 0.7 : scale === "medium" ? 1 : scale === "large" ? 1.3 : 1.6;
+  const h = 4 * f;
+  return (
+    <Page>
+      <TitleBar y={8} w={22 * f} h={h} />
+      <Lines x={7} y={14 + h + 4} w={46} n={Math.floor((H - 26 - h) / 4)} />
+    </Page>
+  );
+}
+
+/** Cartouche d'infos (masse, nombre d'ingrédients, date). */
+export function InfoBoxThumb({ on }: { on: boolean }) {
+  return (
+    <Page>
+      <TitleBar y={7} />
+      {on && (
+        <>
+          <rect x={7} y={15} width={46} height={7} fill="none" stroke={ACC} strokeWidth={0.9} />
+          <line x1={22.3} y1={15} x2={22.3} y2={22} stroke={ACC} strokeWidth={0.6} />
+          <line x1={37.6} y1={15} x2={37.6} y2={22} stroke={ACC} strokeWidth={0.6} />
+        </>
+      )}
+      <IngBlock x={7} y={on ? 29 : 20} w={16} n={5} />
+      <Lines x={28} y={on ? 29 : 20} w={25} n={on ? 9 : 11} />
+    </Page>
+  );
+}
+
+/** Quantité avant ou après le nom. */
+export function QtyPositionThumb({ position }: { position: QtyPosition }) {
+  return (
+    <Page>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+        const y = 12 + i * 8.5;
+        const nameEnd = i % 2 ? 34 : 40;
+        return position === "before" ? (
+          <g key={i}>
+            <line x1={8} y1={y} x2={17} y2={y} stroke={ACC} strokeWidth={1.6} strokeLinecap="round" />
+            <line x1={21} y1={y} x2={nameEnd + 8} y2={y} stroke={INK} strokeWidth={1.4} strokeLinecap="round" opacity={0.55} />
+          </g>
+        ) : (
+          <g key={i}>
+            <line x1={8} y1={y} x2={nameEnd} y2={y} stroke={INK} strokeWidth={1.4} strokeLinecap="round" opacity={0.55} />
+            <line x1={43} y1={y} x2={52} y2={y} stroke={ACC} strokeWidth={1.6} strokeLinecap="round" />
+          </g>
+        );
+      })}
+    </Page>
+  );
+}
+
+/** Lignes zébrées dans la liste d'ingrédients. */
+export function ZebraThumb({ on }: { on: boolean }) {
+  return (
+    <Page>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+        const y = 12 + i * 8.5;
+        return (
+          <g key={i}>
+            {on && i % 2 === 1 && <rect x={5} y={y - 3.4} width={50} height={6.8} rx={1} fill={ACC} opacity={0.18} />}
+            <line x1={8} y1={y} x2={16} y2={y} stroke={ACC} strokeWidth={1.4} strokeLinecap="round" />
+            <line x1={20} y1={y} x2={i % 2 ? 40 : 48} y2={y} stroke={INK} strokeWidth={1.4} strokeLinecap="round" opacity={0.55} />
+          </g>
+        );
+      })}
+    </Page>
+  );
+}
+
+/** Ingrédients sur 1 ou 2 colonnes. */
+export function IngColumnsThumb({ columns, layout }: { columns: IngColumns; layout: RecipeLayout }) {
+  const two = columns === "two" || (columns === "auto" && layout === "moderne");
+  return (
+    <Page>
+      <TitleBar y={7} />
+      {two ? (
+        <>
+          <IngBlock x={7} y={19} w={20} n={4} />
+          <IngBlock x={33} y={19} w={20} n={4} />
+        </>
+      ) : (
+        <IngBlock x={9} y={19} w={42} n={8} />
+      )}
+      <Lines x={7} y={two ? 42 : 57} w={46} n={two ? 7 : 4} />
+      {columns === "auto" && (
+        <text x={W - 6} y={H - 5} textAnchor="end" fontSize={7} fill={ACC} fontWeight={700}>
+          auto
+        </text>
+      )}
+    </Page>
+  );
+}
+
+/** Préparation sur 1 ou 2 colonnes. */
+export function StepsColumnsThumb({ columns }: { columns: StepsColumns }) {
+  return (
+    <Page>
+      <TitleBar y={7} />
+      <rect x={7} y={16} width={22} height={3} rx={1} fill={ACC} />
+      {columns === "two" ? (
+        <>
+          <Lines x={7} y={25} w={21} n={12} />
+          <Lines x={32} y={25} w={21} n={12} />
+        </>
+      ) : (
+        <Lines x={7} y={25} w={46} n={12} />
+      )}
+    </Page>
+  );
+}
+
+/** Filet fin entre chaque étape. */
+export function StepDividerThumb({ on }: { on: boolean }) {
+  return (
+    <Page>
+      {[0, 1, 2].map((i) => {
+        const y = 10 + i * 22;
+        return (
+          <g key={i}>
+            <text x={7} y={y + 3} fontSize={6.4} fontWeight={700} fill={ACC}>
+              {i + 1}.
+            </text>
+            <Lines x={16} y={y + 1} w={37} n={3} />
+            {on && i < 2 && <line x1={7} y1={y + 16} x2={53} y2={y + 16} stroke={INK} strokeWidth={0.7} opacity={0.6} />}
+          </g>
+        );
+      })}
+    </Page>
   );
 }

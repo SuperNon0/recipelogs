@@ -7,6 +7,8 @@ import {
   googleFontsHref,
   coverPatternCss,
   INGREDIENT_RATIO_WIDTH,
+  TITLE_SCALE_FACTOR,
+  recipePageMargins,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
@@ -153,7 +155,7 @@ export function buildCss(
   const titleFont = (FONTS[theme.titleFont] ?? FONTS.arial).family;
   const bodyFont = (FONTS[theme.bodyFont] ?? FONTS.arial).family;
   const baseSize = theme.textSize;
-  const titleSize = titleSizeFor(theme.textSize);
+  const titleSize = Math.round(titleSizeFor(theme.textSize) * (TITLE_SCALE_FACTOR[theme.titleScale] ?? 1) * 2) / 2;
 
   // Placement des colonnes : voir aussi placementCss (gauche / droite / dessus).
   const ingFlex = `0 0 ${INGREDIENT_RATIO_WIDTH[theme.ingredientsRatio] ?? "38%"}`;
@@ -538,7 +540,7 @@ export function buildCss(
 
 /** Classes de <body> qui activent la mise en page et les styles choisis. */
 function bodyClass(theme: CookbookTheme): string {
-  return `layout-${theme.recipeLayout} title-${theme.titleStyle} steps-${theme.stepStyle} ing-${theme.ingredientStyle}`;
+  return `layout-${theme.recipeLayout} title-${theme.titleStyle} steps-${theme.stepStyle} ing-${theme.ingredientStyle} qty-${theme.qtyPosition}`;
 }
 
 /**
@@ -609,6 +611,25 @@ function placementCss(theme: CookbookTheme, v: { baseSize: number }): string {
       .recipe .recipe-title { margin-top: 6mm; margin-bottom: 5mm; }
       .recipe .notes { margin-top: 9mm; }
     `);
+  }
+  // Liste d'ingrédients : quantité après le nom, lignes zébrées, colonnes
+  if (theme.qtyPosition === "after") {
+    out.push(`.qty-after .ing-item .ing-name { order: 1; } .qty-after .ing-item .ing-qty { order: 2; min-width: 0; margin-left: auto; text-align: right; }`);
+  }
+  if (theme.ingZebra) {
+    out.push(`.recipe .ing-item:nth-child(even) { background: ${hexToRgba(a, 0.08)}; } .recipe .ing-item { padding: 0.5mm 1.5mm; border-radius: 1mm; }`);
+  }
+  if (theme.ingColumns === "one") out.push(`.recipe .ing-list { column-count: 1; }`);
+  if (theme.ingColumns === "two") {
+    out.push(`.recipe .ing-list { column-count: 2; column-gap: 8mm; } .recipe .ing-item { break-inside: avoid; }`);
+  }
+
+  // Préparation : colonnes et filets entre les étapes
+  if (theme.stepsColumns === "two") {
+    out.push(`.recipe .steps-rich { column-count: 2; column-gap: 8mm; } .recipe .steps-rich > p { break-inside: avoid; }`);
+  }
+  if (theme.stepDivider) {
+    out.push(`.recipe .steps-rich > p:not(:last-child) { border-bottom: 0.6px solid ${hexToRgba(theme.textColor, 0.18)}; padding-bottom: 2mm; margin-bottom: 2mm; }`);
   }
   return out.join("\n");
 }
@@ -797,19 +818,24 @@ function renderIngredientsTable(
   totalMinG: number,
   totalMaxG: number,
   showTotal: boolean,
+  qtyAfter = false,
 ): string {
+  const pair = (qty: string, name: string) => (qtyAfter ? name + qty : qty + name);
   const avgTotal = (totalMinG + totalMaxG) / 2;
   const rows = items
     .map((i) => {
       const { avg } = recipeMass([i]);
       const pct = avgTotal > 0 && avg > 0 ? ((avg / avgTotal) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %" : "";
-      return `<tr><td class="num">${ingQtyHtml(i)}</td><td>${esc(i.name)}</td><td class="num pct">${pct}</td></tr>`;
+      const qty = `<td class="num">${ingQtyHtml(i)}</td>`;
+      const name = `<td>${esc(i.name)}</td>`;
+      return `<tr>${qtyAfter ? name + qty : qty + name}<td class="num pct">${pct}</td></tr>`;
     })
     .join("");
   const foot = showTotal && totalMinG > 0
-    ? `<tfoot><tr><td class="num">${totalText(totalMinG, totalMaxG)}</td><td>Masse totale</td><td class="num pct">100 %</td></tr></tfoot>`
+    ? `<tfoot><tr>${pair(`<td class="num">${totalText(totalMinG, totalMaxG)}</td>`, "<td>Masse totale</td>")}<td class="num pct">100 %</td></tr></tfoot>`
     : "";
-  return `<table class="ing-table"><thead><tr><th class="num">Quantité</th><th>Ingrédient</th><th class="num">%</th></tr></thead><tbody>${rows}</tbody>${foot}</table>`;
+  const head = pair(`<th class="num">Quantité</th>`, "<th>Ingrédient</th>");
+  return `<table class="ing-table"><thead><tr>${head}<th class="num">%</th></tr></thead><tbody>${rows}</tbody>${foot}</table>`;
 }
 
 function renderIngredients(
@@ -912,11 +938,12 @@ export function renderRecipeCard(
   const ingHtml = snap.ingredients.length === 0
     ? "<p class='muted'>Aucun ingrédient.</p>"
     : layout === "fiche-technique"
-      ? renderIngredientsTable(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass)
+      ? renderIngredientsTable(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass, theme.qtyPosition === "after")
       : renderIngredients(snap.ingredients, totalMinG, totalMaxG, theme.showTotalMass);
 
-  // Fiche technique : cartouche d'en-tête (masse, nb d'ingrédients, date).
-  const ficheLabelHtml = layout === "fiche-technique"
+  // Cartouche d'en-tête (masse, nb d'ingrédients, date) : toujours en Fiche
+  // technique, sur demande dans les autres modèles.
+  const ficheLabelHtml = layout === "fiche-technique" || theme.showInfoBox
     ? `<div class="fiche-label">
         <div><span class="k">Masse totale</span><span class="v">${totalMinG > 0 ? totalText(totalMinG, totalMaxG) : "—"}</span></div>
         <div><span class="k">Ingrédients</span><span class="v">${snap.ingredients.length}</span></div>
@@ -1163,8 +1190,8 @@ export function buildCoverTocHtml(opts: {
   const { cookbookName, description, hasCover, hasToc, entries } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
   const format = opts.format;
-  // Pas de marge basse réservée au footer : ce pass ne porte pas de footer.
-  const margins = { top: 10, right: 12, bottom: 10, left: 12 };
+  // Pas d'en-tête ni de pied de page dans ce pass.
+  const margins = recipePageMargins(theme, { header: false, footer: false });
   const css = buildCss(theme, { format, bleedFirstPage: hasCover, margins });
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
@@ -1194,14 +1221,13 @@ export function buildRecipesHtml(opts: {
   theme?: CookbookTheme;
   entries: CookbookEntryUnion[];
   hasFooter: boolean;
+  hasHeader?: boolean;
 }): string {
   const { entries, hasFooter } = opts;
   const theme = opts.theme ?? DEFAULT_THEME;
   const format = opts.format;
-  // Marge basse élargie quand un pied de page est rendu pour réserver l'espace.
-  const margins = hasFooter
-    ? { top: 10, right: 12, bottom: 16, left: 12 }
-    : { top: 10, right: 12, bottom: 10, left: 12 };
+  // Marges élargies quand un en-tête / pied de page est rendu, pour lui réserver l'espace.
+  const margins = recipePageMargins(theme, { header: !!opts.hasHeader, footer: hasFooter });
   const css = buildCss(theme, { format, margins });
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
@@ -1243,11 +1269,12 @@ export function buildSingleRecipeHtml(
   snap: RecipeSnap,
   format: "A4" | "A5" = "A4",
   theme: CookbookTheme = DEFAULT_THEME,
+  chrome: { header: boolean; footer: boolean } = { header: false, footer: true },
 ): string {
   // 1ʳᵉ recette : pas de saut de page avant (`page-break-before: auto`).
   // Sous-recettes : saut de page automatique grâce au CSS .recipe par défaut
   // (`page-break-before: always`).
-  let css = buildCss(theme, { format });
+  let css = buildCss(theme, { format, margins: recipePageMargins(theme, chrome) });
   css = css.replace("page-break-before: always;", "page-break-before: auto;");
   const fontsLink = googleFontsHref(theme);
   const fontsTag = fontsLink ? `<link rel="stylesheet" href="${fontsLink}" />` : "";
