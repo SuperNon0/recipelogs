@@ -21,6 +21,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Thèmes PDF : taille du titre, cartouche d'infos sur tous les modèles, quantité avant ou après le nom",
       "Thèmes PDF : lignes zébrées, ingrédients et préparation sur 2 colonnes, filet entre les étapes",
       "Réglages → Accès MCP : brancher Claude sur RecipeLog pour gérer ingrédients, recettes, dossiers, listes de courses et cahiers en discutant",
+      "Accès MCP : la clé peut passer dans un en-tête (Authorization: Bearer ou X-API-Key) au lieu de l'adresse, comme BotPanel",
     ],
     fixes: [
       "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
