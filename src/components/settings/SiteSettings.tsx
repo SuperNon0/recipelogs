@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, ChevronRight, Link2, RefreshCw, Sparkles, Wrench } from "lucide-react";
 import { saveSiteUrl } from "@/app/actions/settings";
 import { CHANGELOG } from "@/lib/changelog";
+import { getMergedPrs } from "@/lib/pr-log";
 import { DeployButton } from "@/components/DeployButton";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
@@ -116,9 +117,31 @@ function SiteUrlModal({ initial, onClose }: { initial: string | null; onClose: (
 }
 
 function ChangelogModal({ onClose }: { onClose: () => void }) {
+  const prs = getMergedPrs();
   return (
     <ModalOverlay title="Nouveautés" onClose={onClose}>
       <div className="set-log">
+        {prs.length > 0 && (
+          <section>
+            <h4>
+              <span className="fl-tag" style={{ color: "var(--accent)" }}>
+                PR
+              </span>
+              Dernières mises à jour installées
+            </h4>
+            <ul>
+              {prs.map((pr) => (
+                <li key={pr.number}>
+                  <span className="fl-kbd" style={{ flex: "none" }}>#{pr.number}</span>
+                  {pr.title}
+                  <small style={{ marginLeft: "auto", flex: "none", color: "var(--muted)" }}>
+                    {formatDate(pr.date)}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {CHANGELOG.map((v) => (
           <section key={v.version}>
             <h4>
