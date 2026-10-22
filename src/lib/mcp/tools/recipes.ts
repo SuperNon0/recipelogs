@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { recipeMass } from "@/lib/massAdjust";
 import { getRecipeDetail, listRecipes } from "@/lib/recipes";
+import { htmlToPlainText } from "@/lib/stepsText";
 import { INGREDIENT_UNITS } from "@/lib/validation";
 import {
   addComment,
@@ -58,7 +59,7 @@ const recipeFields = {
 const recipeFieldsJs = {
   nom: js.str("Nom de la recette"),
   ingredients: ingredientsJs,
-  etapes: js.str("Étapes de préparation, en texte (une étape par ligne) ou en HTML simple (<p>, <ol><li>, <strong>…)"),
+  etapes: js.str("Étapes de préparation en texte simple, une étape par ligne, sans numéro (l'appli numérote toute seule). Pas de HTML ni de Markdown."),
   source: js.str("Source (livre, site, chef…)"),
   notes: js.str("Notes et astuces"),
   dossier_id: js.int("Id du dossier (voir lister_dossiers_et_categories), null pour aucun"),
@@ -87,7 +88,8 @@ function recipeForm(v: RecipeValues): FormData {
     name: v.nom,
     source: v.source ?? "",
     notesTips: v.notes ?? "",
-    steps: v.etapes ?? "",
+    // Même format que le formulaire de l'appli : texte simple, une étape par ligne.
+    steps: htmlToPlainText(v.etapes ?? ""),
     favorite: v.favori ?? false,
     rating: v.note ?? undefined,
     tags: (v.tags ?? []).join(","),
@@ -211,7 +213,7 @@ export const RECIPE_TOOLS: McpTool[] = [
           quantite_max: i.quantityGMax,
           unite: i.unit,
         })),
-        etapes: r.stepsBlock?.content ?? null,
+        etapes: r.stepsBlock ? htmlToPlainText(r.stepsBlock.content) : null,
         sous_recettes: r.parentLinks.map((l, idx) => {
           const s = snap?.subRecipes[idx];
           return {

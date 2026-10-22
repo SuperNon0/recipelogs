@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { BOOT_TIME } from "@/lib/bootTime";
 import { CHANGELOG } from "@/lib/changelog";
 import { getMergedPrs } from "@/lib/pr-log";
+import { htmlToPlainText } from "@/lib/stepsText";
 import { importRecipesFromJson } from "@/app/actions/import";
 import { triggerDeploy } from "@/app/actions/admin";
 import { READ, WRITE, id, js, parseArgs, runAction, text, type McpTool } from "./helpers";
@@ -65,7 +66,7 @@ export const SITE_TOOLS: McpTool[] = [
                   required: ["name"],
                 },
               },
-              steps: js.str("Étapes (texte)"),
+              steps: js.str("Étapes en texte simple, une par ligne, sans numéro"),
               notes: js.str("Notes"),
               source: js.str("Source"),
               yield: js.str("Rendement (ex. « 8 parts »), ajouté aux notes"),
@@ -80,7 +81,8 @@ export const SITE_TOOLS: McpTool[] = [
     run: async (args) => {
       const a = parseArgs(z.object({ recettes: z.array(jsonRecipe).min(1).max(200) }), args);
       const fd = new FormData();
-      fd.append("file", new File([JSON.stringify(a.recettes)], "mcp.json", { type: "application/json" }));
+      const recettes = a.recettes.map((r) => ({ ...r, steps: r.steps ? htmlToPlainText(r.steps) : r.steps }));
+      fd.append("file", new File([JSON.stringify(recettes)], "mcp.json", { type: "application/json" }));
       const { result } = await runAction(() => importRecipesFromJson(fd));
       return text({ importees: result?.imported ?? 0, ignorees_deja_presentes: result?.skipped ?? 0, erreurs: result?.errors ?? [] });
     },
