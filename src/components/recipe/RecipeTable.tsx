@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Check, Layers, Star } from "lucide-react";
 import { ContextArea, MoreButton } from "@/components/ui/Menu";
-import { Photo } from "@/components/ui/Photo";
 import { useRecipeSelection } from "@/components/RecipeSelection";
 import { useRecipeMenu, type FolderOption } from "./RecipeMenu";
 import { formatG, formatRelativeDate } from "@/lib/format";
@@ -93,11 +92,7 @@ function RecipeRow({
   const cells = (
     <>
       <span className="rthumb" style={{ "--c": color } as React.CSSProperties}>
-        {r.photoPath ? (
-          <Photo src={r.photoPath} fallback={r.subCount > 0 ? <Layers size={16} /> : null} />
-        ) : r.subCount > 0 ? (
-          <Layers size={16} />
-        ) : null}
+        {r.subCount > 0 && <Layers size={16} />}
         {selectionMode && (
           <span className="rcheck" data-on={selected ? "true" : undefined}>
             {selected && <Check size={14} />}

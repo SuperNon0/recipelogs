@@ -1,11 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import JSZip from "jszip";
-import { createHash } from "node:crypto";
-import { UPLOAD_DIR, fileFromUploadUrl, uploadUrl } from "@/lib/uploads";
 import { prisma } from "@/lib/prisma";
 import { normalizeForSearch } from "@/lib/recipes";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
@@ -20,17 +16,7 @@ export type ImportResult = {
   imported: number;
   skipped: number;
   errors: string[];
-  /** Import ZIP : photos rattachées à des recettes déjà existantes. */
-  photosRestored?: number;
 };
-
-/** Vrai si l'URL /uploads/... pointe vers un fichier présent sur le disque. */
-function photoExists(photoPath: string | null): boolean {
-  const file = fileFromUploadUrl(photoPath);
-  return !!file && existsSync(file);
-}
-
-const RECIPES_IMG_DIR = join(UPLOAD_DIR, "recipekeeper");
 
 // ─── Import CSV (existant) ────────────────────────────────────────────────────
 
@@ -129,8 +115,6 @@ export async function importRecipeKeeperHtmlOrZip(
   }
 
   let htmlText: string;
-  // imagePath (chemin relatif dans le ZIP) → bytes
-  const imagesInZip = new Map<string, Uint8Array>();
 
   try {
     if (isZip) {
@@ -155,26 +139,6 @@ export async function importRecipeKeeperHtmlOrZip(
         };
       }
       htmlText = await (htmlEntry as JSZip.JSZipObject).async("text");
-
-      // Récupère toutes les images
-      const imgPromises: Promise<void>[] = [];
-      zip.forEach((path, entry) => {
-        if (entry.dir) return;
-        const lower = path.toLowerCase();
-        if (
-          lower.endsWith(".jpg") ||
-          lower.endsWith(".jpeg") ||
-          lower.endsWith(".png") ||
-          lower.endsWith(".webp")
-        ) {
-          imgPromises.push(
-            entry.async("uint8array").then((bytes) => {
-              imagesInZip.set(path, bytes);
-            }),
-          );
-        }
-      });
-      await Promise.all(imgPromises);
     } else {
       htmlText = await file.text();
     }
@@ -212,55 +176,17 @@ export async function importRecipeKeeperHtmlOrZip(
     };
   }
 
-  // S'assure que le dossier d'upload existe (si on a des images)
-  if (imagesInZip.size > 0) {
-    try {
-      mkdirSync(RECIPES_IMG_DIR, { recursive: true });
-    } catch {
-      // ignore
-    }
-  }
-
-  /** Écrit la 1ʳᵉ photo de la recette (si présente dans le ZIP) et renvoie son URL. */
-  const savePhoto = (rk: RKHtmlRecipe): string | null => {
-    const imgPath = rk.images[0]?.path;
-    const bytes = imgPath ? imagesInZip.get(imgPath) : undefined;
-    if (!imgPath || !bytes) return null;
-    // Préfixe = empreinte du contenu : deux photos différentes portant le
-    // même nom dans le ZIP ne s'écrasent plus.
-    const hash = createHash("sha1").update(bytes).digest("hex").slice(0, 10);
-    const baseName = (imgPath.split("/").pop() ?? "photo.jpg").replace(/[^\w.\-]/g, "_");
-    const fileName = `${hash}-${baseName}`;
-    const targetPath = join(RECIPES_IMG_DIR, fileName);
-    if (!existsSync(targetPath)) {
-      try {
-        writeFileSync(targetPath, bytes);
-      } catch {
-        return null; // écriture impossible : recette sans photo
-      }
-    }
-    return uploadUrl("recipekeeper", fileName);
-  };
-
   let imported = 0;
   let skipped = 0;
-  let photosRestored = 0;
   const errors: string[] = [];
 
   for (const rk of recipes) {
     try {
-      const photoPath = savePhoto(rk);
       const exists = await prisma.recipe.findFirst({
         where: { name: rk.name },
-        select: { id: true, photoPath: true },
+        select: { id: true },
       });
       if (exists) {
-        // Recette déjà présente : on ne la réimporte pas, mais on lui
-        // rattache sa photo si elle n'en a pas (ou si le fichier a disparu).
-        if (photoPath && !photoExists(exists.photoPath)) {
-          await prisma.recipe.update({ where: { id: exists.id }, data: { photoPath } });
-          photosRestored++;
-        }
         skipped++;
         continue;
       }
@@ -292,7 +218,6 @@ export async function importRecipeKeeperHtmlOrZip(
           notesTips: rk.notesTips,
           favorite: rk.favorite,
           rating: rk.rating,
-          photoPath,
           stepsBlock: rk.steps ? { create: { content: rk.steps } } : undefined,
           tags: {
             create: rk.tags.map((tag) => ({ name: tag })),
@@ -326,7 +251,7 @@ export async function importRecipeKeeperHtmlOrZip(
   revalidatePath("/");
   revalidatePath("/settings");
 
-  return { ok: true, imported, skipped, errors, photosRestored };
+  return { ok: true, imported, skipped, errors };
 }
 
 // ─── Import JSON ──────────────────────────────────────────────────────────────

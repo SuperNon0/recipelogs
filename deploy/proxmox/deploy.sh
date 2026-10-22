@@ -61,16 +61,10 @@ main() {
 
     # Dossier des photos (hors du build, sinon effacé à chaque déploiement)
     mkdir -p "${UPLOAD_DIR}"
-    # Anciennes versions : les photos étaient écrites dans ./public/uploads,
-    # relatif au dossier de lancement (/opt/recipelog), puis copiées dans le build.
-    local OLD_UPLOADS
-    for OLD_UPLOADS in "${APP_DIR}/public/uploads" \
-                       "${APP_DIR}/.next/standalone/public/uploads" \
-                       "${APP_DIR}/.next-prev/standalone/public/uploads"; do
-      if [ -d "${OLD_UPLOADS}" ]; then
-        cp -rn "${OLD_UPLOADS}/." "${UPLOAD_DIR}/" || true
-      fi
-    done
+    local OLD_UPLOADS="${APP_DIR}/.next/standalone/public/uploads"
+    if [ -d "${OLD_UPLOADS}" ]; then
+      cp -rn "${OLD_UPLOADS}/." "${UPLOAD_DIR}/" || true
+    fi
     chown -R "${APP_USER}:${APP_USER}" "$(dirname "${UPLOAD_DIR}")"
     if ! grep -q '^UPLOAD_DIR=' "${APP_DIR}/.env"; then
       echo "UPLOAD_DIR=\"${UPLOAD_DIR}\"" >> "${APP_DIR}/.env"

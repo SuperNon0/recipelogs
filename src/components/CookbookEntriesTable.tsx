@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useId, useState, useTransition } from "react";
 import Link from "next/link";
-import { Photo } from "@/components/ui/Photo";
 import {
   DndContext,
   closestCenter,
@@ -413,11 +412,7 @@ function RecipeRow({ entry, no, cookbookId, handle, canUp, canDown, onMove, onDi
         <Link href={`/recipes/${entry.recipeId}`} className="cb-link">
           <span className="cb-no desk-only">{no}</span>
           <span className="rthumb" style={{ "--c": color } as React.CSSProperties}>
-            {entry.photoPath ? (
-              <Photo src={entry.photoPath} fallback={<Layers size={16} style={{ opacity: 0.5 }} />} />
-            ) : (
-              <Layers size={16} style={{ opacity: 0.5 }} />
-            )}
+            <Layers size={16} style={{ opacity: 0.5 }} />
           </span>
           <span className="rname">
             <b>{entry.recipeName}</b>
