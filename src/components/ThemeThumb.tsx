@@ -83,11 +83,6 @@ export function ThemeThumb({
           <div style={{ position: "absolute", right: 3 * s, bottom: 3 * s, width: 8 * s, height: 8 * s, borderRight: `${s}px solid ${a}`, borderBottom: `${s}px solid ${a}` }} />
         </>
       )}
-      {config.recipeLayout === "magazine" || config.photoMode === "top" ? (
-        config.photoMode !== "none" && (
-          <div style={{ height: 14 * s, margin: `${-2 * s}px 0 ${4 * s}px`, borderRadius: 2 * s, background: `linear-gradient(135deg, ${a}55, ${a}22)` }} />
-        )
-      ) : null}
       <div
         style={{
           fontFamily: (FONTS[config.titleFont] ?? FONTS.arial).family,
