@@ -21,6 +21,22 @@ import { Help } from "@/components/ui/Help";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { ThemeThumb } from "@/components/ThemeThumb";
 import { ThemePreviewPanel, type RecipeChoice } from "./ThemePreviewPanel";
+import {
+  BlockOrderThumb,
+  DensityThumb,
+  FormatThumb,
+  FrameThumb,
+  IngPositionThumb,
+  IngRatioThumb,
+  IngStyleThumb,
+  LayoutThumb,
+  PaperThumb,
+  SectionTitleThumb,
+  StepStyleThumb,
+  TitleAlignThumb,
+  TitleStyleThumb,
+} from "./OptionThumbs";
+import { CoverBgPatternThumb, CoverLayoutThumb } from "@/components/CookbookConfigForm";
 import { setDefaultPdfTheme, updatePdfTheme, resetPdfTheme } from "@/app/actions/pdfThemes";
 import {
   COVER_BG_PATTERNS,
@@ -113,7 +129,10 @@ export function ThemeEditor({ theme, recipes }: Props) {
       } else setMsg({ ok: false, text: r.error });
     });
 
-  const sideBySide = c.recipeLayout === "classique" || c.recipeLayout === "magazine";
+  // Réglages sans effet avec le modèle choisi : masqués (cf. template.ts).
+  const layout = c.recipeLayout;
+  const sideBySide = layout === "classique" || layout === "magazine";
+  const hidden = HIDDEN_BY_LAYOUT[layout];
 
   return (
     <div>
@@ -158,55 +177,70 @@ export function ThemeEditor({ theme, recipes }: Props) {
             <Field label="Description (facultatif)">
               <input className="fl-input" value={description} maxLength={400} onChange={(e) => setDescription(e.target.value)} placeholder="Ex. pour les fiches de l'examen" />
             </Field>
-            <Choice
+            <VisualChoice
               label="Format de page"
               help={{ title: "Format de page", text: "Taille du papier du PDF. A4 = feuille classique (21 × 29,7 cm). A5 = moitié d'A4 (14,8 × 21 cm), pratique pour un classeur de cuisine." }}
               value={format}
               onChange={setFormat}
-              options={[{ value: "A4", label: "A4" }, { value: "A5", label: "A5" }]}
+              options={(["A4", "A5"] as const).map((v) => ({ value: v, label: v, thumb: <FormatThumb format={v} /> }))}
             />
           </Section>
 
           <Section icon={LayoutTemplate} title="Mise en page" help="La structure de la fiche : où se placent le titre, les ingrédients et la préparation.">
-            <Choice
+            <VisualChoice
               label="Modèle"
-              value={c.recipeLayout}
+              value={layout}
               onChange={(v) => set("recipeLayout", v)}
-              options={RECIPE_LAYOUTS.map((v) => ({ value: v, label: RECIPE_LAYOUT_LABELS[v] }))}
-              hint={RECIPE_LAYOUT_HINTS[c.recipeLayout]}
+              options={RECIPE_LAYOUTS.map((v) => ({ value: v, label: RECIPE_LAYOUT_LABELS[v], thumb: <LayoutThumb layout={v} /> }))}
+              hint={RECIPE_LAYOUT_HINTS[layout]}
             />
-            <Choice
-              label="Place des ingrédients"
-              help={{
-                title: "Place des ingrédients",
-                text: "À gauche ou à droite de la préparation, ou au-dessus. Avec les modèles en une colonne (Moderne, Fiche technique), « À droite » affiche la préparation en premier.",
-              }}
-              value={c.ingredientsPosition}
-              onChange={(v) => set("ingredientsPosition", v)}
-              options={INGREDIENT_POSITIONS.map((v) => ({ value: v, label: INGREDIENT_POSITION_LABELS[v] }))}
-            />
+            {hidden.length > 0 && (
+              <p style={{ color: "var(--muted)", fontSize: 12.5, marginTop: -8 }}>
+                Avec ce modèle, ces réglages n&apos;ont pas d&apos;effet et sont masqués : {hidden.join(", ")}.
+              </p>
+            )}
+            {sideBySide ? (
+              <VisualChoice
+                label="Place des ingrédients"
+                help={{ title: "Place des ingrédients", text: "À gauche ou à droite de la préparation, ou au-dessus sur toute la largeur." }}
+                value={c.ingredientsPosition}
+                onChange={(v) => set("ingredientsPosition", v)}
+                options={INGREDIENT_POSITIONS.map((v) => ({ value: v, label: INGREDIENT_POSITION_LABELS[v], thumb: <IngPositionThumb position={v} /> }))}
+              />
+            ) : (
+              <VisualChoice
+                label="Ordre des blocs"
+                help={{ title: "Ordre des blocs", text: "Ce modèle met tout sur une seule colonne : choisis si les ingrédients viennent avant ou après la préparation." }}
+                value={c.ingredientsPosition === "right" ? "right" : "left"}
+                onChange={(v) => set("ingredientsPosition", v)}
+                options={[
+                  { value: "left" as const, label: "Ingrédients d'abord", thumb: <BlockOrderThumb ingFirst /> },
+                  { value: "right" as const, label: "Préparation d'abord", thumb: <BlockOrderThumb ingFirst={false} /> },
+                ]}
+              />
+            )}
             {sideBySide && c.ingredientsPosition !== "top" && (
-              <Choice
+              <VisualChoice
                 label="Largeur de la colonne ingrédients"
                 help={{ title: "Largeur de la colonne", text: "Part de la largeur de page donnée aux ingrédients quand ils sont à côté de la préparation.", calc: "Étroite = 38 %   Moitié = 48 %   Large = 58 %" }}
                 value={c.ingredientsRatio}
                 onChange={(v) => set("ingredientsRatio", v)}
-                options={INGREDIENT_RATIOS.map((v) => ({ value: v, label: INGREDIENT_RATIO_LABELS[v] }))}
+                options={INGREDIENT_RATIOS.map((v) => ({ value: v, label: INGREDIENT_RATIO_LABELS[v], thumb: <IngRatioThumb ratio={v} /> }))}
               />
             )}
-            <Choice
+            <VisualChoice
               label="Alignement du titre"
               help={{ title: "Alignement du titre", text: "Position du nom de la recette et des lignes juste en dessous (catégories, tags, note). « Selon la mise en page » : centré en Classique, à gauche sinon." }}
               value={c.titleAlign}
               onChange={(v) => set("titleAlign", v)}
-              options={TITLE_ALIGNS.map((v) => ({ value: v, label: TITLE_ALIGN_LABELS[v] }))}
+              options={TITLE_ALIGNS.map((v) => ({ value: v, label: TITLE_ALIGN_LABELS[v], thumb: <TitleAlignThumb align={v} layout={layout} /> }))}
             />
-            <Choice
+            <VisualChoice
               label="Espacement"
               help={{ title: "Espacement", text: "Serré fait tenir plus de texte sur une page ; Aéré donne une fiche plus lisible et plus « magazine »." }}
               value={c.density}
               onChange={(v) => set("density", v)}
-              options={DENSITIES.map((v) => ({ value: v, label: DENSITY_LABELS[v] }))}
+              options={DENSITIES.map((v) => ({ value: v, label: DENSITY_LABELS[v], thumb: <DensityThumb density={v} /> }))}
             />
             <Choice
               label="Photo de la recette"
@@ -218,16 +252,26 @@ export function ThemeEditor({ theme, recipes }: Props) {
           </Section>
 
           <Section icon={Columns2} title="Styles des éléments">
-            <Choice label="Titre de la recette" value={c.titleStyle} onChange={(v) => set("titleStyle", v)} options={TITLE_STYLES.map((v) => ({ value: v, label: TITLE_STYLE_LABELS[v] }))} />
-            <Toggle label="Titre en majuscules" checked={c.titleUppercase} onChange={(v) => set("titleUppercase", v)} />
-            <Choice
+            <VisualChoice label="Titre de la recette" value={c.titleStyle} onChange={(v) => set("titleStyle", v)} options={TITLE_STYLES.map((v) => ({ value: v, label: TITLE_STYLE_LABELS[v], thumb: <TitleStyleThumb style={v} /> }))} />
+            {layout !== "fiche-technique" && <Toggle label="Titre en majuscules" checked={c.titleUppercase} onChange={(v) => set("titleUppercase", v)} />}
+            <VisualChoice
               label="Intertitres (Ingrédients, Préparation)"
               value={c.sectionTitleStyle}
               onChange={(v) => set("sectionTitleStyle", v)}
-              options={SECTION_TITLE_STYLES.map((v) => ({ value: v, label: SECTION_TITLE_STYLE_LABELS[v] }))}
+              options={SECTION_TITLE_STYLES.map((v) => ({ value: v, label: SECTION_TITLE_STYLE_LABELS[v], thumb: <SectionTitleThumb style={v} /> }))}
             />
-            <Choice label="Liste d'ingrédients" value={c.ingredientStyle} onChange={(v) => set("ingredientStyle", v)} options={INGREDIENT_STYLES.map((v) => ({ value: v, label: INGREDIENT_STYLE_LABELS[v] }))} />
-            <Choice label="Numéros des étapes" value={c.stepStyle} onChange={(v) => set("stepStyle", v)} options={STEP_STYLES.map((v) => ({ value: v, label: STEP_STYLE_LABELS[v] }))} />
+            {layout !== "fiche-technique" && (
+              <VisualChoice
+                label="Liste d'ingrédients"
+                value={c.ingredientStyle}
+                onChange={(v) => set("ingredientStyle", v)}
+                // Le magazine a déjà son propre encadré : « Encadré » n'y change rien.
+                options={INGREDIENT_STYLES.filter((v) => layout !== "magazine" || v !== "boxed").map((v) => ({ value: v, label: INGREDIENT_STYLE_LABELS[v], thumb: <IngStyleThumb style={v} /> }))}
+              />
+            )}
+            {layout !== "magazine" && (
+              <VisualChoice label="Numéros des étapes" value={c.stepStyle} onChange={(v) => set("stepStyle", v)} options={STEP_STYLES.map((v) => ({ value: v, label: STEP_STYLE_LABELS[v], thumb: <StepStyleThumb style={v} /> }))} />
+            )}
           </Section>
 
           <Section icon={Palette} title="Couleurs">
@@ -255,8 +299,8 @@ export function ThemeEditor({ theme, recipes }: Props) {
           </Section>
 
           <Section icon={BookImage} title="Page">
-            <Choice label="Papier" help={{ title: "Papier", text: "Fond de chaque page, imprimé sous le texte (marges comprises)." }} value={c.paper} onChange={(v) => set("paper", v)} options={PAPERS.map((v) => ({ value: v, label: PAPER_LABELS[v] }))} />
-            <Choice label="Décor de page" help={{ title: "Décor de page", text: "Ornement répété sur chaque page dans les marges, dans la couleur d'accent." }} value={c.pageFrame} onChange={(v) => set("pageFrame", v)} options={PAGE_FRAMES.map((v) => ({ value: v, label: PAGE_FRAME_LABELS[v] }))} />
+            <VisualChoice label="Papier" help={{ title: "Papier", text: "Fond de chaque page, imprimé sous le texte (marges comprises)." }} value={c.paper} onChange={(v) => set("paper", v)} options={PAPERS.map((v) => ({ value: v, label: PAPER_LABELS[v], thumb: <PaperThumb paper={v} /> }))} />
+            <VisualChoice label="Décor de page" help={{ title: "Décor de page", text: "Ornement répété sur chaque page dans les marges, dans la couleur d'accent." }} value={c.pageFrame} onChange={(v) => set("pageFrame", v)} options={PAGE_FRAMES.map((v) => ({ value: v, label: PAGE_FRAME_LABELS[v], thumb: <FrameThumb frame={v} /> }))} />
           </Section>
 
           <Section icon={ListChecks} title="Informations imprimées">
@@ -269,8 +313,17 @@ export function ThemeEditor({ theme, recipes }: Props) {
           </Section>
 
           <Section icon={BookImage} title="Couverture des cahiers" help="Utilisée seulement quand ce thème est appliqué à un cahier qui a une page de couverture.">
-            <Choice label="Placement du titre" value={c.coverLayout} onChange={(v) => set("coverLayout", v)} options={COVER_LAYOUTS.map((v) => ({ value: v, label: COVER_LAYOUT_LABELS[v] }))} />
-            <Choice label="Fond" value={c.coverBgPattern} onChange={(v) => set("coverBgPattern", v)} options={COVER_BG_PATTERNS.filter((p) => p !== "image").map((v) => ({ value: v, label: COVER_BG_PATTERN_LABELS[v] }))} />
+            <VisualChoice label="Placement du titre" value={c.coverLayout} onChange={(v) => set("coverLayout", v)} options={COVER_LAYOUTS.map((v) => ({ value: v, label: COVER_LAYOUT_LABELS[v], thumb: <CoverLayoutThumb layout={v} /> }))} />
+            <VisualChoice
+              label="Fond"
+              value={c.coverBgPattern}
+              onChange={(v) => set("coverBgPattern", v)}
+              options={COVER_BG_PATTERNS.filter((p) => p !== "image").map((v) => ({
+                value: v,
+                label: COVER_BG_PATTERN_LABELS[v],
+                thumb: <CoverBgPatternThumb pattern={v} c1={c.coverBgColor} c2={c.coverBgColor2} accent={c.coverAccentColor} image="" />,
+              }))}
+            />
             <ColorField label="Couleur de fond 1" value={c.coverBgColor} onChange={(v) => set("coverBgColor", v)} />
             <ColorField label="Couleur de fond 2" value={c.coverBgColor2} onChange={(v) => set("coverBgColor2", v)} />
             <ColorField label="Couleur du texte" value={c.coverTextColor} onChange={(v) => set("coverTextColor", v)} />
@@ -324,6 +377,14 @@ export function ThemeEditor({ theme, recipes }: Props) {
     </div>
   );
 }
+
+/** Réglages masqués selon le modèle, parce qu'il ne les utilise pas. */
+const HIDDEN_BY_LAYOUT: Record<CookbookTheme["recipeLayout"], string[]> = {
+  classique: [],
+  "fiche-technique": ["largeur de la colonne ingrédients", "titre en majuscules (toujours en majuscules)", "liste d'ingrédients (toujours en tableau)"],
+  moderne: ["largeur de la colonne ingrédients"],
+  magazine: ["numéros des étapes (le magazine met une lettrine)", "liste « Encadré » (déjà encadrée)"],
+};
 
 // ─── Petits composants de formulaire ─────────────────────────────────────────
 
@@ -397,6 +458,38 @@ function Choice<T extends string>({
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {options.map((o) => (
           <button key={o.value} type="button" className="fl-chip" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {hint && <p style={{ color: "var(--muted)", fontSize: 12.5 }}>{hint}</p>}
+    </div>
+  );
+}
+
+/** Comme Choice, avec un petit schéma au-dessus de chaque option. */
+function VisualChoice<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+  help,
+}: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string; thumb: React.ReactNode }[];
+  hint?: string;
+  help?: HelpSpec;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <Label text={label} help={help} />
+      <div className="cb-cover-grid">
+        {options.map((o) => (
+          <button key={o.value} type="button" className="cb-cover-opt" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+            {o.thumb}
             {o.label}
           </button>
         ))}
