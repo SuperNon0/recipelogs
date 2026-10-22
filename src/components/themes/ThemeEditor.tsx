@@ -285,7 +285,7 @@ export function ThemeEditor({ theme, recipes }: Props) {
               avant d&apos;enregistrer). Choisis la recette qui sert d&apos;exemple dans la liste.
             </Help>
           </div>
-          <ThemePreviewPanel config={c} format={format} recipes={recipes} />
+          <ThemePreviewPanel config={c} format={format} recipes={recipes} expandable />
         </aside>
       </div>
 

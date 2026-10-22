@@ -15,6 +15,7 @@ export function ModalOverlay({
   children,
   title,
   wide,
+  full,
 }: {
   onClose: () => void;
   children: React.ReactNode;
@@ -22,6 +23,8 @@ export function ModalOverlay({
   title?: React.ReactNode;
   /** Fenêtre large (aperçus, éditeurs). */
   wide?: boolean;
+  /** Fenêtre qui occupe tout l'écran (aperçu en grand). */
+  full?: boolean;
 }) {
   useEscape(true, onClose);
 
@@ -40,7 +43,7 @@ export function ModalOverlay({
       <div
         role="dialog"
         aria-modal="true"
-        className={`modal fl-scroll${wide ? " wide" : ""}`}
+        className={`modal fl-scroll${wide ? " wide" : ""}${full ? " full" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-grab" />
