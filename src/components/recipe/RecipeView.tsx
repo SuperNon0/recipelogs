@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Photo } from "@/components/ui/Photo";
 import { ChevronLeft, FileDown, Layers, Library, Pencil, Star } from "lucide-react";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
@@ -66,10 +67,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, comments, usedIn, 
       </Link>
 
       <div className="rhd">
-        {recipe.photoPath && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.photoPath} alt="" className="rhd-photo" />
-        )}
+        {recipe.photoPath && <Photo src={recipe.photoPath} className="rhd-photo" />}
         <h1>{recipe.name}</h1>
         <div className="rhd-actions">
           <button

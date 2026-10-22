@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Check, Layers, Star } from "lucide-react";
 import { ContextArea, MoreButton } from "@/components/ui/Menu";
+import { Photo } from "@/components/ui/Photo";
 import { useRecipeSelection } from "@/components/RecipeSelection";
 import { useRecipeMenu, type FolderOption } from "./RecipeMenu";
 import { formatG, formatRelativeDate } from "@/lib/format";
@@ -93,8 +94,7 @@ function RecipeRow({
     <>
       <span className="rthumb" style={{ "--c": color } as React.CSSProperties}>
         {r.photoPath ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={r.photoPath} alt="" loading="lazy" />
+          <Photo src={r.photoPath} fallback={r.subCount > 0 ? <Layers size={16} /> : null} />
         ) : r.subCount > 0 ? (
           <Layers size={16} />
         ) : null}
