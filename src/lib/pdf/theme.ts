@@ -355,6 +355,102 @@ export const DENSITY_LABELS: Record<Density, string> = {
   airy: "Aéré",
 };
 
+/** Marges de la page (en mm) : haut / côtés. Le bas = le haut. */
+export const PAGE_MARGINS = ["narrow", "normal", "wide"] as const;
+export type PageMargins = (typeof PAGE_MARGINS)[number];
+export const PAGE_MARGIN_LABELS: Record<PageMargins, string> = {
+  narrow: "Étroites",
+  normal: "Normales",
+  wide: "Larges",
+};
+export const PAGE_MARGIN_MM: Record<PageMargins, { top: number; side: number }> = {
+  narrow: { top: 7, side: 8 },
+  normal: { top: 10, side: 12 },
+  wide: { top: 16, side: 20 },
+};
+/** Place réservée en haut / en bas quand un en-tête / pied de page est imprimé. */
+export const HEADER_FOOTER_MM = 6;
+
+/** Marges @page des pages de recettes, selon le thème et ce qui est imprimé autour. */
+export function recipePageMargins(
+  theme: Pick<CookbookTheme, "pageMargins">,
+  opts: { header: boolean; footer: boolean },
+): { top: number; right: number; bottom: number; left: number } {
+  const m = PAGE_MARGIN_MM[theme.pageMargins] ?? PAGE_MARGIN_MM.normal;
+  return {
+    top: m.top + (opts.header ? HEADER_FOOTER_MM : 0),
+    right: m.side,
+    bottom: m.top + (opts.footer ? HEADER_FOOTER_MM : 0),
+    left: m.side,
+  };
+}
+
+/** En-tête répété en haut de chaque page de recette. */
+export const HEADER_MODES = ["none", "name", "custom"] as const;
+export type HeaderMode = (typeof HEADER_MODES)[number];
+export const HEADER_MODE_LABELS: Record<HeaderMode, string> = {
+  none: "Aucun",
+  name: "Nom du cahier",
+  custom: "Texte libre",
+};
+
+/** Alignement à 3 positions (en-tête, numéros de page). */
+export const H_ALIGNS = ["left", "center", "right"] as const;
+export type HAlign = (typeof H_ALIGNS)[number];
+export const H_ALIGN_LABELS: Record<HAlign, string> = {
+  left: "À gauche",
+  center: "Au centre",
+  right: "À droite",
+};
+
+/** Texte de l'en-tête d'après le thème (`name` = nom du cahier ou de la recette). */
+export function themeHeaderText(theme: Pick<CookbookTheme, "headerMode" | "headerText">, name: string): string {
+  if (theme.headerMode === "name") return name;
+  if (theme.headerMode === "custom") return theme.headerText.trim();
+  return "";
+}
+
+/** Taille du titre de la recette, par rapport à la taille calculée depuis le texte. */
+export const TITLE_SCALES = ["small", "medium", "large", "xlarge"] as const;
+export type TitleScale = (typeof TITLE_SCALES)[number];
+export const TITLE_SCALE_LABELS: Record<TitleScale, string> = {
+  small: "Petit",
+  medium: "Moyen",
+  large: "Grand",
+  xlarge: "Très grand",
+};
+export const TITLE_SCALE_FACTOR: Record<TitleScale, number> = {
+  small: 0.8,
+  medium: 1,
+  large: 1.2,
+  xlarge: 1.45,
+};
+
+/** Quantité avant ou après le nom de l'ingrédient. */
+export const QTY_POSITIONS = ["before", "after"] as const;
+export type QtyPosition = (typeof QTY_POSITIONS)[number];
+export const QTY_POSITION_LABELS: Record<QtyPosition, string> = {
+  before: "250 g Farine",
+  after: "Farine 250 g",
+};
+
+/** Nombre de colonnes de la liste d'ingrédients. « auto » = 2 en Moderne, 1 sinon. */
+export const ING_COLUMNS = ["auto", "one", "two"] as const;
+export type IngColumns = (typeof ING_COLUMNS)[number];
+export const ING_COLUMNS_LABELS: Record<IngColumns, string> = {
+  auto: "Selon le modèle",
+  one: "1 colonne",
+  two: "2 colonnes",
+};
+
+/** Nombre de colonnes de la préparation. */
+export const STEPS_COLUMNS = ["one", "two"] as const;
+export type StepsColumns = (typeof STEPS_COLUMNS)[number];
+export const STEPS_COLUMNS_LABELS: Record<StepsColumns, string> = {
+  one: "1 colonne",
+  two: "2 colonnes",
+};
+
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 
 const hex = z
@@ -384,6 +480,15 @@ export const cookbookThemeSchema = z.object({
   titleUppercase: z.boolean().default(false),
   sectionTitleStyle: z.enum(SECTION_TITLE_STYLES).default("simple"),
   density: z.enum(DENSITIES).default("normal"),
+  pageMargins: z.enum(PAGE_MARGINS).default("normal"),
+  titleScale: z.enum(TITLE_SCALES).default("medium"),
+  /** Cartouche masse / nb d'ingrédients / date (toujours affiché en Fiche technique). */
+  showInfoBox: z.boolean().default(false),
+  qtyPosition: z.enum(QTY_POSITIONS).default("before"),
+  ingZebra: z.boolean().default(false),
+  ingColumns: z.enum(ING_COLUMNS).default("auto"),
+  stepsColumns: z.enum(STEPS_COLUMNS).default("one"),
+  stepDivider: z.boolean().default(false),
 
   // Sections affichées sur la fiche recette
   showTags: z.boolean().default(true),
@@ -411,8 +516,15 @@ export const cookbookThemeSchema = z.object({
   coverBgImageUrl: z.string().max(2_500_000).default(""),
   coverBgImageOpacity: z.number().min(0.05).max(1).default(0.7),
 
-  // Pied de page (alignement du texte ; le numéro de page est toujours centré)
-  footerAlign: z.enum(["left", "right"]).default("left"),
+  // Pied de page : texte (celui du cahier s'il en a un, sinon footerText) et numéro
+  footerAlign: z.enum(H_ALIGNS).default("left"),
+  footerText: z.string().max(200).default(""),
+  pageNumberAlign: z.enum(H_ALIGNS).default("center"),
+
+  // En-tête répété en haut des pages de recettes
+  headerMode: z.enum(HEADER_MODES).default("none"),
+  headerText: z.string().max(120).default(""),
+  headerAlign: z.enum(H_ALIGNS).default("left"),
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;

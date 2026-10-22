@@ -302,7 +302,7 @@ export function CookbookConfigForm({
             />
             <Field
               label="Pied de page (facultatif)"
-              help={{ title: "Pied de page", text: "Petit texte répété en bas de chaque page de recette (pas sur la couverture ni le sommaire). Le numéro de page reste toujours centré." }}
+              help={{ title: "Pied de page", text: "Petit texte répété en bas de chaque page de recette (pas sur la couverture ni le sommaire). Vide : le texte de pied de page du thème est utilisé. La place du numéro de page se règle dans le thème." }}
             >
               <input value={footer} onChange={(e) => setFooter(e.target.value)} maxLength={500} className="fl-input" placeholder="Ex. Ma pâtisserie, 2026" />
             </Field>
@@ -310,7 +310,7 @@ export function CookbookConfigForm({
               label="Position du pied de page"
               value={theme.footerAlign}
               onChange={(v) => set("footerAlign", v)}
-              options={[{ value: "left", label: "À gauche" }, { value: "right", label: "À droite" }]}
+              options={[{ value: "left", label: "À gauche" }, { value: "center", label: "Au centre" }, { value: "right", label: "À droite" }]}
             />
           </Section>
 

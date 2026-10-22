@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { buildSingleRecipeHtml, type RecipeSnap } from "./template";
 import { renderHtmlToPdf } from "./renderer";
 import { decoratePdf } from "./decorate";
-import type { CookbookTheme } from "./theme";
+import { recipePageMargins, themeHeaderText, type CookbookTheme } from "./theme";
 
 /** PDF d'une recette seule (et de ses sous-recettes) avec un thème donné. */
 export async function renderRecipePdf(
@@ -11,10 +11,21 @@ export async function renderRecipePdf(
   theme: CookbookTheme,
   format: "A4" | "A5",
 ): Promise<Uint8Array> {
-  const html = buildSingleRecipeHtml(snap, format, theme);
   // Numéros de page seulement quand la recette tient sur plusieurs pages (sous-recettes).
   const showPageNumber = theme.showPageNumbers && snap.subRecipes.length > 0;
-  return decoratePdf(await renderHtmlToPdf(html, format, { showPageNumber }), theme);
+  const header = themeHeaderText(theme, snap.name);
+  const footer = theme.footerText.trim();
+  const html = buildSingleRecipeHtml(snap, format, theme, { header: !!header, footer: showPageNumber || !!footer });
+  const pdf = await renderHtmlToPdf(html, format, {
+    showPageNumber,
+    pageNumberAlign: theme.pageNumberAlign,
+    footer,
+    footerAlign: theme.footerAlign,
+    header,
+    headerAlign: theme.headerAlign,
+    sideMarginMm: recipePageMargins(theme, { header: false, footer: false }).left,
+  });
+  return decoratePdf(pdf, theme);
 }
 
 /** Recette d'exemple quand la base ne contient encore aucune recette. */

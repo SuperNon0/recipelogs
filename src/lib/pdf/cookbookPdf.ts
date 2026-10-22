@@ -2,7 +2,7 @@ import { buildRecipeSnapshot, type RecipeSnapshot, getCookbookDetail } from "@/l
 import { buildCoverTocHtml, buildRecipesHtml, TOC_ANCHOR_PREFIX, type CookbookEntryUnion } from "./template";
 import { renderHtmlToPdf, mergePdfs, readAnchorPages } from "./renderer";
 import { decoratePdf } from "./decorate";
-import type { CookbookTheme } from "./theme";
+import { recipePageMargins, themeHeaderText, type CookbookTheme } from "./theme";
 
 type CookbookDetail = NonNullable<Awaited<ReturnType<typeof getCookbookDetail>>>;
 
@@ -71,11 +71,19 @@ export async function renderCookbookPdf(opts: {
   let recipesPdf: Uint8Array | null = null;
   let tocPages: number[] | undefined;
   if (entries.length > 0) {
-    const html = buildRecipesHtml({ format, theme, entries, hasFooter: true });
+    const header = themeHeaderText(theme, opts.name);
+    // Texte du cahier s'il en a un, sinon celui du thème.
+    const footer = opts.footer?.trim() || theme.footerText.trim();
+    const hasFooter = !!footer || theme.showPageNumbers;
+    const html = buildRecipesHtml({ format, theme, entries, hasFooter, hasHeader: !!header });
     recipesPdf = await renderHtmlToPdf(html, format, {
-      footer: opts.footer,
+      footer,
       footerAlign: theme.footerAlign,
       showPageNumber: theme.showPageNumbers,
+      pageNumberAlign: theme.pageNumberAlign,
+      header,
+      headerAlign: theme.headerAlign,
+      sideMarginMm: recipePageMargins(theme, { header: false, footer: false }).left,
     });
     if (opts.hasToc) tocPages = await readAnchorPages(recipesPdf, TOC_ANCHOR_PREFIX);
     recipesPdf = await decoratePdf(recipesPdf, theme);

@@ -10,6 +10,7 @@ import {
   LayoutTemplate,
   ListChecks,
   Palette,
+  PanelTop,
   RotateCcw,
   Save,
   Star,
@@ -22,6 +23,16 @@ import { ModalOverlay } from "@/components/ModalOverlay";
 import { ThemeThumb } from "@/components/ThemeThumb";
 import { ThemePreviewPanel, type RecipeChoice } from "./ThemePreviewPanel";
 import {
+  BandAlignThumb,
+  HeaderModeThumb,
+  InfoBoxThumb,
+  IngColumnsThumb,
+  MarginsThumb,
+  QtyPositionThumb,
+  StepDividerThumb,
+  StepsColumnsThumb,
+  TitleScaleThumb,
+  ZebraThumb,
   BlockOrderThumb,
   DensityThumb,
   FormatThumb,
@@ -48,6 +59,20 @@ import {
   FONTS,
   FONT_KEYS,
   FONT_LABELS,
+  H_ALIGNS,
+  H_ALIGN_LABELS,
+  HEADER_MODES,
+  HEADER_MODE_LABELS,
+  ING_COLUMNS,
+  ING_COLUMNS_LABELS,
+  PAGE_MARGINS,
+  PAGE_MARGIN_LABELS,
+  QTY_POSITIONS,
+  QTY_POSITION_LABELS,
+  STEPS_COLUMNS,
+  STEPS_COLUMNS_LABELS,
+  TITLE_SCALES,
+  TITLE_SCALE_LABELS,
   INGREDIENT_POSITIONS,
   INGREDIENT_POSITION_LABELS,
   INGREDIENT_RATIOS,
@@ -182,6 +207,13 @@ export function ThemeEditor({ theme, recipes }: Props) {
               onChange={setFormat}
               options={(["A4", "A5"] as const).map((v) => ({ value: v, label: v, thumb: <FormatThumb format={v} /> }))}
             />
+            <VisualChoice
+              label="Marges"
+              help={{ title: "Marges", text: "Espace blanc autour du texte. Étroites = plus de place pour la recette ; Larges = fiche plus aérée.", calc: "Étroites 7 × 8 mm   Normales 10 × 12 mm   Larges 16 × 20 mm (haut × côtés)" }}
+              value={c.pageMargins}
+              onChange={(v) => set("pageMargins", v)}
+              options={PAGE_MARGINS.map((v) => ({ value: v, label: PAGE_MARGIN_LABELS[v], thumb: <MarginsThumb margins={v} /> }))}
+            />
           </Section>
 
           <Section icon={LayoutTemplate} title="Mise en page" help="La structure de la fiche : où se placent le titre, les ingrédients et la préparation.">
@@ -240,10 +272,29 @@ export function ThemeEditor({ theme, recipes }: Props) {
               onChange={(v) => set("density", v)}
               options={DENSITIES.map((v) => ({ value: v, label: DENSITY_LABELS[v], thumb: <DensityThumb density={v} /> }))}
             />
+            {layout !== "fiche-technique" && (
+              <VisualChoice
+                label="Cartouche d'infos"
+                help={{ title: "Cartouche d'infos", text: "Petit tableau sous le titre : masse totale, nombre d'ingrédients et date. Toujours affiché en Fiche technique." }}
+                value={onOff(c.showInfoBox)}
+                onChange={(v) => set("showInfoBox", v === "on")}
+                options={[
+                  { value: "off" as const, label: "Sans", thumb: <InfoBoxThumb on={false} /> },
+                  { value: "on" as const, label: "Avec", thumb: <InfoBoxThumb on /> },
+                ]}
+              />
+            )}
           </Section>
 
           <Section icon={Columns2} title="Styles des éléments">
             <VisualChoice label="Titre de la recette" value={c.titleStyle} onChange={(v) => set("titleStyle", v)} options={TITLE_STYLES.map((v) => ({ value: v, label: TITLE_STYLE_LABELS[v], thumb: <TitleStyleThumb style={v} /> }))} />
+            <VisualChoice
+              label="Taille du titre"
+              help={{ title: "Taille du titre", text: "Taille du nom de la recette, par rapport à la taille calculée depuis le texte.", calc: "Petit × 0,8   Moyen × 1   Grand × 1,2   Très grand × 1,45" }}
+              value={c.titleScale}
+              onChange={(v) => set("titleScale", v)}
+              options={TITLE_SCALES.map((v) => ({ value: v, label: TITLE_SCALE_LABELS[v], thumb: <TitleScaleThumb scale={v} /> }))}
+            />
             {layout !== "fiche-technique" && <Toggle label="Titre en majuscules" checked={c.titleUppercase} onChange={(v) => set("titleUppercase", v)} />}
             <VisualChoice
               label="Intertitres (Ingrédients, Préparation)"
@@ -260,6 +311,53 @@ export function ThemeEditor({ theme, recipes }: Props) {
                 options={INGREDIENT_STYLES.filter((v) => layout !== "magazine" || v !== "boxed").map((v) => ({ value: v, label: INGREDIENT_STYLE_LABELS[v], thumb: <IngStyleThumb style={v} /> }))}
               />
             )}
+            {(layout === "fiche-technique" || c.ingredientStyle !== "leaders") && (
+              <VisualChoice
+                label="Place de la quantité"
+                help={{ title: "Place de la quantité", text: "Quantité devant le nom de l'ingrédient, ou au bout de la ligne. Avec la liste « Pointillés », elle est toujours au bout." }}
+                value={c.qtyPosition}
+                onChange={(v) => set("qtyPosition", v)}
+                options={QTY_POSITIONS.map((v) => ({ value: v, label: QTY_POSITION_LABELS[v], thumb: <QtyPositionThumb position={v} /> }))}
+              />
+            )}
+            {layout !== "fiche-technique" && (
+              <>
+                <VisualChoice
+                  label="Lignes zébrées"
+                  help={{ title: "Lignes zébrées", text: "Une ligne d'ingrédient sur deux sur un fond légèrement coloré, pour suivre la ligne plus facilement." }}
+                  value={onOff(c.ingZebra)}
+                  onChange={(v) => set("ingZebra", v === "on")}
+                  options={[
+                    { value: "off" as const, label: "Non", thumb: <ZebraThumb on={false} /> },
+                    { value: "on" as const, label: "Oui", thumb: <ZebraThumb on /> },
+                  ]}
+                />
+                <VisualChoice
+                  label="Colonnes d'ingrédients"
+                  help={{ title: "Colonnes d'ingrédients", text: "Liste d'ingrédients sur une ou deux colonnes. « Selon le modèle » : 2 colonnes en Moderne, 1 sinon." }}
+                  value={c.ingColumns}
+                  onChange={(v) => set("ingColumns", v)}
+                  options={ING_COLUMNS.map((v) => ({ value: v, label: ING_COLUMNS_LABELS[v], thumb: <IngColumnsThumb columns={v} layout={layout} /> }))}
+                />
+              </>
+            )}
+            <VisualChoice
+              label="Colonnes de la préparation"
+              help={{ title: "Colonnes de la préparation", text: "Les étapes sur deux colonnes, comme un journal. Pratique pour les longues recettes." }}
+              value={c.stepsColumns}
+              onChange={(v) => set("stepsColumns", v)}
+              options={STEPS_COLUMNS.map((v) => ({ value: v, label: STEPS_COLUMNS_LABELS[v], thumb: <StepsColumnsThumb columns={v} /> }))}
+            />
+            <VisualChoice
+              label="Filet entre les étapes"
+              help={{ title: "Filet entre les étapes", text: "Un trait fin sépare chaque étape de la suivante." }}
+              value={onOff(c.stepDivider)}
+              onChange={(v) => set("stepDivider", v === "on")}
+              options={[
+                { value: "off" as const, label: "Non", thumb: <StepDividerThumb on={false} /> },
+                { value: "on" as const, label: "Oui", thumb: <StepDividerThumb on /> },
+              ]}
+            />
             {layout !== "magazine" && (
               <VisualChoice label="Numéros des étapes" value={c.stepStyle} onChange={(v) => set("stepStyle", v)} options={STEP_STYLES.map((v) => ({ value: v, label: STEP_STYLE_LABELS[v], thumb: <StepStyleThumb style={v} /> }))} />
             )}
@@ -275,7 +373,7 @@ export function ThemeEditor({ theme, recipes }: Props) {
             <FontField label="Police du texte" value={c.bodyFont} onChange={(v) => set("bodyFont", v)} />
             <Field
               label={`Taille du texte : ${String(c.textSize).replace(".", ",")} pt`}
-              help={{ title: "Taille du texte", text: "Taille du texte courant. Les titres suivent automatiquement.", calc: "titre = taille du texte × 2,2", example: "Texte de 10 pt : titres de 22 pt." }}
+              help={{ title: "Taille du texte", text: "Taille du texte courant. Les titres suivent automatiquement.", calc: "titre = taille du texte × 2,2 × taille du titre (Moyen = × 1)", example: "Texte de 10 pt, titre Moyen : 22 pt." }}
             >
               <input
                 type="range"
@@ -300,7 +398,52 @@ export function ThemeEditor({ theme, recipes }: Props) {
             <Toggle label="Note (étoiles)" checked={c.showRating} onChange={(v) => set("showRating", v)} />
             <Toggle label="Notes et astuces" checked={c.showNotes} onChange={(v) => set("showNotes", v)} />
             <Toggle label="Source" checked={c.showSource} onChange={(v) => set("showSource", v)} />
+          </Section>
+
+          <Section icon={PanelTop} title="En-tête et pied de page" help="Petites lignes répétées en haut et en bas de chaque page de recette (pas sur la couverture ni le sommaire).">
+            <VisualChoice
+              label="En-tête"
+              help={{ title: "En-tête", text: "« Nom du cahier » : le nom du cahier, ou celui de la recette quand tu imprimes une recette seule." }}
+              value={c.headerMode}
+              onChange={(v) => set("headerMode", v)}
+              options={HEADER_MODES.map((v) => ({ value: v, label: HEADER_MODE_LABELS[v], thumb: <HeaderModeThumb mode={v} /> }))}
+            />
+            {c.headerMode === "custom" && (
+              <Field label="Texte de l'en-tête">
+                <input className="fl-input" value={c.headerText} maxLength={120} onChange={(e) => set("headerText", e.target.value)} placeholder="Ex. CAP Pâtissier — fiches techniques" />
+              </Field>
+            )}
+            {c.headerMode !== "none" && (
+              <VisualChoice
+                label="Place de l'en-tête"
+                value={c.headerAlign}
+                onChange={(v) => set("headerAlign", v)}
+                options={H_ALIGNS.map((v) => ({ value: v, label: H_ALIGN_LABELS[v], thumb: <BandAlignThumb align={v} where="top" /> }))}
+              />
+            )}
+            <Field
+              label="Texte du pied de page (facultatif)"
+              help={{ title: "Texte du pied de page", text: "Répété en bas de chaque page. Un cahier qui a son propre pied de page garde le sien." }}
+            >
+              <input className="fl-input" value={c.footerText} maxLength={200} onChange={(e) => set("footerText", e.target.value)} placeholder="Ex. Noë, 2026" />
+            </Field>
+            {c.footerText.trim() && (
+              <VisualChoice
+                label="Place du texte"
+                value={c.footerAlign}
+                onChange={(v) => set("footerAlign", v)}
+                options={H_ALIGNS.map((v) => ({ value: v, label: H_ALIGN_LABELS[v], thumb: <BandAlignThumb align={v} where="bottom" /> }))}
+              />
+            )}
             <Toggle label="Numéros de page (cahiers et recettes de plusieurs pages)" checked={c.showPageNumbers} onChange={(v) => set("showPageNumbers", v)} />
+            {c.showPageNumbers && (
+              <VisualChoice
+                label="Place du numéro de page"
+                value={c.pageNumberAlign}
+                onChange={(v) => set("pageNumberAlign", v)}
+                options={H_ALIGNS.map((v) => ({ value: v, label: H_ALIGN_LABELS[v], thumb: <BandAlignThumb align={v} where="bottom" label="3" /> }))}
+              />
+            )}
           </Section>
 
           <Section icon={BookImage} title="Couverture des cahiers" help="Utilisée seulement quand ce thème est appliqué à un cahier qui a une page de couverture.">
@@ -372,10 +515,18 @@ export function ThemeEditor({ theme, recipes }: Props) {
 /** Réglages masqués selon le modèle, parce qu'il ne les utilise pas. */
 const HIDDEN_BY_LAYOUT: Record<CookbookTheme["recipeLayout"], string[]> = {
   classique: [],
-  "fiche-technique": ["largeur de la colonne ingrédients", "titre en majuscules (toujours en majuscules)", "liste d'ingrédients (toujours en tableau)"],
+  "fiche-technique": [
+    "largeur de la colonne ingrédients",
+    "cartouche d'infos (toujours affiché)",
+    "titre en majuscules (toujours en majuscules)",
+    "liste d'ingrédients, lignes zébrées et colonnes d'ingrédients (toujours un tableau)",
+  ],
   moderne: ["largeur de la colonne ingrédients"],
   magazine: ["numéros des étapes (le magazine met une lettrine)", "liste « Encadré » (déjà encadrée)"],
 };
+
+/** Oui / non sous forme de choix à schémas. */
+const onOff = (v: boolean) => (v ? ("on" as const) : ("off" as const));
 
 // ─── Petits composants de formulaire ─────────────────────────────────────────
 

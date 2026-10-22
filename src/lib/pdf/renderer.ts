@@ -70,15 +70,46 @@ function scheduleBrowserClose() {
   shared.__pdfBrowserTimer.unref?.();
 }
 
+type Align = "left" | "center" | "right";
+
+export type RenderOptions = {
+  footer?: string | null;
+  footerAlign?: Align;
+  /** Affiche le numéro de page dans le footer. */
+  showPageNumber?: boolean;
+  /** Place du numéro de page (centré par défaut). */
+  pageNumberAlign?: Align;
+  /** Texte répété en haut de chaque page (rien si vide). */
+  header?: string | null;
+  headerAlign?: Align;
+  /** Marge gauche / droite de la page (mm), pour aligner en-tête et pied sur le texte. */
+  sideMarginMm?: number;
+};
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** Bandeau en 3 zones (gauche / centre / droite) pour l'en-tête ou le pied de page. */
+function bandHtml(zones: Record<Align, string[]>, sideMm: number): string {
+  const cell = (a: Align) => `<span style="text-align:${a}">${zones[a].join(" &nbsp;·&nbsp; ")}</span>`;
+  return `<div style="
+      font-size: 8pt;
+      color: #888;
+      width: 100%;
+      padding: 0 ${sideMm}mm;
+      font-family: -apple-system, Arial, sans-serif;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 4mm;
+      align-items: center;
+    ">${cell("left")}${cell("center")}${cell("right")}</div>`;
+}
+
 export function renderHtmlToPdf(
   html: string,
   format: "A4" | "A5" = "A4",
-  options: {
-    footer?: string | null;
-    footerAlign?: "left" | "right";
-    /** Affiche le numéro de page (centré) dans le footer. */
-    showPageNumber?: boolean;
-  } = {},
+  options: RenderOptions = {},
 ): Promise<Uint8Array> {
   return runExclusive(() => renderHtmlToPdfNow(html, format, options));
 }
@@ -86,12 +117,7 @@ export function renderHtmlToPdf(
 async function renderHtmlToPdfNow(
   html: string,
   format: "A4" | "A5" = "A4",
-  options: {
-    footer?: string | null;
-    footerAlign?: "left" | "right";
-    /** Affiche le numéro de page (centré) dans le footer. */
-    showPageNumber?: boolean;
-  } = {},
+  options: RenderOptions = {},
 ): Promise<Uint8Array> {
   clearTimeout(shared.__pdfBrowserTimer);
   const browser = await getBrowser();
@@ -106,48 +132,30 @@ async function renderHtmlToPdfNow(
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.waitForNetworkIdle({ idleTime: 150, timeout: 10_000 }).catch(() => undefined);
 
+    const sideMm = options.sideMarginMm ?? 12;
     const footerText = (options.footer ?? "").trim();
+    const headerText = (options.header ?? "").trim();
     const hasFooter = footerText.length > 0 || !!options.showPageNumber;
-    const escapedFooter = footerText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-    const align = options.footerAlign ?? "left";
+    const hasHeader = headerText.length > 0;
 
-    // Footer en 3 zones (CSS grid) : gauche / centre / droite.
-    // - Le texte du footer va à gauche OU à droite selon `footerAlign`.
-    // - Le numéro de page est TOUJOURS au centre (s'il est demandé).
-    const leftHtml = align === "left" ? escapedFooter : "";
-    const rightHtml = align === "right" ? escapedFooter : "";
-    const centerHtml = options.showPageNumber
-      ? `<span class="pageNumber"></span>`
-      : "";
+    // Pied de page : le texte et le numéro vont chacun dans leur zone
+    // (sur la même zone, ils sont séparés par un point médian).
+    const footerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
+    if (footerText) footerZones[options.footerAlign ?? "left"].push(escapeHtml(footerText));
+    if (options.showPageNumber) footerZones[options.pageNumberAlign ?? "center"].push(`<span class="pageNumber"></span>`);
+    const headerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
+    if (headerText) headerZones[options.headerAlign ?? "left"].push(escapeHtml(headerText));
 
-    const footerHtml = hasFooter
-      ? `<div style="
-            font-size: 8pt;
-            color: #888;
-            width: 100%;
-            padding: 0 12mm;
-            font-family: -apple-system, Arial, sans-serif;
-            display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            gap: 4mm;
-            align-items: center;
-          ">
-            <span style="text-align:left">${leftHtml}</span>
-            <span style="text-align:center">${centerHtml}</span>
-            <span style="text-align:right">${rightHtml}</span>
-          </div>`
-      : '<span style="display:none"></span>';
+    const empty = '<span style="display:none"></span>';
+    const footerHtml = hasFooter ? bandHtml(footerZones, sideMm) : empty;
+    const headerHtml = hasHeader ? bandHtml(headerZones, sideMm) : empty;
 
     const pdf = await page.pdf({
       format,
       printBackground: true,
       preferCSSPageSize: true,
-      displayHeaderFooter: hasFooter,
-      headerTemplate: '<span style="display:none"></span>',
+      displayHeaderFooter: hasFooter || hasHeader,
+      headerTemplate: headerHtml,
       footerTemplate: footerHtml,
     });
 
