@@ -24,6 +24,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
     fixes: [
       "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
+      "La mise à jour du site est beaucoup plus rapide (elle ne recompile plus tout à chaque fois)",
+      "L'écran de mise à jour n'annonce plus d'échec au bout de 12 minutes alors qu'elle continue",
       "Cartes de thème PDF : les badges passent sous le texte au lieu de couvrir la miniature",
       "PDF : l'alignement du titre, l'ordre des blocs, les intertitres et l'espacement marchent aussi en Moderne, Magazine et Fiche technique",
       "Aperçu PDF qui ne s'affichait pas",

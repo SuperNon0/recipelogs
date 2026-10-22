@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import path from "node:path";
 import type { NextConfig } from "next";
 import { parseGitLog } from "./src/lib/pr-log";
 
@@ -51,6 +52,13 @@ const nextConfig: NextConfig = {
       test: /pdf\.worker\.min\.mjs$/,
       type: "asset/resource",
       generator: { filename: "static/media/[name].[hash].js" },
+    });
+    // Le CSS (Tailwind) est toujours reconstruit, même quand le reste du build
+    // vient du cache : le cache webpack a déjà resservi un ancien CSS sur le
+    // serveur. Ça ne coûte que quelques secondes.
+    config.module.rules.push({
+      test: /[\\/]src[\\/]app[\\/]globals\.css$/,
+      use: [{ loader: path.resolve(__dirname, "scripts/no-cache-loader.cjs") }],
     });
     return config;
   },
