@@ -177,7 +177,7 @@ export const RECIPE_LAYOUT_HINTS: Record<RecipeLayout, string> = {
   classique: "Ingrédients à gauche, préparation à droite.",
   "fiche-technique": "Style BTM : cartouche (masse, date), tableau des ingrédients avec % de la masse.",
   moderne: "Une seule colonne, titre éditorial, ingrédients sur 2 colonnes.",
-  magazine: "Photo de la recette en tête, encadré ingrédients, lettrine.",
+  magazine: "Grand titre, encadré ingrédients, lettrine.",
 };
 
 export const COVER_LAYOUTS = [
@@ -355,15 +355,6 @@ export const DENSITY_LABELS: Record<Density, string> = {
   airy: "Aéré",
 };
 
-/** Photo de la recette : « auto » = seulement en mise en page Magazine. */
-export const PHOTO_MODES = ["auto", "top", "none"] as const;
-export type PhotoMode = (typeof PHOTO_MODES)[number];
-export const PHOTO_MODE_LABELS: Record<PhotoMode, string> = {
-  auto: "Magazine uniquement",
-  top: "En tête de page",
-  none: "Jamais",
-};
-
 // ─── Zod schema ───────────────────────────────────────────────────────────────
 
 const hex = z
@@ -393,7 +384,6 @@ export const cookbookThemeSchema = z.object({
   titleUppercase: z.boolean().default(false),
   sectionTitleStyle: z.enum(SECTION_TITLE_STYLES).default("simple"),
   density: z.enum(DENSITIES).default("normal"),
-  photoMode: z.enum(PHOTO_MODES).default("auto"),
 
   // Sections affichées sur la fiche recette
   showTags: z.boolean().default(true),
@@ -426,13 +416,6 @@ export const cookbookThemeSchema = z.object({
 });
 
 export type CookbookTheme = z.infer<typeof cookbookThemeSchema>;
-
-/** La photo de la recette est-elle imprimée avec ce thème ? */
-export function themeShowsPhoto(theme: Pick<CookbookTheme, "photoMode" | "recipeLayout">): boolean {
-  if (theme.photoMode === "none") return false;
-  if (theme.photoMode === "top") return true;
-  return theme.recipeLayout === "magazine";
-}
 
 export const DEFAULT_THEME: CookbookTheme = cookbookThemeSchema.parse({});
 
@@ -642,7 +625,7 @@ export const THEME_PRESETS: { key: string; label: string; description: string; v
   {
     key: "bistrot",
     label: "Bistrot",
-    description: "Bandeau bordeaux, photo en tête, ingrédients en pointillés.",
+    description: "Bandeau bordeaux, grand titre, ingrédients en pointillés.",
     values: {
       recipeLayout: "magazine", paper: "ivory", pageFrame: "band", titleStyle: "simple",
       stepStyle: "numbers", ingredientStyle: "leaders",

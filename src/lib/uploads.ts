@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 
 /**
@@ -38,17 +37,3 @@ export function imageMime(file: string): string | null {
   return IMAGE_MIME[extname(file).toLowerCase()] ?? null;
 }
 
-/**
- * Convertit une photo « /uploads/... » en data: URI, pour l'intégrer dans un
- * PDF (Chromium génère le PDF hors du site et ne peut pas charger l'URL).
- */
-export async function photoDataUri(photoPath: string | null | undefined): Promise<string | null> {
-  const file = fileFromUploadUrl(photoPath);
-  const mime = file ? imageMime(file) : null;
-  if (!file || !mime) return null;
-  try {
-    return `data:${mime};base64,${(await readFile(file)).toString("base64")}`;
-  } catch {
-    return null;
-  }
-}

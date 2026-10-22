@@ -7,7 +7,6 @@ import {
   googleFontsHref,
   coverPatternCss,
   INGREDIENT_RATIO_WIDTH,
-  themeShowsPhoto,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
@@ -735,10 +734,7 @@ function layoutCss(
     .layout-moderne .ing-list { column-count: 2; column-gap: 10mm; }
     .layout-moderne .ing-item { break-inside: avoid; }
 
-    /* ─── Magazine : photo, encadré ingrédients, lettrine ─── */
-    .recipe-photo {
-      display: block; width: 100%; height: 70mm; object-fit: cover; margin-bottom: 4mm;
-    }
+    /* ─── Magazine : encadré ingrédients, lettrine ─── */
     .layout-magazine .recipe-title {
       text-align: left; font-size: ${v.titleSize + 8}pt; font-weight: 700; margin: 0 0 2mm;
     }
@@ -925,10 +921,6 @@ export function renderRecipeCard(
         <div><span class="k">Date</span><span class="v">${new Date().toLocaleDateString("fr-FR")}</span></div>
       </div>`
     : "";
-  // Magazine : photo en tête (la route PDF l'a déjà convertie en data: URI).
-  const photoHtml = themeShowsPhoto(theme) && snap.photoPath?.startsWith("data:")
-    ? `<img class="recipe-photo" src="${snap.photoPath}" alt="" />`
-    : "";
 
   const stepsHtml =
     snap.steps && !isStepsHtmlEffectivelyEmpty(snap.steps)
@@ -970,7 +962,6 @@ export function renderRecipeCard(
 
   return `
     <section class="recipe">
-      ${photoHtml}
       <h2 class="recipe-title">${esc(snap.name)}</h2>
       ${parentLabelHtml}
       ${ficheLabelHtml}
