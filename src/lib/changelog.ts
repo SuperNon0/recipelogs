@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.1",
+    date: "2026-10-22",
+    title: "Plus de photos, corrections d'affichage et de mise à jour",
+    features: ["Les photos de recettes sont retirées du site (liste, cahiers, fiche, import Recipe Keeper)"],
+    fixes: [
+      "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
+      "Cartes de thème PDF : les badges passent sous le texte au lieu de couvrir la miniature",
+      "Aperçu PDF qui ne s'affichait pas",
+      "Plus d'icône cassée quand une photo manque",
+    ],
+    migrations: ["Les photos déjà importées sont détachées des recettes (automatique à la mise à jour)"],
+  },
+  {
     version: "V2.0",
     date: "2026-10-21",
     title: "Nouveau design, thèmes PDF personnalisables",
