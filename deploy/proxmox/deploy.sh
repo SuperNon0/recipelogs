@@ -98,7 +98,9 @@ main() {
 
   # ── Étape 3 : build dans un dossier séparé ──────────────
   echo "==> Build Next.js (le site reste en ligne pendant ce temps)..."
-  as_app "rm -rf .next-build && mkdir -p .next-build && { [ -d .next/cache ] && cp -r .next/cache .next-build/cache || true; }"
+  # Build toujours propre : le cache webpack d'un build précédent a déjà servi
+  # un ancien CSS (V2.0 : page nouvelle, styles anciens). Un peu plus long, mais sûr.
+  as_app "rm -rf .next-build .next/cache && mkdir -p .next-build"
   as_app "NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=.next-build pnpm build"
   # Mode standalone : static/ et public/ doivent être copiés à côté du serveur.
   as_app "cp -r .next-build/static .next-build/standalone/.next-build/static && { [ -d public ] && cp -r public .next-build/standalone/public || true; }"
