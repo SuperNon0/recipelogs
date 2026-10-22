@@ -1,20 +1,22 @@
 import Link from "next/link";
-import { ChevronRight, FileArchive, FileJson, FolderOpen, Palette, Tag, Wheat } from "lucide-react";
+import { ChevronRight, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { getSiteUrl } from "@/app/actions/settings";
+import { getMcpToken } from "@/lib/mcp/token";
 import { SiteSettings } from "@/components/settings/SiteSettings";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [folderCount, categoryCount, ingredientBaseCount, themes, siteUrl] = await Promise.all([
+  const [folderCount, categoryCount, ingredientBaseCount, themes, siteUrl, mcpToken] = await Promise.all([
     prisma.folder.count(),
     prisma.category.count(),
     prisma.ingredientBase.count(),
     listPdfThemes(),
     getSiteUrl(),
+    getMcpToken(),
   ]);
 
   const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
@@ -77,6 +79,18 @@ export default async function SettingsPage() {
           icon={FileArchive}
           title="Import Recipe Keeper"
           sub="Sauvegarde ZIP / HTML ou export CSV de l'application Recipe Keeper"
+        />
+      </div>
+
+      <div className="sect-title">
+        <h2>Claude</h2>
+      </div>
+      <div className="fl-list">
+        <Row
+          href="/settings/mcp"
+          icon={Plug}
+          title="Accès MCP"
+          sub={mcpToken ? "Activé · Claude peut se connecter à RecipeLog" : "Coupé · permet à Claude de consulter et gérer RecipeLog"}
         />
       </div>
 

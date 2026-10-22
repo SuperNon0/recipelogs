@@ -20,6 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Thèmes PDF : marges, en-tête répété, texte du pied de page et place du numéro de page",
       "Thèmes PDF : taille du titre, cartouche d'infos sur tous les modèles, quantité avant ou après le nom",
       "Thèmes PDF : lignes zébrées, ingrédients et préparation sur 2 colonnes, filet entre les étapes",
+      "Réglages → Accès MCP : une adresse secrète pour brancher Claude sur RecipeLog",
     ],
     fixes: [
       "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
