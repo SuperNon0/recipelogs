@@ -129,6 +129,14 @@ export function ThemeList({ themes, recipes }: { themes: ThemeCard[]; recipes: R
                 <ThemeThumb config={t.config} width={92} />
               </div>
               <div style={{ minWidth: 0 }}>
+                <div className="theme-card-tags">
+                  {t.isDefault && (
+                    <span className="fl-tag" style={{ color: "var(--accent)", borderColor: "rgba(240,166,74,.35)", background: "var(--accent-dim)" }}>
+                      <Star size={11} /> Par défaut
+                    </span>
+                  )}
+                  {!t.presetKey && <span className="fl-tag">Perso</span>}
+                </div>
                 <b>{t.name}</b>
                 <small>
                   {RECIPE_LAYOUT_LABELS[t.config.recipeLayout]} · {FONT_LABELS[t.config.titleFont] ?? t.config.titleFont} · {PAPER_LABELS[t.config.paper]} · {t.format}
@@ -137,12 +145,6 @@ export function ThemeList({ themes, recipes }: { themes: ThemeCard[]; recipes: R
               </div>
             </Link>
             <div className="theme-card-top">
-              {t.isDefault && (
-                <span className="fl-tag" style={{ color: "var(--accent)", borderColor: "rgba(240,166,74,.35)", background: "var(--accent-dim)" }}>
-                  <Star size={11} /> Par défaut
-                </span>
-              )}
-              {!t.presetKey && <span className="fl-tag">Perso</span>}
               <MoreButton spec={() => specFor(t, i)} label={`Actions pour ${t.name}`} horizontal />
             </div>
           </ContextArea>

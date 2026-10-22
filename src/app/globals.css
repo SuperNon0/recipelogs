@@ -1402,7 +1402,7 @@ button.fl-row:hover {
   display: block;
   font-weight: 600;
   font-size: 15px;
-  margin: 28px 0 3px;
+  margin: 6px 0 3px;
 }
 
 .theme-card small {
@@ -1422,11 +1422,15 @@ button.fl-row:hover {
   position: absolute;
   top: 10px;
   right: 10px;
-  left: 128px;
+}
+
+/* Badges dans la colonne texte : ils ne peuvent plus déborder sur la miniature */
+.theme-card-tags {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  min-height: 22px;
+  margin-right: 18px;
 }
 
 .theme-card-new {
