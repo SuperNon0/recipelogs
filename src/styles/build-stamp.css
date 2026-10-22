@@ -1,0 +1,6 @@
+/* Témoin de fraîcheur du CSS. deploy.sh réécrit ce fichier avant chaque build
+   puis vérifie que la valeur se retrouve dans le CSS produit : si ce n'est pas
+   le cas, le cache a resservi un ancien CSS et le build est refait sans cache. */
+:root {
+  --build-stamp: "dev";
+}

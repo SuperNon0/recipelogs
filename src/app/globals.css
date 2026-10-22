@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../styles/build-stamp.css";
 @import "../styles/recipe-form.css";
 @import "../styles/cookbooks.css";
 @import "../styles/shopping.css";

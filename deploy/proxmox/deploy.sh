@@ -29,8 +29,11 @@
 #
 #  1. git pull ; si rien de nouveau depuis le dernier déploiement réussi → fin.
 #  2. Relance la NOUVELLE version de ce script (--after-pull).
-#  3. pnpm install, prisma generate + migrate, build dans .next-build
-#     (le site en ligne continue de tourner sur .next pendant ce temps).
+#  3. pnpm install (sauté si pnpm-lock.yaml n'a pas changé), prisma generate
+#     + migrate, build dans .next-build en réutilisant le cache du build
+#     précédent (le site en ligne continue de tourner sur .next).
+#     Un témoin (src/styles/build-stamp.css) vérifie que le CSS produit est
+#     neuf ; sinon le build est refait sans cache.
 #  4. Échange .next-build ↔ .next, redémarrage, vérification de /api/health.
 #  5. Si le nouveau serveur ne répond pas : retour automatique à l'ancienne
 #     version (.next-prev).
@@ -44,6 +47,8 @@ main() {
   local UPLOAD_DIR="/var/lib/recipelog/uploads"
   local SELF="${APP_DIR}/deploy/proxmox/deploy.sh"
   local STAMP="${APP_DIR}/.next/DEPLOYED_COMMIT"
+  local CSS_STAMP_FILE="src/styles/build-stamp.css"
+  local LOCK_HASH="node_modules/.deploy-lock-hash"
   local STAGE="${1:-}"
 
   # Commande lancée en tant qu'utilisateur de l'application, dans APP_DIR.
@@ -73,7 +78,9 @@ main() {
     echo "==> Git pull..."
     # Next.js peut réécrire tsconfig.json pendant le build : on le restaure
     # pour que le pull ne soit jamais bloqué par une « modification locale ».
+    # Idem pour le témoin CSS, réécrit à chaque build.
     as_app "git checkout -- tsconfig.json"
+    as_app "git checkout -- ${CSS_STAMP_FILE} 2>/dev/null || true"
     as_app "git pull --ff-only"
     local HEAD
     HEAD="$(as_app "git rev-parse HEAD")"
@@ -86,10 +93,17 @@ main() {
   fi
 
   # ── Étape 2 : dépendances et base de données ────────────
-  echo "==> pnpm install..."
-  as_app "pnpm install --frozen-lockfile"
+  local lock_hash
+  lock_hash="$(sha256sum "${APP_DIR}/pnpm-lock.yaml" | cut -d' ' -f1)"
+  if [ -f "${APP_DIR}/${LOCK_HASH}" ] && [ "$(cat "${APP_DIR}/${LOCK_HASH}")" = "${lock_hash}" ]; then
+    echo "==> [$(date '+%H:%M:%S')] Dépendances inchangées : pnpm install sauté."
+  else
+    echo "==> [$(date '+%H:%M:%S')] pnpm install..."
+    as_app "pnpm install --frozen-lockfile"
+    as_app "echo ${lock_hash} > ${LOCK_HASH}"
+  fi
 
-  echo "==> Prisma (client + migrations)..."
+  echo "==> [$(date '+%H:%M:%S')] Prisma (client + migrations)..."
   local DEPLOY_START
   DEPLOY_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   as_app "pnpm exec prisma generate"
@@ -97,17 +111,30 @@ main() {
   as_app "pnpm exec tsx scripts/post-deploy-report.ts '${DEPLOY_START}'" || echo "⚠ post-deploy-report ignoré"
 
   # ── Étape 3 : build dans un dossier séparé ──────────────
-  echo "==> Build Next.js (le site reste en ligne pendant ce temps)..."
-  # Build toujours propre : le cache webpack d'un build précédent a déjà servi
-  # un ancien CSS (V2.0 : page nouvelle, styles anciens). Un peu plus long, mais sûr.
-  as_app "rm -rf .next-build .next/cache && mkdir -p .next-build"
+  echo "==> [$(date '+%H:%M:%S')] Build Next.js (le site reste en ligne pendant ce temps)..."
+  # Le cache du build précédent rend le build bien plus rapide, mais il a déjà
+  # resservi un ancien CSS (V2.0 : page nouvelle, styles anciens). D'où le
+  # témoin : une valeur unique écrite dans le CSS source, qui doit se
+  # retrouver dans le CSS produit. Absente → CSS périmé → build sans cache.
+  local css_stamp
+  css_stamp="$(as_app "git rev-parse --short HEAD")-$(date +%s)"
+  as_app "sed -i 's/--build-stamp: \"[^\"]*\"/--build-stamp: \"${css_stamp}\"/' ${CSS_STAMP_FILE}"
+  as_app "grep -q '${css_stamp}' ${CSS_STAMP_FILE}" || fail "impossible d'écrire le témoin CSS"
+  as_app "rm -rf .next-build && mkdir -p .next-build && { [ -d .next/cache ] && mv .next/cache .next-build/cache || true; }"
   as_app "NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=.next-build pnpm build"
+  if ! as_app "grep -qs '${css_stamp}' .next-build/static/css/*.css"; then
+    echo "==> [$(date '+%H:%M:%S')] ⚠ Le cache a produit un CSS périmé : nouveau build sans cache..."
+    as_app "rm -rf .next-build && mkdir -p .next-build"
+    as_app "NEXT_TELEMETRY_DISABLED=1 NEXT_DIST_DIR=.next-build pnpm build"
+    as_app "grep -qs '${css_stamp}' .next-build/static/css/*.css" || fail "le CSS produit est périmé même sans cache"
+  fi
+  as_app "git checkout -- ${CSS_STAMP_FILE}"
   # Mode standalone : static/ et public/ doivent être copiés à côté du serveur.
   as_app "cp -r .next-build/static .next-build/standalone/.next-build/static && { [ -d public ] && cp -r public .next-build/standalone/public || true; }"
   [ -f "${APP_DIR}/.next-build/standalone/server.js" ] || fail "le build n'a pas produit server.js"
 
   # ── Étape 4 : échange et redémarrage ────────────────────
-  echo "==> Bascule vers la nouvelle version et redémarrage..."
+  echo "==> [$(date '+%H:%M:%S')] Bascule vers la nouvelle version et redémarrage..."
   trap 'echo "==> ❌ ÉCHEC DU DÉPLOIEMENT pendant la bascule (ligne ${LINENO}) : vérifier /opt/recipelog/.next"; exit 1' ERR
   cd "${APP_DIR}"
   rm -rf .next-prev
@@ -116,7 +143,7 @@ main() {
   chmod -R o+rX .next
   systemctl restart recipelog
 
-  echo "==> Vérification du démarrage..."
+  echo "==> [$(date '+%H:%M:%S')] Vérification du démarrage..."
   local ok=0
   for _ in $(seq 1 30); do
     if curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:3000/api/health; then ok=1; break; fi
