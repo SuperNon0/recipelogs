@@ -12,7 +12,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "V2.1",
     date: "2026-10-22",
     title: "Plus de photos, corrections d'affichage et de mise à jour",
-    features: ["Les photos de recettes sont retirées du site (liste, cahiers, fiche, import Recipe Keeper)"],
+    features: [
+      "Les photos de recettes sont retirées du site (liste, cahiers, fiche, import Recipe Keeper)",
+      "Thèmes PDF : le réglage « Photo de la recette » est retiré",
+    ],
     fixes: [
       "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
       "Cartes de thème PDF : les badges passent sous le texte au lieu de couvrir la miniature",
