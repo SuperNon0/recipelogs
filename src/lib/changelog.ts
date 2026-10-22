@@ -14,6 +14,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: "Plus de photos, corrections d'affichage et de mise à jour",
     features: [
       "Les photos de recettes sont retirées du site (liste, cahiers, fiche, import Recipe Keeper)",
+      "Thèmes PDF : le réglage « Photo de la recette » est retiré",
       "Éditeur de thème : l'aperçu suit la page quand on descend, s'ouvre en grand et se met à jour plus vite",
     ],
     fixes: [

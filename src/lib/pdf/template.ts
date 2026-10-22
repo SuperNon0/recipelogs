@@ -7,7 +7,6 @@ import {
   googleFontsHref,
   coverPatternCss,
   INGREDIENT_RATIO_WIDTH,
-  themeShowsPhoto,
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
@@ -545,7 +544,9 @@ function bodyClass(theme: CookbookTheme): string {
 /**
  * Disposition choisie dans le thème (place des ingrédients, alignement et casse
  * du titre, intertitres, espacement). Placé APRÈS layoutCss pour primer sur la
- * mise en page.
+ * mise en page : les sélecteurs commencent par `.recipe` pour avoir le même
+ * poids que ceux de layoutCss (`.layout-moderne .columns`…), sinon le réglage
+ * était ignoré en Moderne, Magazine et Fiche technique.
  */
 function placementCss(theme: CookbookTheme, v: { baseSize: number }): string {
   const a = theme.accentColor;
@@ -554,38 +555,38 @@ function placementCss(theme: CookbookTheme, v: { baseSize: number }): string {
 
   // Ingrédients à droite / au-dessus
   if (sideBySide) {
-    if (theme.ingredientsPosition === "right") out.push(`.columns { flex-direction: row-reverse; }`);
+    if (theme.ingredientsPosition === "right") out.push(`.recipe .columns { flex-direction: row-reverse; }`);
     if (theme.ingredientsPosition === "top") {
-      out.push(`.columns { flex-direction: column; gap: 5mm; } .col-ing { flex: 0 0 auto; }`);
+      out.push(`.recipe .columns { flex-direction: column; gap: 5mm; } .recipe .col-ing { flex: 0 0 auto; }`);
     }
   } else if (theme.ingredientsPosition === "right") {
     // Mises en page en une colonne : « à droite » = la préparation d'abord.
-    out.push(`.columns { flex-direction: column-reverse; }`);
+    out.push(`.recipe .columns { flex-direction: column-reverse; }`);
   }
 
   // Alignement du titre et des lignes qui le suivent
   if (theme.titleAlign !== "auto") {
     const al = theme.titleAlign;
     out.push(`
-      .recipe-title, .recipe-categories, .tags-line, .subrecipe-of, .portion, .recipe-rating, .source { text-align: ${al}; }
-      .recipe-title::after { margin-left: ${al === "left" ? "0" : "auto"} !important; margin-right: ${al === "right" ? "0" : "auto"} !important; }
-      .tag-chip { margin: 0 ${al === "right" ? "0 0 2mm" : al === "left" ? "2mm 0 0" : "1mm"}; }
+      .recipe .recipe-title, .recipe .recipe-categories, .recipe .tags-line, .recipe .subrecipe-of, .recipe .portion, .recipe .recipe-rating, .recipe .source { text-align: ${al}; }
+      .recipe .recipe-title::after { margin-left: ${al === "left" ? "0" : "auto"} !important; margin-right: ${al === "right" ? "0" : "auto"} !important; }
+      .recipe .tag-chip { margin: 0 ${al === "right" ? "0 0 2mm" : al === "left" ? "2mm 0 0" : "1mm"}; }
     `);
   }
   if (theme.titleUppercase) {
-    out.push(`.recipe-title { text-transform: uppercase; letter-spacing: 0.04em; }`);
+    out.push(`.recipe .recipe-title { text-transform: uppercase; letter-spacing: 0.04em; }`);
   }
 
   // Intertitres « Ingrédients » / « Préparation »
   switch (theme.sectionTitleStyle) {
     case "underline":
-      out.push(`.col-title { border-bottom: 1.5px solid ${a}; padding-bottom: 1.2mm; }`);
+      out.push(`.recipe .col-title { border-bottom: 1.5px solid ${a}; padding-bottom: 1.2mm; }`);
       break;
     case "caps":
-      out.push(`.col-title { text-transform: uppercase; letter-spacing: 0.14em; font-size: ${v.baseSize}pt; }`);
+      out.push(`.recipe .col-title { text-transform: uppercase; letter-spacing: 0.14em; font-size: ${v.baseSize}pt; }`);
       break;
     case "pill":
-      out.push(`.col-title { display: inline-block; background: ${a}; color: #ffffff; padding: 0.8mm 3.2mm; border-radius: 999px; font-size: ${v.baseSize + 0.5}pt; border-bottom: none; }`);
+      out.push(`.recipe .col-title { display: inline-block; background: ${a}; color: #ffffff; padding: 0.8mm 3.2mm; border-radius: 999px; font-size: ${v.baseSize + 0.5}pt; border-bottom: none; }`);
       break;
   }
 
@@ -593,20 +594,20 @@ function placementCss(theme: CookbookTheme, v: { baseSize: number }): string {
   if (theme.density === "compact") {
     out.push(`
       body { line-height: 1.35; }
-      .columns { gap: 4mm; }
-      .ing-item { margin-bottom: 0.9mm; }
-      .steps-rich > p { margin-bottom: 1.4mm; }
-      .recipe-title { margin-top: 2mm; margin-bottom: 2mm; }
-      .notes { margin-top: 4mm; }
+      .recipe .columns { gap: 4mm; }
+      .recipe .ing-item { margin-bottom: 0.9mm; }
+      .recipe .steps-rich > p { margin-bottom: 1.4mm; }
+      .recipe .recipe-title { margin-top: 2mm; margin-bottom: 2mm; }
+      .recipe .notes { margin-top: 4mm; }
     `);
   } else if (theme.density === "airy") {
     out.push(`
       body { line-height: 1.68; }
-      .columns { gap: 9mm; }
-      .ing-item { margin-bottom: 2.8mm; }
-      .steps-rich > p { margin-bottom: 4mm; }
-      .recipe-title { margin-top: 6mm; margin-bottom: 5mm; }
-      .notes { margin-top: 9mm; }
+      .recipe .columns { gap: 9mm; }
+      .recipe .ing-item { margin-bottom: 2.8mm; }
+      .recipe .steps-rich > p { margin-bottom: 4mm; }
+      .recipe .recipe-title { margin-top: 6mm; margin-bottom: 5mm; }
+      .recipe .notes { margin-top: 9mm; }
     `);
   }
   return out.join("\n");
@@ -735,10 +736,7 @@ function layoutCss(
     .layout-moderne .ing-list { column-count: 2; column-gap: 10mm; }
     .layout-moderne .ing-item { break-inside: avoid; }
 
-    /* ─── Magazine : photo, encadré ingrédients, lettrine ─── */
-    .recipe-photo {
-      display: block; width: 100%; height: 70mm; object-fit: cover; margin-bottom: 4mm;
-    }
+    /* ─── Magazine : encadré ingrédients, lettrine ─── */
     .layout-magazine .recipe-title {
       text-align: left; font-size: ${v.titleSize + 8}pt; font-weight: 700; margin: 0 0 2mm;
     }
@@ -925,10 +923,6 @@ export function renderRecipeCard(
         <div><span class="k">Date</span><span class="v">${new Date().toLocaleDateString("fr-FR")}</span></div>
       </div>`
     : "";
-  // Magazine : photo en tête (la route PDF l'a déjà convertie en data: URI).
-  const photoHtml = themeShowsPhoto(theme) && snap.photoPath?.startsWith("data:")
-    ? `<img class="recipe-photo" src="${snap.photoPath}" alt="" />`
-    : "";
 
   const stepsHtml =
     snap.steps && !isStepsHtmlEffectivelyEmpty(snap.steps)
@@ -970,7 +964,6 @@ export function renderRecipeCard(
 
   return `
     <section class="recipe">
-      ${photoHtml}
       <h2 class="recipe-title">${esc(snap.name)}</h2>
       ${parentLabelHtml}
       ${ficheLabelHtml}

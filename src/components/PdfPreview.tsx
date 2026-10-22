@@ -40,9 +40,29 @@ export function PdfPreview({
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+
+  // Largeur réelle de l'aperçu : on redessine les pages quand elle change
+  // (fenêtre agrandie, plein écran…), sinon l'image dessinée à l'ancienne
+  // taille est étirée et devient floue.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setBoxWidth(Math.round(box.clientWidth)), 150);
+    });
+    ro.observe(box);
+    setBoxWidth(Math.round(box.clientWidth));
+    return () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
-    if (!data || !boxRef.current) return;
+    if (!data || !boxRef.current || boxWidth <= 0) return;
     let cancelled = false;
     const box = boxRef.current;
     (async () => {
@@ -51,8 +71,10 @@ export function PdfPreview({
         const doc = await pdfjs.getDocument({ data: new Uint8Array(data.slice(0)) }).promise;
         if (cancelled) return;
         const n = Math.min(doc.numPages, maxPages);
-        const width = Math.max(240, box.clientWidth - 2);
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(240, boxWidth - 2);
+        // Au moins 2 pixels par point affiché (texte net même en zoomant un
+        // peu), jusqu'à 3 sur les écrans très denses (téléphones).
+        const ratio = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
         const canvases: HTMLCanvasElement[] = [];
         for (let i = 1; i <= n; i++) {
           const page = await doc.getPage(i);
@@ -84,7 +106,7 @@ export function PdfPreview({
     return () => {
       cancelled = true;
     };
-  }, [data, maxPages]);
+  }, [data, maxPages, boxWidth]);
 
   const msg = error ?? renderError;
   return (

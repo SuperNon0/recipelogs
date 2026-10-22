@@ -50,8 +50,6 @@ import {
   PAGE_FRAME_LABELS,
   PAPERS,
   PAPER_LABELS,
-  PHOTO_MODES,
-  PHOTO_MODE_LABELS,
   RECIPE_LAYOUTS,
   RECIPE_LAYOUT_HINTS,
   RECIPE_LAYOUT_LABELS,
@@ -441,13 +439,6 @@ export function CookbookConfigForm({
               onChange={(v) => set("density", v)}
               options={DENSITIES.map((v) => ({ value: v, label: DENSITY_LABELS[v] }))}
             />
-            <Choice
-              label="Photo de la recette"
-              help={{ title: "Photo de la recette", text: "La photo ajoutée à la recette, imprimée en bandeau en haut de la fiche. Sans photo, rien n'est affiché." }}
-              value={theme.photoMode}
-              onChange={(v) => set("photoMode", v)}
-              options={PHOTO_MODES.map((v) => ({ value: v, label: PHOTO_MODE_LABELS[v] }))}
-            />
           </Section>
 
           {/* ── Styles des éléments ───────────────────── */}
@@ -752,7 +743,7 @@ function FontField({ label, value, onChange }: { label: string; value: FontKey; 
 
 // ─── Vignettes de couverture ─────────────────────────────────────────────────
 
-function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
+export function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
   const w = 60;
   const h = 80;
   const txt = "var(--text)";
@@ -808,7 +799,7 @@ function CoverLayoutThumb({ layout }: { layout: CoverLayout }) {
   );
 }
 
-function CoverBgPatternThumb({
+export function CoverBgPatternThumb({
   pattern,
   c1,
   c2,

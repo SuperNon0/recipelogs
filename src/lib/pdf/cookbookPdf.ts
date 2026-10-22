@@ -2,8 +2,7 @@ import { buildRecipeSnapshot, type RecipeSnapshot, getCookbookDetail } from "@/l
 import { buildCoverTocHtml, buildRecipesHtml, TOC_ANCHOR_PREFIX, type CookbookEntryUnion } from "./template";
 import { renderHtmlToPdf, mergePdfs, readAnchorPages } from "./renderer";
 import { decoratePdf } from "./decorate";
-import { themeShowsPhoto, type CookbookTheme } from "./theme";
-import { photoDataUri } from "@/lib/uploads";
+import type { CookbookTheme } from "./theme";
 
 type CookbookDetail = NonNullable<Awaited<ReturnType<typeof getCookbookDetail>>>;
 
@@ -65,8 +64,7 @@ export async function renderCookbookPdf(opts: {
   footer: string | null;
   entries: CookbookEntryUnion[];
 }): Promise<Uint8Array | null> {
-  const { format, theme } = opts;
-  const entries = themeShowsPhoto(theme) ? await withInlinePhotos(opts.entries) : opts.entries;
+  const { format, theme, entries } = opts;
 
   // Les recettes sont rendues EN PREMIER : on relit dans ce PDF la page réelle
   // de chaque entrée pour que le sommaire soit exact.
@@ -101,13 +99,4 @@ export async function renderCookbookPdf(opts: {
   if (recipesPdf) pdfs.push(recipesPdf);
 
   return pdfs.length > 0 ? mergePdfs(pdfs) : null;
-}
-
-/** Mise en page magazine : intègre les photos des recettes dans le HTML. */
-async function withInlinePhotos(entries: CookbookEntryUnion[]): Promise<CookbookEntryUnion[]> {
-  return Promise.all(
-    entries.map(async (e) =>
-      e.type === "recipe" ? { ...e, snap: { ...e.snap, photoPath: await photoDataUri(e.snap.photoPath) } } : e,
-    ),
-  );
 }
