@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const INGREDIENT_UNITS = ["g", "L", "cc", "cs", "pièce", "QS"] as const;
+export const INGREDIENT_UNITS = ["g", "L", "cc", "cs", "pièce", "QS"] as const;
 export type IngredientUnit = (typeof INGREDIENT_UNITS)[number];
 
 export const ingredientInputSchema = z.object({
