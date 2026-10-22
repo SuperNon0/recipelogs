@@ -1,20 +1,37 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Copy, Eye, KeyRound, Link2, Pencil, Power, RefreshCw, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Copy,
+  Eye,
+  KeyRound,
+  Link2,
+  ListChecks,
+  Pencil,
+  Power,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { disableMcpAccess, regenerateMcpAccess } from "@/app/actions/mcp";
 import { Help } from "@/components/ui/Help";
 
 type ToolInfo = { name: string; description: string; kind: "read" | "write" | "delete" };
 export type ToolGroupInfo = { title: string; tools: ToolInfo[] };
 
-const KIND = {
-  read: { icon: Eye, label: "Lecture seule", color: "var(--muted)" },
+const KIND: Record<ToolInfo["kind"], { icon: LucideIcon; label: string; color: string }> = {
+  read: { icon: Eye, label: "Lecture", color: "var(--accent-2)" },
   write: { icon: Pencil, label: "Modifie", color: "var(--accent)" },
   delete: { icon: Trash2, label: "Supprime", color: "var(--danger)" },
-} as const;
+};
 
-/** Réglages → Accès MCP : activer, copier l'adresse, changer la clé, couper. */
+/** Couleur de chaque groupe d'outils (titre et pastille). */
+const GROUP_COLORS = ["var(--accent)", "var(--accent-2)", "var(--pending)", "var(--accent-3)", "#e48fc1", "#7cc4f0"];
+
+/** Réglages → Accès MCP : activer, copier l'adresse et la clé, changer la clé, couper. */
 export function McpAccess({ token, groups }: { token: string | null; groups: ToolGroupInfo[] }) {
   const [pending, startTransition] = useTransition();
   const [origin, setOrigin] = useState("");
@@ -23,8 +40,8 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
   useEffect(() => setOrigin(window.location.origin), []);
 
   const endpoint = `${origin}/api/mcp`;
-  const header = token ? `Bearer ${token}` : null;
-  const urlWithKey = token ? `${endpoint}/${token}` : null;
+  const header = token ? `Bearer ${token}` : "";
+  const urlWithKey = token ? `${endpoint}/${token}` : "";
 
   const regenerate = () => {
     if (token && !confirm("Changer la clé ? L'ancienne cessera aussitôt de marcher dans Claude.")) return;
@@ -52,24 +69,46 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
 
   const copyButton = (what: string, value: string) => (
     <button type="button" className="fl-btn fl-btn-secondary" onClick={() => copy(what, value)}>
-      {copied === what ? <Check size={15} /> : <Copy size={15} />}
+      {copied === what ? <Check size={15} style={{ color: "var(--accent-2)" }} /> : <Copy size={15} />}
       {copied === what ? "Copié" : "Copier"}
     </button>
   );
 
+  const total = groups.reduce((n, g) => n + g.tools.length, 0);
+
   return (
     <>
+      <div className="mcp-status">
+        <span className={`mcp-pill ${token ? "on" : "off"}`}>
+          <span className="dot" />
+          {token ? "Activé" : "Coupé"}
+        </span>
+        <span className="mcp-status-tx">
+          {token ? (
+            <>
+              Claude peut utiliser <b>{total} outils</b>
+            </>
+          ) : (
+            "Active l'accès pour brancher Claude"
+          )}
+        </span>
+        <span className="mcp-setup">
+          Mise en place
+          <SetupHelp endpoint={endpoint} />
+        </span>
+      </div>
+
       <div className="fl-list">
         {!token ? (
           <div className="fl-row">
-            <span className="ic">
+            <span className="ic mcp-ic" style={{ color: "var(--accent)" }}>
               <KeyRound size={17} />
             </span>
             <span className="set-tx">
               <b>
-                <span>Accès coupé</span>
+                <span>Clé secrète</span>
               </b>
-              <small>Active-le pour créer une clé secrète</small>
+              <small>Aucune clé pour l&apos;instant</small>
             </span>
             <button type="button" className="fl-btn fl-btn-primary" onClick={regenerate} disabled={pending}>
               <Power size={15} />
@@ -79,160 +118,193 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
         ) : (
           <>
             <div className="fl-row">
-              <span className="ic">
+              <span className="ic mcp-ic" style={{ color: "var(--accent-2)" }}>
                 <Link2 size={17} />
               </span>
               <span className="set-tx">
                 <b>
-                  <span>Adresse du serveur</span>
+                  <span>Adresse</span>
+                  <Help title="Adresse du serveur">
+                    L&apos;URL à donner à Claude. Seule, elle ne donne accès à rien : il faut aussi la
+                    clé, dans l&apos;en-tête ci-dessous.
+                  </Help>
                 </b>
-                <small style={{ wordBreak: "break-all", userSelect: "all" }}>{endpoint}</small>
+                <small className="mcp-val">{endpoint}</small>
               </span>
               {copyButton("endpoint", endpoint)}
             </div>
             <div className="fl-row">
-              <span className="ic">
+              <span className="ic mcp-ic" style={{ color: "var(--accent)" }}>
                 <KeyRound size={17} />
               </span>
               <span className="set-tx">
                 <b>
                   <span>En-tête Authorization</span>
                   <Help title="En-tête Authorization">
-                    La façon conseillée de donner la clé : Claude l&apos;envoie dans l&apos;en-tête{" "}
-                    <code>Authorization</code> de chaque requête, elle n&apos;apparaît pas dans
-                    l&apos;adresse. Toute personne qui a cette clé peut utiliser les outils ci-dessous :
-                    ne la partage pas.
+                    La façon conseillée de donner la clé : Claude l&apos;envoie à chaque requête, elle
+                    n&apos;apparaît pas dans l&apos;adresse. Dans claude.ai, nom <code>Authorization</code>,
+                    valeur = ce texte (il commence par « Bearer »). <code>X-API-Key: &lt;clé&gt;</code> est
+                    aussi accepté. Ne partage pas cette clé.
                   </Help>
                 </b>
-                <small style={{ wordBreak: "break-all", userSelect: "all" }}>{header}</small>
+                <small className="mcp-val mcp-secret">{header}</small>
               </span>
-              {copyButton("header", header!)}
+              {copyButton("header", header)}
             </div>
             <div className="fl-row">
-              <span className="ic">
+              <span className="ic mcp-ic" style={{ color: "var(--pending)" }}>
                 <Link2 size={17} />
               </span>
               <span className="set-tx">
                 <b>
-                  <span>Ou : adresse avec la clé</span>
+                  <span>Adresse avec la clé</span>
                   <Help title="Adresse avec la clé">
-                    Pour une appli qui ne permet pas d&apos;ajouter un en-tête : la clé est alors à la
-                    fin de l&apos;adresse. Ça marche aussi, mais l&apos;adresse devient secrète.
+                    En secours, si l&apos;appli ne permet pas d&apos;ajouter un en-tête : la clé est à la fin
+                    de l&apos;adresse. Ça marche aussi, mais la clé apparaît alors dans les journaux de
+                    Cloudflare.
                   </Help>
                 </b>
-                <small style={{ wordBreak: "break-all", userSelect: "all" }}>{urlWithKey}</small>
+                <small className="mcp-val">{urlWithKey}</small>
               </span>
-              {copyButton("url", urlWithKey!)}
+              {copyButton("url", urlWithKey)}
+            </div>
+            <div className="fl-row">
+              <span className="ic mcp-ic" style={{ color: "var(--danger)" }}>
+                <RefreshCw size={17} />
+              </span>
+              <span className="set-tx">
+                <b>
+                  <span>Changer ou couper</span>
+                  <Help title="Sécurité">
+                    Sans la clé, l&apos;adresse répond « introuvable ». <b>Changer</b> crée une nouvelle clé
+                    et l&apos;ancienne cesse aussitôt de marcher : remets la nouvelle dans Claude.{" "}
+                    <b>Couper</b> ferme tout de suite l&apos;accès.
+                  </Help>
+                </b>
+                <small>Si la clé a fuité</small>
+              </span>
+              <button type="button" className="fl-btn fl-btn-secondary" onClick={regenerate} disabled={pending}>
+                Changer
+              </button>
+              <button type="button" className="fl-btn fl-btn-danger" onClick={disable} disabled={pending}>
+                Couper
+              </button>
             </div>
           </>
-        )}
-
-        {token && (
-          <div className="fl-row">
-            <span className="ic">
-              <RefreshCw size={17} />
-            </span>
-            <span className="set-tx">
-              <b>
-                <span>Clé secrète</span>
-              </b>
-              <small>Change la clé si elle a fuité, ou coupe l&apos;accès</small>
-            </span>
-            <button type="button" className="fl-btn fl-btn-secondary" onClick={regenerate} disabled={pending}>
-              Changer
-            </button>
-            <button type="button" className="fl-btn fl-btn-danger" onClick={disable} disabled={pending}>
-              Couper
-            </button>
-          </div>
         )}
       </div>
 
       <div className="sect-title">
-        <h2>Mise en place, une seule fois</h2>
+        <h2>Outils de Claude</h2>
+        <span className="mcp-legend">
+          {Object.values(KIND).map((k) => (
+            <span key={k.label} style={{ color: k.color }}>
+              <k.icon size={12} /> {k.label}
+            </span>
+          ))}
+        </span>
       </div>
-      <ol className="set-note" style={{ paddingLeft: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-        <li>
-          <b>Active l&apos;accès</b> ci-dessus.
-        </li>
-        <li>
-          <b>Ouvre ce chemin dans Cloudflare.</b> Le site est derrière Cloudflare Zero Trust, qui
-          demande de se connecter : Claude, lui, ne sait pas le faire. Dans Cloudflare Zero Trust :
-          Access → Applications → <i>Add an application</i> → <i>Self-hosted</i>. Nom : « RecipeLog
-          MCP ». Domaine : celui du site, chemin <code>api/mcp</code>, puis une 2ᵉ entrée{" "}
-          <code>api/mcp/*</code> (pour l&apos;adresse avec la clé). Règle (policy) : action{" "}
-          <b>Bypass</b>, Include <b>Everyone</b>. Enregistre, et place cette application{" "}
-          <b>au-dessus</b> de celle qui protège tout le site. Le reste du site reste protégé ;{" "}
-          <code>/api/mcp</code> reste verrouillé par la clé.
-        </li>
-        <li>
-          <b>Vérifie.</b> Colle l&apos;adresse avec la clé dans une fenêtre de navigation privée : tu
-          dois voir « Method not allowed » (normal, Claude n&apos;utilise pas cette méthode). Si tu
-          vois la page de connexion Cloudflare, la règle de l&apos;étape 2 ne s&apos;applique pas encore.
-        </li>
-        <li>
-          <b>Ajoute RecipeLog dans Claude.</b> Sur claude.ai : Paramètres → Connecteurs →{" "}
-          <i>Ajouter un connecteur personnalisé</i>. Nom : « RecipeLog », URL : l&apos;
-          <b>adresse du serveur</b>. Dans « En-têtes de requête » (Request headers), ajoute{" "}
-          <code>Authorization</code> avec la valeur de l&apos;<b>en-tête Authorization</b> copiée
-          ci-dessus (elle commence par « Bearer »). Si cette section n&apos;apparaît pas sur ton compte,
-          mets plutôt l&apos;<b>adresse avec la clé</b> comme URL. Le connecteur marche ensuite aussi sur
-          l&apos;application mobile.
-          <br />
-          Claude Code :{" "}
-          <code>claude mcp add --transport http recipelog &lt;adresse&gt; --header &quot;Authorization: Bearer &lt;clé&gt;&quot;</code>
-          <br />
-          Claude Desktop (fichier <code>claude_desktop_config.json</code>) :
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", margin: "6px 0 0" }}>
-            {`{
-  "mcpServers": {
-    "recipelog": {
-      "command": "npx",
-      "args": ["mcp-remote", "${endpoint}",
-               "--header", "Authorization: Bearer <clé>"]
-    }
-  }
-}`}
-          </pre>
-        </li>
-        <li>
-          <b>Utilise-le.</b> Dans une conversation, active RecipeLog dans le menu des outils, puis
-          demande par exemple « classe mes ingrédients à classer ». Claude te demande ton accord avant
-          d&apos;utiliser un outil qui modifie ou supprime.
-        </li>
-      </ol>
-      <p className="set-note" style={{ marginTop: 10 }}>
-        Sécurité : sans la clé, l&apos;adresse répond « introuvable ». Préfère l&apos;en-tête à
-        l&apos;adresse avec la clé : sinon la clé apparaît dans les journaux de Cloudflare. Si tu penses
-        qu&apos;elle a fuité, change la clé ci-dessus puis mets la nouvelle dans Claude. « Couper » ferme
-        tout de suite l&apos;accès. L&apos;en-tête <code>X-API-Key: &lt;clé&gt;</code> est aussi accepté.
-      </p>
 
-      {groups.map((g) => (
-        <div key={g.title}>
-          <div className="sect-title">
-            <h2>{g.title}</h2>
-          </div>
-          <div className="fl-list">
-            {g.tools.map((t) => {
-              const k = KIND[t.kind];
-              return (
-                <div key={t.name} className="fl-row">
-                  <span className="ic" style={{ color: k.color }} title={k.label}>
-                    <k.icon size={17} aria-label={k.label} />
-                  </span>
-                  <span className="set-tx">
-                    <b>
-                      <span>{t.name}</span>
-                    </b>
-                    <small>{t.description}</small>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      {groups.map((g, gi) => {
+        const color = GROUP_COLORS[gi % GROUP_COLORS.length];
+        return (
+          <section key={g.title} className="mcp-group">
+            <h3 style={{ color }}>
+              <span className="mcp-dot" style={{ background: color }} />
+              {g.title}
+              <span className="mcp-count">{g.tools.length}</span>
+            </h3>
+            <div className="fl-list">
+              {g.tools.map((t) => {
+                const k = KIND[t.kind];
+                return (
+                  <div key={t.name} className="fl-row mcp-tool">
+                    <span className="ic mcp-ic" style={{ color: k.color }} title={k.label}>
+                      <k.icon size={15} aria-label={k.label} />
+                    </span>
+                    <span className="set-tx">
+                      <b>
+                        <span>{t.name}</span>
+                        <Help title={t.name}>{t.description}</Help>
+                      </b>
+                    </span>
+                    <span className="mcp-kind" style={{ color: k.color }}>
+                      {k.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </>
+  );
+}
+
+/** Le pas-à-pas de mise en place, rangé derrière un « ? ». */
+function SetupHelp({ endpoint }: { endpoint: string }) {
+  const steps: { icon: LucideIcon; color: string; title: string; body: React.ReactNode }[] = [
+    {
+      icon: Power,
+      color: "var(--accent)",
+      title: "Activer",
+      body: <>Clique sur « Activer » : une clé secrète est créée.</>,
+    },
+    {
+      icon: ShieldCheck,
+      color: "var(--accent-2)",
+      title: "Ouvrir le chemin dans Cloudflare",
+      body: (
+        <>
+          Zero Trust → Access → Applications → <i>Add</i> → <i>Self-hosted</i>. Chemins{" "}
+          <code>api/mcp</code> et <code>api/mcp/*</code>, règle <b>Bypass / Everyone</b>, placée
+          au-dessus de celle du site. Le reste du site reste protégé.
+        </>
+      ),
+    },
+    {
+      icon: ListChecks,
+      color: "var(--pending)",
+      title: "Vérifier",
+      body: (
+        <>
+          Ouvre l&apos;adresse avec la clé en navigation privée : « Method not allowed » = OK. Page de
+          connexion Cloudflare = la règle ne s&apos;applique pas encore.
+        </>
+      ),
+    },
+    {
+      icon: BookOpen,
+      color: "var(--accent-3)",
+      title: "Ajouter dans Claude",
+      body: (
+        <>
+          claude.ai : Paramètres → Connecteurs → <i>Ajouter un connecteur personnalisé</i>. URL ={" "}
+          <b>Adresse</b>, puis dans « Request headers » : <code>Authorization</code> = l&apos;
+          <b>en-tête</b> copié. Sans cette section : mets l&apos;<b>adresse avec la clé</b> comme URL.
+          <br />
+          Claude Code : <code>claude mcp add --transport http recipelog {endpoint} --header &quot;Authorization: Bearer &lt;clé&gt;&quot;</code>
+        </>
+      ),
+    },
+  ];
+  return (
+    <Help title="Mise en place (une seule fois)" label="Comment brancher Claude">
+      <ol className="mcp-steps">
+        {steps.map((s, i) => (
+          <li key={s.title}>
+            <span className="no" style={{ color: s.color, borderColor: s.color }}>
+              {i + 1}
+            </span>
+            <span>
+              <b style={{ color: s.color }}>{s.title}</b>
+              <br />
+              {s.body}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Help>
   );
 }

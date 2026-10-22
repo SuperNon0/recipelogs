@@ -22,6 +22,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Thèmes PDF : lignes zébrées, ingrédients et préparation sur 2 colonnes, filet entre les étapes",
       "Réglages → Accès MCP : brancher Claude sur RecipeLog pour gérer ingrédients, recettes, dossiers, listes de courses et cahiers en discutant",
       "Accès MCP : la clé peut passer dans un en-tête (Authorization: Bearer ou X-API-Key) au lieu de l'adresse, comme BotPanel",
+      "Accès MCP : page plus claire et plus colorée, explications et mise en place rangées derrière des « ? »",
     ],
     fixes: [
       "Accès MCP : les étapes écrites par Claude s'affichent tout de suite bien numérotées, sans repasser par « Modifier »",
