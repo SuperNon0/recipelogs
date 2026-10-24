@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.2",
+    date: "2026-10-24",
+    title: "Mises à jour du site en une minute",
+    features: [
+      "Mettre à jour le site : la nouvelle version est préparée par GitHub, le serveur n'a plus qu'à la télécharger (environ 1 minute au lieu de 15 à 20)",
+      "L'écran de mise à jour affiche l'étape en cours, par exemple l'attente de GitHub juste après une fusion",
+    ],
+    fixes: [
+      "La mise à jour n'est plus coupée au redémarrage du site : vérification finale, retour automatique à l'ancienne version si besoin, et fin annoncée tout de suite",
+      "Après une mise à jour, le site ne se croit plus « en cours de mise à jour »",
+    ],
+  },
+  {
     version: "V2.1",
     date: "2026-10-22",
     title: "Plus de photos, corrections d'affichage et de mise à jour",

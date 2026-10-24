@@ -473,16 +473,21 @@ pnpm dev                      # http://localhost:3000
 ### Mise à jour
 Bouton **Réglages, Mettre à jour le site**, ou :
 ```bash
-bash /opt/recipelog/deploy/proxmox/deploy.sh          # --force : reconstruit même sans nouveauté
+bash /opt/recipelog/deploy/proxmox/deploy.sh   # --force : refait la mise à jour même sans nouveauté
+                                               # --local-build : construit sur le serveur, sans GitHub
 ```
-Déroulé :
-1. dossier photos, `git pull` ; si le commit est déjà celui de `.next/DEPLOYED_COMMIT` → « Déjà à jour », fin ;
-2. relance la version qui vient d'être téléchargée du script ;
-3. `pnpm install`, `prisma generate`, `prisma migrate deploy`, build dans **`.next-build`** (le site reste en ligne sur `.next`) ;
-4. bascule `.next` → `.next-prev` et `.next-build` → `.next`, redémarrage, vérification de `/api/health` (60 s) ;
-5. si le site ne répond pas : retour automatique sur `.next-prev`.
+Le site n'est plus construit sur le serveur (15 à 20 min sur son disque dur) : à chaque mise à jour de `main`, GitHub Actions le construit (`.github/workflows/server-build.yml`, environ 2 min) et publie le paquet `recipelog-<commit>.tar.gz` dans la release **`server-builds`** du dépôt (10 derniers gardés, ne pas la supprimer).
 
-Les messages « ✅ Déploiement terminé », « ✅ DÉJÀ À JOUR » et « ❌ ÉCHEC DU DÉPLOIEMENT » sont lus par l'écran de maintenance : ne pas les reformuler. Tout le code du script est dans `main()` (bash le lit en entier avant de l'exécuter) : le `git pull` peut réécrire le fichier sans danger.
+Déroulé de `deploy.sh` :
+1. lancé par le bouton, il se relance dans sa propre unité systemd `recipelog-deploy` (sinon `systemctl restart recipelog` l'arrêtait à la bascule) ;
+2. dossier photos, `git pull` ; si le commit est déjà celui de `.next/DEPLOYED_COMMIT` → « Déjà à jour », fin ; sinon relance la version qui vient d'être téléchargée du script ;
+3. `pnpm install` et `prisma generate`, seulement si `pnpm-lock.yaml` ou le schéma ont changé ;
+4. télécharge le paquet GitHub du commit dans **`.next-build`** (le site reste en ligne sur `.next`) ; si GitHub le construit encore, attend (10 min maximum) ; sans paquet (build GitHub en échec, absent…) : build sur le serveur, comme avant ;
+5. `prisma migrate deploy` ;
+6. bascule `.next` → `.next-prev` et `.next-build` → `.next`, redémarrage, vérification de `/api/health?db=1` (site et base, 60 s) ;
+7. si le site ne répond pas : retour automatique sur `.next-prev` ; si c'était le paquet GitHub, build sur le serveur puis nouvel essai.
+
+Les messages « ✅ Déploiement terminé », « ✅ DÉJÀ À JOUR » et « ❌ ÉCHEC DU DÉPLOIEMENT » sont lus par l'écran de maintenance : ne pas les reformuler. Les lignes « ==> » sont les étapes (affichées par l'écran et par l'outil MCP `etat_du_site`). Tout le code du script est dans `main()` (bash le lit en entier avant de l'exécuter) : le `git pull` peut réécrire le fichier sans danger.
 
 ### Sauvegardes
 ```bash
@@ -507,7 +512,7 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 | nginx | `tail -f /var/log/nginx/error.log` · `nginx -t` |
 | Test direct | `curl -I http://localhost:3000` (Next) · `curl -I http://localhost` (nginx) |
 | Pack de logs | `bash /opt/recipelog/deploy/proxmox/collect-logs.sh` → `/tmp/recipelog-logs-*.tar.gz` |
-| Mise à jour bloquée | bouton « débloquer » dans Paramètres, ou `rm /tmp/recipelog-deploy.lock` |
+| Mise à jour bloquée | bouton « débloquer » dans Paramètres, ou `rm /tmp/recipelog-deploy.lock` ; en cours ? `systemctl status recipelog-deploy` |
 | PDF en erreur | `which chromium` et `grep PUPPETEER /opt/recipelog/.env` ; vérifier Nesting |
 | Retour arrière manuel | `cd /opt/recipelog && rm -rf .next-failed && mv .next .next-failed && mv .next-prev .next && systemctl restart recipelog` |
 
