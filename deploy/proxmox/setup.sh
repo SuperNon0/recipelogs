@@ -25,7 +25,7 @@ apt-get update -qq
 apt-get install -y -qq \
   curl git build-essential ca-certificates \
   postgresql postgresql-contrib \
-  nginx chromium \
+  nginx chromium ffmpeg \
   openssl ufw
 
 # ── 2. Node.js ───────────────────────────────────────────

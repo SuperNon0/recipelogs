@@ -188,6 +188,23 @@ main() {
     as_app "echo ${prisma_hash} > ${PRISMA_HASH}"
   fi
 
+  # Outils de l'outil MCP « lire_video » (Réglages → Recettes depuis TikTok) :
+  # ffmpeg depuis apt, yt-dlp en binaire autonome (la version apt est trop
+  # vieille : TikTok et Instagram changent souvent). Jamais bloquant.
+  if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "==> [$(now)] Installation de ffmpeg..."
+    { apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg; } \
+      || echo "⚠ ffmpeg non installé (lire_video n'aura pas d'images)"
+  fi
+  if [ ! -x /usr/local/bin/yt-dlp ]; then
+    echo "==> [$(now)] Installation de yt-dlp..."
+    { curl -fsSL -o /usr/local/bin/yt-dlp.tmp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+      && chmod 755 /usr/local/bin/yt-dlp.tmp && mv /usr/local/bin/yt-dlp.tmp /usr/local/bin/yt-dlp; } \
+      || echo "⚠ yt-dlp non installé (lire_video ne lira pas les vidéos)"
+  else
+    timeout 60 /usr/local/bin/yt-dlp -U >/dev/null 2>&1 || echo "⚠ mise à jour de yt-dlp ignorée"
+  fi
+
   # État du build GitHub de ce commit : running, success, failure, none ou unknown.
   github_build_state() {
     local json
