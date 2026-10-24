@@ -51,9 +51,19 @@ export type AdjIngredient = {
   unit: string;
 };
 
+/** Au-dessous de ce poids, un ingrédient n'est jamais retouché par l'ajustement
+ * (ex. gélatine, levure) : ±1 g y fausserait trop la recette. */
+const ADJUST_MIN_G = 20;
+
 /**
  * Après arrondi au supérieur, répartit l'écart ±N g sur les ingrédients
- * en grammes (les plus gros en premier) pour atteindre exactement targetMassG.
+ * en grammes pour atteindre exactement targetMassG.
+ *
+ * - On vise la masse **affichée** (moyenne des fourchettes), pas la somme des
+ *   minimums : sinon une recette à fourchette tombe à côté de la cible.
+ * - On ne retouche que les **gros** ingrédients (≥ 20 g) ; les petits (gélatine,
+ *   levure…) ne bougent pas. S'il n'y a que des petits, on les utilise quand même.
+ * - Pour une fourchette, min et max bougent ensemble (la largeur est conservée).
  */
 export function adjustToTarget(
   ingredients: AdjIngredient[],
@@ -61,25 +71,36 @@ export function adjustToTarget(
 ): { ingredients: AdjIngredient[]; totalMassGMin: number; totalMassGMax: number } {
   const result = ingredients.map((i) => ({ ...i }));
 
-  const total = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  let diff = Math.round(total - targetMassG);
+  let diff = Math.round(recipeMass(result).avg - targetMassG);
 
   if (diff !== 0) {
-    const gIdx = result
+    const grams = result
       .map((ing, idx) => ({ idx, qty: ing.quantityG, unit: ing.unit ?? "g" }))
       .filter(({ unit }) => !unit || unit === "g")
       .sort((a, b) => b.qty - a.qty);
+    // En priorité les gros ingrédients ; à défaut (que des petits), tous.
+    const big = grams.filter((g) => g.qty >= ADJUST_MIN_G);
+    const pool = big.length > 0 ? big : grams;
 
-    if (gIdx.length > 0) {
+    if (pool.length > 0) {
       let i = 0;
-      const maxIter = Math.abs(diff) * gIdx.length + gIdx.length;
+      const maxIter = Math.abs(diff) * pool.length + pool.length;
       while (diff !== 0 && i < maxIter) {
-        const { idx } = gIdx[i % gIdx.length];
-        if (diff > 0 && result[idx].quantityG > 1) {
-          result[idx] = { ...result[idx], quantityG: result[idx].quantityG - 1 };
+        const { idx } = pool[i % pool.length];
+        const ing = result[idx];
+        if (diff > 0 && ing.quantityG > 1) {
+          result[idx] = {
+            ...ing,
+            quantityG: ing.quantityG - 1,
+            quantityGMax: ing.quantityGMax != null ? ing.quantityGMax - 1 : null,
+          };
           diff--;
         } else if (diff < 0) {
-          result[idx] = { ...result[idx], quantityG: result[idx].quantityG + 1 };
+          result[idx] = {
+            ...ing,
+            quantityG: ing.quantityG + 1,
+            quantityGMax: ing.quantityGMax != null ? ing.quantityGMax + 1 : null,
+          };
           diff++;
         }
         i++;
