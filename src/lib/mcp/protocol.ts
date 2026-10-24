@@ -11,7 +11,7 @@ export const SERVER_INFO = { name: "recipelog", title: "RecipeLog", version: "1.
 export const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 export type McpToolResult = {
-  content: { type: "text"; text: string }[];
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
   isError?: boolean;
 };
 
@@ -71,7 +71,9 @@ export async function handleMcpMessage(msg: unknown, tools: McpTool[]): Promise<
         instructions:
           "Accès à RecipeLog, l'application de recettes de pâtisserie de Noë. Réponds en français. " +
           "Les quantités sont en grammes sauf unité contraire. Avant de modifier une recette, relis-la avec lire_recette. " +
-          "Demande toujours confirmation avant une suppression ou une mise à jour du site.",
+          "Demande toujours confirmation avant une suppression ou une mise à jour du site. " +
+          "Quand on te partage un lien TikTok, Instagram, YouTube ou une page de recette, lis-le avec lire_video, " +
+          "puis crée la recette avec creer_recette dans le dossier indiqué, avec l'étiquette « à vérifier » et le lien en source.",
       });
     }
     case "ping":

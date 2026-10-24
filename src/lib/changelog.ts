@@ -9,6 +9,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.2",
+    date: "2026-10-24",
+    title: "Recettes depuis TikTok, Instagram ou un lien",
+    features: [
+      "Partage une vidéo TikTok, Instagram, YouTube ou un lien de recette à Claude : il lit la vidéo (description, sous-titres, texte à l'écran) et ajoute la recette",
+      "Les recettes importées vont dans un dossier TikTok, Instagram, YouTube ou Internet, avec l'étiquette « à vérifier »",
+      "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
+    ],
+    migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
+  },
+  {
     version: "V2.1",
     date: "2026-10-22",
     title: "Plus de photos, corrections d'affichage et de mise à jour",

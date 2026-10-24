@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -91,6 +91,12 @@ export default async function SettingsPage() {
           icon={Plug}
           title="Accès MCP"
           sub={mcpToken ? "Activé · Claude peut se connecter à RecipeLog" : "Coupé · permet à Claude de consulter et gérer RecipeLog"}
+        />
+        <Row
+          href="/settings/import-video"
+          icon={Clapperboard}
+          title="Recettes depuis TikTok"
+          sub="Partager une vidéo TikTok, Instagram ou un lien à Claude, qui l'ajoute dans RecipeLog"
         />
       </div>
 
