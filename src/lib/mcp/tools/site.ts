@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { BOOT_TIME } from "@/lib/bootTime";
 import { CHANGELOG } from "@/lib/changelog";
+import { deploySteps } from "@/lib/deployLog";
 import { getMergedPrs } from "@/lib/pr-log";
 import { importRecipesFromJson } from "@/app/actions/import";
 import { triggerDeploy } from "@/app/actions/admin";
@@ -133,14 +134,19 @@ export const SITE_TOOLS: McpTool[] = [
     name: "etat_du_site",
     title: "État du site",
     description:
-      "Donne la version de RecipeLog, l'heure de démarrage du serveur, les dernières mises à jour installées et, si une mise à jour tourne ou a échoué, la fin de son journal.",
+      "Donne la version de RecipeLog, l'heure de démarrage du serveur, les dernières mises à jour installées, les étapes horodatées de la dernière mise à jour (pour voir ce qui prend du temps) et la fin de son journal.",
     inputSchema: { type: "object", properties: {} },
     annotations: READ,
     run: async () => {
       const current = CHANGELOG[0];
       let journal: string[] = [];
+      let etapes: string[] = [];
       try {
-        if (existsSync(DEPLOY_LOG)) journal = readFileSync(DEPLOY_LOG, "utf8").trimEnd().split("\n").slice(-20);
+        if (existsSync(DEPLOY_LOG)) {
+          const log = readFileSync(DEPLOY_LOG, "utf8").trimEnd();
+          journal = log.split("\n").slice(-20);
+          etapes = deploySteps(log).slice(-40);
+        }
       } catch {
         /* journal illisible : on l'omet */
       }
@@ -149,6 +155,7 @@ export const SITE_TOOLS: McpTool[] = [
         demarre_le: new Date(BOOT_TIME).toISOString(),
         mise_a_jour_en_cours: existsSync(DEPLOY_LOCK),
         dernieres_mises_a_jour: getMergedPrs().slice(0, 10).map((p) => ({ pr: p.number, date: p.date, titre: p.title })),
+        etapes_de_la_derniere_mise_a_jour: etapes,
         fin_du_journal_de_mise_a_jour: journal,
       });
     },
@@ -158,7 +165,7 @@ export const SITE_TOOLS: McpTool[] = [
     name: "lancer_mise_a_jour",
     title: "Lancer la mise à jour du site",
     description:
-      "Lance « Mettre à jour le site » : récupère la dernière version sur GitHub, la prépare puis redémarre le site (plusieurs minutes, coupure de quelques secondes à la fin). Toujours demander confirmation à l'utilisateur avant. Suivre l'avancement avec etat_du_site.",
+      "Lance « Mettre à jour le site » : récupère la dernière version sur GitHub (déjà construite par GitHub Actions, attendue si le build est en cours) puis redémarre le site. En général 1 à 5 minutes, coupure de quelques secondes à la fin. Toujours demander confirmation à l'utilisateur avant. Suivre l'avancement avec etat_du_site.",
     inputSchema: { type: "object", properties: {} },
     annotations: { ...WRITE, destructiveHint: true },
     run: async () => {

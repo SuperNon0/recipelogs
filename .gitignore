@@ -12,6 +12,7 @@ coverage/
 .next-build/
 .next-prev/
 .next-failed/
+.next-download/
 out/
 build/
 dist/
