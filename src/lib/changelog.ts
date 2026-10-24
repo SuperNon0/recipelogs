@@ -11,11 +11,17 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "V2.2",
     date: "2026-10-24",
-    title: "Recettes depuis TikTok, Instagram ou un lien",
+    title: "Mises à jour du site en une minute, recettes depuis TikTok",
     features: [
+      "Mettre à jour le site : la nouvelle version est préparée par GitHub, le serveur n'a plus qu'à la télécharger (environ 1 minute au lieu de 15 à 20)",
+      "L'écran de mise à jour affiche l'étape en cours, par exemple l'attente de GitHub juste après une fusion",
       "Partage une vidéo TikTok, Instagram, YouTube ou un lien de recette à Claude : il lit la vidéo (description, sous-titres, texte à l'écran) et ajoute la recette",
       "Les recettes importées vont dans un dossier TikTok, Instagram, YouTube ou Internet, avec l'étiquette « à vérifier »",
       "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
+    ],
+    fixes: [
+      "La mise à jour n'est plus coupée au redémarrage du site : vérification finale, retour automatique à l'ancienne version si besoin, et fin annoncée tout de suite",
+      "Après une mise à jour, le site ne se croit plus « en cours de mise à jour »",
     ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
   },

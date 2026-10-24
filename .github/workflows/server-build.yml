@@ -1,0 +1,74 @@
+# Construit le site pour le serveur à chaque mise à jour de main.
+#
+# Le bouton « Mettre à jour le site » (deploy/proxmox/deploy.sh) télécharge ce
+# paquet au lieu de construire le site lui-même : environ 2 min ici, contre
+# 15 min et plus sur le disque dur du serveur. S'il n'y a pas de paquet, le
+# serveur construit le site comme avant.
+#
+# Sur une PR : vérifie seulement que le build passe, rien n'est publié.
+name: Build pour le serveur
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # publier le paquet dans la release « server-builds »
+
+concurrency:
+  group: server-build-${{ github.ref }}
+  # Sur main, on ne coupe jamais un build : le serveur l'attend peut-être.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      PUPPETEER_SKIP_DOWNLOAD: "true" # le serveur utilise son propre Chromium
+      NEXT_DIST_DIR: .next-build # même dossier que deploy.sh
+      ASSET: recipelog-${{ github.sha }}.tar.gz
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # next.config.ts lit les PR fusionnées dans git log
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22 # comme le serveur
+
+      - uses: pnpm/action-setup@v6 # version de pnpm lue dans package.json
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma generate
+      - run: pnpm build
+
+      - name: Paquet pour le serveur
+        run: |
+          echo "${GITHUB_SHA}" > .next-build/BUILD_COMMIT
+          tar -C .next-build -czf "${ASSET}" BUILD_COMMIT BUILD_ID standalone static
+          sha256sum "${ASSET}" > "${ASSET}.sha256"
+          ls -lh "${ASSET}"
+
+      - name: Publication
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: server-builds
+        run: |
+          if ! gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release create "${TAG}" --prerelease --target "${GITHUB_SHA}" \
+              --title "Paquets pour le serveur (automatique)" \
+              --notes "Construits par .github/workflows/server-build.yml à chaque mise à jour de main, puis téléchargés par le bouton « Mettre à jour le site ». Ne pas supprimer."
+          fi
+          gh release upload "${TAG}" "${ASSET}" "${ASSET}.sha256" --clobber
+          # On garde les 10 derniers paquets (2 fichiers chacun).
+          gh api "repos/${GH_REPO}/releases/tags/${TAG}" \
+            --jq '.assets | sort_by(.created_at) | reverse | .[20:] | .[].id' |
+            while read -r id; do gh api -X DELETE "repos/${GH_REPO}/releases/assets/${id}"; done

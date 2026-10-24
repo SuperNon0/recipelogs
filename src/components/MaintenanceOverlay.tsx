@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, CircleAlert, Loader, ScrollText, Wrench } from "lucide-react";
+import { deploySteps, isRestartStep } from "@/lib/deployLog";
 
 type Phase = "starting" | "deploying" | "restarting" | "done" | "failed";
 
 const PHASES: { key: Phase; label: string }[] = [
   { key: "starting", label: "Démarrage du déploiement…" },
-  { key: "deploying", label: "Mise à jour en cours (git, build)…" },
+  { key: "deploying", label: "Préparation de la nouvelle version…" },
   { key: "restarting", label: "Redémarrage du service…" },
   { key: "done", label: "Mise à jour terminée" },
 ];
@@ -22,6 +23,7 @@ export function MaintenanceOverlay({
 }) {
   const [phase, setPhase] = useState<Phase>("starting");
   const [log, setLog] = useState<string>("");
+  const [step, setStep] = useState<string>("");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [upToDate, setUpToDate] = useState(false);
@@ -39,6 +41,8 @@ export function MaintenanceOverlay({
     let timeout: ReturnType<typeof setTimeout>;
 
     let bootChangedAt: number | null = null;
+    // Dernière étape annoncée par deploy.sh (gardée quand le serveur redémarre).
+    let lastStep = "";
 
     const finish = (next: Phase) => {
       setPhase(next);
@@ -55,7 +59,13 @@ export function MaintenanceOverlay({
         if (logRes.ok) {
           const data = await logRes.json();
           if (data.log) setLog(data.log);
-          tail = String(data.log ?? "").slice(-2000).toLowerCase();
+          const full = String(data.log ?? "");
+          tail = full.slice(-2000).toLowerCase();
+          const steps = deploySteps(full);
+          if (steps.length) {
+            lastStep = steps[steps.length - 1];
+            setStep(lastStep.replace(/^\[\d\d:\d\d:\d\d\]\s*/, ""));
+          }
         }
       } catch {
         // Le serveur est probablement en train de redémarrer → on continue à poller
@@ -80,19 +90,20 @@ export function MaintenanceOverlay({
         finish("done");
         return;
       }
-      if (tail.includes("bascule vers la nouvelle version") || tail.includes("redémarrage du service")) {
-        setPhase("restarting");
-      } else if (tail.includes("==> ")) {
-        setPhase("deploying");
-      }
+      const restarting = isRestartStep(lastStep);
+      if (lastStep) setPhase(restarting ? "restarting" : "deploying");
 
       // 2. Redémarrage détecté sans marqueur de fin (anciennes versions du
-      //    script) : on considère la mise à jour terminée après 60 s.
+      //    script) : on considère la mise à jour terminée après 60 s. Pas si
+      //    le script a repris une autre étape après le redémarrage (build sur
+      //    le serveur quand la version de GitHub ne démarre pas).
+      const mayBeOver = restarting || !lastStep;
+      if (!mayBeOver) bootChangedAt = null;
       try {
         const healthRes = await fetch("/api/health", { cache: "no-store" });
         if (healthRes.ok) {
           const h = await healthRes.json();
-          if (typeof h.bootedAt === "number" && h.bootedAt > initialBootedAt) {
+          if (mayBeOver && typeof h.bootedAt === "number" && h.bootedAt > initialBootedAt) {
             bootChangedAt ??= Date.now();
             if (Date.now() - bootChangedAt > 60_000) {
               finish("done");
@@ -104,8 +115,8 @@ export function MaintenanceOverlay({
         // Serveur en cours de redémarrage → silencieux
       }
 
-      // 3. Timeout de sécurité : 60 min. Sur le serveur (disque lent), le build
-      //    seul a déjà pris plus de 20 min : 12 min donnait une fausse alerte.
+      // 3. Timeout de sécurité : 60 min. Quand le serveur construit lui-même
+      //    le site (disque lent), le build seul a déjà pris plus de 20 min.
       if (Date.now() - startedAt.current > 60 * 60 * 1000) {
         setError(
           "Délai dépassé (60 min). La mise à jour a peut-être échoué — consulte les logs.",
@@ -180,6 +191,12 @@ export function MaintenanceOverlay({
             );
           })}
         </div>
+
+        {step && phase !== "done" && !error && (
+          <p className="set-note" style={{ marginTop: 0 }}>
+            {step}
+          </p>
+        )}
 
         {error && (
           <div className="set-alert">
