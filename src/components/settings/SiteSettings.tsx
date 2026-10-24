@@ -5,6 +5,7 @@ import { Check, ChevronRight, Link2, RefreshCw, Sparkles, Wrench } from "lucide-
 import { saveSiteUrl } from "@/app/actions/settings";
 import { CHANGELOG } from "@/lib/changelog";
 import { getMergedPrs } from "@/lib/pr-log";
+import { fullVersion } from "@/lib/version";
 import { DeployButton } from "@/components/DeployButton";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
@@ -67,7 +68,7 @@ export function SiteSettings({ siteUrl }: { siteUrl: string | null }) {
             </b>
             <small>{current ? current.title : "Journal des versions"}</small>
           </span>
-          {current && <span className="fl-kbd">{current.version}</span>}
+          {current && <span className="fl-kbd">{fullVersion(current.version)}</span>}
           <ChevronRight size={16} className="set-chev" />
         </button>
       </div>

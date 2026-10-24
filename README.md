@@ -4,7 +4,7 @@
 
 Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les manques de Recipe Keeper : précision au gramme, multiplication (3 modes), sous-recettes et cahiers PDF.
 
-**Version actuelle : V2.0** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : voir Réglages → Version et nouveautés** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la seule documentation du projet**. Il remplace l'ancien cahier des charges (`CDC.md`), le document de transmission (`HANDOFF.md`) et les guides `INSTALL.md` / `DEPLOYMENT.md`.
 
@@ -373,7 +373,7 @@ src/
 4. **Le serveur standalone tourne dans `.next/standalone/`, effacé à chaque déploiement** : ne jamais y écrire de fichiers ; utiliser `UPLOAD_DIR`.
 5. **`updateRecipe` recrée les ingrédients** (nouveaux id) puis re-pointe les pivots (`remapPivotIngredients`). Toute nouvelle référence à un id d'ingrédient doit faire de même.
 6. Recettes et chapitres d'un cahier **partagent la même `position`** : utiliser `nextCookbookPosition`.
-7. `layout.tsx` est `async` et **dynamique** (lit `siteUrl` et les compteurs du menu) ; le menu affiche `CHANGELOG[0].version` (`src/lib/changelog.ts`) : ajouter une entrée à chaque version.
+7. `layout.tsx` est `async` et **dynamique** (lit `siteUrl` et les compteurs du menu) ; le menu affiche le numéro de version complet, ex. V2.3.88 (`src/lib/version.ts` : version en tête de `src/lib/changelog.ts` + numéro de la dernière PR fusionnée, lu dans git au build). Règles du journal : voir `CLAUDE.md`.
 8. Le champ `cookbooks_recipes.subrecipe_mode` est ignoré (toujours « séparées »).
 9. **Sommaire PDF** : les recettes sont rendues avant la couverture ; chaque page listée porte une ancre `toc-<n>` ciblée par un lien invisible, et `readAnchorPages` relit sa page réelle dans le PDF. Garder le même ordre dans `computeTocEntries` et `buildRecipesHtml` (les deux passent par `subSnapsOf`).
 10. La mise en page (`recipeLayout`) est dans le thème : CSS dans `layoutCss()`, classes `layout-*`, `title-*`, `steps-*`, `ing-*` sur `<body>` (`bodyClass`). La table `pdf_templates` n'est plus utilisée pour le rendu.

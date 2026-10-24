@@ -16,7 +16,7 @@ import {
   Wheat,
   type LucideIcon,
 } from "lucide-react";
-import { CHANGELOG } from "@/lib/changelog";
+import { fullVersion } from "@/lib/version";
 import { openSearch } from "@/components/ui/CommandPalette";
 
 export type NavCounts = {
@@ -63,7 +63,7 @@ const TABS: NavItem[] = [
   },
 ];
 
-const currentVersion = CHANGELOG[0]?.version ?? "V1";
+const currentVersion = fullVersion();
 
 /** Menu latéral (ordinateur, ≥ 900 px). */
 export function AppSidebar(props: { siteUrl: string | null; counts: NavCounts }) {

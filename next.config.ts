@@ -1,21 +1,23 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import type { NextConfig } from "next";
-import { parseGitLog } from "./src/lib/pr-log";
+import { parseGitLog, type MergedPr } from "./src/lib/pr-log";
 
 // Liste des PR fusionnées, lue dans git au moment du build et affichée dans
 // Réglages → « Version et nouveautés ». Sans git (archive, Docker) : liste vide.
-function mergedPrs(): string {
+function mergedPrs(): MergedPr[] {
   try {
     const raw = execSync("git log --first-parent -200 --format=%cs%x1f%s%x1f%b%x1e", {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
-    return JSON.stringify(parseGitLog(raw));
+    return parseGitLog(raw);
   } catch {
-    return "[]";
+    return [];
   }
 }
+
+const prs = mergedPrs();
 
 const nextConfig: NextConfig = {
   // deploy.sh construit dans un dossier à part (NEXT_DIST_DIR=.next-build)
@@ -23,7 +25,9 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
   env: {
-    NEXT_PUBLIC_MERGED_PRS: mergedPrs(),
+    NEXT_PUBLIC_MERGED_PRS: JSON.stringify(prs),
+    // Dernier nombre du numéro de version, « V2.3.88 » (src/lib/version.ts).
+    NEXT_PUBLIC_LAST_PR: prs[0] ? String(prs[0].number) : "",
   },
   experimental: {
     serverActions: {
