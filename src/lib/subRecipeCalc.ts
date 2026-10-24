@@ -42,9 +42,12 @@ export function computeSubRecipe(
   locked: boolean,
 ): { effectiveCoef: number; ingredients: AdjIngredient[]; min: number; max: number } {
   const base = recipeMass(sr.childIngredients).avg;
-  const pivotQty = sr.pivotIngredientId
-    ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)?.quantityG ?? null
+  // Le pivot est une masse voulue en grammes : convertir la quantité du pivot
+  // en grammes (ingMass gère L/cc/cs) avant d'en déduire le coefficient.
+  const pivotIng = sr.pivotIngredientId
+    ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)
     : null;
+  const pivotQty = pivotIng ? ingMass(pivotIng.quantityG, pivotIng.unit ?? "g") : null;
   const localCoef = computeLocalCoef(sr.calcMode, sr.calcValue, base, pivotQty);
   const effectiveCoef = locked ? localCoef : localCoef * globalCoef;
 

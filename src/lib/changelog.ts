@@ -18,6 +18,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
       "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
     ],
+    fixes: [
+      "Multiplicateur « Pivot » : si l'ingrédient fixé est en litres ou en cuillères (cc/cs), la quantité voulue est bien lue en grammes et le coefficient est juste (avant, les quantités pouvaient être multipliées par 1000, 5 ou 15)",
+    ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
   },
   {

@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { computeLocalCoef } from "./subRecipes";
-import { scaleQty, adjustToTarget, recipeMass } from "./massAdjust";
+import { scaleQty, adjustToTarget, recipeMass, ingMass } from "./massAdjust";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -95,9 +95,13 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     const rawIngredients = link.child.ingredients;
     // Même définition que la fiche recette : moyenne min/max des fourchettes.
     const childBaseTotalG = recipeMass(rawIngredients).avg;
-    // Ingrédient pivot (pour le mode pivot_ingredient)
-    const pivotBaseQtyG = link.pivotIngredientId
-      ? Number(rawIngredients.find((i) => i.id === link.pivotIngredientId)?.quantityG ?? 0) || null
+    // Ingrédient pivot (mode pivot_ingredient) : masse voulue en grammes, donc
+    // on convertit la quantité du pivot en grammes (ingMass gère L/cc/cs).
+    const pivotIng = link.pivotIngredientId
+      ? rawIngredients.find((i) => i.id === link.pivotIngredientId)
+      : null;
+    const pivotBaseQtyG = pivotIng
+      ? ingMass(Number(pivotIng.quantityG), pivotIng.unit ?? "g") || null
       : null;
     // Coefficient propre à la sous-recette (calcMode + calcValue définis lors de l'ajout)
     const localCoef = computeLocalCoef(
