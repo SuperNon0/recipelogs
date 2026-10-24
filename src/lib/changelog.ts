@@ -18,6 +18,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
       "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
     ],
+    fixes: [
+      "Les quantités à décimales (par ex. 9,7 g de gélatine) ne sont plus arrondies au gramme supérieur dans les PDF, les cahiers, le partage et les listes de courses quand la recette n'est pas multipliée (×1) : elles s'affichent exactement comme à l'écran",
+    ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
   },
   {

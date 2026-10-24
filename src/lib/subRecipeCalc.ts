@@ -48,13 +48,16 @@ export function computeSubRecipe(
   const localCoef = computeLocalCoef(sr.calcMode, sr.calcValue, base, pivotQty);
   const effectiveCoef = locked ? localCoef : localCoef * globalCoef;
 
+  // À ×1 (effectiveCoef === 1) on garde la valeur exacte ; dès qu'on multiplie,
+  // on arrondit au gramme supérieur (comportement inchangé).
+  const round = effectiveCoef === 1 ? (x: number) => x : Math.ceil;
   let ingredients: AdjIngredient[] = sr.childIngredients.map((ing) => {
     const unit = ing.unit === "L" ? "g" : (ing.unit ?? "g");
     const k = ing.unit === "L" ? effectiveCoef * 1000 : effectiveCoef;
     return {
       name: ing.name,
-      quantityG: Math.ceil(ing.quantityG * k),
-      quantityGMax: ing.quantityGMax != null ? Math.ceil(ing.quantityGMax * k) : null,
+      quantityG: round(ing.quantityG * k),
+      quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * k) : null,
       unit,
     };
   });

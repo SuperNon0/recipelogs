@@ -33,4 +33,13 @@ describe("scaleQty", () => {
   it("convertit L en g arrondi au supérieur", () => {
     expect(scaleQty(0.5, "L", 1)).toEqual({ quantityG: 500, unit: "g" });
   });
+  it("conserve la valeur exacte à ×1 (pas d'arrondi au gramme)", () => {
+    expect(scaleQty(9.7, "g", 1)).toEqual({ quantityG: 9.7, unit: "g" });
+  });
+  it("conserve les décimales d'un litre à ×1 (pas d'arrondi)", () => {
+    expect(scaleQty(0.4005, "L", 1).quantityG).toBeCloseTo(400.5);
+  });
+  it("arrondit au gramme supérieur dès qu'on multiplie", () => {
+    expect(scaleQty(9.7, "g", 2)).toEqual({ quantityG: 20, unit: "g" });
+  });
 });

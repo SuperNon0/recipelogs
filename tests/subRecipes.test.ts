@@ -79,4 +79,14 @@ describe("computeSubRecipe", () => {
     ] }, 1, false);
     expect(r.ingredients[0]).toMatchObject({ quantityG: 500, unit: "g" });
   });
+  it("garde les décimales à ×1 et arrondit dès qu'on multiplie", () => {
+    const base = { ...sr, calcMode: "coefficient" as const, calcValue: 1, childIngredients: [
+      { id: 1, name: "Gélatine", quantityG: 9.7, unit: "g" },
+    ] };
+    const r1 = computeSubRecipe(base, 1, false); // ×1 → valeur exacte
+    expect(r1.ingredients[0].quantityG).toBe(9.7);
+    expect(r1.min).toBeCloseTo(9.7);
+    const r2 = computeSubRecipe(base, 2, false); // ×2 → ceil(19,4) = 20
+    expect(r2.ingredients[0].quantityG).toBe(20);
+  });
 });
