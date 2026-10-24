@@ -101,7 +101,7 @@ main() {
     [ -f "${log}" ] || log="/tmp/recipelog-deploy.log"
     if systemctl is-active --quiet "${UNIT}.service"; then
       echo "==> Une mise à jour est déjà en cours : suivi de celle-ci."
-    elif ! systemd-run --unit="${UNIT}" --collect --quiet \
+    elif ! systemd-run --unit="${UNIT}" --collect --quiet --setenv=PATH="${PATH}" \
       --setenv=RECIPELOG_DEPLOY_DETACHED=1 --setenv=RECIPELOG_DEPLOY_LOG="${log}" \
       /bin/bash "${SELF}" "$@"; then
       echo "==> ⚠ Unité systemd impossible : la mise à jour continue dans le service du site."
@@ -115,12 +115,15 @@ main() {
     fi
   fi
   if [ -n "${RECIPELOG_DEPLOY_LOG:-}" ]; then
-    exec >>"${RECIPELOG_DEPLOY_LOG}" 2>&1
+    # Le journal appartient à l'utilisateur du site : dans /tmp, root ne peut
+    # pas l'ouvrir lui-même (protection fs.protected_regular). D'où tee.
+    exec > >(sudo -u "${APP_USER}" tee -a "${RECIPELOG_DEPLOY_LOG}" >/dev/null) 2>&1
   fi
   if [ -n "${RECIPELOG_DEPLOY_DETACHED:-}" ]; then
     # Verrou posé par le bouton (src/app/actions/admin.ts) : le processus qui
-    # devait le retirer a été arrêté avec le site au redémarrage.
-    trap 'rm -f /tmp/recipelog-deploy.lock' EXIT
+    # devait le retirer a été arrêté avec le site au redémarrage. Puis on
+    # attend que tee ait fini d'écrire le journal.
+    trap 'rm -f /tmp/recipelog-deploy.lock; exec >&- 2>&-; wait' EXIT
   fi
   trap 'fail "commande en erreur (ligne ${LINENO})"' ERR
 
