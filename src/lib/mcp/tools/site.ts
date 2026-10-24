@@ -6,6 +6,7 @@ import { CHANGELOG } from "@/lib/changelog";
 import { deploySteps } from "@/lib/deployLog";
 import { getMergedPrs } from "@/lib/pr-log";
 import { htmlToPlainText } from "@/lib/stepsText";
+import { fullVersion } from "@/lib/version";
 import { importRecipesFromJson } from "@/app/actions/import";
 import { triggerDeploy } from "@/app/actions/admin";
 import { READ, WRITE, id, js, parseArgs, runAction, text, type McpTool } from "./helpers";
@@ -153,7 +154,7 @@ export const SITE_TOOLS: McpTool[] = [
         /* journal illisible : on l'omet */
       }
       return text({
-        version: current ? { numero: current.version, date: current.date, titre: current.title } : null,
+        version: current ? { numero: fullVersion(current.version), date: current.date, titre: current.title } : null,
         demarre_le: new Date(BOOT_TIME).toISOString(),
         mise_a_jour_en_cours: existsSync(DEPLOY_LOCK),
         dernieres_mises_a_jour: getMergedPrs().slice(0, 10).map((p) => ({ pr: p.number, date: p.date, titre: p.title })),

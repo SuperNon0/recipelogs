@@ -9,21 +9,31 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "V2.2",
+    version: "V2.3",
     date: "2026-10-24",
-    title: "Mises à jour du site en une minute, recettes depuis TikTok",
+    title: "Recettes depuis TikTok",
     features: [
-      "Mettre à jour le site : la nouvelle version est préparée par GitHub, le serveur n'a plus qu'à la télécharger (environ 1 minute au lieu de 15 à 20)",
-      "L'écran de mise à jour affiche l'étape en cours, par exemple l'attente de GitHub juste après une fusion",
       "Partage une vidéo TikTok, Instagram, YouTube ou un lien de recette à Claude : il lit la vidéo (description, sous-titres, texte à l'écran) et ajoute la recette",
       "Les recettes importées vont dans un dossier TikTok, Instagram, YouTube ou Internet, avec l'étiquette « à vérifier »",
       "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
+      "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
+    ],
+    migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
+  },
+  {
+    version: "V2.2",
+    date: "2026-10-24",
+    title: "Mises à jour du site en une minute",
+    features: [
+      "Mettre à jour le site : la nouvelle version est préparée par GitHub, le serveur n'a plus qu'à la télécharger (environ 1 minute au lieu de 15 à 20)",
+      "L'écran de mise à jour affiche l'étape en cours, par exemple l'attente de GitHub juste après une fusion",
+      "Accès MCP : page plus claire et plus colorée, explications et mise en place rangées derrière des « ? »",
     ],
     fixes: [
       "La mise à jour n'est plus coupée au redémarrage du site : vérification finale, retour automatique à l'ancienne version si besoin, et fin annoncée tout de suite",
       "Après une mise à jour, le site ne se croit plus « en cours de mise à jour »",
+      "Accès MCP : les étapes écrites par Claude s'affichent tout de suite bien numérotées, sans repasser par « Modifier »",
     ],
-    migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
   },
   {
     version: "V2.1",
@@ -39,10 +49,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Thèmes PDF : lignes zébrées, ingrédients et préparation sur 2 colonnes, filet entre les étapes",
       "Réglages → Accès MCP : brancher Claude sur RecipeLog pour gérer ingrédients, recettes, dossiers, listes de courses et cahiers en discutant",
       "Accès MCP : la clé peut passer dans un en-tête (Authorization: Bearer ou X-API-Key) au lieu de l'adresse, comme BotPanel",
-      "Accès MCP : page plus claire et plus colorée, explications et mise en place rangées derrière des « ? »",
     ],
     fixes: [
-      "Accès MCP : les étapes écrites par Claude s'affichent tout de suite bien numérotées, sans repasser par « Modifier »",
       "Après une mise à jour, le site n'affiche plus l'ancien style (CSS)",
       "La mise à jour du site est beaucoup plus rapide (elle ne recompile plus tout à chaque fois)",
       "L'écran de mise à jour n'annonce plus d'échec au bout de 12 minutes alors qu'elle continue",
