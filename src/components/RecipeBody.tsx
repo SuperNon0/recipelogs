@@ -19,7 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
-import { computeSubRecipe } from "@/lib/subRecipeCalc";
+import { resolveLink, type TreeNode } from "@/lib/recipeTree";
 import { adjustToTarget, ingMass, recipeMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
   moveSubRecipe,
@@ -57,6 +57,7 @@ export type SubRecipeRow = {
   isExact: boolean;
   childIngredients: IngredientRow[];
   childSteps: string | null;
+  childTree: TreeNode;
 };
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
@@ -150,14 +151,39 @@ export function RecipeBody({
 
   // Sous-recettes au multiplicateur courant, et à ×1 (pour la « base »)
   const subs = useMemo(
-    () => subRecipes.map((sr) => ({ sr, calc: computeSubRecipe(sr, globalCoef, locks[sr.id] ?? sr.isLocked) })),
+    () =>
+      subRecipes.map((sr) => ({
+        sr,
+        calc: resolveLink(
+          {
+            calcMode: sr.calcMode,
+            calcValue: sr.calcValue,
+            pivotIngredientId: sr.pivotIngredientId,
+            isLocked: locks[sr.id] ?? sr.isLocked,
+            isExact: sr.isExact,
+            child: sr.childTree,
+          },
+          globalCoef,
+        ),
+      })),
     [subRecipes, globalCoef, locks],
   );
   const subBase = useMemo(
-    () => subRecipes.reduce((s, sr) => {
-      const c = computeSubRecipe(sr, 1, locks[sr.id] ?? sr.isLocked);
-      return s + (c.min + c.max) / 2;
-    }, 0),
+    () =>
+      subRecipes.reduce((s, sr) => {
+        const c = resolveLink(
+          {
+            calcMode: sr.calcMode,
+            calcValue: sr.calcValue,
+            pivotIngredientId: sr.pivotIngredientId,
+            isLocked: locks[sr.id] ?? sr.isLocked,
+            isExact: sr.isExact,
+            child: sr.childTree,
+          },
+          1,
+        );
+        return s + (c.min + c.max) / 2;
+      }, 0),
     [subRecipes, locks],
   );
 
@@ -365,7 +391,7 @@ function SubRows({
 }: {
   parentId: number;
   sr: SubRecipeRow;
-  calc: ReturnType<typeof computeSubRecipe>;
+  calc: ReturnType<typeof resolveLink>;
   locked: boolean;
   setLocked: (v: boolean) => void;
   open: boolean;

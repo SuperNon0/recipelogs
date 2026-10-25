@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getRecipeDetail, listAllFolders } from "@/lib/recipes";
+import { getRecipeDetail, listAllFolders, loadRecipeTree } from "@/lib/recipes";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { recipeMass } from "@/lib/massAdjust";
 import type { SubRecipeRow } from "@/components/RecipeBody";
@@ -20,10 +20,11 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isInteger(recipeId)) notFound();
 
-  const [recipe, folders, themes] = await Promise.all([
+  const [recipe, folders, themes, tree] = await Promise.all([
     getRecipeDetail(recipeId),
     listAllFolders(),
     listPdfThemes(),
+    loadRecipeTree(recipeId),
   ]);
   if (!recipe) notFound();
 
@@ -43,24 +44,21 @@ export default async function RecipePage({
     unit: i.unit ?? "g",
   }));
 
-  const subRecipes: SubRecipeRow[] = recipe.parentLinks.map((link) => ({
+  // Arbre complet (sous-recettes imbriquées comprises) : le calcul de masse et
+  // la liste des ingrédients de chaque sous-recette tiennent compte de tous les niveaux.
+  const subRecipes: SubRecipeRow[] = (tree?.subLinks ?? []).map((link) => ({
     id: link.id,
     childId: link.childId,
-    childName: link.child.name,
+    childName: link.childName,
     label: link.label,
     calcMode: link.calcMode,
-    calcValue: Number(link.calcValue),
+    calcValue: link.calcValue,
     pivotIngredientId: link.pivotIngredientId,
     isLocked: link.isLocked,
     isExact: link.isExact,
-    childIngredients: link.child.ingredients.map((i) => ({
-      id: i.id,
-      name: i.name ?? i.ingredientBase?.name ?? "—",
-      quantityG: Number(i.quantityG),
-      quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
-      unit: i.unit ?? "g",
-    })),
-    childSteps: link.child.stepsBlock?.content ?? null,
+    childIngredients: link.child.ingredients,
+    childSteps: link.child.steps,
+    childTree: link.child,
   }));
 
   return (

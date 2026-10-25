@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { recipeMass } from "./massAdjust";
+import type { TreeNode } from "./recipeTree";
 
 export function normalizeForSearch(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -129,6 +130,62 @@ export async function getRecipeDetail(id: number) {
       },
     },
   });
+}
+
+/**
+ * Charge l'arbre complet d'une recette : ses ingrédients et, récursivement, ses
+ * sous-recettes à tous les niveaux. `visited` casse les cycles éventuels
+ * (une recette qui se contiendrait indirectement elle-même).
+ */
+export async function loadRecipeTree(
+  recipeId: number,
+  visited: Set<number> = new Set(),
+): Promise<TreeNode | null> {
+  if (visited.has(recipeId)) return null;
+  const next = new Set(visited);
+  next.add(recipeId);
+
+  const r = await prisma.recipe.findUnique({
+    where: { id: recipeId },
+    include: {
+      ingredients: { orderBy: { position: "asc" }, include: { ingredientBase: true } },
+      stepsBlock: true,
+      parentLinks: { orderBy: { position: "asc" } },
+    },
+  });
+  if (!r) return null;
+
+  const subLinks = [];
+  for (const link of r.parentLinks) {
+    const child = await loadRecipeTree(link.childId, next);
+    if (!child) continue; // cycle ou enfant introuvable → ignoré
+    subLinks.push({
+      id: link.id,
+      label: link.label,
+      childId: link.childId,
+      childName: child.name,
+      calcMode: link.calcMode,
+      calcValue: Number(link.calcValue),
+      pivotIngredientId: link.pivotIngredientId,
+      isLocked: link.isLocked,
+      isExact: link.isExact,
+      child,
+    });
+  }
+
+  return {
+    id: r.id,
+    name: r.name,
+    steps: r.stepsBlock?.content ?? null,
+    ingredients: r.ingredients.map((i) => ({
+      id: i.id,
+      name: i.name ?? i.ingredientBase?.name ?? "—",
+      quantityG: Number(i.quantityG),
+      quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
+      unit: i.unit ?? "g",
+    })),
+    subLinks,
+  };
 }
 
 export async function listAllIngredientBases() {

@@ -18,6 +18,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → Recettes depuis TikTok : état des outils, mode d'emploi et Raccourci iPhone « Ajouter à RecipeLog »",
       "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
     ],
+    fixes: [
+      "Sous-recettes imbriquées (une sous-recette qui en contient une autre) enfin prises en compte partout : leurs ingrédients apparaissent et comptent dans les masses totales, sur la fiche, dans les PDF, les cahiers et les listes de courses (avant, tout ce qui était au-delà du 1er niveau était oublié)",
+    ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
   },
   {
