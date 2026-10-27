@@ -17,10 +17,18 @@ export function VariantsCard({
   family,
   currentId,
   onNew,
+  onLink,
+  onNavigate,
+  inDialog,
 }: {
   family: VariantFamily;
   currentId: number;
   onNew: () => void;
+  onLink?: () => void;
+  /** Appelé quand on suit un lien (ouvrir, comparer), pour fermer la fenêtre. */
+  onNavigate?: () => void;
+  /** Affiché dans la fenêtre « Variantes » du menu ⋯ : pas d'en-tête de carte (la fenêtre a son titre). */
+  inDialog?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,7 +73,10 @@ export function VariantsCard({
   });
 
   return (
-    <section className="fl-card variants" aria-busy={pending}>
+    <section className={inDialog ? "variants variants-in-dialog" : "fl-card variants"} aria-busy={pending} onClickCapture={(e) => {
+      if (onNavigate && (e.target as HTMLElement).closest("a")) onNavigate();
+    }}>
+      {!inDialog && (
       <div className="variants-head">
         <GitBranch size={16} style={{ color: "var(--accent)" }} />
         <h2>
@@ -80,6 +91,7 @@ export function VariantsCard({
           <Plus size={15} /> Nouvelle variante
         </button>
       </div>
+      )}
       <ul className="variants-list">
         {family.members.map((m) => {
           const current = m.id === currentId;
@@ -103,6 +115,18 @@ export function VariantsCard({
         })}
       </ul>
       {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+      {inDialog && (
+        <div className="variants-foot">
+          {onLink && (
+            <button type="button" className="fl-btn fl-btn-ghost" onClick={onLink}>
+              <Link2 size={15} /> Relier une recette
+            </button>
+          )}
+          <button type="button" className="fl-btn fl-btn-primary" onClick={onNew}>
+            <Plus size={15} /> Nouvelle variante
+          </button>
+        </div>
+      )}
       {renaming && (
         <NoteDialog
           title="Renommer l'essai"
@@ -117,6 +141,30 @@ export function VariantsCard({
         />
       )}
     </section>
+  );
+}
+
+/** Fenêtre « Variantes » ouverte depuis le menu ⋯ de la recette. */
+export function VariantsDialog({
+  family,
+  currentId,
+  onClose,
+  onNew,
+  onLink,
+}: {
+  family: VariantFamily;
+  currentId: number;
+  onClose: () => void;
+  onNew: () => void;
+  onLink: () => void;
+}) {
+  return (
+    <ModalOverlay onClose={onClose} title={`Variantes · ${family.members.length - 1}`}>
+      <p style={{ color: "var(--soft)", fontSize: 13.5, margin: "0 0 12px" }}>
+        Tes essais de cette recette, rangés sous la version principale. Touche une ligne pour l&apos;ouvrir, ou « Comparer » pour voir les écarts.
+      </p>
+      <VariantsCard family={family} currentId={currentId} onNew={onNew} onLink={onLink} onNavigate={onClose} inDialog />
+    </ModalOverlay>
   );
 }
 

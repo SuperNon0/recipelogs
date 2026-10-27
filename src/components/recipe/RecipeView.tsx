@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChefHat, ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
+import { ChefHat, ChevronLeft, FileDown, GitBranch, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
 import type { AllergenHit } from "@/lib/allergens";
 import type { Mold } from "@/lib/mold";
 import type { VariantFamily } from "@/lib/variants";
-import { VariantsCard } from "./Variants";
 import { KitchenMode } from "./KitchenMode";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
@@ -46,12 +45,14 @@ type Props = {
   comments: { id: number; content: string; createdAt: string }[];
   usedIn: { id: number; name: string; label: string }[];
   back: { href: string; label: string };
+  /** Ouvre tout de suite la fenêtre des variantes (lien « Voir les variantes » depuis la liste). */
+  openVariants?: boolean;
 };
 
 type Tab = "recipe" | "steps" | "notes";
 
 /** Fiche recette : en-tête, actions, onglets Recette / Préparation / Notes. */
-export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, variants, allergens, comments, usedIn, back }: Props) {
+export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, variants, allergens, comments, usedIn, back, openVariants }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
@@ -69,8 +70,14 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
       totalMassG: recipe.totalMassG,
       color: recipe.folder?.color,
     },
-    { onPage: true },
+    { onPage: true, variants },
   );
+  useEffect(() => {
+    if (openVariants && variants) menu.openDialog("variants");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openVariants, recipe.id]);
+  const me = variants?.members.find((m) => m.id === recipe.id);
+  const nVariants = variants ? variants.members.length - 1 : 0;
 
   const subSteps = subRecipes.filter((s) => s.childSteps);
   const notesCount = comments.length + (recipe.notesTips ? 1 : 0);
@@ -125,6 +132,12 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
             {recipe.folder.name}
           </Link>
         )}
+        {variants && (
+          <button type="button" className="fl-tag rvariants" onClick={() => menu.openDialog("variants")} title="Voir les variantes de cette recette">
+            <GitBranch size={12} />
+            {me && !me.isRoot ? `Variante : ${me.note ?? "essai"}` : `${nVariants} variante${nVariants > 1 ? "s" : ""}`}
+          </button>
+        )}
         {recipe.categories.map((c) => (
           <span key={c.id} className="fl-tag" style={{ color: c.color, borderColor: `${c.color}55`, background: `${c.color}14` }}>
             {c.name}
@@ -163,7 +176,6 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
       <div hidden={tab !== "recipe"}>
         <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} mold={mold} saleCoef={recipe.saleCoef} onScaleChange={onScaleChange} />
         <AllergensCard allergens={allergens} />
-        {variants && <VariantsCard family={variants} currentId={recipe.id} onNew={() => menu.openDialog("variant")} />}
         {usedIn.length > 0 && (
           <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <Layers size={16} style={{ color: "var(--accent)" }} />

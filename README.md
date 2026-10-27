@@ -1,235 +1,107 @@
 # RecipeLog
 
-> **Gestion de recettes de pâtisserie : application web auto-hébergée**
+> **Recettes de pâtisserie professionnelle : application web auto-hébergée**
 
-Outil personnel conçu pour la pâtisserie professionnelle (BTM). Il comble les manques de Recipe Keeper : précision au gramme, multiplication (3 modes), sous-recettes et cahiers PDF.
+Outil conçu pour le travail d'un pâtissier pro (et quelques recettes perso). Il comble les manques de Recipe Keeper : précision au gramme, multiplicateur (coefficient, masse, pivot, pièces, moule), sous-recettes à tous les niveaux, fiches de production, allergènes, coût de revient, cahiers PDF et accès par Claude (MCP).
 
-**Version actuelle : voir Réglages → Version et nouveautés** · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : V2.5** (le numéro complet, par ex. V2.5.106, est affiché dans le menu et dans Réglages → Version et nouveautés) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
-> Ce fichier est **la seule documentation du projet**. Il remplace l'ancien cahier des charges (`CDC.md`), le document de transmission (`HANDOFF.md`) et les guides `INSTALL.md` / `DEPLOYMENT.md`.
+> Ce fichier est **la documentation du projet**. Le journal des nouveautés affiché dans l'appli est `src/lib/changelog.ts` (règles dans `CLAUDE.md`). Les idées mises de côté pour plus tard sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md).
+
+Choix de fond : pas de planning ni de calendrier, pas de photos, aucun service payant (API), une appli sobre avec peu de boutons visibles.
 
 ---
 
 ## Sommaire
 
-1. [Mises à jour effectuées](#1-mises-à-jour-effectuées)
-2. [Mises à jour proposées](#2-mises-à-jour-proposées)
+1. [Dernières mises à jour](#1-dernières-mises-à-jour)
+2. [Futures mises à jour](#2-futures-mises-à-jour)
 3. [Problèmes connus restants](#3-problèmes-connus-restants)
 4. [Fonctionnalités](#4-fonctionnalités)
 5. [Règles de calcul](#5-règles-de-calcul)
-6. [Architecture technique](#6-architecture-technique)
-7. [Modèle de données](#7-modèle-de-données)
-8. [Design system](#8-design-system)
-9. [Installation (développement)](#9-installation-développement)
-10. [Production (Proxmox LXC)](#10-production-proxmox-lxc)
-11. [Historique des versions](#11-historique-des-versions)
-12. [Conventions](#12-conventions)
+6. [Accès Claude (MCP)](#6-accès-claude-mcp)
+7. [Architecture technique](#7-architecture-technique)
+8. [Modèle de données](#8-modèle-de-données)
+9. [Design system](#9-design-system)
+10. [Installation (développement)](#10-installation-développement)
+11. [Production (Proxmox LXC)](#11-production-proxmox-lxc)
+12. [Historique des versions](#12-historique-des-versions)
+13. [Conventions](#13-conventions)
 
 ---
 
-## 1. Mises à jour effectuées
+## 1. Dernières mises à jour
 
-### V2.0 (21 octobre 2026) : nouveau design et thèmes PDF personnalisables
+Le détail complet de chaque version est dans l'appli (Réglages → Version et nouveautés), avec la liste des dernières PR fusionnées.
 
-**Nouveau design sur tout le site** (sombre, « Encre et ambre »)
-- Plus aucun emoji : des icônes partout.
-- **Ordinateur** : menu à gauche (recettes, favoris, cahiers, courses, ingrédients, dossiers avec leur nombre de recettes, thèmes PDF, réglages).
-- **Téléphone** : barre d'onglets en bas, bouton « + » flottant, fenêtres qui remontent du bas.
-- **Installable comme une application** (PWA) : sur téléphone, « Ajouter à l'écran d'accueil » ; sur ordinateur, l'icône d'installation dans la barre d'adresse de Chrome / Edge.
-- **Moins de boutons** : les actions d'une recette, d'un dossier, d'un cahier, d'une liste ou d'un thème sont dans un **menu** qui s'ouvre au **clic droit**, avec le **bouton ⋯**, ou par un **appui long** sur téléphone (avec de gros boutons d'actions rapides).
-- **Bulles d'aide « ? »** à côté de chaque information : ce que c'est, comment c'est calculé (avec les vrais chiffres de la recette) et un exemple.
-- **Recherche globale Ctrl K** (bouton loupe sur téléphone) : recettes, dossiers, ingrédients, cahiers, listes et actions rapides.
+### V2.5 (27 octobre 2026) : moules, variantes, production et mode labo
 
-**Fiche recette**
-- Onglets **Recette / Préparation / Notes et essais**.
-- Trois cartes : **masse totale** (sous-recettes comprises, avec le détail), **multiplicateur** (coefficient, masse ou ingrédient pivot, + / −, entiers), **base ×1**.
-- Tableau des ingrédients avec **% de la masse** et les **sous-recettes dépliables**. Chaque sous-recette a son menu : ouvrir la recette d'origine, suivre le multiplicateur ou **garder sa quantité** (verrouillée), régler la quantité, **monter / descendre**, retirer.
-- « Utilisée comme sous-recette dans… » : les recettes qui contiennent celle-ci.
-- Étapes affichées en étapes numérotées.
+**Moules**
+- Le multiplicateur a un mode **« Moule »** : de « cercle Ø18 » vers « cercle Ø24 », d'un cadre 40×60 vers des cercles, ou vers **plusieurs moules** (« 3 × Ø16 »). Calcul par la surface, ou par le **volume** si les deux hauteurs sont données.
+- Le **moule d'origine** se note dans « Modifier » (formes cercle, carré, cadre, dimensions courantes proposées, ou « Autre dimension »). Il s'affiche sous « Base (×1) » et l'appli dit combien de moules la recette remplit à ×1.
 
-**Thèmes PDF** (nouvelle page Thèmes PDF)
-- Les **7 thèmes fournis** sont prêts à l'emploi et **modifiables** ; « Revenir à l'original » les remet comme au départ.
-- **Créer, dupliquer, renommer, supprimer, réordonner** ses propres thèmes ; choisir le thème **par défaut**.
-- **Éditeur complet avec aperçu en direct** (le vrai PDF, régénéré pendant la modification, sur la recette de son choix) : modèle, couleurs, polices, taille, papier, décor, informations imprimées, couverture des cahiers.
-- **Nouvelles dispositions** : ingrédients **à gauche, à droite ou au-dessus**, largeur de la colonne, **alignement du titre**, titre en majuscules, style des intertitres, **espacement** (serré / normal / aéré), **photo en tête** pour tous les modèles.
-- **Télécharger le PDF d'une recette** : la liste des thèmes à gauche, l'**aperçu** de la recette à droite, puis Télécharger. Sur téléphone : la liste, puis l'aperçu en plein écran.
-- **Cahiers** : un clic applique un thème enregistré au cahier ; aperçu lisible aussi sur téléphone.
-- L'ancien réglage « PDF d'une recette » devient automatiquement le thème **« Mon style »** (thème par défaut).
+**Variantes (essais d'une recette)**
+- Menu **⋯** d'une recette → **Variantes** → « Nouvelle variante » : copie complète de la recette (sous-recettes, étapes, réglages) rangée sous la **version principale**, avec un nom d'essai (« moins sucré », « chocolat 64 % »).
+- Menu ⋯ → Variantes → **« Voir les variantes »** (ou le badge « 2 variantes » sous le titre) : la liste des essais ; ouvrir, **comparer**, renommer, **en faire la version principale** (l'ancienne devient l'essai « ancienne version ») ou **détacher**.
+- « Relier une recette existante » : range comme variante un essai fait avant dans une recette séparée.
+- **Comparer** : tableau côte à côte (écart en g et en %, ajouté / retiré), étapes modifiées en couleur, bouton « Inverser ».
+- Les variantes sont **masquées** de la liste des recettes et des compteurs de dossiers (lien « N variantes rangées sous leur recette » pour les afficher) ; la recherche les trouve toujours.
 
-**Pages refaites** : accueil (tuiles des dossiers, filtres, tableau des recettes, sélection multiple), formulaire de recette (sections, masse en direct, menu par ingrédient, création de catégorie à la volée), cahiers, listes de courses (grosses cases à cocher, articles cochés regroupés en bas, ajout rapide), réglages et ingrédients.
+**Colonne %**
+- Chaque ingrédient et chaque sous-recette affiche sa **part de la masse totale**, maintenant aussi sur téléphone. Les ingrédients d'une sous-recette dépliée affichent leur part **dans cette sous-recette**.
 
-**Recettes importées réparées automatiquement**
-- Les quantités importées sur une ligne à part (« Abricots frais » 0 g puis « 800g ») sont recollées au bon ingrédient.
-- La ligne de total recopiée comme dernier ingrédient (« 500g ») est retirée : elle doublait la masse.
-- Les lignes à 0 g (titres de section comme « Levain ») ne vont plus dans les listes de courses.
-- La réparation se fait **toute seule au premier démarrage** après la mise à jour, et les prochains imports Recipe Keeper sont corrigés directement.
+**Fiche de production**
+- Menu ⋯ → **Fiche de production** : « 60 éclairs » (ou ×2 sans rendement) donne **toutes les pesées à l'échelle**, sous-recettes comprises, **une préparation par encadré dans l'ordre de fabrication** (sous-recettes d'abord), étapes en option, **PDF à imprimer** pour le labo.
+- Page **Production** (menu de gauche, ou recherche) : plusieurs recettes en même temps, quantités modifiables sur place ; une préparation commune (la même pâte à choux pour éclairs et religieuses) n'a **qu'un encadré, aux quantités additionnées** ; **total à sortir** par ingrédient.
 
-**Bugs corrigés**
-| # | Avant | Maintenant |
-|---|---|---|
-| 1 | Ajouter une sous-recette en mode « ingrédient pivot » échouait toujours. | Le choix de l'ingrédient pivot est demandé. |
-| 2 | Dupliquer une recette perdait ses sous-recettes. | Elles sont copiées avec leurs réglages. |
-| 3 | Modifier une recette faisait disparaître ses fourchettes (« 72–84 g »). | Conservées. |
-| 4 | La saisie en lot mettait tout en grammes (« 3 oeufs » = 3 g, « 250 ml lait » = 0,25 g). | Unités et fourchettes reconnues conservées. |
-| 5 | « Ranger des recettes ici » ignorait le texte recherché. | Recherche prise en compte. |
-| 6 | Cahier : numéro de ligne identique partout, masse des recettes liées absente. | Corrigé. |
-| 7 | L'option « numéros de page » du PDF n'avait aucun effet. | Respectée (cahiers et recettes de plusieurs pages). |
+**Mode labo**
+- Bouton **toque** sur la fiche : la recette **en grand** au multiplicateur choisi, **écran toujours allumé**, pesées à cocher (sous-recettes d'abord), étape en cours mise en avant, **minuteurs** créés depuis les durées des étapes (« cuire 18 min », « 1 h 30 », « 45 s ») avec sonnerie et vibration. Tout reste coché si on quitte et revient. Onglets sur téléphone, deux colonnes sur grand écran.
 
-**Après la mise à jour** : rien à faire. La table des thèmes est créée par la migration, les 7 thèmes et « Mon style » apparaissent à la première ouverture, et la réparation des ingrédients se fait au démarrage.
+**Recherche complète** (Ctrl K ou loupe)
+- Trouve aussi les recettes par **ce qui est écrit dans les étapes, les notes et les essais** (avec l'extrait), et **par ingrédient, sous-recettes comprises** ; « jaunes + crème » donne les recettes qui ont **les deux**. Sans accents ni majuscules.
+- Fiche d'un ingrédient : la **quantité** utilisée par chaque recette et les recettes qui l'utilisent **à travers une sous-recette**.
 
-### V1.9 (20 octobre 2026) : PDF plus rapides et plus beaux, mise à jour du site fiabilisée
+**Claude (MCP)** : 10 nouveaux outils (variantes, comparaison, moule, production, recherche complète), `lire_recette` donne le moule, les variantes et le % de chaque ingrédient (voir §6).
 
-**PDF beaucoup plus rapides**
+### V2.4 (27 octobre 2026) : rendement, allergènes et coût de revient
 
-| | Avant | Maintenant |
-|---|---|---|
-| Cahier de 20 recettes | ~7 s | **~1 s** (0,7 s si un PDF vient d'être fait) |
-| Avec une police Google (Playfair, Lora…) | 9 à 11 s | **~1 s** |
+- **Poids par pièce** sur la fiche de l'ingrédient (œuf 50 g, jaune 20 g…) : les pièces comptent dans la masse totale. **Rendement** d'une recette (« 40 financiers ») et mode **« Pièces »** du multiplicateur. Pièces arrondies **à la plus proche** quand on multiplie.
+- **Allergènes** : les 14 allergènes à déclarer se cochent une fois par ingrédient ; chaque recette les **cumule, sous-recettes comprises**, avec l'ingrédient qui les apporte. Imprimés sur les PDF et dans les cahiers.
+- **Coût de revient** : prix d'achat (€ le kg, le litre ou la pièce, avec **historique**), coût matière, coût par pièce et **prix de vente conseillé** (coefficient ×4 par défaut, réglable par recette). Page **Réglages → Prix des ingrédients** pour tout saisir d'un coup.
+- **Intertitres** (« Pâte », « Crème », « Montage ») dans les ingrédients et dans les étapes (ligne qui commence par `#`).
+- **Quantités liées dans les étapes** : « verser {167 g} de lait » suit le multiplicateur (×2 → 334 g), PDF compris.
+- Le multiplicateur reste réglé entre les onglets Recette et Préparation.
+- Corrections : masse cible et « Enregistrer comme base » avec des pièces, rendement et étapes mis à l'échelle à l'enregistrement, recettes figées dans un cahier, fusion d'ingrédients qui garde allergènes et prix, import JSON (intertitres, fourchettes, rendement), doublons dans l'historique des prix.
 
-Pourquoi c'était lent, et ce qui a changé :
-- **Chromium** était lancé à chaque PDF (deux fois pour un cahier). Il est maintenant gardé ouvert, puis fermé automatiquement après 3 minutes sans PDF pour libérer la mémoire.
-- **Une attente fixe de 500 ms** (« réseau inactif ») avait lieu à chaque passe, même sans rien à charger. On attend maintenant seulement ce qui compte : les polices et les images.
-- **Les polices Google** étaient retéléchargées à chaque PDF. Elles sont maintenant gardées en mémoire et intégrées directement.
-- Les recettes liées d'un cahier sont calculées en parallèle.
+### V2.3 → V2.1 (22 au 24 octobre 2026)
 
-**Nouveaux styles de PDF** (onglet Apparence du cahier, et Paramètres → PDF d'une recette)
-- **7 styles prêts à l'emploi**, en un clic (mise en page, habillage, couleurs, polices et couverture assortie) :
-  - **Pâtissier classique** ;
-  - **Élégant** : papier crème, double filet, Garamond, touches dorées ;
-  - **Carnet de cuisine** : cahier ligné, titres manuscrits, liseré ;
-  - **Pastel gourmand** : papier rosé, coins décoratifs, ingrédients encadrés ;
-  - **Fiche BTM** ;
-  - **Bistrot** : bandeau bordeaux, photo, pointillés ;
-  - **Nordique épuré**.
-- **Habillage des pages**, réglable un par un :
-  - papier : blanc, crème, ivoire, rosé, quadrillé, cahier ligné ;
-  - décor : filet, double filet, coins, liseré, bandeau ;
-  - titre : simple, souligné, ornement, bandeau coloré ;
-  - étapes : numéros ou pastilles ;
-  - ingrédients : liste, pointillés (comme un menu), encadré.
-- **Couvertures** : 3 nouveaux motifs (pois, rayures, quadrillage).
-- **Polices** : 3 nouvelles (Cormorant Garamond, Montserrat, Caveat manuscrite).
-- Le papier et le décor couvrent **toute la page**, marges comprises, sur chaque page (y compris quand une recette fait plusieurs pages). La couverture n'est pas touchée.
-- Les anciens cahiers gardent exactement leur apparence (tout est « blanc / aucun » par défaut).
-
-**Mise à jour du site fiabilisée** : testée de bout en bout sur une copie du serveur, dans 5 scénarios.
-- **Build raté** → le site n'est **pas** touché et continue de tourner (avant, il perdait ses styles et ne redémarrait plus).
-- **Nouvelle version qui ne démarre pas** → **retour automatique** à la version précédente.
-- **Rien de nouveau** → « Déjà à jour », sans rebuild ni coupure.
-- Le site reste utilisable pendant la préparation : la coupure se limite au redémarrage (~10 s).
-- L'écran de maintenance affiche maintenant clairement « terminé », « déjà à jour » ou « échec » (avant : attente de 12 minutes sans explication).
-- Le script ne peut plus être perturbé par sa propre mise à jour (le « cliquer deux fois » n'est plus nécessaire).
-
-**Divers** : icône d'onglet du site (l'ancienne était introuvable), style actif mis en évidence, 70 tests.
-
-### V1.8 (20 octobre 2026) : sommaire exact et mises en page PDF
-
-| # | Avant | Maintenant |
-|---|---|---|
-| 1 | **Sommaire des cahiers faux** dès qu'une recette faisait plus d'une page : tous les numéros suivants étaient décalés. | Le sommaire lit la vraie page de chaque recette dans le PDF généré : numéros toujours exacts. |
-| 2 | **Les styles « moderne », « fiche technique » et « magazine » n'existaient pas** (tout sortait en « classique », sans moyen de choisir). | Nouveau réglage **« Mise en page des recettes »** (onglet Apparence du cahier, et Paramètres → PDF d'une recette) avec 4 styles, détaillés sous le tableau. |
-| 3 | Dans les PDF, une **fourchette ou une cuillère** (« 90 g / 100 g », « 1 cc (≈5 g) ») décalait le nom de l'ingrédient. | Colonne quantité bien alignée. |
-| 4 | « 3 pièce ». | « 3 pièces ». |
-| 5 | Couleurs des dossiers / catégories acceptées sans contrôle. | Seules les couleurs valides (#abc ou #aabbcc) sont enregistrées. |
-| 6 | Détection des boucles de sous-recettes : une requête par niveau. | Une seule requête. |
-
-Les 4 styles :
-- **Classique** : ingrédients à gauche, préparation à droite (inchangé).
-- **Fiche technique** (style BTM) : cartouche masse totale / nombre d'ingrédients / date, tableau des ingrédients avec le **% de chaque ingrédient dans la masse totale**.
-- **Moderne** : une seule colonne, grand titre, ingrédients sur 2 colonnes.
-- **Magazine** : photo de la recette en tête de page, encadré ingrédients, lettrine.
-
-Nettoyage : `ModalOverlay` dans son propre fichier, type `ActionResult` commun, conversion des URL de photos regroupée. 65 tests verts.
-
-### V1.7 (20 octobre 2026) : corrections et fiabilisation
-
-**Bugs corrigés**
-
-| # | Avant | Maintenant |
-|---|---|---|
-| 1 | **Dupliquer une recette** transformait toutes les unités (cc, cs, L, pièce, QS) en grammes. | Les unités sont conservées. La copie reste dans le même dossier et est trouvable par la recherche. |
-| 2 | **« Mettre à jour la recette »** sur un ingrédient en litres donnait 500 **L** au lieu de 500 g. La valeur max d'une fourchette n'était pas multipliée. | Les litres sont convertis proprement en grammes et les fourchettes suivent le coefficient. |
-| 3 | **Modifier une recette** utilisée comme sous-recette en mode « pivot » cassait le pivot : la sous-recette retombait à ×1 sans prévenir. | Le pivot est retrouvé automatiquement (même nom d'ingrédient, sinon même position). |
-| 4 | **Saisie en texte libre / import CSV** : « 2 cc vanille » était enregistré comme 10 cc (≈ 50 g). | On garde le nombre de cuillères (2 cc ≈ 10 g). « 3 oeufs » donne maintenant 3 pièces au lieu de 0 g. |
-| 5 | **Étapes affichées avec des balises `<p>`** dans les sous-recettes (anciennes recettes). | Affichage propre partout. |
-| 6 | **Liste de courses** : 2 pièces + 100 g étaient additionnés (= 102), les sous-recettes étaient ignorées, et **toutes les cases se décochaient** dès qu'on ajoutait une recette. | Fusion uniquement à unité identique, sous-recettes incluses, unités affichées (écran et PDF), cases cochées conservées. |
-| 7 | **Photos importées effacées à chaque mise à jour du site**, et jamais affichées. | Photos rangées dans `/var/lib/recipelog/uploads` (hors du build), affichées en haut de la fiche et incluses dans les sauvegardes. |
-| 8 | **Cahier** : une recette ajoutée après un chapitre pouvait prendre la même place que lui. | Recettes et chapitres partagent correctement l'ordre. |
-| 9 | **Recette figée** : « Mettre à jour le snapshot » remettait la masse d'origine (ex. 800 g → 400 g). | Le coefficient choisi est conservé. |
-| 10 | **Recette figée** : « Modifier la masse » modifiait aussi les sous-recettes **verrouillées**, avec un arrondi différent. | Les sous-recettes verrouillées ne bougent plus et l'arrondi est identique partout. |
-| 11 | **Recherche sans accents** : « creme » ne trouvait pas les recettes importées (CSV/HTML) ou dupliquées. | Toutes les recettes sont trouvées (la migration corrige aussi les recettes existantes). |
-| 12 | **Masse totale différente selon l'écran** : la liste ignorait les litres, le formulaire ignorait L et les fourchettes, l'ajout au cahier ne comptait que les grammes. | Un seul calcul (`recipeMass`) utilisé partout. |
-| 13 | **Cahier PDF vide** (sans recette ni couverture) : erreur serveur. | Message clair. |
-| 14 | **Renommer une catégorie ou un dossier** avec un nom déjà pris : page d'erreur. | Message « existe déjà ». |
-
-**Sécurité et serveur**
-- **Partage public désactivé** : le site est entièrement derrière Cloudflare, donc les liens de partage ne fonctionnaient pas pour un tiers. Le bouton « Partager » est masqué et `/share/...` répond « introuvable ». Le code est conservé pour plus tard (voir [Mises à jour proposées](#2-mises-à-jour-proposées)).
-- **Protection de `/share`** : même quand le partage sera réactivé, aucune action de modification ne pourra être lancée depuis cette adresse.
-- **PDF un par un** : plusieurs PDF demandés en même temps lançaient plusieurs Chromium et pouvaient faire planter le serveur (limité à 800 Mo). Ils sont maintenant générés l'un après l'autre.
-- **Sauvegarde** : `backup.sh` sauvegarde maintenant aussi les photos.
-
-**Nettoyage du code**
-- Suppression de l'ancien éditeur riche Tiptap (plus utilisé) et de ses 7 dépendances, ainsi que de fonctions jamais appelées.
-- Code en double regroupé :
-  - calcul de masse (7 copies → 1) ;
-  - ajout à la base d'ingrédients (3 → 1) ;
-  - renommer / fusionner un ingrédient (4 → 1) ;
-  - génération PDF des cahiers (2 → 1) ;
-  - formatage des quantités (5 → 1).
-- La vérification des types TypeScript ne remonte plus aucune erreur (3 avant). Tests : 61, tous verts (6 échouaient avant).
-- Documentation réunie dans ce seul fichier.
-
-**Après le déploiement de cette version**
-1. Cliquer **deux fois** sur « Mettre à jour le site » (la 1ʳᵉ fois, c'est encore l'ancien script de déploiement qui tourne ; la 2ᵉ installe le nouveau dossier photos).
-2. Si les photos ont déjà été perdues : **Paramètres → Import Recipe Keeper → ZIP**, en réimportant le même ZIP. Les recettes existantes ne sont pas dupliquées, seules leurs photos sont rattachées.
+- **V2.3** : recettes depuis **TikTok, Instagram, YouTube ou un lien** (Claude lit la vidéo et crée la recette, dossier dédié et étiquette « à vérifier », Raccourci iPhone) ; numéro de version complet. Corrections : **sous-recettes imbriquées** prises en compte partout (moteur `recipeTree.ts`), pivot en L / cc / cs, masse cible sur fourchettes, plus d'arrondi au gramme supérieur à ×1.
+- **V2.2** : **mise à jour du site en une minute** (site construit par GitHub Actions et téléchargé par le serveur), écran de mise à jour qui suit les étapes.
+- **V2.1** : **photos retirées** du site, éditeur de thème PDF enrichi (schémas, options masquées selon le modèle, marges, en-tête, pied de page…), **accès MCP** pour Claude (clé dans l'adresse ou en en-tête).
 
 ---
 
-## 2. Mises à jour proposées
+## 2. Futures mises à jour
 
-Classées par intérêt. Chaque idée indique les options possibles.
+Les idées étudiées mais **mises de côté** (avec ce qu'elles apportent, comment elles s'afficheraient et comment elles seraient faites) sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md) :
+- **% boulanger et hydratation** (viennoiserie, pain, levain) ;
+- **Remplacer un ingrédient** dans une recette (avec correction des quantités) ;
+- **Équilibrage** des ganaches et des glaces (sucres, matières grasses, extrait sec) ;
+- petits plus (coût dans les PDF, etc.).
 
-### Partage qui fonctionne vraiment
-Aujourd'hui tout le site est protégé par Cloudflare, donc un lien partagé est bloqué. Options :
-- **A. Bypass Cloudflare sur `/share/*`** (recommandé, le plus simple) : une règle Cloudflare Access « Bypass » limitée à ce chemin. Ensuite on passe `SHARE_ENABLED = true` dans `src/lib/features.ts`. La protection côté appli est déjà en place.
-- **B. Sous-domaine public dédié** (`partage.super-nono.cc`) qui ne sert que `/share/*` : plus cloisonné, un peu plus de configuration.
-- **C. Export autonome** : générer le PDF ou une page HTML à envoyer par message, sans lien public.
+Pour en ajouter une : demander « ajoute le n° 10 » (ou le nom de l'idée) dans une nouvelle discussion.
 
-À ajouter en même temps : bouton « Télécharger le PDF » sur la page partagée, date d'expiration du lien, partage d'une liste de courses.
-
-### Logo personnel sur les cahiers
-Option prévue en base mais sans interface. Options : envoi d'un logo dans Paramètres, puis affichage sur la couverture et/ou en pied de page.
-
-### Variantes de recette
-Créer « v2, v3 » d'une recette en gardant le lien avec l'original, pour comparer les essais (la table existe déjà en base).
-
-### Export / import JSON complet
-Sauvegarde téléchargeable de toutes les données (recettes, dossiers, cahiers, listes), avec restauration. Options : bouton manuel dans Paramètres, et/ou envoi automatique vers un NAS ou S3 (cron).
-
-### Photos
-Ajouter / changer la photo depuis le formulaire de recette (aujourd'hui seulement via l'import Recipe Keeper).
-
-### Coût de revient
-Prix au kilo dans la base d'ingrédients, puis coût total et par portion sur la fiche et dans le PDF.
-
-### Liste de courses
-Groupement par rayon (frais, sec, fruits…) en réutilisant les catégories d'ingrédients (base / fruit / préparation).
-
-### Hors-ligne
-Le site s'installe déjà comme une application (V2.0). Prochaine étape : consultation des recettes sans connexion en cuisine (service worker qui garde les dernières recettes ouvertes).
-
-### Application PC
-Une vraie application de bureau (fenêtre dédiée, raccourci) est possible en enveloppant le site (Tauri ou Electron), connectée au même serveur via Cloudflare. En attendant, l'installation PWA depuis Chrome / Edge donne déjà une fenêtre séparée.
+Toujours en attente côté infrastructure : **partage public** (bloqué par Cloudflare ; une règle « Bypass » sur `/share/*` puis `SHARE_ENABLED = true` dans `src/lib/features.ts` suffirait) et **logo personnel des cahiers** (prévu en base, sans interface).
 
 ---
 
 ## 3. Problèmes connus restants
 
-- **Variantes de recette** et **logo des cahiers** : prévus en base, pas encore développés (voir propositions).
-- **Gros composants** (`IngredientBaseManager`, `CookbookConfigForm`, `CookbookEntriesTable`, `RecipeForm` : 700 à 1 200 lignes) : fonctionnels, à découper si on les fait évoluer.
-- **Format des étapes** : les anciennes recettes sont en HTML (ancien éditeur), les nouvelles en texte (1 étape par ligne). Les deux s'affichent correctement ; ouvrir puis enregistrer une ancienne recette la convertit en texte (le gras est perdu).
-- **Base d'ingrédients importée** : des noms contiennent encore une quantité (« 1/4 pincée fleur de sel », « 1.5 Échalote(s) ») ; à renommer ou fusionner depuis Réglages, Ingrédients.
-- **Titres de section importés** (« Levain », « Pâte » à 0 g) : restent dans la recette comme ingrédients sans quantité (ignorés dans les courses). Il n'existe pas encore de vrais intertitres d'ingrédients.
+- **Arrondis à ×1,5 avec décimales** : les quantités liées des étapes et celles des ingrédients peuvent différer d'un gramme.
+- **Anciennes étapes en HTML** (ancien éditeur) : affichées correctement, mais sans quantités liées ; ouvrir puis enregistrer la recette la convertit en texte (le gras est perdu).
+- **Fiches d'ingrédients à compléter** : quelques allergènes à vérifier (chocolats et couvertures : soja ? pâte à glacer, croustillants, pâte sucrée : amande ?) ; aucun prix fournisseur saisi pour l'instant.
+- **Base d'ingrédients importée** : quelques noms contiennent encore une quantité (« 1/4 pincée fleur de sel ») ; à renommer ou fusionner depuis Réglages → Ingrédients.
+- **Gros composants** (`RecipeBody`, `IngredientBaseManager`, `CookbookConfigForm`, `RecipeForm` : 700 à 1 200 lignes) : fonctionnels, à découper si on les fait évoluer.
 
 ---
 
@@ -237,133 +109,134 @@ Une vraie application de bureau (fenêtre dédiée, raccourci) est possible en e
 
 ### Interface
 - Thème sombre « Encre et ambre », icônes (aucun emoji), polices Geist / Fraunces.
-- **Ordinateur** : menu latéral (sections, dossiers avec compteurs, thèmes PDF, réglages). **Téléphone** : barre d'onglets, bouton « + », feuilles d'actions.
-- **Menus d'actions** partout (recette, dossier, sous-recette, cahier, entrée de cahier, liste, article, thème, dossier, catégorie, ingrédient) : clic droit, bouton ⋯ ou appui long.
-- **Bulles d'aide « ? »** : explication, calcul et exemple.
-- **Recherche Ctrl K** : recettes, dossiers, ingrédients, cahiers, listes, actions.
-- **PWA** : installable (manifeste, icônes).
+- **Ordinateur** : menu latéral (recettes, favoris, cahiers, courses, **production**, ingrédients, dossiers avec compteurs, thèmes PDF, réglages). **Téléphone** : barre d'onglets, bouton « + », feuilles d'actions.
+- **Menus d'actions** partout : clic droit, bouton ⋯ ou appui long ; sous-menus (Déplacer vers, Variantes).
+- **Bulles d'aide « ? »** : explication, calcul avec les vrais chiffres, exemple.
+- **Recherche Ctrl K** : noms (recettes, dossiers, ingrédients, cahiers, listes), recettes par ingrédient (sous-recettes comprises, « a + b »), texte des étapes / notes / essais, actions rapides.
+- **PWA** : installable comme une application.
 
 ### Recettes
-- Création / édition / suppression / duplication (sous-recettes comprises), suppression en lot (sélection multiple).
-- Ingrédients : saisie **liste** (autocomplétion, menu par ligne : fourchette, monter, descendre, supprimer) ou **saisie en lot** (`200g farine`, `Farine\n800g`, `1kg sucre`, `2 cc vanille`, `3 oeufs`, `100-150g sucre`, ajout à la suite ou remplacement). Masse totale en direct.
-- Unités : `g`, `L`, `cc` (≈ 5 g), `cs` (≈ 15 g), `pièce`, `QS`, et **fourchettes** min/max.
-- Étapes : 1 étape par ligne, affichées numérotées.
-- Tags libres, catégories colorées (créables depuis le formulaire), note 1–5, favori, source, notes et astuces, journal d'essais daté, photo (via import).
-- Rangement dans **un dossier** (0 ou 1), « Déplacer vers » depuis le menu.
+- Création, édition, suppression, duplication (sous-recettes comprises), suppression en lot.
+- Ingrédients : saisie **liste** (autocomplétion, menu par ligne : fourchette, monter, descendre, supprimer), **intertitres**, ou **saisie en lot** (`200g farine`, `1kg sucre`, `2 cc vanille`, `3 oeufs`, `100-150g sucre`).
+- Unités : `g`, `L`, `cc` (≈ 5 g), `cs` (≈ 15 g), `pièce` (poids réglé sur la fiche de l'ingrédient), `QS`, et **fourchettes** min/max.
+- Étapes : une étape par ligne, intertitres `# Titre`, **quantités liées** `{167 g}`.
+- **Rendement** (nombre + libellé), **moule d'origine**, coefficient de vente.
+- Tags, catégories colorées, note 1–5, favori, source, notes et astuces, journal d'essais daté.
+- Un dossier par recette (« Déplacer vers » dans le menu).
+- **Variantes** : essais rangés sous la version principale, comparaison, promotion, détachement (menu ⋯ → Variantes).
+- **Mode labo** : affichage cuisine plein écran, pesées à cocher, minuteurs.
 
-### Organisation
-- Accueil : tuiles des dossiers, filtres catégorie / tag, recherche par nom, tableau des recettes (vignette, dossier, masse, date, note, favori), page Favoris.
+### Fiche recette
+- Onglets **Recette / Préparation / Notes et essais**.
+- Cartes **Masse totale** (sous-recettes comprises, rendement), **Multiplicateur**, **Base ×1** (et moule).
+- Tableau des ingrédients avec **quantité** et **% de la masse** (téléphone compris), sous-recettes dépliables avec leur menu (ouvrir, suivre le multiplicateur ou **garder sa quantité**, régler, monter / descendre, retirer).
+- **Allergènes** (avec l'ingrédient qui les apporte) et **coût de revient** / prix conseillé.
+- « Utilisée comme sous-recette dans… ».
 
-### Multiplication et sous-recettes
-- 3 modes : **coefficient** (+ / −), **masse cible**, **ingrédient pivot** ; décimales ou entiers (arrondi au supérieur, masse cible exacte).
-- « Enregistrer comme base » : écrit les quantités affichées comme nouvelle base.
-- **Masse totale sous-recettes comprises**, % de chaque ligne.
-- **Sous-recettes** dépliables dans le tableau : mode / valeur, masse exacte, **suit le multiplicateur ou garde sa quantité** (verrouillée), ordre, retrait, lien vers la recette d'origine ; « Utilisée comme sous-recette dans ». Détection des boucles.
+### Multiplicateur
+- 5 modes : **coefficient** (+ / −), **masse cible**, **ingrédient pivot**, **pièces** (si rendement), **moule** ; affichage décimales ou entiers.
+- « Enregistrer comme base » : écrit les quantités affichées (rendement et quantités liées des étapes suivent).
 
-### Thèmes PDF
-- 7 thèmes fournis (modifiables, réinitialisables) + thèmes personnels : créer, dupliquer, renommer, supprimer, réordonner, thème par défaut.
-- Réglages : modèle (Classique, Fiche technique, Moderne, Magazine), place et largeur des ingrédients, alignement et majuscules du titre, intertitres, espacement, photo, styles de titre / étapes / ingrédients, couleurs, polices, taille, papier, décor, informations imprimées, numéros de page, couverture des cahiers, format A4 / A5.
-- Éditeur avec **aperçu PDF en direct** (pdf.js, aussi sur téléphone).
+### Production
+- Fiche pour une recette (menu ⋯) ou page **Production** pour plusieurs recettes : pesées par préparation dans l'ordre de fabrication, préparations communes additionnées, total à sortir, étapes en option, **PDF**.
 
-### PDF d'une recette
-Bouton PDF : choix du thème avec aperçu, puis téléchargement. Sous-recettes sur des pages séparées.
+### Ingrédients
+- Base d'ingrédients : catégorie (base / arôme / préparation), **poids par pièce**, **allergènes**, **prix d'achat** avec historique, renommage en cascade, fusion, nettoyage.
+- Fiche d'un ingrédient : recettes qui l'utilisent avec la quantité, et celles qui l'utilisent via une sous-recette.
+- **Prix des ingrédients** (Réglages) : tous les prix sur une page.
 
-### Cahiers PDF
-- Recettes **liées** (toujours à jour) ou **figées** (copie datée, masse modifiable en 3 modes).
-- Glisser-déposer, chapitres, titres de section, ajout multiple avec masse cible.
-- **Application d'un thème enregistré** en un clic, puis personnalisation complète.
-- Couverture, sommaire avec sous-recettes et **numéros de page exacts**, pied de page, A4 / A5, aperçu sans enregistrer.
-- Ajout de toutes les recettes du cahier à une liste de courses.
+### Thèmes PDF, PDF d'une recette, cahiers
+- 7 thèmes fournis (modifiables) + thèmes personnels ; éditeur avec **aperçu PDF en direct** et schémas pour chaque choix.
+- PDF d'une recette : choix du thème avec aperçu ; sous-recettes sur des pages séparées ; rendement et allergènes imprimés.
+- **Cahiers** : recettes **liées** (toujours à jour) ou **figées** (copie datée, masse modifiable), chapitres, couverture, sommaire aux numéros de page exacts, A4 / A5.
 
 ### Listes de courses
-- Plusieurs listes, recettes avec coefficient (modifiable), articles libres, ajout rapide.
-- Fusion des ingrédients identiques **de même unité**, sous-recettes incluses, max des fourchettes ; lignes à 0 g ignorées.
-- Grosses cases à cocher, articles cochés regroupés en bas, « tout décocher », « retirer les cochés », export PDF.
+- Plusieurs listes, recettes avec coefficient, articles libres ; fusion des ingrédients identiques de même unité, sous-recettes comprises ; cases à cocher, export PDF.
 
 ### Réglages
-- Dossiers, catégories (nom, couleur, rangement), base d'ingrédients (classement, renommage en cascade, fusion, majuscule, suppression, sélection multiple, entretien : réparation des imports, synchronisation, nettoyage).
-- Thèmes PDF, lien du logo, version et nouveautés.
-- Import **Recipe Keeper** (ZIP/HTML avec photos, ou CSV ; quantités séparées recollées automatiquement) et **import JSON** (avec le prompt de conversion pour une IA).
-- **Mettre à jour le site** : lance `deploy.sh` avec un écran de maintenance.
-
-### Partage public
-**Désactivé depuis la V1.7** (voir [Mises à jour proposées](#2-mises-à-jour-proposées)). Interrupteur : `SHARE_ENABLED` dans `src/lib/features.ts`.
+- Dossiers, catégories, ingrédients, prix, thèmes PDF, **Accès MCP** (Claude), **Recettes depuis TikTok**, import Recipe Keeper et JSON, **Version et nouveautés**, **Mettre à jour le site**.
 
 ---
 
 ## 5. Règles de calcul
 
-Toute la logique pure est dans **`src/lib/massAdjust.ts`**, **`src/lib/subRecipeCalc.ts`** et **`src/lib/ingredientRepair.ts`**, importables côté client ET serveur : **ne jamais y importer Prisma**.
+La logique pure est dans `src/lib/` (**ne jamais y importer Prisma**, sauf les fichiers `*Data.ts`, `recipes.ts`, `cookbooks.ts`…) : `massAdjust.ts`, `recipeTree.ts`, `subRecipeCalc.ts`, `mold.ts`, `production.ts`, `compare.ts`, `cost.ts`, `allergens.ts`, `stepQty.ts`, `durations.ts`, `textSearch.ts`.
 
 | Règle | Détail |
 |---|---|
-| Masse d'un ingrédient (`ingMass`) | g = valeur · cc × 5 · cs × 15 · L × 1000 · pièce / QS = 0 |
-| Masse totale (`recipeMass`) | Somme des masses. Fourchette : `min` = bas, `max` = haut, **masse affichée = moyenne**. Seule fonction autorisée pour ce calcul. |
-| Mise à l'échelle (`scaleQty`) | `qty × coef`, arrondi **au supérieur** ; les L deviennent des g entiers. |
-| Masse cible exacte (`adjustToTarget`) | Après arrondi, retire/ajoute 1 g sur les plus gros ingrédients en grammes jusqu'à la cible exacte. |
-| Sous-recette (`computeLocalCoef`, `computeSubRecipe` dans `subRecipeCalc.ts`) | coefficient = valeur · masse cible = cible ÷ masse de base de l'enfant · pivot = cible ÷ quantité du pivot. |
-| Propagation | Non verrouillée : `coef_local × coef_global`. Verrouillée : `coef_local` seul. |
-| Masse affichée sur la fiche | Ingrédients de la recette × multiplicateur + chaque sous-recette (arrondie au gramme supérieur, verrouillée = sans multiplicateur). Le mode « masse » du multiplicateur porte sur les ingrédients de la recette seuls. |
-| Réparation des imports (`ingredientRepair.ts`) | Ligne « quantité seule » après un ingrédient à 0 g → recollée ; dernière ligne « quantité seule » égale (± 2 %) à la somme des autres → ligne de total supprimée. |
-| Snapshot figé (`buildRecipeSnapshot`) | Copie complète (ingrédients + sous-recettes calculées) avec son `multiplier`. |
+| Masse d'un ingrédient (`ingMass`) | g = valeur · cc × 5 · cs × 15 · L × 1000 · pièce × poids par pièce (0 si non réglé) · QS = 0 |
+| Masse totale (`recipeMass`, `treeBaseMass`) | Somme des masses, sous-recettes comprises. Fourchette : bas / haut, **affichée = moyenne**. |
+| Mise à l'échelle (`scaleQty`, `roundScaled`) | À ×1 : valeur exacte. Sinon gramme **supérieur**, pièce **la plus proche** ; les L deviennent des g. |
+| Masse cible exacte (`adjustToTarget`) | Vise la moyenne (min+max)/2 ; ne bouge que les ingrédients ≥ 20 g. |
+| Sous-recettes (`resolveLink` dans `recipeTree.ts`) | Arbre récursif à tous les niveaux, anti-boucle. coefficient = valeur · masse cible = cible ÷ masse de base de l'enfant · pivot = cible (en g via `ingMass`) ÷ quantité du pivot. Non verrouillée : × multiplicateur du parent ; verrouillée : seule. |
+| Moule (`moldCoef`) | surface cible ÷ surface d'origine (× rapport des hauteurs si les deux sont connues) × nombre de moules. |
+| % de la masse | masse de la ligne ÷ masse totale (sous-recettes comprises) ; ingrédient d'une sous-recette dépliée : ÷ masse de la sous-recette. |
+| Production (`buildProduction`) | Parcours en profondeur (sous-recettes d'abord) ; même sous-recette = un bloc, quantités additionnées ; pièces = quantité ÷ rendement, sinon multiplicateur ; fourchettes pesées au haut. |
+| Coût (`costOf`) | Σ masse × prix ramené au gramme (ou à la pièce) ; prix conseillé = coût × coefficient de vente. |
+| Allergènes (`collectAllergens`) | Union des allergènes des fiches ingrédients, sous-recettes comprises. |
+| Quantités liées (`rescaleStepText`) | `{167 g}` × coefficient (celui de la sous-recette pour ses étapes). |
+| Minuteurs (`findDurations`) | « 18 min », « 1 h 30 », « 45 s » ; fourchette « 15 à 20 min » → la plus longue. |
+| Recherche (`textSearch.ts`) | Sans accents ni casse ; « a + b » = toutes les recettes qui contiennent a ET b, directement ou dans une sous-recette. |
 
-Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g ×1000` (import JSON) ; le texte libre convertit ml/cl en L. Les cuillères gardent leur **nombre**.
+Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g ×1000` ; les cuillères gardent leur **nombre**.
 
 ---
 
-## 6. Architecture technique
+## 6. Accès Claude (MCP)
+
+Serveur MCP intégré à l'appli : `POST /api/mcp` (JSON-RPC sans état, écrit à la main). Clé dans **Réglages → Accès MCP**, envoyée en en-tête `Authorization: Bearer <clé>` ou `X-API-Key`, ou dans l'adresse `/api/mcp/<clé>`. Cloudflare Access doit avoir une règle **Bypass** sur `/api/mcp` et `/api/mcp/*`. Les outils sont dans `src/lib/mcp/tools/` (un fichier par groupe, liste dans `index.ts`).
+
+**Après une mise à jour qui ajoute des outils, reconnecter le connecteur « RecipeLog » dans Claude** pour qu'ils apparaissent.
+
+| Groupe | Outils |
+|---|---|
+| Ingrédients | lister, classer, renommer, fusionner, supprimer les inutilisés, `regler_fiches_ingredients` (allergènes, poids pièce, prix en lot), recettes d'un ingrédient… |
+| Recettes | `chercher_recettes`, `lire_recette` (rendement, moule, variantes, allergènes, coût, **% de chaque ingrédient**), créer, modifier, dupliquer, supprimer, ajuster les quantités, sous-recettes, commentaires, favoris, import / export JSON |
+| Variantes, moules, production et recherche (V2.5) | `voir_variantes`, `creer_variante`, `relier_variante`, `gerer_variante` (renommer, principale, détacher), `comparer_recettes`, `adapter_au_moule`, `voir_fiche_production`, `ajouter_a_production`, `modifier_production`, `recherche_complete` |
+| Vidéos et liens | `lire_video` (TikTok, Instagram, YouTube, page web ; yt-dlp + ffmpeg sur le serveur) |
+| Dossiers et catégories, Listes de courses, Cahiers | création, rangement, couleurs, articles, recettes… |
+| Site | `infos_recipelog`, `lancer_mise_a_jour`, `etat_du_site` |
+
+---
+
+## 7. Architecture technique
 
 | Couche | Choix |
 |---|---|
 | Framework | Next.js 15 (App Router, Server Actions), mode `standalone` |
 | Langage | TypeScript strict |
-| BDD | PostgreSQL 16 + extensions `pg_trgm`, `unaccent` · ORM Prisma 6 |
-| Style | Tailwind CSS v4 + design system « Encre et ambre » (voir §8), icônes lucide-react |
+| BDD | PostgreSQL 16 + `pg_trgm`, `unaccent` · ORM Prisma 6 |
+| Style | Tailwind CSS v4 + design system « Encre et ambre » (§9), icônes lucide-react |
 | Validation | Zod |
-| PDF | Puppeteer 24 (Chromium système) + pdf-lib (fusion des passes) ; aperçus affichés avec pdf.js |
-| Tests | Vitest 4 (86 tests) |
-| Hébergement | LXC Debian 12 (Proxmox) · nginx · Cloudflare Tunnel + Zero Trust |
+| PDF | Puppeteer 24 (Chromium système) + pdf-lib ; aperçus avec pdf.js |
+| Tests | Vitest (27 fichiers, ~175 tests) |
+| Build | GitHub Actions (`server-build.yml`) → release `server-builds`, téléchargée par le serveur |
+| Hébergement | LXC Debian 13 (Proxmox) · nginx · Cloudflare Tunnel + Zero Trust |
 
-**Monolithe Next.js** : pas de séparation front/back ; les « API » sont des Server Actions (`src/app/actions/`) et des Route Handlers (`src/app/**/route.ts`).
+**Monolithe Next.js** : les « API » sont des Server Actions (`src/app/actions/`) et des Route Handlers (`src/app/**/route.ts`).
 
 ```
 src/
 ├── app/
-│   ├── actions/        # Server Actions : recipes, subRecipes, cookbooks, shopping, settings, pdfThemes, import, share, admin, modals
-│   ├── recipes/        # fiche, édition, création, PDF (?theme=ID, ?inline=1)
-│   ├── cookbooks/      # cahiers + PDF
-│   ├── shopping/       # listes de courses + PDF
-│   ├── settings/       # réglages, dossiers, catégories, ingrédients, imports, themes/ (liste + éditeur)
-│   ├── share/[token]/  # page publique (désactivée)
-│   ├── uploads/        # sert les photos depuis UPLOAD_DIR
-│   ├── manifest.ts     # manifeste PWA
-│   └── api/            # search (Ctrl K), recipes, ingrédients, pdf-preview (thème non enregistré), aperçu cahier, health, deploy/log
+│   ├── actions/        # Server Actions : recipes, subRecipes, variants, production, cookbooks, shopping, settings, pdfThemes, import, mcp, share, admin, modals
+│   ├── recipes/[id]/   # fiche, edit, compare (variantes), pdf, production (PDF d'une recette)
+│   ├── production/     # page Production + pdf
+│   ├── cookbooks/  shopping/  favorites/  share/[token]/ (désactivé)
+│   ├── settings/       # categories, folders, ingredients (+ prix), themes, mcp, import-video, import-json, import-recipekeeper
+│   └── api/            # search (Ctrl K), mcp, recipes, ingredient-bases, pdf-preview, cookbooks, health, deploy
 ├── components/
-│   ├── ui/             # Menu (clic droit, ⋯, appui long, feuilles), Help (« ? »), CommandPalette (Ctrl K), useMedia
-│   ├── recipe/         # RecipeTable, RecipeView, RecipeMenu, FolderTiles
-│   ├── themes/         # ThemeList, ThemeEditor, ThemePreviewPanel
-│   ├── settings/       # fenêtres et listes partagées des réglages
-│   └── …               # AppNav (menu latéral + barres téléphone), ModalOverlay, PdfPreview, RecipePdfDialog, ThemeThumb…
-├── styles/             # CSS par zone (recipe-form, cookbooks, shopping, settings), importés par globals.css
-├── instrumentation.ts  # au démarrage : réparation unique des ingrédients importés
-├── middleware.ts       # protection de /share
+│   ├── ui/             # Menu (clic droit, ⋯, appui long, sous-menus), Help (« ? »), CommandPalette (Ctrl K)
+│   ├── recipe/         # RecipeView, RecipeMenu, RecipeTable, Variants, KitchenMode (mode labo), FolderTiles
+│   ├── themes/  settings/
+│   └── …               # RecipeBody (fiche : masses, multiplicateur, tableau, coût), RecipeForm, MoldPicker, Production, AppNav…
+├── styles/             # CSS par zone, importés par globals.css
 └── lib/
-    ├── massAdjust.ts, subRecipeCalc.ts, ingredientRepair.ts   # calculs purs (voir §5)
-    ├── pdfThemes.ts        # thèmes enregistrés (création des thèmes fournis, thème par défaut)
-    ├── ingredientRepairDb.ts
-    ├── recipes.ts / cookbooks.ts / shopping.ts / subRecipes.ts / share.ts
-    ├── ingredientBases.ts  # ajout dédoublonné à la base d'ingrédients
-    ├── parseIngredientsText.ts, importRecipeKeeper*.ts
-    ├── uploads.ts          # dossier des photos
-    ├── features.ts         # interrupteurs (SHARE_ENABLED)
-    └── pdf/
-        ├── theme.ts        # schéma du thème, thèmes fournis, polices, motifs
-        ├── template.ts     # HTML + CSS (4 mises en page, styles, disposition : placementCss)
-        ├── recipePdf.ts    # PDF d'une recette avec un thème, recette d'aperçu
-        ├── renderer.ts     # Chromium partagé + file d'attente + lecture des ancres du sommaire
-        ├── fonts.ts        # polices Google mises en cache et intégrées
-        ├── decorate.ts     # papier et décor dessinés avec pdf-lib après le rendu
-        └── cookbookPdf.ts  # assemblage d'un cahier (recettes → sommaire → fusion)
+    ├── massAdjust.ts, recipeTree.ts, subRecipeCalc.ts     # calculs purs (§5)
+    ├── mold.ts, production.ts, compare.ts, cost.ts, allergens.ts, stepQty.ts, durations.ts, textSearch.ts
+    ├── recipes.ts (loadRecipeTree, listes), cookbooks.ts (snapshots), variants.ts, recipeCopy.ts, productionData.ts, fullSearch.ts
+    ├── changelog.ts, version.ts, pr-log.ts                 # page « Version et nouveautés »
+    ├── mcp/            # protocole, clé, outils (tools/*.ts)
+    └── pdf/            # theme, template, recipePdf, cookbookPdf, productionPdf, renderer, fonts, decorate
 ```
 
 ### Règles à respecter (pièges connus)
@@ -383,34 +256,38 @@ src/
 14. **Thèmes fournis** : créés une seule fois par clé (réglage `pdfThemesSeeded`) ; un thème fourni supprimé ne revient pas. Ajouter un style dans `THEME_PRESETS` le crée à la prochaine ouverture.
 15. **Menus et bulles** (`components/ui`) : rendus dans un portail ; `STOP` arrête la propagation des clics à travers le portail (sinon un clic dans un menu ouvrirait la ligne). Ne pas placer un `MoreButton` dans un `<Link>`, et pas de `Help` dans un `<label>`.
 16. **Styles** : tokens et composants communs dans `globals.css` ; styles propres à une zone dans `src/styles/<zone>.css`. Aucun emoji dans l'interface : icônes `lucide-react`.
+17. **Arbre des recettes** : tout calcul qui traverse les sous-recettes passe par `loadRecipeTree` + `resolveLink` (`recipeTree.ts`), jamais par `computeSubRecipe` (gardé seulement pour l'ancien affichage et ses tests).
+18. **Variantes masquées** : `listRecipes` cache les variantes sauf recherche, filtre ou `withVariants: true` (MCP) ; les compteurs de dossiers les excluent aussi. Une variante est une recette complète (table `variants` : version principale → variante + nom d'essai).
+19. **Nouvelle fonction visible** = ligne dans `src/lib/changelog.ts` (règles dans `CLAUDE.md`) et, si utile, un outil MCP dans `src/lib/mcp/tools/`.
+
 
 ---
 
-## 7. Modèle de données
+## 8. Modèle de données
 
-Source de vérité : `prisma/schema.prisma`. Migrations versionnées dans `prisma/migrations/`.
+Source de vérité : `prisma/schema.prisma`. Migrations versionnées dans `prisma/migrations/` (appliquées toutes seules à la mise à jour).
 
 | Table | Rôle |
 |---|---|
-| `recipes` | Recette : nom, `name_normalized` (recherche sans accents), photo, source, notes, favori, note, `folder_id` |
-| `folders` | Dossier (nom unique, couleur) ; suppression = recettes « Sans dossier » |
-| `ingredients` | Ingrédient d'une recette : nom, `quantity_g` (min), `quantity_g_max` (fourchette), `unit`, position, lien optionnel vers la base |
-| `ingredients_base` | Base d'ingrédients (nom unique, catégorie base/fruit/préparation) |
-| `steps_block` | Étapes (texte, ou HTML pour les anciennes recettes) |
+| `recipes` | Recette : nom, `name_normalized`, source, notes, favori, note, `folder_id`, `yield_count` / `yield_label` (rendement), `sale_coef`, `mold` (JSON : forme, a, b, h en cm) |
+| `folders` | Dossier (nom unique, couleur) |
+| `ingredients` | Ligne d'ingrédient : nom, `quantity_g` (min), `quantity_g_max`, `unit` (g, L, cc, cs, pièce, QS, **titre** = intertitre), position, lien vers la base |
+| `ingredients_base` | Base d'ingrédients : nom unique, catégorie, `piece_g`, `allergens` (liste), prix d'achat |
+| `ingredient_prices` | Historique des prix d'un ingrédient |
+| `steps_block` | Étapes (texte, une par ligne ; HTML pour les anciennes recettes) |
 | `sub_recipes` | Lien parent → enfant : label, `calc_mode`, `calc_value`, `pivot_ingredient_id`, `is_locked`, `is_exact` |
+| `variants` | Version principale → variante, `note` = nom de l'essai |
+| `production_items` | Fiche de production en cours : recette (unique), quantité, position |
 | `categories` / `recipes_categories` / `tags` / `comments` | Classement et journal des essais |
-| `cookbooks` | Cahier : format, couverture/sommaire, thème JSON (`cover_config`), pied de page |
-| `cookbooks_recipes` | Entrée de cahier : `link_mode` (linked/snapshot), `snapshot_data`, titre de section |
-| `cookbooks_chapters` | Pages chapitre (même ordre que les recettes) |
-| `shopping_lists` / `shopping_list_items` / `shopping_list_recipes` | Listes, articles (`unit` : NULL = g), recettes + coefficient |
-| `share_tokens` | Liens publics (inutilisés tant que le partage est désactivé) |
-| `pdf_themes` | Thèmes PDF enregistrés : nom, description, `preset_key` (thème fourni), format, `config` (JSON du thème), `is_default`, position |
-| `settings` | Clé/valeur JSON : `siteUrl`, `pdfThemesSeeded`, `ingredientRepairV1`, `recipePdfSettings` (ancien) |
-| `pdf_templates` / `variants` | Prévu, peu ou pas utilisé |
+| `cookbooks` / `cookbooks_recipes` / `cookbooks_chapters` | Cahiers, entrées liées ou figées (`snapshot_data`), chapitres |
+| `shopping_lists` / `shopping_list_items` / `shopping_list_recipes` | Listes de courses |
+| `pdf_themes` | Thèmes PDF enregistrés (`config` JSON, `is_default`, position) |
+| `settings` | Clé/valeur JSON : `siteUrl`, `mcpToken`, `pdfThemesSeeded`… |
+| `share_tokens` / `pdf_templates` | Partage (désactivé) / ancien format, inutilisés |
 
 ---
 
-## 8. Design system
+## 9. Design system
 
 « Encre et ambre », **sombre uniquement**. Tokens dans `src/app/globals.css` (`:root`).
 - **Couleurs** : fond `#0b0f17`, surface `#0f1520`, cartes `#141b28`, fenêtres `#182131`, bordures `#1e2737` / `#2b3549`, texte `#e7ebf3` / `#aab3c5` / `#6f7a90`.
@@ -423,7 +300,7 @@ Source de vérité : `prisma/schema.prisma`. Migrations versionnées dans `prism
 
 ---
 
-## 9. Installation (développement)
+## 10. Installation (développement)
 
 Prérequis : Node.js ≥ 20, pnpm ≥ 10, PostgreSQL ≥ 15 (ou Docker).
 
@@ -449,14 +326,14 @@ pnpm dev                      # http://localhost:3000
 
 ---
 
-## 10. Production (Proxmox LXC)
+## 11. Production (Proxmox LXC)
 
 ### Installation initiale
 1. **Créer le container** sur l'hôte Proxmox :
    ```bash
    bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/debian.sh)"
    ```
-   Debian 12, unprivileged, **2 CPU, 2 Go RAM, 20 Go disque**.
+   Debian 12 ou 13, unprivileged, **2 CPU, 4 Go RAM, 20 Go disque minimum** (le serveur actuel : Debian 13, 51 Go).
 2. **Activer Nesting** (obligatoire pour Chromium) : Options → Features → Nesting, ou `pct set <VMID> --features nesting=1 && pct reboot <VMID>`.
 3. **Installer l'appli** dans le container (`pct enter <VMID>`) :
    ```bash
@@ -520,10 +397,15 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 
 ---
 
-## 11. Historique des versions
+## 12. Historique des versions
 
 | Version | Contenu principal |
 |---|---|
+| **V2.5** | Moules (mode « Moule » du multiplicateur), variantes rangées sous la recette avec comparaison (menu ⋯ → Variantes), colonne % sur téléphone, fiche et page Production avec PDF, mode labo (écran allumé, pesées à cocher, minuteurs), recherche complète (texte et ingrédients, sous-recettes comprises), 10 outils MCP. |
+| **V2.4** | Poids par pièce et rendement, 14 allergènes, coût de revient et prix conseillé, page des prix, intertitres, quantités liées dans les étapes. |
+| **V2.3** | Recettes depuis TikTok / Instagram / YouTube via Claude ; sous-recettes imbriquées prises en compte partout ; corrections de calcul (pivot, masse cible, arrondi à ×1). |
+| **V2.2** | Mise à jour du site en une minute (build GitHub Actions). |
+| **V2.1** | Photos retirées, éditeur de thème PDF enrichi, accès MCP pour Claude. |
 | **V2.0** | Nouveau design (menu latéral, menus clic droit / appui long, bulles « ? », Ctrl K, PWA), thèmes PDF personnalisables avec aperçu, nouvelles dispositions PDF, fiche recette et sous-recettes repensées, réparation des imports Recipe Keeper. |
 | **V1.9** | PDF ~7× plus rapides, 7 styles prêts à l'emploi, habillage des pages, mise à jour du site avec retour arrière automatique. |
 | **V1.8** | Sommaire PDF exact, 4 mises en page des recettes, petites corrections (voir §1). |
@@ -535,15 +417,12 @@ Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 | **V1.2** | Dossiers et vue explorateur, combobox catégories, réglages PDF d'une recette, « Mettre à jour la recette », masse modifiable des recettes figées, PDF 1 page par recette avec numérotation logique, import Recipe Keeper ZIP/HTML, bouton « Mettre à jour le site ». |
 | **V1.1** | Livraison initiale : recettes, multiplication 3 modes, sous-recettes, cahiers PDF, listes de courses, partage, scripts Proxmox. |
 
----
+## 13. Conventions
 
-## 12. Conventions
-
-- Tout en **français** (interface, code commenté, commits).
-- Préfixes de commit : `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
-- Travail sur une branche, puis **Pull Request vers `main`** ; `main` = ce qui part en production.
-- Avant chaque push : `pnpm typecheck && pnpm test`.
-- À chaque version : ajouter une entrée dans `src/lib/changelog.ts` et dans les sections 1 et 11 de ce fichier.
+- Tout en **français** (interface, commentaires, commits, titres de PR : ils s'affichent dans « Version et nouveautés »).
+- Travail sur une branche, puis **Pull Request vers `main`** ; `main` = ce qui part en production. Une PR par nouveauté.
+- Avant chaque push : `pnpm typecheck && pnpm test`. Le workflow `server-build.yml` doit rester vert sur `main`.
+- Journal : nouvelle fonction = nouvelle version mineure dans `src/lib/changelog.ts` ; correction = ligne dans `fixes` (détails dans `CLAUDE.md`). Mettre aussi à jour les sections 1 et 12 de ce fichier.
 
 ---
 
