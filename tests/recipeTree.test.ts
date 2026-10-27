@@ -94,3 +94,38 @@ describe("recipeTree — sous-recettes imbriquées", () => {
     expect(r.min).toBe(350);
   });
 });
+
+describe("masse cible avec une sous-recette verrouillée à l'intérieur", () => {
+  const n = (id: number, ings: [string, number][], subLinks: TreeLink[] = []): TreeNode => ({
+    id,
+    name: `R${id}`,
+    steps: null,
+    ingredients: ings.map(([name, q], i) => ({ id: id * 100 + i, name, quantityG: q, quantityGMax: null, unit: "g" })),
+    subLinks,
+  });
+  const l = (child: TreeNode, mode: TreeLink["calcMode"], value: number, extra: Partial<TreeLink> = {}): TreeLink => ({
+    id: child.id * 10,
+    label: child.name,
+    childId: child.id,
+    childName: child.name,
+    calcMode: mode,
+    calcValue: value,
+    pivotIngredientId: null,
+    isLocked: false,
+    isExact: false,
+    child,
+    ...extra,
+  });
+  const insert = n(1, [["Fruit", 100]]);
+  const creme = n(2, [["Lait", 300], ["Sucre", 100]], [l(insert, "coefficient", 1, { isLocked: true })]);
+  it("la crème réglée sur 500 g fait 500 g, l'insert verrouillé reste à 100 g", () => {
+    const r = resolveLink(l(creme, "mass_target", 500), 1);
+    expect((r.min + r.max) / 2).toBeCloseTo(500, 6);
+    expect(r.ingredients.find((i) => i.name === "Fruit")!.quantityG).toBe(100);
+  });
+  it("« exact » ne rabote pas l'insert verrouillé", () => {
+    const r = resolveLink(l(creme, "mass_target", 777, { isExact: true }), 1);
+    expect(r.min).toBe(777);
+    expect(r.ingredients.find((i) => i.name === "Fruit")!.quantityG).toBe(100);
+  });
+});

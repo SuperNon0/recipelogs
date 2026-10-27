@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const valid = (amount: number) => Number.isFinite(amount) && amount > 0 && amount <= 100_000;
+// Au moins 0,01 : la base garde 3 décimales (0,0004 serait enregistré comme 0).
+const valid = (amount: number) => Number.isFinite(amount) && amount >= 0.01 && amount <= 100_000;
 
 function refresh() {
   revalidatePath("/production");

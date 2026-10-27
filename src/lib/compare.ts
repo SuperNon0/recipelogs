@@ -14,22 +14,28 @@ export type CompareRow = {
   /** Masse en grammes (null = absent de cette recette). */
   a: number | null;
   b: number | null;
-  /** Unité affichée quand l'ingrédient ne se pèse pas (QS, pièce sans poids). */
-  note?: string;
+  /** Ce qui s'affiche à la place des grammes quand l'ingrédient ne se pèse pas
+   * (QS, pièces sans poids), de chaque côté. */
+  noteA?: string;
+  noteB?: string;
+  /** Vrai si la ligne diffère (grammes, nombre de pièces ou QS). */
+  changed: boolean;
   isSub?: boolean;
 };
 
-const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const norm = (s: string) => s.replace(/œ/gi, "oe").replace(/æ/gi, "ae").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
-type Line = { key: string; name: string; g: number; note?: string; isSub?: boolean };
+type Line = { key: string; name: string; g: number; qs?: boolean; pieces?: number; isSub?: boolean };
 
 function lines(node: TreeNode): Line[] {
   const out: Line[] = [];
   for (const i of node.ingredients) {
     if (i.unit === "titre") continue;
-    const g = ingMass(i.quantityG, i.unit, i.pieceG);
-    const note = i.unit === "QS" ? "QS" : i.unit === "pièce" && !(i.pieceG && i.pieceG > 0) ? `${i.quantityG} pièce${i.quantityG > 1 ? "s" : ""}` : undefined;
-    out.push({ key: `i:${norm(i.name)}`, name: i.name, g, note });
+    // Une fourchette compte pour sa moyenne, comme la masse totale.
+    const q = (i.quantityG + (i.quantityGMax ?? i.quantityG)) / 2;
+    const g = ingMass(q, i.unit, i.pieceG);
+    const loose = i.unit === "pièce" && !(i.pieceG && i.pieceG > 0);
+    out.push({ key: `i:${norm(i.name)}`, name: i.name, g, qs: i.unit === "QS" || undefined, pieces: loose ? q : undefined });
   }
   const memo = new Map();
   for (const l of node.subLinks) {
@@ -39,21 +45,34 @@ function lines(node: TreeNode): Line[] {
   return out;
 }
 
+const fmtCount = (n: number) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} pièce${n > 1 ? "s" : ""}`;
+
+/** Grammes, pièces sans poids et QS d'un ingrédient dans une recette (null = absent). */
+function side(ls: Line[], key: string): { g: number; pieces: number; note?: string } | null {
+  const hit = ls.filter((l) => l.key === key);
+  if (!hit.length) return null;
+  const g = hit.reduce((s, l) => s + l.g, 0);
+  const pieces = hit.reduce((s, l) => s + (l.pieces ?? 0), 0);
+  const qs = hit.some((l) => l.qs);
+  const parts = [...(pieces > 0 ? [fmtCount(pieces)] : []), ...(qs && g === 0 && pieces === 0 ? ["QS"] : [])];
+  // Sans aucun gramme, on montre les pièces ou « QS » à la place.
+  return { g, pieces, note: parts.length && g === 0 ? parts.join(" + ") : undefined };
+}
+
 /** Lignes comparées : d'abord l'ordre de la recette A, puis ce qui n'existe que dans B. */
 export function compareRecipes(a: TreeNode, b: TreeNode): { rows: CompareRow[]; totalA: number; totalB: number } {
   const la = lines(a);
   const lb = lines(b);
-  const sum = (ls: Line[], key: string) => {
-    const hit = ls.filter((l) => l.key === key);
-    return hit.length ? hit.reduce((s, l) => s + l.g, 0) : null;
-  };
   const rows: CompareRow[] = [];
   const seen = new Set<string>();
   for (const l of [...la, ...lb]) {
     if (seen.has(l.key)) continue;
     seen.add(l.key);
-    const other = lb.find((x) => x.key === l.key);
-    rows.push({ key: l.key, name: l.name, a: sum(la, l.key), b: sum(lb, l.key), note: l.note ?? other?.note, isSub: l.isSub });
+    const sa = side(la, l.key);
+    const sb = side(lb, l.key);
+    const changed =
+      !sa || !sb || Math.abs(sb.g - sa.g) > 0.001 || Math.abs(sb.pieces - sa.pieces) > 0.001 || sa.note !== sb.note;
+    rows.push({ key: l.key, name: l.name, a: sa?.g ?? null, b: sb?.g ?? null, noteA: sa?.note, noteB: sb?.note, changed, isSub: l.isSub });
   }
   return { rows, totalA: treeBaseMass(a).avg, totalB: treeBaseMass(b).avg };
 }

@@ -178,10 +178,12 @@ export const LABO_TOOLS: McpTool[] = [
           a_g: r.a == null ? null : round(r.a),
           b_g: r.b == null ? null : round(r.b),
           ...(r.a == null ? { etat: "ajouté" } : r.b == null ? { etat: "retiré" } : {}),
-          ...(r.a != null && r.b != null && r.a !== r.b
+          ...(r.a != null && r.b != null && r.changed ? { etat: "modifié" } : {}),
+          ...(r.a != null && r.b != null && Math.abs(r.b - r.a) > 0.001
             ? { ecart_g: round(r.b - r.a), ecart_pct: r.a > 0 ? round(((r.b - r.a) / r.a) * 100) : null }
             : {}),
-          ...(r.note ? { note: r.note } : {}),
+          ...(r.noteA ? { a_note: r.noteA } : {}),
+          ...(r.noteB ? { b_note: r.noteB } : {}),
         })),
         etapes_modifiees: {
           a: steps.a.filter((s) => s.changed).map((s) => s.text),

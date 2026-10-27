@@ -21,9 +21,18 @@ describe("comparer deux recettes", () => {
       ["Sel", 0, 0],
       ["Glucose", null, 30],
     ]);
-    expect(rows.find((r) => r.name === "Sel")?.note).toBe("QS");
+    expect(rows.find((r) => r.name === "Sel")).toMatchObject({ noteA: "QS", noteB: "QS", changed: false });
     expect(totalA).toBe(580);
     expect(totalB).toBe(350);
+  });
+
+  it("voit les écarts de pièces sans poids et compte une fourchette à sa moyenne", () => {
+    const a = node(1, [["Oeufs", 3, "pièce"], ["Beurre", 100]]);
+    const b = node(2, [["Œufs", 4, "pièce"], ["Beurre", 100]]);
+    b.ingredients[1].quantityGMax = 140;
+    const { rows } = compareRecipes(a, b);
+    expect(rows[0]).toMatchObject({ noteA: "3 pièces", noteB: "4 pièces", changed: true });
+    expect(rows[1]).toMatchObject({ a: 100, b: 120, changed: true });
   });
 
   it("ignore les intertitres", () => {

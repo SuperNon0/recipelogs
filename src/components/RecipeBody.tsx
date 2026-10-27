@@ -89,6 +89,20 @@ function nextMold(from: Mold): Mold {
 }
 const DEFAULT_FROM: Mold = { shape: "cercle", a: 18 };
 
+/** Lien de sous-recette au format du calcul (arbre de l'enfant). */
+const linkOf = (sr: SubRecipeRow) => ({
+  calcMode: sr.calcMode,
+  calcValue: sr.calcValue,
+  pivotIngredientId: sr.pivotIngredientId,
+  isLocked: sr.isLocked,
+  isExact: sr.isExact,
+  child: sr.childTree,
+});
+
+/** Quantité du pivot en grammes, pré-remplie sans arrondi (2,5 g reste 2,5 : le multiplicateur démarre à ×1). */
+const pivotPrefill = (ing: IngredientRow) =>
+  String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g", ing.pieceG) * 100) / 100).replace(".", ",");
+
 const fmtNum = (n: number, max = 2) => n.toLocaleString("fr-FR", { maximumFractionDigits: max });
 
 // ─────────────────────────────────────────────
@@ -123,22 +137,38 @@ export function RecipeBody({
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
   // Ingrédients utilisables comme pivot (les intertitres n'en sont pas).
   const weighable = useMemo(() => ingredients.filter((i) => i.unit !== "titre"), [ingredients]);
+  const [locks, setLocks] = useState<Record<number, boolean>>(() =>
+    Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
+  );
+  // Masse de toute la recette à ×1 (sous-recettes comprises) et la part qui ne
+  // suit pas le multiplicateur (sous-recettes verrouillées) : le mode Masse vise
+  // la masse totale affichée.
+  const massParts = useMemo(() => {
+    let fixed = 0;
+    let total = baseTotalG;
+    for (const sr of subRecipes) {
+      const locked = locks[sr.id] ?? sr.isLocked;
+      const m1 = resolveLink({ ...linkOf(sr), isLocked: locked }, 1);
+      const m2 = resolveLink({ ...linkOf(sr), isLocked: locked }, 2);
+      const a1 = (m1.min + m1.max) / 2;
+      const a2 = (m2.min + m2.max) / 2;
+      total += a1;
+      // Part fixe = ce qui ne double pas quand le multiplicateur double.
+      fixed += Math.max(0, 2 * a1 - a2);
+    }
+    return { total, fixed };
+  }, [baseTotalG, subRecipes, locks]);
 
   const [mode, setMode] = useState<MultMode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
   const [piecesInput, setPiecesInput] = useState(String(yieldInfo?.count ?? ""));
-  const [massInput, setMassInput] = useState(String(Math.round(baseTotalG)));
+  const [massInput, setMassInput] = useState(String(Math.round(massParts.total)));
   const [pivotId, setPivotId] = useState<number | null>(weighable[0]?.id ?? null);
-  const [pivotInput, setPivotInput] = useState(
-    weighable[0] ? String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))) : "0",
-  );
+  const [pivotInput, setPivotInput] = useState(weighable[0] ? pivotPrefill(weighable[0]) : "0");
   const [moldFrom, setMoldFrom] = useState<Mold | null>(mold ?? DEFAULT_FROM);
   const [moldTo, setMoldTo] = useState<Mold | null>(nextMold(mold ?? DEFAULT_FROM));
   const [moldCount, setMoldCount] = useState("1");
   const [decimals, setDecimals] = useState(true);
-  const [locks, setLocks] = useState<Record<number, boolean>>(() =>
-    Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
-  );
   const [open, setOpen] = useState<Record<number, boolean>>({});
   const [adding, setAdding] = useState(false);
 
@@ -151,8 +181,11 @@ export function RecipeBody({
     }
     if (mode === "mass_target") {
       const target = num(massInput);
-      if (!Number.isFinite(target) || target <= 0 || baseTotalG <= 0) return 1;
-      return target / baseTotalG;
+      const { total, fixed } = massParts;
+      if (!Number.isFinite(target) || target <= 0 || total - fixed <= 0) return 1;
+      // Valeur pré-remplie (arrondie au gramme) : on reste à ×1 exact.
+      if (Math.abs(target - total) < 0.5) return 1;
+      return Math.max(target - fixed, 0.01) / (total - fixed);
     }
     if (mode === "pieces") {
       const wanted = num(piecesInput);
@@ -171,21 +204,41 @@ export function RecipeBody({
     const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g", pivot.pieceG) : 0;
     if (!pivot || !Number.isFinite(target) || target <= 0 || pivotBaseG <= 0) return 1;
     return target / pivotBaseG;
-  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, baseTotalG, moldFrom, moldTo, moldCount]);
+  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, massParts, moldFrom, moldTo, moldCount]);
 
   const reset = () => {
     setMode("coefficient");
     setCoefInput("1");
-    setMassInput(String(Math.round(baseTotalG)));
+    setMassInput(String(Math.round(massParts.total)));
     setPiecesInput(String(yieldInfo?.count ?? ""));
     setMoldFrom(mold ?? DEFAULT_FROM);
     setMoldTo(nextMold(mold ?? DEFAULT_FROM));
     setMoldCount("1");
     if (weighable[0]) {
       setPivotId(weighable[0].id);
-      setPivotInput(String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))));
+      setPivotInput(pivotPrefill(weighable[0]));
     }
   };
+
+  // Sous-recettes au multiplicateur courant, et à ×1 (pour la « base »)
+  const subs = useMemo(
+    () =>
+      subRecipes.map((sr) => ({
+        sr,
+        calc: resolveLink({ ...linkOf(sr), isLocked: locks[sr.id] ?? sr.isLocked }, globalCoef),
+      })),
+    [subRecipes, globalCoef, locks],
+  );
+  const subBase = useMemo(
+    () =>
+      subRecipes.reduce((s, sr) => {
+        const c = resolveLink({ ...linkOf(sr), isLocked: locks[sr.id] ?? sr.isLocked }, 1);
+        return s + (c.min + c.max) / 2;
+      }, 0),
+    [subRecipes, locks],
+  );
+
+  const subsAvgAt = subs.reduce((s, x) => s + (x.calc.min + x.calc.max) / 2, 0);
 
   // Quantités des ingrédients de la recette elle-même
   const own = useMemo(() => {
@@ -204,52 +257,15 @@ export function RecipeBody({
     if (mode === "mass_target" && !decimals) {
       const target = num(massInput);
       if (Number.isFinite(target) && target > 0) {
-        const a = adjustToTarget(scaled, target);
+        // La masse visée couvre toute la recette : on retire celle des sous-recettes.
+        const a = adjustToTarget(scaled, Math.max(0, target - subsAvgAt));
         return { rows: a.ingredients, min: a.totalMassGMin, max: a.totalMassGMax };
       }
     }
     const { min, max } = recipeMass(scaled);
     return { rows: scaled, min, max };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingredients, globalCoef, decimals, mode, massInput]);
-
-  // Sous-recettes au multiplicateur courant, et à ×1 (pour la « base »)
-  const subs = useMemo(
-    () =>
-      subRecipes.map((sr) => ({
-        sr,
-        calc: resolveLink(
-          {
-            calcMode: sr.calcMode,
-            calcValue: sr.calcValue,
-            pivotIngredientId: sr.pivotIngredientId,
-            isLocked: locks[sr.id] ?? sr.isLocked,
-            isExact: sr.isExact,
-            child: sr.childTree,
-          },
-          globalCoef,
-        ),
-      })),
-    [subRecipes, globalCoef, locks],
-  );
-  const subBase = useMemo(
-    () =>
-      subRecipes.reduce((s, sr) => {
-        const c = resolveLink(
-          {
-            calcMode: sr.calcMode,
-            calcValue: sr.calcValue,
-            pivotIngredientId: sr.pivotIngredientId,
-            isLocked: locks[sr.id] ?? sr.isLocked,
-            isExact: sr.isExact,
-            child: sr.childTree,
-          },
-          1,
-        );
-        return s + (c.min + c.max) / 2;
-      }, 0),
-    [subRecipes, locks],
-  );
+  }, [ingredients, globalCoef, decimals, mode, massInput, subsAvgAt]);
 
   useEffect(() => {
     onScaleChange?.({
@@ -260,7 +276,7 @@ export function RecipeBody({
   }, [globalCoef, decimals, subs, onScaleChange]);
 
   const ownAvg = (own.min + own.max) / 2;
-  const subsAvg = subs.reduce((s, x) => s + (x.calc.min + x.calc.max) / 2, 0);
+  const subsAvg = subsAvgAt;
   const grandTotal = ownAvg + subsAvg;
   const grandBase = baseTotalG + subBase;
   const fmt = decimals ? formatGDecimal : formatG;
@@ -801,14 +817,21 @@ function MultiplierCard({
   const handleApply = () => {
     if (!dirty) return;
     const k = globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
-    const msg = hasSubRecipes
-      ? `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?\n\nLes sous-recettes liées ne sont pas modifiées.`
-      : `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?`;
+    // Vers un seul moule : il devient le moule d'origine. Sinon le moule enregistré ne correspond plus.
+    const newMold = mode === "mold" && moldTo && Number(moldCount.replace(",", ".")) === 1 ? moldTo : undefined;
+    const moldNote = newMold
+      ? `\n\nLe moule d'origine devient ${moldLabel(newMold)}.`
+      : hasOriginMold
+        ? "\n\nLe moule d'origine est effacé : les nouvelles quantités ne correspondent plus à ce moule."
+        : "";
+    const msg = `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?${hasSubRecipes ? "\n\nLes sous-recettes liées ne sont pas modifiées." : ""}${moldNote}`;
     if (!confirm(msg)) return;
     setSaveError(null);
-    const targetG = mode === "mass_target" ? Number(massInput.replace(",", ".")) : undefined;
+    // La masse visée couvre aussi les sous-recettes, qui ne sont pas modifiées :
+    // l'ajustement au gramme près ne vaut que pour une recette sans sous-recette.
+    const targetG = mode === "mass_target" && !hasSubRecipes ? Number(massInput.replace(",", ".")) : undefined;
     startSave(async () => {
-      const r = await applyMultiplierToRecipe(recipeId, globalCoef, targetG);
+      const r = await applyMultiplierToRecipe(recipeId, globalCoef, targetG, newMold);
       if (!r.ok) return setSaveError(r.error);
       onReset();
     });
@@ -909,7 +932,7 @@ function MultiplierCard({
       )}
       {mode === "pivot_ingredient" && (
         <div className="mrow" style={{ marginTop: 8 }}>
-          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g", ing.pieceG)))); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
+          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(pivotPrefill(ing)); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
             {ingredients.map((i) => (
               <option key={i.id} value={i.id}>{i.name}</option>
             ))}

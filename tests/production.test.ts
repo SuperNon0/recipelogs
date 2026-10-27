@@ -55,3 +55,25 @@ describe("fiche de production", () => {
     expect(productionCoef(3, null)).toBe(3);
   });
 });
+
+describe("fiche de production : verrous, masse exacte, arrondi", () => {
+  const glacage = leaf(5, "Glaçage", [["Chocolat", 300], ["Crème", 133]]);
+  it("une sous-recette verrouillée suit quand même la quantité demandée", () => {
+    const tarte: TreeNode = { ...leaf(6, "Tarte", [["Pâte", 250]]), subLinks: [{ ...link(glacage, 433), isLocked: true }] };
+    const p = buildProduction([{ tree: tarte, coef: 10 }]);
+    expect(p.blocks[0].massG).toBe(4330);
+  });
+  it("une préparation partagée est arrondie une seule fois", () => {
+    const oeuf = leaf(7, "Dorure", [["Œuf", 1, "pièce"], ["Lait", 10]]);
+    const a: TreeNode = { ...leaf(8, "A", [["Sucre", 10]]), subLinks: [{ ...link(oeuf, 4.4), calcMode: "coefficient" as const, calcValue: 0.4 }] };
+    const b: TreeNode = { ...leaf(9, "B", [["Sucre", 10]]), subLinks: [{ ...link(oeuf, 4.4, 77), calcMode: "coefficient" as const, calcValue: 0.4 }] };
+    const p = buildProduction([{ tree: a, coef: 1 }, { tree: b, coef: 1 }]);
+    const d = p.blocks.find((x) => x.recipeId === 7)!;
+    expect(d.lines[0]).toMatchObject({ qty: 1 });
+  });
+  it("garde la « masse exacte »", () => {
+    const e: TreeNode = { ...leaf(10, "E", []), subLinks: [{ ...link(creme, 500), isExact: true }] };
+    const p = buildProduction([{ tree: e, coef: 3 }]);
+    expect(p.blocks[0].massG).toBe(1500);
+  });
+});

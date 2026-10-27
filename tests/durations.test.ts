@@ -12,6 +12,11 @@ describe("durées dans les étapes", () => {
   it("heures et minutes", () => {
     expect(secs("Refroidir 1 h 30 au froid.")).toEqual([5400]);
     expect(secs("Pousser 1h30.")).toEqual([5400]);
+    expect(secs("Pousser 1 h 30 min.")).toEqual([5400]);
+  });
+  it("minutes et secondes", () => {
+    expect(secs("Mixer 2 min 30.")).toEqual([150]);
+    expect(secs("Mixer 2 min 30 s puis 2 min 30 g de sucre.")).toEqual([150, 120]);
   });
   it("fourchette : le haut", () => {
     expect(secs("Cuire 10 à 12 min.")).toEqual([720]);
