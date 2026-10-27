@@ -921,6 +921,11 @@ function MultiplierCard({
               <input value={moldCount} inputMode="numeric" onChange={(e) => setMoldCount(e.target.value)} aria-label="Nombre de moules voulus" />
             </div>
           </div>
+          {(() => {
+            const n = Number(moldCount.replace(",", "."));
+            const why = !moldFrom ? "choisis le moule de départ" : !moldTo ? "choisis le moule voulu (dimension manquante)" : !(Number.isFinite(n) && n > 0) ? "le nombre de moules doit être au moins 1" : null;
+            return why ? <p className="mold-hint mold-warn" role="alert">Reste à ×1 : {why}.</p> : null;
+          })()}
           {moldFrom && moldTo && (
             <p className="mold-hint">
               À ×1, la recette remplit environ {fmtNum(moldsFilled(moldFrom, moldTo), 1)} × {moldLabel(moldTo, false)}

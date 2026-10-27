@@ -8,6 +8,7 @@ import type { AllergenHit } from "@/lib/allergens";
 import type { Mold } from "@/lib/mold";
 import type { VariantFamily } from "@/lib/variants";
 import { KitchenMode } from "./KitchenMode";
+import { LabTimerPill, useLabTimers } from "./labTimers";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
 import { RecipeBody, type IngredientRow, type RecipeScale, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
@@ -57,6 +58,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
   const [lab, setLab] = useState(false);
+  const labTimers = useLabTimers(recipe.id);
   // Multiplicateur de l'onglet Recette, repris par les quantités liées des étapes.
   const [scale, setScale] = useState<RecipeScale>({ coef: 1, wholeNumbers: false, subCoefs: {} });
   const onScaleChange = useCallback((s: RecipeScale) => setScale(s), []);
@@ -250,9 +252,11 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
           ingredients={ingredients}
           subRecipes={subRecipes}
           scale={scale}
+          lab={labTimers}
           onClose={() => setLab(false)}
         />
       )}
+      {!lab && <LabTimerPill lab={labTimers} onOpen={() => setLab(true)} />}
     </article>
   );
 }

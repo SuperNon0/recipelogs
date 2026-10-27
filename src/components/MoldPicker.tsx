@@ -101,6 +101,7 @@ export function MoldPicker({
               <option key={s} value={s}>{MOLD_SHAPE_LABEL[s]}</option>
             ))}
           </select>
+          <span className="mold-dims">
           <input
             className="fl-input num"
             inputMode="decimal"
@@ -130,6 +131,7 @@ export function MoldPicker({
               />
             </>
           )}
+          </span>
         </>
       )}
       {(custom || presetKey) && (

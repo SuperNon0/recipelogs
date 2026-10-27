@@ -28,7 +28,7 @@ export function ProductionDialog({ recipeId, recipeName, onClose }: { recipeId: 
   }, [recipeId]);
 
   const n = Number(amount.replace(",", "."));
-  const okAmount = Number.isFinite(n) && n > 0;
+  const okAmount = Number.isFinite(n) && n >= 0.01;
 
   return (
     <ModalOverlay
@@ -83,8 +83,11 @@ export function ProductionDialog({ recipeId, recipeName, onClose }: { recipeId: 
                   setError(null);
                   const r = await addToProduction(recipeId, n);
                   setBusy(false);
-                  if (r.ok) setAdded(true);
-                  else setError(r.error);
+                  if (r.ok) {
+                    setAdded(true);
+                    // Elle y est maintenant : le bouton propose de mettre à jour.
+                    setInfo((i) => (i ? { ...i, inProduction: n } : i));
+                  } else setError(r.error);
                 }}
               >
                 <Plus size={15} /> {info.inProduction ? "Mettre à jour la fiche" : "Ajouter à la fiche"}
