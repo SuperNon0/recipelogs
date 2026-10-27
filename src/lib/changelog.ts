@@ -18,6 +18,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Des outils pour le travail au labo : changer de moule en un clic, garder ses essais sous la recette d'origine, sortir une fiche de production pour une quantité donnée, suivre une recette en grand sur le téléphone avec des minuteurs, et retrouver une recette par ce qui est écrit dedans.",
     features: [
       "Conversion de moule : un mode « Moule » dans le multiplicateur passe d'un cercle Ø18 à un Ø24, d'un cadre 40×60 à des cercles, ou à plusieurs moules (au volume si les hauteurs sont données) ; le moule d'origine se note dans « Modifier »",
+      "Variantes : « Nouvelle variante » (menu ⋯) copie la recette pour un essai rangé sous la version principale ; le bloc « Variantes » de la fiche les liste, les compare côte à côte (écarts en grammes et en %, étapes modifiées en couleur) et peut faire d'un essai la nouvelle version principale. Des recettes existantes peuvent aussi être reliées",
+      "Les variantes ne s'affichent plus dans la liste des recettes ni dans les compteurs des dossiers (lien « variantes rangées sous leur recette » pour les voir) ; la recherche les trouve toujours",
     ],
     migrations: ["Ajout du moule d'origine sur les recettes ; rien à faire"],
   },

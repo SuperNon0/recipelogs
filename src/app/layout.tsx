@@ -23,14 +23,15 @@ export const viewport: Viewport = {
 
 async function loadNavCounts(): Promise<NavCounts> {
   const [recipes, favorites, cookbooks, lists, noFolder, folders] = await Promise.all([
-    prisma.recipe.count(),
+    // Les variantes sont rangées sous leur recette : comptées avec elle, pas à part.
+    prisma.recipe.count({ where: { variantTargets: { none: {} } } }),
     prisma.recipe.count({ where: { favorite: true } }),
     prisma.cookbook.count(),
     prisma.shoppingList.count(),
-    prisma.recipe.count({ where: { folderId: null } }),
+    prisma.recipe.count({ where: { folderId: null, variantTargets: { none: {} } } }),
     prisma.folder.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, color: true, _count: { select: { recipes: true } } },
+      select: { id: true, name: true, color: true, _count: { select: { recipes: { where: { variantTargets: { none: {} } } } } } },
     }),
   ]);
   return {

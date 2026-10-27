@@ -20,6 +20,8 @@ export type RecipeListItem = {
   folderId: number | null;
   /** Nombre de sous-recettes utilisées par cette recette. */
   subCount: number;
+  /** Nombre de variantes rangées sous cette recette. */
+  variantCount: number;
   updatedAt: Date;
 };
 
@@ -30,8 +32,11 @@ export async function listRecipes(opts: {
   favoritesOnly?: boolean;
   /** Filtre par dossier : number = ce dossier, "none" = sans dossier, undefined = tous. */
   folderId?: number | "none";
+  /** Montrer aussi les variantes (sinon rangées sous leur recette, sauf en recherche). */
+  withVariants?: boolean;
 }): Promise<RecipeListItem[]> {
   const where: Prisma.RecipeWhereInput = {};
+  if (!opts.withVariants && !hasSearchFilter(opts)) where.variantTargets = { none: {} };
 
   if (opts.q && opts.q.trim()) {
     const normalized = normalizeForSearch(opts.q);
@@ -57,7 +62,7 @@ export async function listRecipes(opts: {
       tags: true,
       categories: { include: { category: true } },
       ingredients: { select: { name: true, quantityG: true, quantityGMax: true, unit: true } },
-      _count: { select: { parentLinks: true } },
+      _count: { select: { parentLinks: true, variantSources: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -82,8 +87,24 @@ export async function listRecipes(opts: {
     })),
     folderId: r.folderId,
     subCount: r._count.parentLinks,
+    variantCount: r._count.variantSources,
     updatedAt: r.updatedAt,
   }));
+}
+
+/** Recherche ou filtre actif : les variantes sont alors montrées comme les autres recettes. */
+function hasSearchFilter(opts: { q?: string; tag?: string; categoryId?: number; favoritesOnly?: boolean }): boolean {
+  return !!(opts.q?.trim() || opts.tag || opts.categoryId || opts.favoritesOnly);
+}
+
+/** Nombre de variantes rangées sous leur recette (donc absentes de la liste), dans un dossier ou partout. */
+export async function countHiddenVariants(folderId?: number | "none"): Promise<number> {
+  return prisma.recipe.count({
+    where: {
+      variantTargets: { some: {} },
+      ...(folderId === "none" ? { folderId: null } : typeof folderId === "number" ? { folderId } : {}),
+    },
+  });
 }
 
 /** Lignes sérialisables (date en texte ISO) pour le tableau des recettes. */
@@ -95,7 +116,8 @@ export async function listAllFolders() {
   return prisma.folder.findMany({
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { recipes: true } },
+      // Les variantes sont rangées sous leur recette : elles ne comptent pas dans le dossier.
+      _count: { select: { recipes: { where: { variantTargets: { none: {} } } } } },
     },
   });
 }

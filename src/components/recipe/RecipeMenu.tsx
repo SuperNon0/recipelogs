@@ -9,7 +9,9 @@ import {
   FileDown,
   FolderInput,
   FolderX,
+  GitBranch,
   Library,
+  Link2,
   Pencil,
   ShoppingBasket,
   Star,
@@ -20,6 +22,7 @@ import type { MenuEntry, MenuSpec } from "@/components/ui/Menu";
 import { AddToCookbookDialog } from "@/components/AddToCookbookModal";
 import { AddToShoppingListDialog } from "@/components/AddToShoppingListModal";
 import { RecipePdfDialog, type PdfThemeOption } from "@/components/RecipePdfDialog";
+import { LinkVariantDialog, NewVariantDialog } from "./Variants";
 import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/app/actions/recipes";
 import { assignRecipesToFolder } from "@/app/actions/settings";
 import { formatG } from "@/lib/format";
@@ -49,7 +52,7 @@ export type RecipeMenuTarget = {
   subtitle?: string;
 };
 
-type Dialog = "pdf" | "cookbook" | "shopping" | null;
+type Dialog = "pdf" | "cookbook" | "shopping" | "variant" | "link-variant" | null;
 
 /**
  * Menu d'actions d'une recette (clic droit, bouton « ⋯ », appui long) et les
@@ -124,6 +127,8 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
           icon: Copy,
           onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
         },
+        { label: "Nouvelle variante…", icon: GitBranch, onSelect: () => setDialog("variant") },
+        { label: "Relier une variante…", icon: Link2, onSelect: () => setDialog("link-variant") },
         { separator: true },
         { label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") },
         { label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") },
@@ -152,6 +157,10 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
       <AddToCookbookDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "shopping" ? (
       <AddToShoppingListDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
+    ) : dialog === "variant" ? (
+      <NewVariantDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
+    ) : dialog === "link-variant" ? (
+      <LinkVariantDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : null;
 
   return { getSpec, dialogs, openDialog: setDialog };

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
 import type { AllergenHit } from "@/lib/allergens";
 import type { Mold } from "@/lib/mold";
+import type { VariantFamily } from "@/lib/variants";
+import { VariantsCard } from "./Variants";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
 import { RecipeBody, type IngredientRow, type RecipeScale, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
@@ -38,6 +40,7 @@ type Props = {
   subRecipes: SubRecipeRow[];
   yieldInfo: YieldInfo | null;
   mold: Mold | null;
+  variants: VariantFamily | null;
   allergens: AllergenHit[];
   comments: { id: number; content: string; createdAt: string }[];
   usedIn: { id: number; name: string; label: string }[];
@@ -47,7 +50,7 @@ type Props = {
 type Tab = "recipe" | "steps" | "notes";
 
 /** Fiche recette : en-tête, actions, onglets Recette / Préparation / Notes. */
-export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, allergens, comments, usedIn, back }: Props) {
+export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, variants, allergens, comments, usedIn, back }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
@@ -154,6 +157,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, a
       <div hidden={tab !== "recipe"}>
         <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} mold={mold} saleCoef={recipe.saleCoef} onScaleChange={onScaleChange} />
         <AllergensCard allergens={allergens} />
+        {variants && <VariantsCard family={variants} currentId={recipe.id} onNew={() => menu.openDialog("variant")} />}
         {usedIn.length > 0 && (
           <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <Layers size={16} style={{ color: "var(--accent)" }} />

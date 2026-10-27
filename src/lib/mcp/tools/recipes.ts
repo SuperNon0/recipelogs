@@ -1,3 +1,4 @@
+import { getVariantFamily } from "@/lib/variants";
 import { parseMold } from "@/lib/mold";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -189,6 +190,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         categoryId: a.categorie_id,
         favoritesOnly: a.favoris,
         folderId: a.dossier_id === "sans" ? "none" : a.dossier_id,
+        withVariants: true,
       });
       if (a.ingredient) {
         const rows = await prisma.ingredient.findMany({
@@ -221,7 +223,7 @@ export const RECIPE_TOOLS: McpTool[] = [
     name: "lire_recette",
     title: "Lire une recette",
     description:
-      "Donne une recette complète : ingrédients, étapes, rendement, allergènes (sous-recettes comprises), coût matière et prix de vente conseillé, notes, source, dossier, catégories, étiquettes, sous-recettes (avec leurs quantités calculées), commentaires et recettes qui l'utilisent. Un multiplicateur facultatif recalcule les quantités sans rien enregistrer.",
+      "Donne une recette complète : ingrédients, étapes, rendement, moule, variantes (essais reliés), allergènes (sous-recettes comprises), coût matière et prix de vente conseillé, notes, source, dossier, catégories, étiquettes, sous-recettes (avec leurs quantités calculées), commentaires et recettes qui l'utilisent. Un multiplicateur facultatif recalcule les quantités sans rien enregistrer.",
     inputSchema: {
       type: "object",
       properties: { id: js.int("Id de la recette"), multiplicateur: js.num("Coefficient appliqué aux quantités (1 par défaut)") },
@@ -231,7 +233,7 @@ export const RECIPE_TOOLS: McpTool[] = [
     run: async (args) => {
       const a = parseArgs(z.object({ id, multiplicateur: z.number().positive().max(1000).default(1) }), args);
       const r = await requireRecipe(a.id);
-      const snap = await buildRecipeSnapshot(a.id, a.multiplicateur);
+      const [snap, family] = await Promise.all([buildRecipeSnapshot(a.id, a.multiplicateur), getVariantFamily(a.id)]);
       const cost = snap ? costOf([...snap.ingredients, ...snap.subRecipes.flatMap((s) => s.ingredients)]) : null;
       const coef = r.saleCoef != null ? Number(r.saleCoef) : DEFAULT_SALE_COEF;
       const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -249,6 +251,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         masse_totale_g: snap ? Math.round(snap.totalMassG) : null,
         rendement: snap?.yield ? { nombre: snap.yield.count, libelle: snap.yield.label } : null,
         moule: moldArg(r.mold),
+        variantes: family ? family.members.map((m) => ({ id: m.id, nom: m.name, essai: m.note, version_principale: m.isRoot })) : [],
         allergenes: snap?.allergens ?? [],
         cout:
           cost && cost.detail.length > 0

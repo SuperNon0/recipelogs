@@ -13,6 +13,7 @@ import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { rescaleStepText } from "@/lib/stepQty";
 import { parseMold } from "@/lib/mold";
+import { copyRecipe } from "@/lib/recipeCopy";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -354,67 +355,12 @@ export async function toggleFavorite(id: number) {
 }
 
 export async function duplicateRecipe(id: number) {
-  const source = await prisma.recipe.findUnique({
-    where: { id },
-    include: {
-      ingredients: true,
-      tags: true,
-      categories: true,
-      stepsBlock: true,
-      parentLinks: true,
-    },
-  });
+  const source = await prisma.recipe.findUnique({ where: { id }, select: { name: true } });
   if (!source) throw new Error("Recette introuvable");
-
-  const copy = await prisma.recipe.create({
-    data: {
-      name: source.name + " (copie)",
-      nameNormalized: normalizeForSearch(source.name + " (copie)"),
-      folderId: source.folderId,
-      yieldCount: source.yieldCount,
-      yieldLabel: source.yieldLabel,
-      saleCoef: source.saleCoef,
-      mold: source.mold ?? Prisma.DbNull,
-      source: source.source,
-      notesTips: source.notesTips,
-      favorite: false,
-      rating: source.rating,
-      ingredients: {
-        create: source.ingredients.map((ing) => ({
-          name: ing.name,
-          ingredientBaseId: ing.ingredientBaseId,
-          quantityG: ing.quantityG,
-          quantityGMax: ing.quantityGMax ?? null,
-          unit: ing.unit,
-          position: ing.position,
-        })),
-      },
-      tags: { create: source.tags.map((t) => ({ name: t.name })) },
-      categories: {
-        create: source.categories.map((c) => ({ categoryId: c.categoryId })),
-      },
-      stepsBlock: source.stepsBlock
-        ? { create: { content: source.stepsBlock.content } }
-        : undefined,
-      // Les sous-recettes sont reprises avec leurs réglages. L'ingrédient pivot
-      // appartient à la sous-recette (pas à la copie) : l'identifiant reste valable.
-      parentLinks: {
-        create: source.parentLinks.map((l) => ({
-          childId: l.childId,
-          label: l.label,
-          calcMode: l.calcMode,
-          calcValue: l.calcValue,
-          pivotIngredientId: l.pivotIngredientId,
-          isLocked: l.isLocked,
-          isExact: l.isExact,
-          position: l.position,
-        })),
-      },
-    },
-  });
+  const copyId = await copyRecipe(id, source.name + " (copie)");
 
   revalidatePath("/");
-  redirect(`/recipes/${copy.id}`);
+  redirect(`/recipes/${copyId}`);
 }
 
 export async function addComment(recipeId: number, formData: FormData) {

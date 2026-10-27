@@ -2425,3 +2425,163 @@ button.fl-row:hover {
   color: var(--accent);
   white-space: nowrap;
 }
+
+/* Variantes d'une recette (fiche) */
+.variants {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.variants-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.variants-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+.variants-new {
+  margin-left: auto;
+  height: 32px;
+  font-size: 13px;
+}
+.variants-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.variants-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.variants-list li[data-current] .variants-main b {
+  color: var(--accent);
+}
+.variants-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+}
+.variants-main b {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.variants-main small {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.variants-mass {
+  color: var(--soft);
+  font-size: 13px;
+}
+.variants-here {
+  color: var(--accent);
+}
+.variants-cmp {
+  height: 30px;
+  font-size: 12.5px;
+  padding: 0 8px;
+}
+
+/* Comparer deux recettes */
+.cmp-table-wrap {
+  overflow-x: auto;
+}
+.cmp-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.cmp-table th,
+.cmp-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.cmp-table th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.cmp-table th a {
+  color: var(--soft);
+}
+.cmp-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cmp-table tr[data-state] td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.cmp-table tr[data-state="added"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+.cmp-table tr[data-state="removed"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.cmp-table tr[data-state] .cmp-diff {
+  color: var(--accent);
+  font-weight: 600;
+}
+.cmp-table tr[data-state="added"] .cmp-diff {
+  color: var(--accent-2);
+}
+.cmp-table tr[data-state="removed"] .cmp-diff {
+  color: var(--danger);
+}
+.cmp-diff small {
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.cmp-sub {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.cmp-total td {
+  font-weight: 600;
+  border-bottom: 0;
+}
+.cmp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+.cmp-steps h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.cmp-steps ol {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--soft);
+  font-size: 13.5px;
+}
+.cmp-steps li[data-changed] {
+  color: var(--text);
+  background: var(--accent-dim);
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: -6px;
+}

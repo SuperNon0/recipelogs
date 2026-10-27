@@ -15,6 +15,7 @@ import {
   listAllCategories,
   listAllFolders,
   listAllTags,
+  countHiddenVariants,
   listRecipes,
   toRecipeRows,
 } from "@/lib/recipes";
@@ -32,6 +33,7 @@ export default async function HomePage({
   const tag = typeof sp.tag === "string" ? sp.tag : undefined;
   const categoryId = typeof sp.category === "string" ? Number(sp.category) : undefined;
   const folderParam = typeof sp.folder === "string" ? sp.folder : undefined;
+  const withVariants = sp.variantes === "1";
 
   // Dossier ouvert : "none" = sans dossier, "42" = ce dossier, sinon toutes les recettes.
   let folderFilter: number | "none" | undefined = undefined;
@@ -40,12 +42,13 @@ export default async function HomePage({
 
   const hasFilters = !!(q || tag || categoryId);
 
-  const [tags, categories, folders, recipes, themes] = await Promise.all([
+  const [tags, categories, folders, recipes, themes, hiddenVariants] = await Promise.all([
     listAllTags(),
     listAllCategories(),
     listAllFolders(),
-    listRecipes({ q, tag, categoryId, folderId: folderFilter }),
+    listRecipes({ q, tag, categoryId, folderId: folderFilter, withVariants }),
     listPdfThemes(),
+    hasFilters || withVariants ? 0 : countHiddenVariants(folderFilter),
   ]);
 
   const currentFolder =
@@ -79,6 +82,22 @@ export default async function HomePage({
           <p className="sub">
             {recipes.length} recette{recipes.length > 1 ? "s" : ""}
             {hasFilters ? " correspondant aux filtres" : ""}
+            {hiddenVariants > 0 && (
+              <>
+                {" · "}
+                <Link href={variantsHref(folderParam, true)} style={{ color: "var(--soft)" }}>
+                  {hiddenVariants} variante{hiddenVariants > 1 ? "s" : ""} {hiddenVariants > 1 ? "rangées sous leur recette" : "rangée sous sa recette"}
+                </Link>
+              </>
+            )}
+            {withVariants && (
+              <>
+                {" · variantes affichées · "}
+                <Link href={variantsHref(folderParam, false)} style={{ color: "var(--soft)" }}>
+                  les ranger
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -136,4 +155,13 @@ export default async function HomePage({
       </RecipeSelectionProvider>
     </RecipeMenuProvider>
   );
+}
+
+/** Lien vers la liste avec ou sans les variantes, en gardant le dossier ouvert. */
+function variantsHref(folder: string | undefined, show: boolean): string {
+  const p = new URLSearchParams();
+  if (folder) p.set("folder", folder);
+  if (show) p.set("variantes", "1");
+  const qs = p.toString();
+  return qs ? `/?${qs}` : "/";
 }
