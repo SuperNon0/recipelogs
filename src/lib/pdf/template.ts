@@ -14,6 +14,7 @@ import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
 import { formatG, formatQty, formatYield } from "../format";
 import { parseStepLines } from "../stepLines";
+import { scaleStepParts } from "../stepQty";
 
 /** Slug historique conservé pour compatibilité descendante. */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
@@ -62,7 +63,10 @@ export type RecipeSnap = {
     totalMassGMax?: number;
     steps: string | null;
     allergens?: string[];
+    /** Coefficient effectif de la sous-recette (quantités liées de ses étapes). */
+    coef?: number;
   }[];
+  /** Multiplicateur appliqué aux quantités (et aux quantités liées des étapes). */
   multiplier?: number;
 };
 
@@ -908,7 +912,14 @@ export function isStepsHtmlEffectivelyEmpty(raw: string | null | undefined): boo
   return text.length === 0;
 }
 
-function renderSteps(raw: string): string {
+/** Texte d'une étape avec ses quantités liées mises à l'échelle (en gras). */
+function stepHtml(text: string, coef: number): string {
+  return scaleStepParts(text, coef)
+    .map((p) => (typeof p === "string" ? esc(p) : `<strong>${esc(p.qty)}</strong>`))
+    .join("");
+}
+
+function renderSteps(raw: string, coef = 1): string {
   if (looksLikeHtml(raw)) {
     const sanitized = sanitizeRichText(raw);
     const cleaned = stripLeadingStepNumberingInHtml(sanitized);
@@ -919,7 +930,7 @@ function renderSteps(raw: string): string {
   // Les intertitres (« # Crème ») deviennent des <h4>, hors numérotation.
   const lines = parseStepLines(raw);
   if (lines.length === 0) return "";
-  const html = lines.map((l) => (l.kind === "title" ? `<h4>${esc(l.text)}</h4>` : `<p>${esc(l.text)}</p>`)).join("");
+  const html = lines.map((l) => (l.kind === "title" ? `<h4>${esc(l.text)}</h4>` : `<p>${stepHtml(l.text, coef)}</p>`)).join("");
   return `<div class="steps-rich">${html}</div>`;
 }
 
@@ -964,7 +975,7 @@ export function renderRecipeCard(
 
   const stepsHtml =
     snap.steps && !isStepsHtmlEffectivelyEmpty(snap.steps)
-      ? renderSteps(snap.steps)
+      ? renderSteps(snap.steps, snap.multiplier ?? 1)
       : "<p class='muted'>—</p>";
 
   // Sous-recettes inline retirées : on rend toujours une recette par page.
@@ -1119,6 +1130,7 @@ function subSnapsOf(entry: Extract<CookbookEntryUnion, { type: "recipe" }>): Rec
     totalMassGMin: sr.totalMassGMin,
     totalMassGMax: sr.totalMassGMax,
     allergens: sr.allergens,
+    multiplier: sr.coef,
     subRecipes: [],
   }));
 }
@@ -1322,6 +1334,7 @@ export function buildSingleRecipeHtml(
         totalMassGMin: sr.totalMassGMin,
         totalMassGMax: sr.totalMassGMax,
         allergens: sr.allergens,
+        multiplier: sr.coef,
         subRecipes: [],
       };
       return renderRecipeCard(subSnap, "single", null, "", theme, snap.name);

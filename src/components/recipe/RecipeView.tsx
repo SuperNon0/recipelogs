@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
 import type { AllergenHit } from "@/lib/allergens";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
-import { RecipeBody, type IngredientRow, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
+import { RecipeBody, type IngredientRow, type RecipeScale, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
+import { formatCoef } from "@/lib/format";
+import { hasStepQty } from "@/lib/stepQty";
 import { StepsContent } from "@/components/StepsContent";
 import { CommentsSection } from "@/components/CommentsSection";
 import { toggleFavorite } from "@/app/actions/recipes";
@@ -47,6 +49,9 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, allerge
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
+  // Multiplicateur de l'onglet Recette, repris par les quantités liées des étapes.
+  const [scale, setScale] = useState<RecipeScale>({ coef: 1, wholeNumbers: false, subCoefs: {} });
+  const onScaleChange = useCallback((s: RecipeScale) => setScale(s), []);
   const [, startTransition] = useTransition();
   const menu = useRecipeMenu(
     {
@@ -143,35 +148,39 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, allerge
         </button>
       </div>
 
-      {tab === "recipe" && (
-        <>
-          <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} saleCoef={recipe.saleCoef} />
-          <AllergensCard allergens={allergens} />
-          {usedIn.length > 0 && (
-            <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Layers size={16} style={{ color: "var(--accent)" }} />
-              <span style={{ color: "var(--soft)", fontSize: 13.5, display: "flex", alignItems: "center" }}>
-                Utilisée comme sous-recette dans
-                <Help title="Utilisée comme sous-recette">
-                  Ces recettes contiennent celle-ci. Si tu la modifies, elles suivent
-                  automatiquement (les quantités sont recalculées selon leur réglage).
-                </Help>
-              </span>
-              {usedIn.map((u) => (
-                <Link key={u.id} href={`/recipes/${u.id}`} className="fl-tag" style={{ color: "var(--accent)" }}>
-                  {u.name}
-                </Link>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {/* Toujours monté (caché hors de l'onglet) : le multiplicateur est gardé d'un onglet à l'autre. */}
+      <div hidden={tab !== "recipe"}>
+        <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} saleCoef={recipe.saleCoef} onScaleChange={onScaleChange} />
+        <AllergensCard allergens={allergens} />
+        {usedIn.length > 0 && (
+          <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <Layers size={16} style={{ color: "var(--accent)" }} />
+            <span style={{ color: "var(--soft)", fontSize: 13.5, display: "flex", alignItems: "center" }}>
+              Utilisée comme sous-recette dans
+              <Help title="Utilisée comme sous-recette">
+                Ces recettes contiennent celle-ci. Si tu la modifies, elles suivent
+                automatiquement (les quantités sont recalculées selon leur réglage).
+              </Help>
+            </span>
+            {usedIn.map((u) => (
+              <Link key={u.id} href={`/recipes/${u.id}`} className="fl-tag" style={{ color: "var(--accent)" }}>
+                {u.name}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
       {tab === "steps" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {scale.coef !== 1 && [recipe.steps, ...subSteps.map((s) => s.childSteps)].some(hasStepQty) && (
+            <p style={{ color: "var(--muted)", fontSize: 12.5, margin: "-4px 0 0" }}>
+              Quantités en couleur calculées au multiplicateur {formatCoef(scale.coef)} de l&apos;onglet Recette.
+            </p>
+          )}
           <section className="fl-card">
             <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{recipe.name}</h2>
-            {recipe.steps ? <StepsContent content={recipe.steps} /> : <p style={{ color: "var(--muted)" }}>Pas encore d&apos;étapes. Ajoute-les avec « Modifier ».</p>}
+            {recipe.steps ? <StepsContent content={recipe.steps} coef={scale.coef} wholeNumbers={scale.wholeNumbers} /> : <p style={{ color: "var(--muted)" }}>Pas encore d&apos;étapes. Ajoute-les avec « Modifier ».</p>}
           </section>
           {subSteps.map((s) => (
             <section className="fl-card" key={s.id}>
@@ -180,7 +189,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, allerge
                 {s.label}
                 {s.label !== s.childName && <small style={{ color: "var(--muted)", fontWeight: 400 }}>{s.childName}</small>}
               </h2>
-              <StepsContent content={s.childSteps!} />
+              <StepsContent content={s.childSteps!} coef={scale.subCoefs[s.id] ?? scale.coef} wholeNumbers={scale.wholeNumbers} />
             </section>
           ))}
         </div>

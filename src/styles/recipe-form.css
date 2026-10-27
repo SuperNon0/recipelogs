@@ -356,3 +356,11 @@
   gap: 8px;
   max-width: 420px;
 }
+
+/* Préparation : bouton « Quantité liée » au-dessus de la zone de texte */
+.rf-steps-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: -4px;
+}

@@ -2367,3 +2367,10 @@ button.fl-row:hover {
 .isection.ichild .n::before {
   content: none;
 }
+
+/* Quantité liée dans une étape : suit le multiplicateur */
+.step-qty {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}

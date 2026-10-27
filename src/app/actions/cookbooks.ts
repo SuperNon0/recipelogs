@@ -553,6 +553,8 @@ export async function updateSnapshotMass(
       return {
         ...sr,
         ingredients: subIngredients,
+        // Quantités liées des étapes de la sous-recette : même mise à l'échelle.
+        ...(typeof sr.coef === "number" ? { coef: round3(sr.coef * ratio) } : {}),
         totalMassGMin: round3(subMinG),
         totalMassGMax: round3(subMaxG),
         totalMassG: round3((subMinG + subMaxG) / 2),
