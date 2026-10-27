@@ -18,6 +18,7 @@ export type RecipeRowData = {
   categories: { id: number; name: string; color: string }[];
   folderId: number | null;
   subCount: number;
+  variantCount?: number;
   /** Date ISO (sérialisable). */
   updatedAt: string;
 };
@@ -72,6 +73,7 @@ function RecipeRow({
   const color = folder?.color ?? r.categories[0]?.color ?? "#3b475e";
   const sub = [
     r.subCount > 0 ? `${r.subCount} sous-recette${r.subCount > 1 ? "s" : ""}` : null,
+    r.variantCount ? `${r.variantCount} variante${r.variantCount > 1 ? "s" : ""}` : null,
     ...r.categories.map((c) => c.name),
     ...r.tags.slice(0, 2),
   ]

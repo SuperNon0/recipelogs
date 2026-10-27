@@ -4,6 +4,7 @@ import { listPdfThemes } from "@/lib/pdfThemes";
 import { recipeMass } from "@/lib/massAdjust";
 import { collectAllergens } from "@/lib/allergens";
 import { parseMold } from "@/lib/mold";
+import { getVariantFamily } from "@/lib/variants";
 import type { SubRecipeRow } from "@/components/RecipeBody";
 import { RecipeView } from "@/components/recipe/RecipeView";
 import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
@@ -22,11 +23,12 @@ export default async function RecipePage({
   const recipeId = Number(id);
   if (!Number.isInteger(recipeId)) notFound();
 
-  const [recipe, folders, themes, tree] = await Promise.all([
+  const [recipe, folders, themes, tree, variants] = await Promise.all([
     getRecipeDetail(recipeId),
     listAllFolders(),
     listPdfThemes(),
     loadRecipeTree(recipeId),
+    getVariantFamily(recipeId),
   ]);
   if (!recipe) notFound();
 
@@ -84,6 +86,7 @@ export default async function RecipePage({
         ingredients={ingredients}
         subRecipes={subRecipes}
         mold={parseMold(recipe.mold)}
+        variants={variants}
         allergens={tree ? collectAllergens(tree) : []}
         yieldInfo={recipe.yieldCount ? { count: recipe.yieldCount, label: recipe.yieldLabel?.trim() || "pièces" } : null}
         comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
