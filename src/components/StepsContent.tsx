@@ -1,9 +1,11 @@
 import { sanitizeRichText, looksLikeHtml } from "@/lib/sanitizeRichText";
+import { parseStepLines } from "@/lib/stepLines";
 
 /**
  * Affiche le bloc d'étapes d'une recette, en étapes numérotées.
  * Deux formats coexistent en base : l'ancien HTML (éditeur Tiptap, un
- * paragraphe par étape) et le texte brut actuel (une étape par ligne).
+ * paragraphe par étape) et le texte brut actuel (une étape par ligne,
+ * « # » en début de ligne pour un intertitre).
  */
 export function StepsContent({
   content,
@@ -21,20 +23,19 @@ export function StepsContent({
       />
     );
   }
-  const steps = content
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    // « 1. », « 2) », « - » en début de ligne : la numérotation est ajoutée ici.
-    .map((l) => l.replace(/^(\d+\s*[.)-]|[-•*])\s+/, ""));
+  const lines = parseStepLines(content);
   return (
     <div style={{ fontSize }}>
-      {steps.map((s, i) => (
-        <div className="step-line" key={i}>
-          <b className="no">{i + 1}</b>
-          <span style={{ whiteSpace: "pre-wrap", minWidth: 0 }}>{s}</span>
-        </div>
-      ))}
+      {lines.map((l, i) =>
+        l.kind === "title" ? (
+          <h3 className="step-title" key={i}>{l.text}</h3>
+        ) : (
+          <div className="step-line" key={i}>
+            <b className="no">{l.no}</b>
+            <span style={{ whiteSpace: "pre-wrap", minWidth: 0 }}>{l.text}</span>
+          </div>
+        ),
+      )}
     </div>
   );
 }

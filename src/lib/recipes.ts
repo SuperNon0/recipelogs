@@ -160,6 +160,7 @@ async function attachIngredientInfo(tree: TreeNode) {
   const info = await loadIngredientInfo(nodes.flatMap((n) => n.ingredients.map((i) => i.name)));
   for (const n of nodes) {
     for (const ing of n.ingredients) {
+      if (ing.unit === "titre") continue; // intertitre : pas un ingrédient
       ing.pieceG = pieceWeightOf(info, ing.name);
       ing.allergens = allergensOf(info, ing.name);
       ing.cost = costOfIngredient(info, ing.name);

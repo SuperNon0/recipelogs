@@ -32,7 +32,7 @@ type CostLine = {
  */
 export function lineCost(ing: CostLine): number | null {
   const unit = ing.unit ?? "g";
-  if (unit === "QS") return 0;
+  if (unit === "QS" || unit === "titre") return 0;
   if (!ing.cost) return null;
   const qty = (ing.quantityG + (ing.quantityGMax ?? ing.quantityG)) / 2;
   const { price, unit: pu } = ing.cost;

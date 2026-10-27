@@ -187,8 +187,28 @@
   height: 36px;
 }
 
+/* Intertitre : le nom prend la place de la quantité et de l'unité. */
+.rf-ing.rf-ing-title {
+  grid-template-areas: "num name name name del more";
+}
+
+.rf-ing-title .rf-ing-num {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--accent);
+}
+
+.rf-ing-title .fl-input {
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* Téléphone : nom sur toute la largeur, quantité + unité en dessous. */
 @media (max-width: 699px) {
+  .rf-ing.rf-ing-title {
+    grid-template-columns: 22px minmax(0, 1fr) 36px 36px;
+    grid-template-areas: "num name del more";
+  }
   .rf-ing-head {
     display: none;
   }

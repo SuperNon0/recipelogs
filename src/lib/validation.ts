@@ -1,7 +1,14 @@
 import { z } from "zod";
 
-export const INGREDIENT_UNITS = ["g", "L", "cc", "cs", "pièce", "QS"] as const;
+/**
+ * « titre » n'est pas une vraie unité : la ligne est un intertitre (« Pâte »,
+ * « Crème »…) dans la liste d'ingrédients, sans quantité, ignoré des calculs.
+ */
+export const INGREDIENT_UNITS = ["g", "L", "cc", "cs", "pièce", "QS", "titre"] as const;
 export type IngredientUnit = (typeof INGREDIENT_UNITS)[number];
+
+/** Vrai si la ligne d'ingrédient est un intertitre de section. */
+export const isSectionTitle = (unit: string | null | undefined) => unit === "titre";
 
 export const ingredientInputSchema = z.object({
   name: z.string().trim().min(1).max(200),

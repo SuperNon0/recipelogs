@@ -8,6 +8,7 @@ import {
   ChefHat,
   CircleAlert,
   FileText,
+  Heading,
   ListPlus,
   MoveHorizontal,
   Plus,
@@ -27,9 +28,10 @@ import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 import { htmlToPlainText } from "@/lib/stepsText";
 
-type IngredientUnit = "g" | "L" | "cc" | "cs" | "pièce" | "QS";
+type IngredientUnit = "g" | "L" | "cc" | "cs" | "pièce" | "QS" | "titre";
+/** Unités proposées dans la liste ; « titre » = intertitre, ajouté par son propre bouton. */
 const UNITS: IngredientUnit[] = ["g", "L", "cc", "cs", "pièce", "QS"];
-const isUnit = (u: string | undefined): u is IngredientUnit => UNITS.includes(u as IngredientUnit);
+const isUnit = (u: string | undefined): u is IngredientUnit => u === "titre" || UNITS.includes(u as IngredientUnit);
 
 type IngredientRow = {
   /** Clé stable pour React (les lignes peuvent être réordonnées). */
@@ -132,13 +134,23 @@ export function RecipeForm({
     })),
   );
 
+  // Numéros des lignes d'ingrédients (les intertitres ne sont pas comptés).
+  const numbers = ingredients.reduce<{ n: number; out: number[] }>(
+    (acc, r) => {
+      if (r.unit !== "titre") acc.n++;
+      acc.out.push(acc.n);
+      return acc;
+    },
+    { n: 0, out: [] },
+  ).out;
+
   const updateRow = (idx: number, patch: Partial<IngredientRow>) => {
     setIngredients((rows) => rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
     setDirty(true);
   };
 
-  const addRow = () => {
-    const row = emptyRow();
+  const addRow = (title = false) => {
+    const row: IngredientRow = { ...emptyRow(), unit: title ? "titre" : "g" };
     setIngredients((rows) => [...rows, row]);
     setFocusKey(row.key);
     setDirty(true);
@@ -229,11 +241,21 @@ export function RecipeForm({
   const rowMenu = (idx: number, row: IngredientRow): MenuSpec => ({
     title: row.name.trim() || `Ingrédient ${idx + 1}`,
     items: [
+      ...(row.unit === "titre"
+        ? []
+        : [
+            {
+              label: row.range ? "Quantité simple" : "Fourchette (min – max)",
+              icon: MoveHorizontal,
+              disabled: row.unit === "QS",
+              onSelect: () => toggleRange(idx, row),
+            },
+          ]),
       {
-        label: row.range ? "Quantité simple" : "Fourchette (min – max)",
-        icon: MoveHorizontal,
-        disabled: row.unit === "QS",
-        onSelect: () => toggleRange(idx, row),
+        label: row.unit === "titre" ? "Transformer en ingrédient" : "Transformer en intertitre",
+        icon: Heading,
+        onSelect: () =>
+          updateRow(idx, row.unit === "titre" ? { unit: "g" } : { unit: "titre", quantity: "", quantityMax: "", range: false }),
       },
       { separator: true },
       { label: "Monter", icon: ArrowUp, disabled: idx === 0, onSelect: () => moveRow(idx, -1) },
@@ -492,9 +514,36 @@ export function RecipeForm({
                 <span />
               </div>
 
-              {ingredients.map((row, idx) => (
+              {ingredients.map((row, idx) =>
+                row.unit === "titre" ? (
+                  <div key={row.key} className="rf-ing rf-ing-title" data-row={idx}>
+                    <span className="rf-ing-num"><Heading size={13} /></span>
+                    <div className="rf-ing-name">
+                      <input
+                        className="fl-input"
+                        value={row.name}
+                        maxLength={200}
+                        aria-label="Intertitre"
+                        placeholder="Intertitre (ex. Pâte, Crème, Montage)"
+                        onChange={(e) => updateRow(idx, { name: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="fl-btn fl-btn-ghost fl-btn-icon rf-ing-del"
+                      aria-label="Supprimer l'intertitre"
+                      title="Supprimer"
+                      onClick={() => removeRow(idx)}
+                    >
+                      <X size={16} />
+                    </button>
+                    <div className="rf-ing-more">
+                      <MoreButton spec={() => rowMenu(idx, row)} label="Actions pour l'intertitre" />
+                    </div>
+                  </div>
+                ) : (
                 <div key={row.key} className="rf-ing" data-row={idx}>
-                  <span className="rf-ing-num">{idx + 1}</span>
+                  <span className="rf-ing-num">{numbers[idx]}</span>
                   <div className="rf-ing-name">
                     <IngredientNameInput
                       value={row.name}
@@ -562,12 +611,20 @@ export function RecipeForm({
                     <MoreButton spec={() => rowMenu(idx, row)} label={`Actions pour l'ingrédient ${idx + 1}`} />
                   </div>
                 </div>
-              ))}
+                ),
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-              <button type="button" onClick={addRow} className="fl-btn fl-btn-secondary">
+              <button type="button" onClick={() => addRow()} className="fl-btn fl-btn-secondary">
                 <Plus size={16} /> Ajouter un ingrédient
               </button>
+              <button type="button" onClick={() => addRow(true)} className="fl-btn fl-btn-ghost">
+                <Heading size={15} /> Intertitre
+              </button>
+              <Help title="Intertitre" example="Pâte · farine, beurre, sucre… puis Crème · lait, jaunes…">
+                Un titre pour regrouper les ingrédients (« Pâte », « Crème », « Montage ») sans créer de
+                sous-recette. Il s&apos;affiche sur la fiche et dans le PDF, et n&apos;entre dans aucun calcul.
+              </Help>
               {/* Sur téléphone, les aides des colonnes (masquées) sont ici. */}
               <span className="rf-hint rf-ing-mobhelp">
                 Unités <UnitHelp />
@@ -581,7 +638,7 @@ export function RecipeForm({
         {ingredients.map((row) => (
           <div key={row.key} hidden>
             <input type="hidden" name="ingredientName" value={row.name} />
-            <input type="hidden" name="ingredientQty" value={row.unit === "QS" ? "0" : row.quantity} />
+            <input type="hidden" name="ingredientQty" value={row.unit === "QS" || row.unit === "titre" ? "0" : row.quantity} />
             <input type="hidden" name="ingredientQtyMax" value={row.range ? row.quantityMax : ""} />
             <input type="hidden" name="ingredientUnit" value={row.unit} />
           </div>
@@ -592,7 +649,7 @@ export function RecipeForm({
       <Section
         icon={ChefHat}
         title="Préparation"
-        help="Écris une étape par ligne. La numérotation (1, 2, 3…) est ajoutée automatiquement à l'affichage et dans le PDF."
+        help="Écris une étape par ligne. La numérotation (1, 2, 3…) est ajoutée automatiquement à l'affichage et dans le PDF. Commence une ligne par # pour en faire un intertitre (« # Crème ») : il n'est pas numéroté."
       >
         <textarea
           name="steps"
@@ -600,7 +657,7 @@ export function RecipeForm({
           rows={10}
           aria-label="Étapes de préparation"
           defaultValue={htmlToPlainText(initial?.steps ?? "")}
-          placeholder={"Une étape par ligne :\n\nPréparer la pâte sablée\nCuire 20 min à 180 °C\nGarnir et laisser refroidir"}
+          placeholder={"Une étape par ligne, # pour un intertitre :\n\n# Pâte sablée\nSabler la farine et le beurre\nCuire 20 min à 180 °C\n# Montage\nGarnir et laisser refroidir"}
         />
       </Section>
 

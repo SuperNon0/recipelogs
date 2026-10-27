@@ -98,14 +98,16 @@ export function RecipeBody({
   saleCoef?: number | null;
 }) {
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
+  // Ingrédients utilisables comme pivot (les intertitres n'en sont pas).
+  const weighable = useMemo(() => ingredients.filter((i) => i.unit !== "titre"), [ingredients]);
 
   const [mode, setMode] = useState<MultMode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
   const [piecesInput, setPiecesInput] = useState(String(yieldInfo?.count ?? ""));
   const [massInput, setMassInput] = useState(String(Math.round(baseTotalG)));
-  const [pivotId, setPivotId] = useState<number | null>(ingredients[0]?.id ?? null);
+  const [pivotId, setPivotId] = useState<number | null>(weighable[0]?.id ?? null);
   const [pivotInput, setPivotInput] = useState(
-    ingredients[0] ? String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g", ingredients[0].pieceG))) : "0",
+    weighable[0] ? String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))) : "0",
   );
   const [decimals, setDecimals] = useState(true);
   const [locks, setLocks] = useState<Record<number, boolean>>(() =>
@@ -145,9 +147,9 @@ export function RecipeBody({
     setCoefInput("1");
     setMassInput(String(Math.round(baseTotalG)));
     setPiecesInput(String(yieldInfo?.count ?? ""));
-    if (ingredients[0]) {
-      setPivotId(ingredients[0].id);
-      setPivotInput(String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g", ingredients[0].pieceG))));
+    if (weighable[0]) {
+      setPivotId(weighable[0].id);
+      setPivotInput(String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))));
     }
   };
 
@@ -283,7 +285,7 @@ export function RecipeBody({
           setPivotId={setPivotId}
           pivotInput={pivotInput}
           setPivotInput={setPivotInput}
-          ingredients={ingredients}
+          ingredients={weighable}
           yieldInfo={yieldInfo ?? null}
           piecesInput={piecesInput}
           setPiecesInput={setPiecesInput}
@@ -395,6 +397,7 @@ function OwnRow({
   const spoon = ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : ing.unit === "pièce" ? (ing.pieceG ?? 0) : 0;
   const avg = (adj.quantityG + (adj.quantityGMax ?? adj.quantityG)) / 2;
   const mass = ingMass(avg, adj.unit, adj.pieceG);
+  if (ing.unit === "titre") return <SectionRow name={ing.name} />;
   return (
     <div className="irow">
       <span />
@@ -412,6 +415,16 @@ function OwnRow({
       </span>
       <span className="p desk-only num">{mass > 0 ? pct(mass) : ""}</span>
       <span />
+    </div>
+  );
+}
+
+/** Intertitre dans la liste d'ingrédients (« Pâte », « Crème »…), hors calculs. */
+function SectionRow({ name, child }: { name: string; child?: boolean }) {
+  return (
+    <div className={`irow isection${child ? " ichild" : ""}`}>
+      <span />
+      <span className="n">{name}</span>
     </div>
   );
 }
@@ -520,7 +533,10 @@ function SubRows({
         <MoreButton spec={spec} label={`Actions pour la sous-recette ${sr.label}`} />
       </ContextArea>
       {open &&
-        calc.ingredients.map((ing, i) => (
+        calc.ingredients.map((ing, i) =>
+          ing.unit === "titre" ? (
+            <SectionRow key={i} name={ing.name} child />
+          ) : (
           <div className="irow ichild" key={i}>
             <span />
             <span className="n">{ing.name}</span>
@@ -537,7 +553,8 @@ function SubRows({
             <span className="p desk-only" />
             <span />
           </div>
-        ))}
+          ),
+        )}
       {editing && <EditSubRecipeModal subRecipe={sr} parentId={parentId} onClose={() => setEditing(false)} />}
     </>
   );

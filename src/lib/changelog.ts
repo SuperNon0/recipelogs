@@ -21,6 +21,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Prix d'achat sur la fiche d'un ingrédient (€ le kg, le litre ou la pièce), avec l'historique des anciens prix",
       "Coût de revient sur la fiche recette : coût matière (sous-recettes comprises, multiplicateur appliqué), coût par pièce, et prix de vente conseillé selon ton coefficient (×4 par défaut, gardé pour chaque recette)",
       "Claude (accès MCP) peut remplir les allergènes, le poids des pièces et les prix de plusieurs ingrédients d'un coup",
+      "Intertitres dans les ingrédients (bouton « Intertitre » dans « Modifier ») pour regrouper « Pâte », « Crème », « Montage » sans créer de sous-recette ; ils s'affichent sur la fiche et le PDF et ne comptent dans aucun calcul",
+      "Une ligne déjà saisie (par ex. un titre importé à 0 g) se transforme en intertitre depuis son menu « ⋯ »",
+      "Intertitres dans les étapes : une ligne qui commence par # (« # Crème ») devient un titre, non numéroté",
     ],
     fixes: [
       "Quand on multiplie une recette, les pièces sont arrondies à la plus proche (5,06 jaunes → 5) au lieu de passer à la pièce au-dessus",

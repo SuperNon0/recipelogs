@@ -47,6 +47,7 @@ export function collectAllergens(node: TreeNode): AllergenHit[] {
   const sources = new Map<string, Set<string>>();
   const walk = (n: TreeNode, where: string | null) => {
     for (const ing of n.ingredients) {
+      if (ing.unit === "titre") continue;
       for (const k of ing.allergens ?? []) {
         if (!sources.has(k)) sources.set(k, new Set());
         sources.get(k)!.add(where ? `${ing.name} (${where})` : ing.name);
