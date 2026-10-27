@@ -846,3 +846,73 @@ button.set-row:first-child {
   color: var(--accent);
   overflow-wrap: anywhere;
 }
+
+/* Fiche d'un ingrédient : poids d'une pièce, allergènes, prix */
+.ing-facts {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px;
+  margin-bottom: 18px;
+}
+
+.ing-fact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+
+.ing-fact + .ing-fact {
+  border-top: 1px solid var(--border);
+}
+
+.ing-fact-l {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.ing-fact-l b {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ing-fact-l small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.ing-fact-v {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.ing-fact-v .stepper {
+  margin-left: 0;
+}
+
+.ing-fact-v .stepper input {
+  width: 80px;
+  border-color: var(--border);
+  background: var(--bg);
+  font-size: 16px;
+}
+
+.ing-fact-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--accent-2);
+}
+
+.ing-fact-msg[data-err="true"] {
+  color: var(--danger);
+}

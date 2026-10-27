@@ -55,6 +55,8 @@ export type RecipeFormInitial = {
   tags?: string[];
   categoryIds?: number[];
   folderId?: number | null;
+  yieldCount?: number | null;
+  yieldLabel?: string | null;
   ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
 };
 
@@ -67,10 +69,13 @@ export function RecipeForm({
   folders,
   action,
   submitLabel = "Enregistrer",
+  pieceWeights = {},
 }: {
   initial?: RecipeFormInitial;
   categories: { id: number; name: string; color: string }[];
   folders: { id: number; name: string; color: string }[];
+  /** Poids d'une pièce par ingrédient (nom en minuscules), pour la masse totale. */
+  pieceWeights?: Record<string, number>;
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
 }) {
@@ -123,6 +128,7 @@ export function RecipeForm({
       quantityG: Number(r.quantity) || 0,
       quantityGMax: r.range && r.quantityMax ? Number(r.quantityMax) || 0 : null,
       unit: r.unit,
+      pieceG: r.unit === "pièce" ? pieceWeights[r.name.trim().toLowerCase()] ?? null : null,
     })),
   );
 
@@ -279,6 +285,38 @@ export function RecipeForm({
         </div>
 
         <Field
+          label="Rendement"
+          hint="Facultatif. Ex. 40 financiers, 8 parts, 1 cadre 40×60."
+          help={{
+            title: "Rendement",
+            text: "Ce que donne la recette telle qu'elle est écrite (×1). La fiche affiche alors le poids d'une pièce, et le multiplicateur gagne un mode « Pièces » pour viser un nombre de pièces.",
+            example: "40 financiers pour 1 000 g de pâte : 25 g la pièce. Pour 60 financiers, le multiplicateur passe à ×1,5.",
+          }}
+        >
+          <div className="rf-yield">
+            <input
+              name="yieldCount"
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
+              className="fl-input num"
+              defaultValue={initial?.yieldCount ?? ""}
+              placeholder="40"
+              aria-label="Nombre de pièces"
+            />
+            <input
+              name="yieldLabel"
+              className="fl-input"
+              maxLength={80}
+              defaultValue={initial?.yieldLabel ?? ""}
+              placeholder="financiers"
+              aria-label="Nom des pièces"
+            />
+          </div>
+        </Field>
+
+        <Field
           label="Catégories"
           help={{
             title: "Catégories ou tags ?",
@@ -361,14 +399,14 @@ export function RecipeForm({
             Masse totale <b className="num">{formatG(mass.avg)}</b>
             <Help
               title="Masse totale"
-              calc={"g      = quantité\ncc     = quantité × 5 g\ncs     = quantité × 15 g\nL      = quantité × 1000 g\npièce, QS = non comptés"}
+              calc={"g      = quantité\ncc     = quantité × 5 g\ncs     = quantité × 15 g\nL      = quantité × 1000 g\npièce  = quantité × poids d'une pièce\nQS     = non compté"}
               example={
                 mass.min !== mass.max ? (
                   <>
                     Avec tes fourchettes : entre {formatG(mass.min)} et {formatG(mass.max)}, la moyenne ({formatG(mass.avg)}) est affichée.
                   </>
                 ) : (
-                  "200 g de farine + 2 cs de sucre (30 g) + 3 œufs (pièces, non comptés) = 230 g."
+                  "200 g de farine + 2 cs de sucre (30 g) + 3 œufs (50 g pièce) = 380 g."
                 )
               }
             >
@@ -615,10 +653,11 @@ function UnitHelp() {
   return (
     <Help
       title="Unités"
-      calc={"g      gramme\nL      litre ≈ 1000 g\ncc     cuillère à café ≈ 5 g\ncs     cuillère à soupe ≈ 15 g\npièce  à l'unité (œufs…), non comptée\nQS     quantité suffisante, non comptée"}
+      calc={"g      gramme\nL      litre ≈ 1000 g\ncc     cuillère à café ≈ 5 g\ncs     cuillère à soupe ≈ 15 g\npièce  à l'unité (œufs…)\nQS     quantité suffisante, non comptée"}
     >
       L&apos;unité de chaque ingrédient. Les litres et les cuillères sont convertis en grammes pour la
-      masse totale. Les pièces et « QS » (selon le goût) ne sont pas comptés dans la masse.
+      masse totale. Une pièce compte si son poids est réglé sur la fiche de l&apos;ingrédient
+      (Réglages → Ingrédients) ; « QS » (selon le goût) ne compte pas.
     </Help>
   );
 }

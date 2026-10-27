@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { scaleQty, recipeMass } from "./massAdjust";
+import { scaleQty, recipeMass, type AdjIngredient } from "./massAdjust";
 import { resolveLink } from "./recipeTree";
 import { loadRecipeTree } from "./recipes";
 
@@ -48,82 +48,53 @@ export async function getCookbookDetail(id: number) {
  *                   Permet de figer une version multipliée de la recette.
  */
 export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
-  const r = await prisma.recipe.findUnique({
-    where: { id: recipeId },
-    include: {
-      ingredients: {
-        orderBy: { position: "asc" },
-        include: { ingredientBase: true },
+  const [r, tree] = await Promise.all([
+    prisma.recipe.findUnique({
+      where: { id: recipeId },
+      include: {
+        tags: { orderBy: { name: "asc" } },
+        categories: { include: { category: true } },
       },
-      stepsBlock: true,
-      tags: { orderBy: { name: "asc" } },
-      categories: { include: { category: true } },
-      parentLinks: {
-        orderBy: { position: "asc" },
-        include: {
-          child: {
-            include: {
-              ingredients: {
-                orderBy: { position: "asc" },
-                include: { ingredientBase: true },
-              },
-              stepsBlock: true,
-            },
-          },
-        },
-      },
-    },
-  });
-  if (!r) return null;
+    }),
+    // Arbre complet (sous-recettes imbriquées, poids des pièces…).
+    loadRecipeTree(recipeId),
+  ]);
+  if (!r || !tree) return null;
 
   const k = multiplier > 0 ? multiplier : 1;
 
-  const ingredients = r.ingredients.map((i) => {
-    const unit = i.unit ?? "g";
-    const scaled = scaleQty(Number(i.quantityG), unit, k);
-    const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, k) : null;
+  const ingredients: AdjIngredient[] = tree.ingredients.map((i) => {
+    const scaled = scaleQty(i.quantityG, i.unit, k);
+    const scaledMax = i.quantityGMax != null ? scaleQty(i.quantityGMax, i.unit, k) : null;
     return {
-      name: i.name ?? i.ingredientBase?.name ?? "—",
+      name: i.name,
       quantityG: scaled.quantityG,
       quantityGMax: scaledMax?.quantityG ?? null,
       unit: scaled.unit,
+      pieceG: i.pieceG ?? null,
     };
   });
   const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);
 
   // Chaque sous-recette est résolue sur son arbre complet (sous-recettes
   // imbriquées comprises) : plus rien n'est oublié au-delà du 1er niveau.
-  const subRecipes = await Promise.all(
-    r.parentLinks.map(async (link) => {
-      const childTree = await loadRecipeTree(link.childId);
-      const res = childTree
-        ? resolveLink(
-            {
-              calcMode: link.calcMode,
-              calcValue: Number(link.calcValue),
-              pivotIngredientId: link.pivotIngredientId,
-              isLocked: link.isLocked,
-              isExact: link.isExact,
-              child: childTree,
-            },
-            k,
-          )
-        : { effectiveCoef: 1, ingredients: [], min: 0, max: 0 };
-      return {
-        label: link.label,
-        childName: link.child.name,
-        calcMode: link.calcMode,
-        calcValue: Number(link.calcValue),
-        isLocked: link.isLocked,
-        isExact: link.isExact,
-        ingredients: res.ingredients,
-        totalMassG: (res.min + res.max) / 2,
-        totalMassGMin: res.min,
-        totalMassGMax: res.max,
-        steps: link.child.stepsBlock?.content ?? null,
-      };
-    }),
-  );
+  const memo = new Map();
+  const subRecipes = tree.subLinks.map((link) => {
+    const res = resolveLink(link, k, memo);
+    return {
+      label: link.label,
+      childName: link.childName,
+      calcMode: link.calcMode,
+      calcValue: link.calcValue,
+      isLocked: link.isLocked,
+      isExact: link.isExact,
+      ingredients: res.ingredients,
+      totalMassG: (res.min + res.max) / 2,
+      totalMassGMin: res.min,
+      totalMassGMax: res.max,
+      steps: link.child.steps,
+    };
+  });
 
   return {
     recipeId: r.id,
@@ -135,13 +106,20 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     tags: r.tags.map((t) => t.name),
     categories: r.categories.map((rc) => rc.category.name),
     ingredients,
-    steps: r.stepsBlock?.content ?? null,
+    steps: tree.steps,
     totalMassG,
     totalMassGMin,
     totalMassGMax,
     subRecipes,
     multiplier: k,
+    yield: yieldOf(r.yieldCount, r.yieldLabel, k),
   };
+}
+
+/** Rendement mis à l'échelle (« 60 financiers »), ou null s'il n'est pas renseigné. */
+export function yieldOf(count: number | null, label: string | null, coef = 1): { count: number; label: string } | null {
+  if (!count || count <= 0) return null;
+  return { count: Math.round(count * coef * 10) / 10, label: label?.trim() || "pièces" };
 }
 
 export type RecipeSnapshot = Awaited<ReturnType<typeof buildRecipeSnapshot>>;

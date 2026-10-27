@@ -251,10 +251,27 @@ export async function mergeIngredientBases(
 
   await prisma.$transaction(async (tx) => {
     await relinkIngredients(tx, sourceId, source.name, targetId, target.name);
+    // La fiche fusionnée garde ce que la cible n'avait pas encore (poids d'une pièce…).
+    if (target.pieceG == null && source.pieceG != null) {
+      await tx.ingredientBase.update({ where: { id: targetId }, data: { pieceG: source.pieceG } });
+    }
     await tx.ingredientBase.delete({ where: { id: sourceId } });
   });
 
   revalidatePath("/settings/ingredients");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Poids d'une pièce (g) d'un ingrédient ; null pour l'effacer. */
+export async function setIngredientPieceWeight(id: number, pieceG: number | null): Promise<ActionResult> {
+  if (pieceG != null && (!Number.isFinite(pieceG) || pieceG <= 0 || pieceG > 100_000)) {
+    return { ok: false, error: "Poids invalide." };
+  }
+  const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) return { ok: false, error: "Ingrédient introuvable." };
+  await prisma.ingredientBase.update({ where: { id }, data: { pieceG } });
+  revalidatePath(`/settings/ingredients/${id}`);
   revalidatePath("/");
   return { ok: true };
 }

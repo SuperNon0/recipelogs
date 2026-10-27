@@ -328,3 +328,11 @@
 .rf-ing-qty input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Rendement : nombre + nom des pièces sur une ligne */
+.rf-yield {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  max-width: 420px;
+}

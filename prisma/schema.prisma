@@ -26,6 +26,9 @@ model Recipe {
   rating     Int?
   folderId       Int?     @map("folder_id")
   nameNormalized String?  @map("name_normalized")
+  /** Rendement à ×1 : nombre de pièces (ou de parts, de cadres…) et leur nom. */
+  yieldCount     Int?     @map("yield_count")
+  yieldLabel     String?  @map("yield_label") @db.VarChar(80)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -80,6 +83,8 @@ model IngredientBase {
   name        String   @unique
   defaultUnit String   @default("g") @map("default_unit")
   category    String?  // "base" | "fruit" | "preparation" | null = à classer
+  /** Poids d'une pièce en grammes (œuf ≈ 50 g) : les pièces comptent alors dans la masse. */
+  pieceG      Decimal? @map("piece_g") @db.Decimal(10, 3)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 

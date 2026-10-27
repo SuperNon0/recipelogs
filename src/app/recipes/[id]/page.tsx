@@ -36,13 +36,8 @@ export default async function RecipePage({
         ? { href: `/?folder=${recipe.folder.id}`, label: recipe.folder.name }
         : { href: "/", label: "Recettes" };
 
-  const ingredients = recipe.ingredients.map((i) => ({
-    id: i.id,
-    name: i.name ?? i.ingredientBase?.name ?? "—",
-    quantityG: Number(i.quantityG),
-    quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
-    unit: i.unit ?? "g",
-  }));
+  // Ingrédients de la recette, avec le poids des pièces lu sur leur fiche.
+  const ingredients = tree?.ingredients ?? [];
 
   // Arbre complet (sous-recettes imbriquées comprises) : le calcul de masse et
   // la liste des ingrédients de chaque sous-recette tiennent compte de tous les niveaux.
@@ -85,6 +80,7 @@ export default async function RecipePage({
         }}
         ingredients={ingredients}
         subRecipes={subRecipes}
+        yieldInfo={recipe.yieldCount ? { count: recipe.yieldCount, label: recipe.yieldLabel?.trim() || "pièces" } : null}
         comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
         usedIn={recipe.childLinks.map((l) => ({ id: l.parent.id, name: l.parent.name, label: l.label }))}
       />

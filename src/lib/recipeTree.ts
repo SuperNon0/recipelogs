@@ -1,4 +1,4 @@
-import { adjustToTarget, ingMass, recipeMass, type AdjIngredient } from "./massAdjust";
+import { adjustToTarget, ingMass, recipeMass, roundScaled, type AdjIngredient } from "./massAdjust";
 import { computeLocalCoef } from "./subRecipeCalc";
 
 /**
@@ -14,6 +14,8 @@ export type TreeIngredient = {
   quantityG: number;
   quantityGMax: number | null;
   unit: string;
+  /** Poids d'une pièce (fiche de l'ingrédient), pour compter les pièces dans la masse. */
+  pieceG?: number | null;
 };
 
 export type TreeLink = {
@@ -41,7 +43,7 @@ export type TreeNode = {
 function pivotGrams(node: TreeNode, pivotId: number | null): number | null {
   if (!pivotId) return null;
   const ing = node.ingredients.find((i) => i.id === pivotId);
-  return ing ? ingMass(ing.quantityG, ing.unit ?? "g") : null;
+  return ing ? ingMass(ing.quantityG, ing.unit ?? "g", ing.pieceG) : null;
 }
 
 /**
@@ -60,8 +62,8 @@ export function treeBaseMass(
   let max = 0;
   for (const ing of node.ingredients) {
     const unit = ing.unit ?? "g";
-    min += ingMass(ing.quantityG, unit);
-    max += ingMass(ing.quantityGMax ?? ing.quantityG, unit);
+    min += ingMass(ing.quantityG, unit, ing.pieceG);
+    max += ingMass(ing.quantityGMax ?? ing.quantityG, unit, ing.pieceG);
   }
   for (const link of node.subLinks) {
     const cb = treeBaseMass(link.child, memo);
@@ -80,7 +82,8 @@ export function treeBaseMass(
 }
 
 /** Applique un coefficient à un ingrédient (L → g). Exact à ×1, arrondi sinon. */
-function scaleLeaf(ing: TreeIngredient, coef: number, round: (x: number) => number): AdjIngredient {
+function scaleLeaf(ing: TreeIngredient, coef: number): AdjIngredient {
+  const round = coef === 1 ? (x: number) => x : (x: number) => roundScaled(x, ing.unit);
   if (ing.unit === "L") {
     return {
       name: ing.name,
@@ -94,6 +97,7 @@ function scaleLeaf(ing: TreeIngredient, coef: number, round: (x: number) => numb
     quantityG: round(ing.quantityG * coef),
     quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * coef) : null,
     unit: ing.unit ?? "g",
+    pieceG: ing.pieceG ?? null,
   };
 }
 
@@ -105,8 +109,7 @@ function scaleLeaf(ing: TreeIngredient, coef: number, round: (x: number) => numb
  *   verrouillage (ignore `coef`) et son « masse exacte ».
  */
 function expand(node: TreeNode, coef: number, memo: Map<TreeNode, { min: number; max: number; avg: number }>): AdjIngredient[] {
-  const round = coef === 1 ? (x: number) => x : Math.ceil;
-  const out: AdjIngredient[] = node.ingredients.map((ing) => scaleLeaf(ing, coef, round));
+  const out: AdjIngredient[] = node.ingredients.map((ing) => scaleLeaf(ing, coef));
   for (const link of node.subLinks) {
     out.push(...resolveLink(link, coef, memo).ingredients);
   }

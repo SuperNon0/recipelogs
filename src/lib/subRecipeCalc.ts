@@ -1,4 +1,4 @@
-import { adjustToTarget, ingMass, recipeMass, type AdjIngredient } from "./massAdjust";
+import { adjustToTarget, ingMass, recipeMass, roundScaled, type AdjIngredient } from "./massAdjust";
 
 /**
  * Calcule le coefficient local effectif d'une sous-recette
@@ -27,7 +27,7 @@ export type SubRecipeCalcInput = {
   calcValue: number;
   pivotIngredientId: number | null;
   isExact: boolean;
-  childIngredients: { id: number; name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
+  childIngredients: { id: number; name: string; quantityG: number; quantityGMax?: number | null; unit?: string; pieceG?: number | null }[];
 };
 
 /**
@@ -47,27 +47,27 @@ export function computeSubRecipe(
   const pivotIng = sr.pivotIngredientId
     ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)
     : null;
-  const pivotQty = pivotIng ? ingMass(pivotIng.quantityG, pivotIng.unit ?? "g") : null;
+  const pivotQty = pivotIng ? ingMass(pivotIng.quantityG, pivotIng.unit ?? "g", pivotIng.pieceG) : null;
   const localCoef = computeLocalCoef(sr.calcMode, sr.calcValue, base, pivotQty);
   const effectiveCoef = locked ? localCoef : localCoef * globalCoef;
 
   // À ×1 (effectiveCoef === 1) on garde la valeur exacte ; dès qu'on multiplie,
   // on arrondit au gramme supérieur (comportement inchangé).
-  const round = effectiveCoef === 1 ? (x: number) => x : Math.ceil;
   let ingredients: AdjIngredient[] = sr.childIngredients.map((ing) => {
     const unit = ing.unit === "L" ? "g" : (ing.unit ?? "g");
+    const round = effectiveCoef === 1 ? (x: number) => x : (x: number) => roundScaled(x, unit);
     const k = ing.unit === "L" ? effectiveCoef * 1000 : effectiveCoef;
     return {
       name: ing.name,
       quantityG: round(ing.quantityG * k),
       quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * k) : null,
       unit,
+      pieceG: ing.pieceG ?? null,
     };
   });
   if (sr.isExact && sr.calcMode === "mass_target") {
     ingredients = adjustToTarget(ingredients, Math.round(sr.calcValue * (locked ? 1 : globalCoef))).ingredients;
   }
-  const min = ingredients.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  const max = ingredients.reduce((s, i) => s + ingMass(i.quantityGMax ?? i.quantityG, i.unit), 0);
+  const { min, max } = recipeMass(ingredients);
   return { effectiveCoef, ingredients, min, max };
 }
