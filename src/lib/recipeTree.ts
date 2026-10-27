@@ -1,5 +1,6 @@
 import { adjustToTarget, ingMass, recipeMass, roundScaled, type AdjIngredient } from "./massAdjust";
 import { computeLocalCoef } from "./subRecipeCalc";
+import type { IngredientPrice } from "./cost";
 
 /**
  * Arbre complet d'une recette avec ses sous-recettes imbriquées (tous niveaux).
@@ -18,6 +19,8 @@ export type TreeIngredient = {
   pieceG?: number | null;
   /** Allergènes cochés sur la fiche de l'ingrédient. */
   allergens?: string[];
+  /** Prix d'achat (fiche de l'ingrédient), pour le coût de revient. */
+  cost?: IngredientPrice | null;
 };
 
 export type TreeLink = {
@@ -92,6 +95,7 @@ function scaleLeaf(ing: TreeIngredient, coef: number): AdjIngredient {
       quantityG: round(ing.quantityG * coef * 1000),
       quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * coef * 1000) : null,
       unit: "g",
+      cost: ing.cost ?? null,
     };
   }
   return {
@@ -100,6 +104,7 @@ function scaleLeaf(ing: TreeIngredient, coef: number): AdjIngredient {
     quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * coef) : null,
     unit: ing.unit ?? "g",
     pieceG: ing.pieceG ?? null,
+    cost: ing.cost ?? null,
   };
 }
 

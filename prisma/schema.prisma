@@ -29,6 +29,8 @@ model Recipe {
   /** Rendement à ×1 : nombre de pièces (ou de parts, de cadres…) et leur nom. */
   yieldCount     Int?     @map("yield_count")
   yieldLabel     String?  @map("yield_label") @db.VarChar(80)
+  /** Coefficient prix de vente / coût matière (null = ×4 par défaut). */
+  saleCoef       Decimal? @map("sale_coef") @db.Decimal(6, 2)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -87,12 +89,30 @@ model IngredientBase {
   pieceG      Decimal? @map("piece_g") @db.Decimal(10, 3)
   /** Allergènes INCO cochés (clés de lib/allergens.ts : "gluten", "lait"…). */
   allergens   String[] @default([])
+  /** Prix d'achat (€) par `priceUnit` : "kg", "L" ou "pièce". */
+  price       Decimal? @db.Decimal(10, 4)
+  priceUnit   String?  @map("price_unit")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   usages Ingredient[]
+  prices IngredientPrice[]
 
   @@map("ingredients_base")
+}
+
+/** Historique des prix d'achat d'un ingrédient (une ligne par changement). */
+model IngredientPrice {
+  id        Int      @id @default(autoincrement())
+  baseId    Int      @map("base_id")
+  price     Decimal  @db.Decimal(10, 4)
+  priceUnit String   @map("price_unit")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  base IngredientBase @relation(fields: [baseId], references: [id], onDelete: Cascade)
+
+  @@index([baseId, createdAt(sort: Desc)])
+  @@map("ingredient_prices")
 }
 
 model Ingredient {

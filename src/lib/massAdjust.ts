@@ -68,8 +68,10 @@ export type AdjIngredient = {
   quantityG: number;
   quantityGMax: number | null;
   unit: string;
-  /** Poids d'une pièce en g (unité « pièce » seulement), s'il est connu. */
+  /** Poids d'une pièce en g, s'il est connu (compte dans la masse pour l'unité « pièce »). */
   pieceG?: number | null;
+  /** Prix d'achat de l'ingrédient, pour le coût de revient. */
+  cost?: { price: number; unit: "kg" | "L" | "pièce" } | null;
 };
 
 /** Au-dessous de ce poids, un ingrédient n'est jamais retouché par l'ajustement

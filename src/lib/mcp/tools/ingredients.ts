@@ -6,6 +6,7 @@ import { INGREDIENT_UNITS } from "@/lib/validation";
 import { mergeIngredientBasesBulk, renameIngredientBase } from "@/app/actions/settings";
 import { duplicateKey } from "../duplicates";
 import { ALLERGENS, cleanAllergens } from "@/lib/allergens";
+import { PRICE_UNITS } from "@/lib/cost";
 import { DELETE, READ, WRITE, formData, id, ids, js, parseArgs, runAction, text, type McpTool } from "./helpers";
 
 /** Catégories d'ingrédients telles qu'affichées (« fruit » s'affiche « Arôme »). */
@@ -246,7 +247,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
     name: "regler_fiches_ingredients",
     title: "Régler les fiches d'ingrédients",
     description:
-      "Règle, pour un ou plusieurs ingrédients (par id ou nom exact sans casse), ce que leur fiche apporte aux calculs : les allergènes INCO (la liste donnée REMPLACE celle de l'ingrédient ; [] pour tout décocher) et le poids d'une pièce en grammes (null pour l'effacer). Les recettes en tiennent compte toutes seules (allergènes cumulés, pièces comptées dans la masse). " +
+      "Règle, pour un ou plusieurs ingrédients (par id ou nom exact sans casse), ce que leur fiche apporte aux calculs : les allergènes INCO (la liste donnée REMPLACE celle de l'ingrédient ; [] pour tout décocher), le poids d'une pièce en grammes (null pour l'effacer) et le prix d'achat en € par kg, L ou pièce (null pour l'effacer ; l'ancien prix reste dans l'historique). Les recettes en tiennent compte toutes seules (allergènes cumulés, pièces comptées dans la masse, coût de revient). " +
       `Clés d'allergènes : ${ALLERGENS.map((a) => `${a.key} (${a.label})`).join(", ")}.`,
     inputSchema: {
       type: "object",
@@ -260,6 +261,8 @@ export const INGREDIENT_TOOLS: McpTool[] = [
               ...idOrNameJs,
               allergenes: { type: "array", items: { type: "string", enum: ALLERGENS.map((a) => a.key) }, description: "Allergènes contenus (remplace la liste)" },
               poids_piece_g: { type: ["number", "null"], description: "Poids d'une pièce en g (œuf ≈ 50), null pour effacer" },
+              prix: { type: ["number", "null"], description: "Prix d'achat en € (par unite_prix), null pour effacer" },
+              unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg (défaut), L ou pièce"),
             },
           },
         },
@@ -275,6 +278,8 @@ export const INGREDIENT_TOOLS: McpTool[] = [
               idOrName.extend({
                 allergenes: z.array(z.string()).optional(),
                 poids_piece_g: z.number().positive().max(100_000).nullable().optional(),
+                prix: z.number().min(0).max(1_000_000).nullable().optional(),
+                unite_prix: z.enum(PRICE_UNITS).default("kg"),
               }),
             )
             .min(1)
@@ -282,7 +287,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
         }),
         args,
       );
-      const modifies: { nom: string; allergenes?: string[]; poids_piece_g?: number | null }[] = [];
+      const modifies: { nom: string; allergenes?: string[]; poids_piece_g?: number | null; prix?: string | null }[] = [];
       const introuvables: string[] = [];
       for (const f of fiches) {
         let found;
@@ -298,12 +303,17 @@ export const INGREDIENT_TOOLS: McpTool[] = [
           data: {
             ...(allergens !== undefined ? { allergens } : {}),
             ...(f.poids_piece_g !== undefined ? { pieceG: f.poids_piece_g } : {}),
+            ...(f.prix !== undefined ? { price: f.prix, priceUnit: f.prix != null ? f.unite_prix : null } : {}),
           },
         });
+        if (f.prix != null) {
+          await prisma.ingredientPrice.create({ data: { baseId: found.id, price: f.prix, priceUnit: f.unite_prix } });
+        }
         modifies.push({
           nom: found.name,
           ...(allergens !== undefined ? { allergenes: allergens } : {}),
           ...(f.poids_piece_g !== undefined ? { poids_piece_g: f.poids_piece_g } : {}),
+          ...(f.prix !== undefined ? { prix: f.prix != null ? `${f.prix} €/${f.unite_prix}` : null } : {}),
         });
       }
       revalidatePath("/settings/ingredients");

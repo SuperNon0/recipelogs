@@ -29,6 +29,7 @@ type Props = {
     createdAt: string;
     updatedAt: string;
     totalMassG: number;
+    saleCoef: number | null;
   };
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
@@ -144,7 +145,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, allerge
 
       {tab === "recipe" && (
         <>
-          <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} />
+          <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} saleCoef={recipe.saleCoef} />
           <AllergensCard allergens={allergens} />
           {usedIn.length > 0 && (
             <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

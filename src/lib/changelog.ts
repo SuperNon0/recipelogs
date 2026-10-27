@@ -11,19 +11,21 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "V2.4",
     date: "2026-10-27",
-    title: "Rendement, pièces et allergènes",
+    title: "Rendement, allergènes et coût de revient",
     features: [
       "Poids d'une pièce sur la fiche d'un ingrédient (Réglages → Ingrédients) : un œuf à 50 g, un jaune à 20 g… compte enfin dans la masse totale, les %, le multiplicateur et les PDF",
       "Rendement d'une recette (ex. 40 financiers, 8 parts) dans « Modifier » : la fiche affiche le poids d'une pièce, et le multiplicateur a un mode « Pièces » pour viser un nombre de pièces",
       "Le rendement s'imprime sur le PDF de la recette et dans les cahiers",
       "Allergènes : les 14 allergènes à déclarer se cochent sur la fiche de chaque ingrédient ; chaque recette les cumule toute seule, sous-recettes comprises, avec le détail de l'ingrédient qui les apporte",
       "Les allergènes s'impriment sur le PDF de la recette et dans les cahiers",
-      "Claude (accès MCP) peut remplir les allergènes et le poids des pièces de plusieurs ingrédients d'un coup",
+      "Prix d'achat sur la fiche d'un ingrédient (€ le kg, le litre ou la pièce), avec l'historique des anciens prix",
+      "Coût de revient sur la fiche recette : coût matière (sous-recettes comprises, multiplicateur appliqué), coût par pièce, et prix de vente conseillé selon ton coefficient (×4 par défaut, gardé pour chaque recette)",
+      "Claude (accès MCP) peut remplir les allergènes, le poids des pièces et les prix de plusieurs ingrédients d'un coup",
     ],
     fixes: [
       "Quand on multiplie une recette, les pièces sont arrondies à la plus proche (5,06 jaunes → 5) au lieu de passer à la pièce au-dessus",
     ],
-    migrations: ["Ajout du poids par pièce et des allergènes (ingrédients) et du rendement (recettes) ; rien à faire"],
+    migrations: ["Ajout du poids par pièce, des allergènes et des prix (ingrédients), du rendement et du coefficient de vente (recettes) ; rien à faire"],
   },
   {
     version: "V2.3",
