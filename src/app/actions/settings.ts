@@ -239,6 +239,32 @@ export async function renameIngredientBase(
   return { ok: true };
 }
 
+type BaseFacts = {
+  id: number;
+  pieceG: Prisma.Decimal | null;
+  price: Prisma.Decimal | null;
+  priceUnit: string | null;
+  allergens: string[];
+};
+
+/**
+ * La fiche fusionnée garde ce que la cible n'avait pas encore : poids d'une
+ * pièce, prix, et TOUS les allergènes (un allergène perdu fausserait la
+ * déclaration). L'historique des prix des sources passe sur la cible.
+ */
+async function mergeFacts(tx: Prisma.TransactionClient, target: BaseFacts, sources: BaseFacts[]) {
+  const priced = sources.find((s) => s.price != null);
+  await tx.ingredientBase.update({
+    where: { id: target.id },
+    data: {
+      pieceG: target.pieceG ?? sources.find((s) => s.pieceG != null)?.pieceG ?? null,
+      ...(target.price == null && priced ? { price: priced.price, priceUnit: priced.priceUnit } : {}),
+      allergens: cleanAllergens([...target.allergens, ...sources.flatMap((s) => s.allergens)]),
+    },
+  });
+  await tx.ingredientPrice.updateMany({ where: { baseId: { in: sources.map((s) => s.id) } }, data: { baseId: target.id } });
+}
+
 export async function mergeIngredientBases(
   sourceId: number,
   targetId: number,
@@ -253,15 +279,7 @@ export async function mergeIngredientBases(
 
   await prisma.$transaction(async (tx) => {
     await relinkIngredients(tx, sourceId, source.name, targetId, target.name);
-    // La fiche fusionnée garde ce que la cible n'avait pas encore (poids d'une pièce…).
-    await tx.ingredientBase.update({
-      where: { id: targetId },
-      data: {
-        pieceG: target.pieceG ?? source.pieceG,
-        ...(target.price == null && source.price != null ? { price: source.price, priceUnit: source.priceUnit } : {}),
-        allergens: cleanAllergens([...target.allergens, ...source.allergens]),
-      },
-    });
+    await mergeFacts(tx, target, [source]);
     await tx.ingredientBase.delete({ where: { id: sourceId } });
   });
 
@@ -292,9 +310,15 @@ export async function setIngredientPrice(id: number, price: number | null, unit:
   if (price != null && (!Number.isFinite(price) || price < 0 || price > 1_000_000)) {
     return { ok: false, error: "Prix invalide." };
   }
-  const current = await prisma.ingredientBase.findUnique({ where: { id }, select: { price: true, priceUnit: true } });
+  const current = await prisma.ingredientBase.findUnique({
+    where: { id },
+    select: { prices: { orderBy: { createdAt: "desc" }, take: 1, select: { price: true, priceUnit: true } } },
+  });
   if (!current) return { ok: false, error: "Ingrédient introuvable." };
-  const changed = price != null && (current.price == null || Number(current.price) !== price || current.priceUnit !== unit);
+  // Comparé au dernier prix de l'historique : effacer puis remettre le même
+  // prix n'ajoute pas de doublon.
+  const lastPrice = current.prices[0];
+  const changed = price != null && (!lastPrice || Number(lastPrice.price) !== price || lastPrice.priceUnit !== unit);
   await prisma.$transaction([
     prisma.ingredientBase.update({ where: { id }, data: { price, priceUnit: price != null ? unit : null } }),
     ...(changed ? [prisma.ingredientPrice.create({ data: { baseId: id, price, priceUnit: unit } })] : []),
@@ -375,13 +399,14 @@ export async function mergeIngredientBasesBulk(
 
   const sourceRows = await prisma.ingredientBase.findMany({
     where: { id: { in: sources } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, pieceG: true, price: true, priceUnit: true, allergens: true },
   });
 
   await prisma.$transaction(async (tx) => {
     for (const src of sourceRows) {
       await relinkIngredients(tx, src.id, src.name, targetId, target.name);
     }
+    await mergeFacts(tx, target, sourceRows);
     await tx.ingredientBase.deleteMany({ where: { id: { in: sourceRows.map((s) => s.id) } } });
   });
 

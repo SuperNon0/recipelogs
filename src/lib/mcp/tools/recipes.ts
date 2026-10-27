@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { DEFAULT_SALE_COEF, costOf } from "@/lib/cost";
 import { recipeMass } from "@/lib/massAdjust";
+import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { getRecipeDetail, listRecipes } from "@/lib/recipes";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { INGREDIENT_UNITS } from "@/lib/validation";
@@ -367,17 +368,20 @@ export const RECIPE_TOOLS: McpTool[] = [
           .refine((v) => v.multiplicateur || v.masse_cible_g, { message: "donne un multiplicateur ou une masse_cible_g" }),
         args,
       );
-      const ings = await prisma.ingredient.findMany({ where: { recipeId: a.id }, select: { quantityG: true, quantityGMax: true, unit: true } });
-      const before = recipeMass(ings).avg;
+      // Masse avec le poids des pièces, comme sur la fiche.
+      const massNow = async () => {
+        const rows = await prisma.ingredient.findMany({ where: { recipeId: a.id }, select: { name: true, quantityG: true, quantityGMax: true, unit: true } });
+        const info = await loadIngredientInfo(rows.map((r) => r.name ?? ""));
+        return recipeMass(rows.map((r) => ({ ...r, pieceG: pieceWeightOf(info, r.name ?? "") }))).avg;
+      };
+      const before = await massNow();
       let mult = a.multiplicateur ?? 1;
       if (a.masse_cible_g && !a.multiplicateur) {
         if (before <= 0) throw new Error("masse actuelle nulle : impossible de viser une masse");
         mult = a.masse_cible_g / before;
       }
       await runAction(() => applyMultiplierToRecipe(a.id, mult, a.masse_cible_g));
-      const after = recipeMass(
-        await prisma.ingredient.findMany({ where: { recipeId: a.id }, select: { quantityG: true, quantityGMax: true, unit: true } }),
-      ).avg;
+      const after = await massNow();
       return text({ id: a.id, masse_avant_g: Math.round(before), masse_apres_g: Math.round(after) });
     },
   },

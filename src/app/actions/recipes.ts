@@ -10,6 +10,8 @@ import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
 import { normalizeForSearch } from "@/lib/recipes";
 import { scaleQty, adjustToTarget } from "@/lib/massAdjust";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
+import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
+import { rescaleStepText } from "@/lib/stepQty";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -263,11 +265,14 @@ export async function applyMultiplierToRecipe(
   const ingredients = await prisma.ingredient.findMany({
     where: { recipeId: id },
     orderBy: { quantityG: "desc" },
-    select: { id: true, quantityG: true, quantityGMax: true, unit: true },
+    select: { id: true, name: true, quantityG: true, quantityGMax: true, unit: true, ingredientBase: { select: { name: true } } },
   });
   if (ingredients.length === 0) {
     return { ok: false, error: "Aucun ingrédient à mettre à jour." };
   }
+  const nameOf = (ing: (typeof ingredients)[number]) => ing.name ?? ing.ingredientBase?.name ?? "";
+  // Poids des pièces : la masse visée par le client les compte, l'ajustement aussi.
+  const info = await loadIngredientInfo(ingredients.map(nameOf));
 
   let scaled = ingredients.map((ing) => {
     const unit = ing.unit ?? "g";
@@ -281,24 +286,37 @@ export async function applyMultiplierToRecipe(
   });
 
   if (targetMassG && targetMassG > 0) {
-    const adjInput = scaled.map((s) => ({
+    const adjInput = scaled.map((s, i) => ({
       name: "",
       quantityG: s.quantityG,
       quantityGMax: null,
       unit: s.unit,
+      pieceG: pieceWeightOf(info, nameOf(ingredients[i])),
     }));
     const { ingredients: adjusted } = adjustToTarget(adjInput, targetMassG);
     scaled = scaled.map((s, i) => ({ ...s, quantityG: adjusted[i].quantityG }));
   }
 
-  await prisma.$transaction(
-    scaled.map((ing) =>
+  // Le rendement et les quantités liées des étapes suivent la nouvelle base.
+  const recipe = await prisma.recipe.findUnique({
+    where: { id },
+    select: { yieldCount: true, stepsBlock: { select: { content: true } } },
+  });
+  const steps = recipe?.stepsBlock?.content;
+  const newSteps = steps ? rescaleStepText(steps, multiplier) : steps;
+
+  await prisma.$transaction([
+    ...scaled.map((ing) =>
       prisma.ingredient.update({
         where: { id: ing.id },
         data: { quantityG: ing.quantityG, quantityGMax: ing.quantityGMax, unit: ing.unit },
       }),
     ),
-  );
+    ...(recipe?.yieldCount
+      ? [prisma.recipe.update({ where: { id }, data: { yieldCount: Math.max(1, Math.round(recipe.yieldCount * multiplier)) } })]
+      : []),
+    ...(steps && newSteps !== steps ? [prisma.stepsBlock.update({ where: { recipeId: id }, data: { content: newSteps! } })] : []),
+  ]);
 
   revalidatePath("/");
   revalidatePath("/favorites");

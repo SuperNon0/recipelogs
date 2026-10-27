@@ -128,6 +128,9 @@ export const SITE_TOOLS: McpTool[] = [
           tags: r.tags.map((t) => t.name),
           favorite: r.favorite,
           rating: r.rating,
+          yield_count: r.yieldCount,
+          yield_label: r.yieldLabel,
+          sale_coef: r.saleCoef != null ? Number(r.saleCoef) : null,
         })),
       );
     },

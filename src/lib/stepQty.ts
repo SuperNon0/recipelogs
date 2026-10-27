@@ -9,15 +9,19 @@ const TOKEN = /\{\s*(\d+(?:[.,]\d+)?)\s*(kg|mg|g|cl|ml|L|l|cc|cs|pièces?|pcs?)?
 
 export type StepPart = string | { qty: string };
 
+/** Valeur d'une quantité liée mise à l'échelle, arrondie comme les ingrédients. */
+function scaledValue(value: number, u: string | undefined, piece: boolean, coef: number, wholeNumbers: boolean): number {
+  const v = value * coef;
+  if (coef === 1 && !wholeNumbers) return v;
+  // kg et L gardent 2 décimales (1,25 kg) ; le reste, comme les ingrédients.
+  return u === "kg" || u === "L" ? Math.round(v * 100) / 100 : roundScaled(v, piece ? "pièce" : "g");
+}
+
 /** Texte d'une quantité liée mise à l'échelle (« 334 g »). */
 function scaledText(value: number, unit: string | undefined, coef: number, wholeNumbers: boolean): string {
   const u = unit === "l" ? "L" : unit;
   const piece = !!u && (u.startsWith("pi") || u.startsWith("pc"));
-  let v = value * coef;
-  if (coef !== 1 || wholeNumbers) {
-    // kg et L gardent 2 décimales (1,25 kg) ; le reste, comme les ingrédients.
-    v = u === "kg" || u === "L" ? Math.round(v * 100) / 100 : roundScaled(v, piece ? "pièce" : "g");
-  }
+  const v = scaledValue(value, u, piece, coef, wholeNumbers);
   const n = v.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
   if (!u) return n;
   return piece ? `${n} ${v > 1 ? "pièces" : "pièce"}` : `${n} ${u}`;
@@ -39,4 +43,20 @@ export function scaleStepParts(text: string, coef = 1, wholeNumbers = false): St
 /** Vrai si le texte contient au moins une quantité liée. */
 export function hasStepQty(text: string | null | undefined): boolean {
   return !!text && new RegExp(TOKEN.source).test(text);
+}
+
+/**
+ * Réécrit les quantités liées d'un texte d'étapes multipliées par `coef`, en
+ * gardant les accolades (« {167 g} » ×2 → « {334 g} ») : sert quand une
+ * recette multipliée devient la nouvelle base.
+ */
+export function rescaleStepText(text: string, coef: number): string {
+  if (coef === 1) return text;
+  return text.replace(TOKEN, (_m, num: string, unit: string | undefined) => {
+    const u = unit === "l" ? "L" : unit;
+    const piece = !!u && (u.startsWith("pi") || u.startsWith("pc"));
+    const v = scaledValue(Number(num.replace(",", ".")), u, piece, coef, false);
+    const n = String(Math.round(v * 100) / 100).replace(".", ",");
+    return unit ? `{${n} ${unit}}` : `{${n}}`;
+  });
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasStepQty, scaleStepParts } from "@/lib/stepQty";
+import { hasStepQty, rescaleStepText, scaleStepParts } from "@/lib/stepQty";
 
 const flat = (parts: ReturnType<typeof scaleStepParts>) => parts.map((p) => (typeof p === "string" ? p : `[${p.qty}]`)).join("");
 
@@ -24,5 +24,15 @@ describe("quantités liées dans les étapes", () => {
     expect(flat(scaleStepParts("Cuire 20 min à 180 °C", 2))).toBe("Cuire 20 min à 180 °C");
     expect(hasStepQty("Cuire 20 min")).toBe(false);
     expect(hasStepQty("Verser {100 g}")).toBe(true);
+  });
+});
+
+describe("rescaleStepText", () => {
+  it("réécrit les quantités liées en gardant les accolades", () => {
+    expect(rescaleStepText("verser {167 g} de lait puis {2 pièces}", 1.5)).toBe("verser {251 g} de lait puis {3 pièces}");
+  });
+  it("garde 2 décimales en kg et ne touche pas au texte à ×1", () => {
+    expect(rescaleStepText("{1,25 kg}", 2)).toBe("{2,5 kg}");
+    expect(rescaleStepText("{167 g}", 1)).toBe("{167 g}");
   });
 });
