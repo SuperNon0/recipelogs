@@ -256,10 +256,15 @@ export async function importRecipeKeeperHtmlOrZip(
 
 // ─── Import JSON ──────────────────────────────────────────────────────────────
 
-type JsonIngredient = { name: string; quantity: number; unit: string };
+type JsonIngredient = { name: string; quantity: number; quantity_max?: number | null; unit: string };
 type JsonRecipe = {
   name: string;
+  /** Rendement en texte libre (« 12 parts »), rangé dans les notes. */
   yield?: string;
+  /** Rendement chiffré, comme l'export de RecipeLog (« 40 » + « financiers »). */
+  yield_count?: number | null;
+  yield_label?: string | null;
+  sale_coef?: number | null;
   ingredients: JsonIngredient[];
   steps?: string;
   notes?: string | null;
@@ -280,6 +285,7 @@ function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; q
     case "cs": case "cuillère à soupe": case "cuillere a soupe": return { unit: "cs", quantityG: q };
     case "pièce": case "piece": case "pcs": case "unité": case "unite": return { unit: "pièce", quantityG: q };
     case "qs": return { unit: "QS", quantityG: 0 };
+    case "titre": return { unit: "titre", quantityG: 0 };
     default: return { unit: "g", quantityG: q };
   }
 }
@@ -321,7 +327,10 @@ export async function importRecipesFromJson(
         .filter((i) => i.name?.trim())
         .map((i, position) => {
           const norm = normalizeImportUnit(i.unit, i.quantity);
-          return { name: i.name.trim(), quantityG: norm.quantityG, unit: norm.unit, position };
+          const max = i.quantity_max != null && norm.quantityG > 0
+            ? normalizeImportUnit(i.unit, i.quantity_max).quantityG
+            : null;
+          return { name: i.name.trim(), quantityG: norm.quantityG, quantityGMax: max, unit: norm.unit, position };
         });
 
       const notesParts: string[] = [];
@@ -338,10 +347,14 @@ export async function importRecipesFromJson(
             ? { create: { content: r.steps.trim() } }
             : undefined,
           ingredients: { create: ingredients },
+          yieldCount: r.yield_count && r.yield_count > 0 ? Math.round(r.yield_count) : null,
+          yieldLabel: r.yield_count && r.yield_count > 0 ? r.yield_label?.trim() || null : null,
+          saleCoef: r.sale_coef && r.sale_coef > 0 && r.sale_coef <= 100 ? r.sale_coef : null,
         },
       });
 
-      await ensureIngredientBases(ingredients.map((i) => i.name));
+      // Les intertitres (« Pâte », « Crème ») ne vont pas dans la base d'ingrédients.
+      await ensureIngredientBases(ingredients.filter((i) => i.unit !== "titre").map((i) => i.name));
 
       imported++;
     } catch (err) {
