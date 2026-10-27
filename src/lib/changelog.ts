@@ -19,6 +19,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
     ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
+    fixes: [
+      "« Masse cible exacte » sur une recette avec des fourchettes : la masse obtenue est maintenant pile celle demandée, sans gonfler les petits ingrédients (gélatine, levure…)",
+    ],
   },
   {
     version: "V2.2",
