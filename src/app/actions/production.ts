@@ -16,11 +16,15 @@ function refresh() {
 /** Ajoute une recette à la fiche de production (ou change sa quantité si elle y est déjà). */
 export async function addToProduction(recipeId: number, amount: number): Promise<Result> {
   if (!valid(amount)) return { ok: false, error: "Quantité invalide." };
+  const recipe = await prisma.recipe.findUnique({ where: { id: recipeId }, select: { yieldCount: true } });
+  if (!recipe) return { ok: false, error: "Recette introuvable." };
+  // Le rendement du moment fixe le sens de la quantité (pièces ou multiplicateur).
+  const yieldCount = recipe.yieldCount && recipe.yieldCount > 0 ? recipe.yieldCount : null;
   const last = await prisma.productionItem.aggregate({ _max: { position: true } });
   await prisma.productionItem.upsert({
     where: { recipeId },
-    update: { amount },
-    create: { recipeId, amount, position: (last._max.position ?? 0) + 1 },
+    update: { amount, yieldCount },
+    create: { recipeId, amount, yieldCount, position: (last._max.position ?? 0) + 1 },
   });
   refresh();
   return { ok: true };
@@ -28,7 +32,8 @@ export async function addToProduction(recipeId: number, amount: number): Promise
 
 export async function setProductionAmount(id: number, amount: number): Promise<Result> {
   if (!valid(amount)) return { ok: false, error: "Quantité invalide." };
-  await prisma.productionItem.update({ where: { id }, data: { amount } });
+  const { count } = await prisma.productionItem.updateMany({ where: { id }, data: { amount } });
+  if (!count) return { ok: false, error: "Ligne introuvable sur la fiche de production." };
   refresh();
   return { ok: true };
 }

@@ -12,22 +12,23 @@ export function productionTarget(amount: number, yieldCount: number | null, yiel
 export async function listProductionItems() {
   const rows = await prisma.productionItem.findMany({
     orderBy: [{ position: "asc" }, { id: "asc" }],
-    select: { id: true, amount: true, recipe: { select: { id: true, name: true, yieldCount: true, yieldLabel: true } } },
+    select: { id: true, amount: true, yieldCount: true, recipe: { select: { id: true, name: true, yieldLabel: true } } },
   });
+  // `yieldCount` : rendement au moment de l'ajout (la quantité est alors en pièces), sinon null (multiplicateur).
   return rows.map((r) => ({
     id: r.id,
     recipeId: r.recipe.id,
     name: r.recipe.name,
     amount: Number(r.amount),
-    yieldCount: r.recipe.yieldCount,
-    yieldLabel: r.recipe.yieldLabel?.trim() || (r.recipe.yieldCount ? "pièces" : null),
+    yieldCount: r.yieldCount,
+    yieldLabel: r.yieldCount ? r.recipe.yieldLabel?.trim() || "pièces" : null,
   }));
 }
 
 export type ProductionItemRow = Awaited<ReturnType<typeof listProductionItems>>[number];
 
 /** Fiche complète (blocs de pesées + total par ingrédient) pour des recettes et leurs quantités. */
-export async function buildProductionSheet(entries: { recipeId: number; amount: number }[]) {
+export async function buildProductionSheet(entries: { recipeId: number; amount: number; yieldCount?: number | null }[]) {
   const recipes = await prisma.recipe.findMany({
     where: { id: { in: entries.map((e) => e.recipeId) } },
     select: { id: true, yieldCount: true, yieldLabel: true },
@@ -37,7 +38,11 @@ export async function buildProductionSheet(entries: { recipeId: number; amount: 
     const r = recipes.find((x) => x.id === e.recipeId);
     const tree = r ? await loadRecipeTree(e.recipeId) : null;
     if (!r || !tree) continue;
-    inputs.push({ tree, coef: productionCoef(e.amount, r.yieldCount), target: productionTarget(e.amount, r.yieldCount, r.yieldLabel) });
+    // Quantité en pièces (rendement noté à l'ajout) : on divise par le rendement
+    // actuel de la recette, ou par celui de l'ajout s'il a été effacé depuis.
+    const pieces = e.yieldCount === undefined ? r.yieldCount : e.yieldCount;
+    const yieldNow = pieces ? (r.yieldCount && r.yieldCount > 0 ? r.yieldCount : pieces) : null;
+    inputs.push({ tree, coef: productionCoef(e.amount, yieldNow), target: productionTarget(e.amount, yieldNow, r.yieldLabel) });
   }
   return buildProduction(inputs);
 }

@@ -14,7 +14,7 @@ import { READ, WRITE, id, js, parseArgs, runAction, text, type McpTool } from ".
 const DEPLOY_LOG = "/tmp/recipelog-deploy.log";
 const DEPLOY_LOCK = "/tmp/recipelog-deploy.lock";
 
-const jsonIngredient = z.object({ name: z.string().trim().min(1), quantity: z.number().nonnegative().default(0), unit: z.string().default("g") });
+const jsonIngredient = z.object({ name: z.string().trim().min(1), quantity: z.number().nonnegative().default(0), quantity_max: z.number().nonnegative().nullable().optional(), unit: z.string().default("g") });
 const jsonRecipe = z.object({
   name: z.string().trim().min(1).max(200),
   yield: z.string().optional(),
@@ -22,6 +22,16 @@ const jsonRecipe = z.object({
   steps: z.string().optional(),
   notes: z.string().nullable().optional(),
   source: z.string().nullable().optional(),
+  // Champs de l'export RecipeLog : ré-importés tels quels.
+  yield_count: z.number().nullable().optional(),
+  yield_label: z.string().nullable().optional(),
+  sale_coef: z.number().nullable().optional(),
+  mold: z.unknown().optional(),
+  folder: z.string().nullable().optional(),
+  categories: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  favorite: z.boolean().optional(),
+  rating: z.number().nullable().optional(),
 });
 
 export const SITE_TOOLS: McpTool[] = [
@@ -49,7 +59,7 @@ export const SITE_TOOLS: McpTool[] = [
     name: "importer_recettes_json",
     title: "Importer des recettes",
     description:
-      "Ajoute des recettes en lot, comme Réglages → Import JSON. Une recette dont le nom existe déjà est ignorée. Unités acceptées : g, kg, ml, cl, dl, l, cc, cs, pièce, qs (converties automatiquement).",
+      "Ajoute des recettes en lot, comme Réglages → Import JSON. Une recette dont le nom existe déjà est ignorée. Unités acceptées : g, kg, ml, cl, dl, l, cc, cs, pièce, qs (converties automatiquement). Accepte tel quel le JSON de exporter_recettes_json (rendement, moule, dossier et catégories existants, étiquettes, favori, note).",
     inputSchema: {
       type: "object",
       properties: {
@@ -94,7 +104,7 @@ export const SITE_TOOLS: McpTool[] = [
     name: "exporter_recettes_json",
     title: "Exporter des recettes",
     description:
-      "Renvoie des recettes en JSON (même format que l'import, plus dossier, catégories, étiquettes et favori) : pour une sauvegarde, une copie ou une conversion. Sans ids : toutes les recettes.",
+      "Renvoie des recettes en JSON (même format que l'import : ingrédients, étapes, rendement, moule, dossier, catégories, étiquettes, favori, note) : pour une sauvegarde, une copie ou une conversion. Sans ids : toutes les recettes.",
     inputSchema: { type: "object", properties: { ids: js.ints("Ids des recettes (toutes si absent)") } },
     annotations: READ,
     run: async (args) => {
@@ -131,6 +141,7 @@ export const SITE_TOOLS: McpTool[] = [
           yield_count: r.yieldCount,
           yield_label: r.yieldLabel,
           sale_coef: r.saleCoef != null ? Number(r.saleCoef) : null,
+          mold: r.mold ?? null,
         })),
       );
     },

@@ -75,9 +75,10 @@ export function RecipeActions({
                     "Supprimer définitivement cette recette ? Cette action est irréversible.",
                   )
                 ) {
-                  startTransition(() => {
+                  startTransition(async () => {
                     setOpen(false);
-                    deleteRecipe(recipeId);
+                    const res = await deleteRecipe(recipeId);
+                    if (res && !res.ok) alert(res.error);
                   });
                 }
               }}

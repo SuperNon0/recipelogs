@@ -7,7 +7,7 @@ import { getDefaultPdfTheme } from "@/lib/pdfThemes";
 export async function GET(req: Request) {
   const items = await listProductionItems();
   if (items.length === 0) return new NextResponse("Fiche de production vide", { status: 404 });
-  const sheet = await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount })));
+  const sheet = await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount, yieldCount: i.yieldCount })));
   const theme = await getDefaultPdfTheme();
   const url = new URL(req.url);
   const pdf = await renderProductionPdf(sheet, theme.config, "Fiche de production", url.searchParams.get("etapes") === "1");

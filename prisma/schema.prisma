@@ -168,7 +168,7 @@ model SubRecipe {
 model Variant {
   id              Int     @id @default(autoincrement())
   sourceRecipeId  Int     @map("source_recipe_id")
-  variantRecipeId Int     @map("variant_recipe_id")
+  variantRecipeId Int     @unique @map("variant_recipe_id")
   note            String? @db.Text
 
   source  Recipe @relation("VariantSource", fields: [sourceRecipeId], references: [id], onDelete: Cascade)
@@ -412,6 +412,9 @@ model ProductionItem {
   id        Int      @id @default(autoincrement())
   recipeId  Int      @unique @map("recipe_id")
   amount    Decimal  @db.Decimal(12, 3)
+  /// Rendement de la recette au moment de l'ajout : `amount` est alors un nombre
+  /// de pièces ; null = `amount` est un multiplicateur.
+  yieldCount Int?    @map("yield_count")
   position  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 

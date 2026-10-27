@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Fiche de production : les recettes à produire, leurs quantités, et toutes les pesées. */
 export default async function ProductionPage() {
   const items = await listProductionItems();
-  const sheet = items.length ? await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount }))) : null;
+  const sheet = items.length ? await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount, yieldCount: i.yieldCount }))) : null;
 
   return (
     <>

@@ -250,7 +250,8 @@ type BaseFacts = {
 /**
  * La fiche fusionnée garde ce que la cible n'avait pas encore : poids d'une
  * pièce, prix, et TOUS les allergènes (un allergène perdu fausserait la
- * déclaration). L'historique des prix des sources passe sur la cible.
+ * déclaration). L'historique des prix des sources passe sur la cible si
+ * c'est son prix qui est repris.
  */
 async function mergeFacts(tx: Prisma.TransactionClient, target: BaseFacts, sources: BaseFacts[]) {
   const priced = sources.find((s) => s.price != null);
@@ -262,7 +263,11 @@ async function mergeFacts(tx: Prisma.TransactionClient, target: BaseFacts, sourc
       allergens: cleanAllergens([...target.allergens, ...sources.flatMap((s) => s.allergens)]),
     },
   });
-  await tx.ingredientPrice.updateMany({ where: { baseId: { in: sources.map((s) => s.id) } }, data: { baseId: target.id } });
+  // L'historique suit le prix gardé : celui des sources seulement si la cible n'avait pas de prix
+  // (sinon on mélangerait deux produits dans une même courbe).
+  const ids = sources.map((s) => s.id);
+  if (target.price == null) await tx.ingredientPrice.updateMany({ where: { baseId: { in: ids } }, data: { baseId: target.id } });
+  else await tx.ingredientPrice.deleteMany({ where: { baseId: { in: ids } } });
 }
 
 export async function mergeIngredientBases(
@@ -307,7 +312,7 @@ export async function setIngredientPieceWeight(id: number, pieceG: number | null
  */
 export async function setIngredientPrice(id: number, price: number | null, unit: string): Promise<ActionResult> {
   if (!isPriceUnit(unit)) return { ok: false, error: "Unité de prix invalide." };
-  if (price != null && (!Number.isFinite(price) || price < 0 || price > 1_000_000)) {
+  if (price != null && (!Number.isFinite(price) || price < 0 || price >= 1_000_000)) {
     return { ok: false, error: "Prix invalide." };
   }
   const current = await prisma.ingredientBase.findUnique({

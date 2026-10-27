@@ -246,7 +246,7 @@ export const LABO_TOOLS: McpTool[] = [
       const a = parseArgs(z.object({ avec_etapes: z.boolean().default(false) }), args);
       const items = await listProductionItems();
       if (!items.length) return text({ recettes: [], info: "La fiche de production est vide." });
-      const sheet = await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount })));
+      const sheet = await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount, yieldCount: i.yieldCount })));
       return text({
         recettes: items.map((i) => ({
           ligne_id: i.id,
