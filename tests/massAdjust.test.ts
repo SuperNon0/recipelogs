@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { recipeMass, scaleQty } from "@/lib/massAdjust";
+import { recipeMass, scaleQty, adjustToTarget } from "@/lib/massAdjust";
 
 describe("recipeMass", () => {
   it("compte g, cc (5 g), cs (15 g) et L (1000 g)", () => {
@@ -32,5 +32,42 @@ describe("recipeMass", () => {
 describe("scaleQty", () => {
   it("convertit L en g arrondi au supérieur", () => {
     expect(scaleQty(0.5, "L", 1)).toEqual({ quantityG: 500, unit: "g" });
+  });
+});
+
+describe("adjustToTarget", () => {
+  it("vise la masse moyenne affichée, pas la somme des minimums (fourchette)", () => {
+    // crème 360–380 (moyenne 370) + sucre 240 + gélatine 3 → moyenne 613
+    const ings = [
+      { name: "Crème", quantityG: 360, quantityGMax: 380, unit: "g" },
+      { name: "Sucre", quantityG: 240, quantityGMax: null, unit: "g" },
+      { name: "Gélatine", quantityG: 3, quantityGMax: null, unit: "g" },
+    ];
+    const r = adjustToTarget(ings, 613);
+    expect((r.totalMassGMin + r.totalMassGMax) / 2).toBe(613);
+    expect(r.ingredients[2].quantityG).toBe(3); // gélatine intacte
+  });
+
+  it("corrige l'excédent d'arrondi sur les gros ingrédients, pas sur les petits", () => {
+    // moyenne 371 + 240 + 3 = 614 ; cible 613 → retirer 1 g à la crème (min ET max)
+    const ings = [
+      { name: "Crème", quantityG: 361, quantityGMax: 381, unit: "g" },
+      { name: "Sucre", quantityG: 240, quantityGMax: null, unit: "g" },
+      { name: "Gélatine", quantityG: 3, quantityGMax: null, unit: "g" },
+    ];
+    const r = adjustToTarget(ings, 613);
+    expect((r.totalMassGMin + r.totalMassGMax) / 2).toBe(613);
+    expect(r.ingredients[0]).toMatchObject({ quantityG: 360, quantityGMax: 380 });
+    expect(r.ingredients[2].quantityG).toBe(3); // gélatine toujours intacte
+  });
+
+  it("n'altère pas une recette sans fourchette (comportement inchangé)", () => {
+    const ings = [
+      { name: "A", quantityG: 108, quantityGMax: null, unit: "g" },
+      { name: "B", quantityG: 218, quantityGMax: null, unit: "g" },
+    ];
+    const r = adjustToTarget(ings, 325);
+    expect(r.totalMassGMin).toBe(325);
+    expect(r.ingredients[1].quantityG).toBe(217);
   });
 });

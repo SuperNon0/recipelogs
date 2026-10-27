@@ -22,6 +22,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Multiplicateur « Pivot » : si l'ingrédient fixé est en litres ou en cuillères (cc/cs), la quantité voulue est bien lue en grammes et le coefficient est juste (avant, les quantités pouvaient être multipliées par 1000, 5 ou 15)",
     ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
+    fixes: [
+      "« Masse cible exacte » sur une recette avec des fourchettes : la masse obtenue est maintenant pile celle demandée, sans gonfler les petits ingrédients (gélatine, levure…)",
+    ],
   },
   {
     version: "V2.2",
