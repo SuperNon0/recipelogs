@@ -288,11 +288,33 @@ export async function getIngredientBaseDetail(id: number) {
     select: {
       recipeId: true,
       name: true,
+      quantityG: true,
+      unit: true,
       recipe: { select: { id: true, name: true } },
     },
     distinct: ["recipeId"],
     orderBy: { recipe: { name: "asc" } },
   });
+
+  // Recettes qui l'utilisent à travers une sous-recette (à tous les niveaux).
+  const links = await prisma.subRecipe.findMany({ select: { parentId: true, childId: true, label: true } });
+  const via = new Map<number, string>();
+  let frontier = usages.map((u) => u.recipeId);
+  const reached = new Set(frontier);
+  while (frontier.length) {
+    const next: number[] = [];
+    for (const l of links) {
+      if (frontier.includes(l.childId) && !reached.has(l.parentId)) {
+        reached.add(l.parentId);
+        via.set(l.parentId, l.label);
+        next.push(l.parentId);
+      }
+    }
+    frontier = next;
+  }
+  const viaRecipes = via.size
+    ? await prisma.recipe.findMany({ where: { id: { in: [...via.keys()] } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    : [];
 
   return {
     base: {
@@ -304,7 +326,14 @@ export async function getIngredientBaseDetail(id: number) {
       priceUnit: base.priceUnit ?? (base.defaultUnit === "pièce" ? "pièce" : base.defaultUnit === "L" ? "L" : "kg"),
       priceHistory: base.prices.map((p) => ({ price: Number(p.price), unit: p.priceUnit, date: p.createdAt.toISOString() })),
     },
-    recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name ?? base.name })),
+    recipes: usages.map((u) => ({
+      id: u.recipe.id,
+      name: u.recipe.name,
+      ingredientName: u.name ?? base.name,
+      quantityG: Number(u.quantityG),
+      unit: u.unit,
+    })),
+    viaRecipes: viaRecipes.map((r) => ({ id: r.id, name: r.name, via: via.get(r.id) ?? "" })),
   };
 }
 

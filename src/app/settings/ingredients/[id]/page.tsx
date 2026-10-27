@@ -31,6 +31,7 @@ export default async function IngredientDetailPage({
       <IngredientDetailClient
         base={detail.base}
         recipes={detail.recipes}
+        viaRecipes={detail.viaRecipes}
         otherBases={otherBases.map((b) => ({ id: b.id, name: b.name, count: b._count.usages }))}
       />
     </div>
