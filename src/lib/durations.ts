@@ -14,9 +14,11 @@ export type DurationHit = {
 };
 
 const NUM = String.raw`\d+(?:[.,]\d+)?`;
-// « 1 h 30 », « 1h30 », « 2 h », « 18 min », « 45 s » ; « 10 à 12 min » (fourchette).
+// « 1 h 30 », « 1h30 », « 1 h 30 min », « 2 min 30 (s) », « 2 h », « 18 min »,
+// « 45 s » ; « 10 à 12 min » (fourchette).
+const UNIT = String.raw`h|heures?|min(?:utes?)?|mn|s|sec(?:ondes?)?`;
 const RE = new RegExp(
-  String.raw`(?<![\w,.])(?:(${NUM})\s*(?:à|-|–)\s*)?(${NUM})\s*(h|heures?|min(?:utes?)?|mn|s|sec(?:ondes?)?)(?:\s*(\d{1,2})(?!\s*(?:°|%|g\b|min|s\b|cm|mm)))?(?![\wÀ-ÿ])`,
+  String.raw`(?<![\w,.])(?:(${NUM})\s*(?:à|-|–)\s*)?(${NUM})\s*(${UNIT})(?:\s*(\d{1,2})(?:\s*(${UNIT}))?(?![\wÀ-ÿ])(?!\s*(?:°|%|g\b|cm|mm)))?(?![\wÀ-ÿ])`,
   "gi",
 );
 
@@ -28,9 +30,13 @@ export function findDurations(text: string): DurationHit[] {
     const value = toNum(m[2]);
     const unit = m[3].toLowerCase();
     let seconds = unit.startsWith("h") ? value * 3600 : unit.startsWith("m") ? value * 60 : value;
-    // « 1 h 30 » : minutes après les heures.
-    if (m[4] && unit.startsWith("h")) seconds += Number(m[4]) * 60;
-    else if (m[4]) continue;
+    // « 1 h 30 (min) » : minutes après les heures ; « 2 min 30 (s) » : secondes après les minutes.
+    if (m[4]) {
+      const tail = (m[5] ?? "").toLowerCase();
+      if (unit.startsWith("h") && (!tail || tail.startsWith("m"))) seconds += Number(m[4]) * 60;
+      else if (unit.startsWith("m") && (!tail || tail.startsWith("s"))) seconds += Number(m[4]);
+      else continue;
+    }
     if (!(seconds > 0) || seconds > 72 * 3600) continue;
     out.push({ start: m.index!, end: m.index! + m[0].length, seconds: Math.round(seconds), text: m[0] });
   }

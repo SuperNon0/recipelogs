@@ -54,17 +54,40 @@ function pivotGrams(node: TreeNode, pivotId: number | null): number | null {
 /**
  * Masse intrinsèque (à ×1) d'une recette, sous-recettes imbriquées comprises.
  * Sert de base aux calculs « masse cible » et au total affiché.
+ * `fixedMin`/`fixedMax` : la part qui ne suit pas le multiplicateur de la
+ * recette (sous-recettes verrouillées, à tous les niveaux).
  * Mémoïsé par nœud pour éviter de recalculer un sous-arbre partagé.
  */
-export function treeBaseMass(
-  node: TreeNode,
-  memo: Map<TreeNode, { min: number; max: number; avg: number }> = new Map(),
-): { min: number; max: number; avg: number } {
+export type BaseMass = { min: number; max: number; avg: number; fixedMin: number; fixedMax: number };
+type MassMemo = Map<TreeNode, BaseMass>;
+
+/**
+ * Coefficient local d'une sous-recette. En masse cible, la part verrouillée de
+ * l'enfant ne bouge pas : seul le reste est mis à l'échelle pour tomber sur la
+ * masse voulue (crème de 500 g avec un insert verrouillé de 100 g → le reste
+ * vise 400 g).
+ */
+function linkLocalCoef(
+  link: Pick<TreeLink, "calcMode" | "calcValue" | "pivotIngredientId">,
+  child: TreeNode,
+  base: BaseMass,
+): number {
+  if (link.calcMode === "mass_target") {
+    const fixed = (base.fixedMin + base.fixedMax) / 2;
+    const free = base.avg - fixed;
+    if (fixed > 0 && free > 0 && link.calcValue > fixed) return (link.calcValue - fixed) / free;
+  }
+  return computeLocalCoef(link.calcMode, link.calcValue, base.avg, pivotGrams(child, link.pivotIngredientId));
+}
+
+export function treeBaseMass(node: TreeNode, memo: MassMemo = new Map()): BaseMass {
   const cached = memo.get(node);
   if (cached) return cached;
 
   let min = 0;
   let max = 0;
+  let fixedMin = 0;
+  let fixedMax = 0;
   for (const ing of node.ingredients) {
     const unit = ing.unit ?? "g";
     min += ingMass(ing.quantityG, unit, ing.pieceG);
@@ -72,16 +95,21 @@ export function treeBaseMass(
   }
   for (const link of node.subLinks) {
     const cb = treeBaseMass(link.child, memo);
-    const localCoef = computeLocalCoef(
-      link.calcMode,
-      link.calcValue,
-      cb.avg,
-      pivotGrams(link.child, link.pivotIngredientId),
-    );
-    min += cb.min * localCoef;
-    max += cb.max * localCoef;
+    const k = linkLocalCoef(link, link.child, cb);
+    // La part verrouillée de l'enfant ne suit pas son coefficient.
+    const lMin = (cb.min - cb.fixedMin) * k + cb.fixedMin;
+    const lMax = (cb.max - cb.fixedMax) * k + cb.fixedMax;
+    min += lMin;
+    max += lMax;
+    if (link.isLocked) {
+      fixedMin += lMin;
+      fixedMax += lMax;
+    } else {
+      fixedMin += cb.fixedMin;
+      fixedMax += cb.fixedMax;
+    }
   }
-  const r = { min, max, avg: (min + max) / 2 };
+  const r = { min, max, avg: (min + max) / 2, fixedMin, fixedMax };
   memo.set(node, r);
   return r;
 }
@@ -114,13 +142,40 @@ function scaleLeaf(ing: TreeIngredient, coef: number): AdjIngredient {
  * - arrondi au gramme supérieur seulement quand on multiplie (coef ≠ 1) ;
  * - chaque sous-recette garde son mode (coef / masse cible / pivot), son
  *   verrouillage (ignore `coef`) et son « masse exacte ».
+ * `fixed[i]` est vrai pour un ingrédient venu d'une sous-recette verrouillée
+ * (à ne pas retoucher pour viser une masse exacte).
  */
-function expand(node: TreeNode, coef: number, memo: Map<TreeNode, { min: number; max: number; avg: number }>): AdjIngredient[] {
-  const out: AdjIngredient[] = node.ingredients.map((ing) => scaleLeaf(ing, coef));
+function expand(node: TreeNode, coef: number, memo: MassMemo): { ingredients: AdjIngredient[]; fixed: boolean[] } {
+  const ingredients: AdjIngredient[] = node.ingredients.map((ing) => scaleLeaf(ing, coef));
+  const fixed: boolean[] = ingredients.map(() => false);
   for (const link of node.subLinks) {
-    out.push(...resolveLink(link, coef, memo).ingredients);
+    const r = resolveParts(link, coef, memo);
+    ingredients.push(...r.ingredients);
+    fixed.push(...r.fixed.map((f) => f || link.isLocked));
   }
-  return out;
+  return { ingredients, fixed };
+}
+
+type LinkInput = Pick<TreeLink, "calcMode" | "calcValue" | "pivotIngredientId" | "isLocked" | "isExact" | "child">;
+
+function resolveParts(link: LinkInput, parentCoef: number, memo: MassMemo) {
+  const child = link.child;
+  const localCoef = linkLocalCoef(link, child, treeBaseMass(child, memo));
+  const effectiveCoef = link.isLocked ? localCoef : localCoef * parentCoef;
+
+  let { ingredients, fixed } = expand(child, effectiveCoef, memo);
+  if (link.isExact && link.calcMode === "mass_target") {
+    // Seule la part qui suit est ajustée : un insert verrouillé n'est pas raboté.
+    const target = Math.round(link.calcValue * (link.isLocked ? 1 : parentCoef));
+    const fixedMass = recipeMass(ingredients.filter((_, i) => fixed[i])).avg;
+    if (target > fixedMass) {
+      const idx = ingredients.map((_, i) => i).filter((i) => !fixed[i]);
+      const adjusted = adjustToTarget(idx.map((i) => ingredients[i]), target - fixedMass).ingredients;
+      ingredients = [...ingredients];
+      idx.forEach((i, j) => (ingredients[i] = adjusted[j]));
+    }
+  }
+  return { effectiveCoef, ingredients, fixed };
 }
 
 /**
@@ -129,25 +184,11 @@ function expand(node: TreeNode, coef: number, memo: Map<TreeNode, { min: number;
  * compris) et masse min/max.
  */
 export function resolveLink(
-  link: Pick<TreeLink, "calcMode" | "calcValue" | "pivotIngredientId" | "isLocked" | "isExact" | "child">,
+  link: LinkInput,
   parentCoef: number,
-  memo: Map<TreeNode, { min: number; max: number; avg: number }> = new Map(),
+  memo: MassMemo = new Map(),
 ): { effectiveCoef: number; ingredients: AdjIngredient[]; min: number; max: number } {
-  const child = link.child;
-  const base = treeBaseMass(child, memo);
-  const localCoef = computeLocalCoef(
-    link.calcMode,
-    link.calcValue,
-    base.avg,
-    pivotGrams(child, link.pivotIngredientId),
-  );
-  const effectiveCoef = link.isLocked ? localCoef : localCoef * parentCoef;
-
-  let ingredients = expand(child, effectiveCoef, memo);
-  if (link.isExact && link.calcMode === "mass_target") {
-    const target = Math.round(link.calcValue * (link.isLocked ? 1 : parentCoef));
-    ingredients = adjustToTarget(ingredients, target).ingredients;
-  }
+  const { effectiveCoef, ingredients } = resolveParts(link, parentCoef, memo);
   const { min, max } = recipeMass(ingredients);
   return { effectiveCoef, ingredients, min, max };
 }

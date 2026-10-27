@@ -261,7 +261,10 @@ export async function applyMultiplierToRecipe(
   id: number,
   multiplier: number,
   targetMassG?: number,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  /** Nouveau moule d'origine (mode « Moule » vers un seul moule). Sinon, un moule
+   * enregistré est effacé : les quantités ne correspondent plus à ce moule. */
+  newMold?: unknown,
+): Promise<{ ok: true; moldCleared?: boolean } | { ok: false; error: string }> {
   if (!Number.isFinite(multiplier) || multiplier <= 0) {
     return { ok: false, error: "Multiplicateur invalide." };
   }
@@ -291,23 +294,31 @@ export async function applyMultiplierToRecipe(
   });
 
   if (targetMassG && targetMassG > 0) {
+    // La fourchette (max) est transmise : sinon la masse visée est fausse et
+    // le minimum ajusté peut dépasser le maximum (400–500 g → 975–750 g).
     const adjInput = scaled.map((s, i) => ({
       name: "",
       quantityG: s.quantityG,
-      quantityGMax: null,
+      quantityGMax: s.quantityGMax,
       unit: s.unit,
       pieceG: pieceWeightOf(info, nameOf(ingredients[i])),
     }));
     const { ingredients: adjusted } = adjustToTarget(adjInput, targetMassG);
-    scaled = scaled.map((s, i) => ({ ...s, quantityG: adjusted[i].quantityG }));
+    scaled = scaled.map((s, i) => ({ ...s, quantityG: adjusted[i].quantityG, quantityGMax: adjusted[i].quantityGMax }));
   }
 
   // Le rendement et les quantités liées des étapes suivent la nouvelle base.
   const recipe = await prisma.recipe.findUnique({
     where: { id },
-    select: { yieldCount: true, stepsBlock: { select: { content: true } } },
+    select: { yieldCount: true, mold: true, stepsBlock: { select: { content: true } } },
   });
   const steps = recipe?.stepsBlock?.content;
+  const target = parseMold(newMold);
+  const moldData = target
+    ? { mold: target as unknown as Prisma.InputJsonValue }
+    : recipe?.mold != null
+      ? { mold: Prisma.DbNull }
+      : null;
   const newSteps = steps ? rescaleStepText(steps, multiplier) : steps;
 
   await prisma.$transaction([
@@ -317,8 +328,16 @@ export async function applyMultiplierToRecipe(
         data: { quantityG: ing.quantityG, quantityGMax: ing.quantityGMax, unit: ing.unit },
       }),
     ),
-    ...(recipe?.yieldCount
-      ? [prisma.recipe.update({ where: { id }, data: { yieldCount: Math.max(1, Math.round(recipe.yieldCount * multiplier)) } })]
+    ...(recipe?.yieldCount || moldData
+      ? [
+          prisma.recipe.update({
+            where: { id },
+            data: {
+              ...(recipe?.yieldCount ? { yieldCount: Math.max(1, Math.round(recipe.yieldCount * multiplier)) } : {}),
+              ...(moldData ?? {}),
+            },
+          }),
+        ]
       : []),
     ...(steps && newSteps !== steps ? [prisma.stepsBlock.update({ where: { recipeId: id }, data: { content: newSteps! } })] : []),
   ]);
@@ -326,7 +345,7 @@ export async function applyMultiplierToRecipe(
   revalidatePath("/");
   revalidatePath("/favorites");
   revalidatePath(`/recipes/${id}`);
-  return { ok: true };
+  return { ok: true, moldCleared: !target && recipe?.mold != null };
 }
 
 /** Coefficient de vente d'une recette (prix conseillé = coût matière × coef). */

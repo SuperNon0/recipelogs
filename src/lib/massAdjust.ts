@@ -13,11 +13,15 @@ export function ingMass(q: number, unit: string, pieceG?: number | null): number
 
 /**
  * Arrondi d'une quantité multipliée : au gramme supérieur, sauf les pièces,
- * arrondies à la pièce la plus proche (5,06 jaunes → 5, et non 6 ; au moins 1).
+ * arrondies à la pièce la plus proche (5,06 jaunes → 5, et non 6 ; au moins 1),
+ * et les cuillères, à la demi-cuillère la plus proche (½ cc ×0,5 → ½ cc, et
+ * non 1 cc ; au moins ½).
  */
 export function roundScaled(x: number, unit: string | null | undefined): number {
   if (unit === "pièce") return x > 0 ? Math.max(1, Math.round(x)) : 0;
-  return Math.ceil(x);
+  if (unit === "cc" || unit === "cs") return x > 0 ? Math.max(0.5, Math.round(x * 2) / 2) : 0;
+  // Petite marge : 2,2 × 10 vaut 22,000000000000004 en machine, pas 23 g.
+  return Math.ceil(x - 1e-9);
 }
 
 /**

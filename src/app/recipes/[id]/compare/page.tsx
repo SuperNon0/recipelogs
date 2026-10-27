@@ -70,20 +70,24 @@ export default async function ComparePage({
           <tbody>
             {rows.map((r) => {
               const diff = r.a !== null && r.b !== null ? r.b - r.a : null;
-              const state = r.a === null ? "added" : r.b === null ? "removed" : Math.abs(diff ?? 0) > 0.001 ? "changed" : undefined;
+              const state = r.a === null ? "added" : r.b === null ? "removed" : r.changed ? "changed" : undefined;
+              // Écart en grammes seulement entre deux pesées (pas pour « 3 pièces » contre « 4 pièces »).
+              const weighed = !r.noteA && !r.noteB && diff !== null && Math.abs(diff) > 0.001;
               return (
                 <tr key={r.key} data-state={state}>
                   <td>
                     {r.name}
                     {r.isSub && <small className="cmp-sub">sous-recette</small>}
                   </td>
-                  <td className="num">{r.a === null ? "—" : r.note ?? formatG(r.a)}</td>
-                  <td className="num">{r.b === null ? "—" : r.note ?? formatG(r.b)}</td>
+                  <td className="num">{r.a === null ? "—" : r.noteA ?? formatG(r.a)}</td>
+                  <td className="num">{r.b === null ? "—" : r.noteB ?? formatG(r.b)}</td>
                   <td className="num cmp-diff">
-                    {state === "added" ? "ajouté" : state === "removed" ? "retiré" : state === "changed" && diff !== null ? (
+                    {state === "added" ? "ajouté" : state === "removed" ? "retiré" : state === "changed" && weighed ? (
                       <>
-                        {fmtDiff(diff)} <small>{fmtPct(r.a!, r.b!)}</small>
+                        {fmtDiff(diff!)} <small>{fmtPct(r.a!, r.b!)}</small>
                       </>
+                    ) : state === "changed" ? (
+                      "modifié"
                     ) : (
                       ""
                     )}
