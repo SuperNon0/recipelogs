@@ -222,7 +222,49 @@ export async function updateRecipe(id: number, formData: FormData) {
   redirect(`/recipes/${id}`);
 }
 
-export async function deleteRecipe(id: number) {
+/**
+ * Avant de supprimer des recettes :
+ * - refuse si l'une sert de sous-recette dans une recette gardée (message clair,
+ *   au lieu d'une erreur de la base) ;
+ * - une version principale supprimée laisse sa place à sa plus ancienne
+ *   variante gardée : les essais restent reliés entre eux.
+ */
+async function prepareDeletion(ids: number[]): Promise<string | null> {
+  const uses = await prisma.subRecipe.findMany({
+    where: { childId: { in: ids }, parentId: { notIn: ids } },
+    select: { child: { select: { name: true } }, parent: { select: { name: true } } },
+  });
+  if (uses.length) {
+    const byChild = new Map<string, string[]>();
+    for (const u of uses) byChild.set(u.child.name, [...(byChild.get(u.child.name) ?? []), u.parent.name]);
+    return [...byChild]
+      .map(([child, parents]) => `« ${child} » sert de sous-recette dans : ${[...new Set(parents)].join(", ")}. Retire-la d'abord de ces recettes.`)
+      .join("\n");
+  }
+  const roots = await prisma.variant.findMany({
+    where: { sourceRecipeId: { in: ids }, variantRecipeId: { notIn: ids } },
+    orderBy: { id: "asc" },
+    select: { id: true, sourceRecipeId: true, variantRecipeId: true },
+  });
+  const done = new Set<number>();
+  for (const link of roots) {
+    if (done.has(link.sourceRecipeId)) continue;
+    done.add(link.sourceRecipeId);
+    await prisma.$transaction([
+      prisma.variant.delete({ where: { id: link.id } }),
+      prisma.variant.updateMany({
+        where: { sourceRecipeId: link.sourceRecipeId, variantRecipeId: { notIn: ids } },
+        data: { sourceRecipeId: link.variantRecipeId },
+      }),
+    ]);
+    revalidatePath(`/recipes/${link.variantRecipeId}`);
+  }
+  return null;
+}
+
+export async function deleteRecipe(id: number): Promise<{ ok: false; error: string } | void> {
+  const error = await prepareDeletion([id]);
+  if (error) return { ok: false, error };
   await prisma.recipe.delete({ where: { id } });
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -241,6 +283,8 @@ export async function deleteRecipes(
   if (cleanIds.length === 0) {
     return { ok: false, error: "Aucune recette sélectionnée." };
   }
+  const error = await prepareDeletion(cleanIds);
+  if (error) return { ok: false, error };
   const { count } = await prisma.recipe.deleteMany({
     where: { id: { in: cleanIds } },
   });
@@ -353,8 +397,12 @@ export async function setRecipeSaleCoef(
   id: number,
   coef: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!Number.isFinite(coef) || coef <= 0 || coef > 100) return { ok: false, error: "Coefficient invalide." };
-  await prisma.recipe.update({ where: { id }, data: { saleCoef: Math.round(coef * 100) / 100 } });
+  // Au moins 0,01 : la base garde 2 décimales (0,004 deviendrait 0).
+  if (!Number.isFinite(coef) || coef < 0.01 || coef > 100) return { ok: false, error: "Coefficient invalide (entre 0,01 et 100)." };
+  const { count } = await prisma.recipe.updateMany({ where: { id }, data: { saleCoef: Math.round(coef * 100) / 100 } });
+  if (!count) return { ok: false, error: "Recette introuvable." };
+  revalidatePath(`/recipes/${id}`);
+  revalidatePath("/settings/ingredients/prix");
   return { ok: true };
 }
 

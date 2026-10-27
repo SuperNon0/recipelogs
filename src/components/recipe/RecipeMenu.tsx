@@ -98,13 +98,14 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
     ];
 
     const remove = () => {
-      if (!confirm(`Supprimer définitivement « ${r.name} » ?\n\nCette action est irréversible.`)) return;
+      const nv = opts.variants ? opts.variants.members.length - 1 : (r.variantCount ?? 0);
+      const isRoot = opts.variants ? opts.variants.rootId === r.id : true;
+      const variantNote = nv > 0 && isRoot ? "\n\nSes variantes restent reliées : la plus ancienne devient la version principale." : "";
+      if (!confirm(`Supprimer définitivement « ${r.name} » ?${variantNote}\n\nCette action est irréversible.`)) return;
       startTransition(async () => {
-        if (opts.onPage) await deleteRecipe(r.id);
-        else {
-          await deleteRecipes([r.id]);
-          router.refresh();
-        }
+        const res = opts.onPage ? await deleteRecipe(r.id) : await deleteRecipes([r.id]);
+        if (res && !res.ok) return alert(res.error);
+        if (!opts.onPage) router.refresh();
       });
     };
 

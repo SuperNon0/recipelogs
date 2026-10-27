@@ -28,7 +28,13 @@ export async function createVariant(recipeId: number, note: string): Promise<Res
   const name = `${root?.name ?? source.name} · ${n ?? `essai ${count + 2}`}`.slice(0, 200);
 
   const id = await copyRecipe(recipeId, name);
-  await prisma.variant.create({ data: { sourceRecipeId: rootId, variantRecipeId: id, note: n } });
+  try {
+    await prisma.variant.create({ data: { sourceRecipeId: rootId, variantRecipeId: id, note: n } });
+  } catch {
+    // Pas de copie orpheline si le lien échoue.
+    await prisma.recipe.delete({ where: { id } }).catch(() => {});
+    return { ok: false, error: "La variante n'a pas pu être créée. Réessaie." };
+  }
   refresh(recipeId, rootId, id);
   return { ok: true, id };
 }
@@ -39,6 +45,8 @@ export async function createVariant(recipeId: number, note: string): Promise<Res
  */
 export async function linkVariant(recipeId: number, otherId: number, note: string): Promise<Result> {
   if (recipeId === otherId) return { ok: false, error: "Choisis une autre recette." };
+  const found = await prisma.recipe.count({ where: { id: { in: [recipeId, otherId] } } });
+  if (found < 2) return { ok: false, error: "Recette introuvable." };
   const rootId = await variantRootOf(recipeId);
   const otherRoot = await variantRootOf(otherId);
   if (otherRoot === rootId) return { ok: false, error: "Cette recette est déjà une variante de la même famille." };

@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import JSZip from "jszip";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { parseMold } from "@/lib/mold";
 import { normalizeForSearch } from "@/lib/recipes";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { parseRecipeKeeperCsv } from "@/lib/importRecipeKeeper";
@@ -269,6 +271,13 @@ type JsonRecipe = {
   steps?: string;
   notes?: string | null;
   source?: string | null;
+  /** Champs de l'export RecipeLog. Dossier et catégories : reliés s'ils existent déjà (par leur nom). */
+  mold?: unknown;
+  folder?: string | null;
+  categories?: string[];
+  tags?: string[];
+  favorite?: boolean;
+  rating?: number | null;
 };
 
 function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; quantityG: number } {
@@ -327,9 +336,11 @@ export async function importRecipesFromJson(
         .filter((i) => i.name?.trim())
         .map((i, position) => {
           const norm = normalizeImportUnit(i.unit, i.quantity);
-          const max = i.quantity_max != null && norm.quantityG > 0
+          const rawMax = i.quantity_max != null && norm.quantityG > 0
             ? normalizeImportUnit(i.unit, i.quantity_max).quantityG
             : null;
+          // Fourchette inversée ou vide (max ≤ min) : on garde la quantité seule.
+          const max = rawMax != null && rawMax > norm.quantityG ? rawMax : null;
           return { name: i.name.trim(), quantityG: norm.quantityG, quantityGMax: max, unit: norm.unit, position };
         });
 
@@ -337,10 +348,28 @@ export async function importRecipesFromJson(
       if (r.yield?.trim()) notesParts.push(`Rendement : ${r.yield.trim()}`);
       if (r.notes?.trim()) notesParts.push(r.notes.trim());
 
+      const folder = typeof r.folder === "string" && r.folder.trim()
+        ? await prisma.folder.findUnique({ where: { name: r.folder.trim() }, select: { id: true } })
+        : null;
+      const categories = Array.isArray(r.categories) && r.categories.length
+        ? await prisma.category.findMany({ where: { name: { in: r.categories.map(String) } }, select: { id: true } })
+        : [];
+      const tags = Array.isArray(r.tags)
+        ? [...new Set(r.tags.map((t) => String(t).trim()).filter(Boolean))].slice(0, 50)
+        : [];
+      const mold = parseMold(r.mold);
+      const rating = typeof r.rating === "number" && r.rating >= 1 && r.rating <= 5 ? Math.round(r.rating) : null;
+
       await prisma.recipe.create({
         data: {
           name: r.name.trim(),
           nameNormalized: normalizeForSearch(r.name.trim()),
+          folderId: folder?.id ?? null,
+          favorite: r.favorite === true,
+          rating,
+          ...(mold ? { mold: mold as unknown as Prisma.InputJsonValue } : {}),
+          categories: { create: categories.map((c) => ({ categoryId: c.id })) },
+          tags: { create: tags.map((name) => ({ name })) },
           source: r.source?.trim() || null,
           notesTips: notesParts.length > 0 ? notesParts.join("\n\n") : null,
           stepsBlock: r.steps?.trim()
