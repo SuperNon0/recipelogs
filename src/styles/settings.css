@@ -477,6 +477,13 @@ button.set-row:first-child {
   font-size: 12px;
 }
 
+.set-log-sum {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 .set-log ul {
   margin: 6px 0 0;
   padding: 0;

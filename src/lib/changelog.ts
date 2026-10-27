@@ -2,6 +2,8 @@ export type ChangelogEntry = {
   version: string;
   date: string;
   title: string;
+  /** Résumé en une ou deux phrases d'une mise à jour (ajouts importants). */
+  summary?: string;
   features?: string[];
   fixes?: string[];
   migrations?: string[];
@@ -12,21 +14,17 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "V2.4",
     date: "2026-10-27",
     title: "Rendement, allergènes et coût de revient",
+    summary:
+      "Grosse mise à jour pour le labo : chaque recette connaît maintenant son rendement, ses allergènes et son coût de revient, calculés tout seuls à partir des fiches ingrédients (sous-recettes comprises). Les recettes se lisent aussi mieux, avec des intertitres et des quantités dans les étapes qui suivent le multiplicateur.",
     features: [
-      "Poids d'une pièce sur la fiche d'un ingrédient (Réglages → Ingrédients) : un œuf à 50 g, un jaune à 20 g… compte enfin dans la masse totale, les %, le multiplicateur et les PDF",
-      "Rendement d'une recette (ex. 40 financiers, 8 parts) dans « Modifier » : la fiche affiche le poids d'une pièce, et le multiplicateur a un mode « Pièces » pour viser un nombre de pièces",
-      "Le rendement s'imprime sur le PDF de la recette et dans les cahiers",
-      "Allergènes : les 14 allergènes à déclarer se cochent sur la fiche de chaque ingrédient ; chaque recette les cumule toute seule, sous-recettes comprises, avec le détail de l'ingrédient qui les apporte",
-      "Les allergènes s'impriment sur le PDF de la recette et dans les cahiers",
-      "Prix d'achat sur la fiche d'un ingrédient (€ le kg, le litre ou la pièce), avec l'historique des anciens prix",
-      "Coût de revient sur la fiche recette : coût matière (sous-recettes comprises, multiplicateur appliqué), coût par pièce, et prix de vente conseillé selon ton coefficient (×4 par défaut, gardé pour chaque recette)",
-      "Page « Prix des ingrédients » (Réglages, ou bouton « Prix » dans Ingrédients) : tous les prix d'achat sur une seule page, modifiables sur place, avec la date du prix, l'écart avec le précédent et un filtre « Sans prix »",
-      "Claude (accès MCP) peut remplir les allergènes, le poids des pièces et les prix de plusieurs ingrédients d'un coup",
-      "Claude (accès MCP) lit aussi le rendement, les allergènes, le coût matière et le prix conseillé d'une recette, et peut régler son rendement et son coefficient de vente",
-      "Intertitres dans les ingrédients (bouton « Intertitre » dans « Modifier ») pour regrouper « Pâte », « Crème », « Montage » sans créer de sous-recette ; ils s'affichent sur la fiche et le PDF et ne comptent dans aucun calcul",
-      "Une ligne déjà saisie (par ex. un titre importé à 0 g) se transforme en intertitre depuis son menu « ⋯ »",
-      "Intertitres dans les étapes : une ligne qui commence par # (« # Crème ») devient un titre, non numéroté",
-      "Quantités liées dans les étapes : « verser {167 g} de lait » suit le multiplicateur (×2 → 334 g) sur la fiche, dans les PDF et les cahiers ; bouton « Quantité liée » dans « Modifier »",
+      "Rendement et poids par pièce : un œuf à 50 g, un jaune à 20 g… comptent dans la masse totale ; une recette indique ce qu'elle donne (ex. 40 financiers) et le multiplicateur a un mode « Pièces »",
+      "Allergènes : les 14 allergènes à déclarer se cochent une fois sur la fiche de l'ingrédient ; chaque recette les cumule, sous-recettes comprises, avec l'ingrédient qui les apporte",
+      "Coût de revient : prix d'achat sur la fiche de l'ingrédient (€ le kg, le litre ou la pièce, avec l'historique des anciens prix) ; la fiche recette affiche le coût matière, le coût par pièce et un prix de vente conseillé (coefficient ×4 par défaut, réglable par recette)",
+      "Page « Prix des ingrédients » (Réglages) : tous les prix sur une page, modifiables sur place, avec l'écart avec le prix précédent et un filtre « Sans prix »",
+      "Intertitres : « Pâte », « Crème », « Montage »… dans les ingrédients (bouton « Intertitre ») et dans les étapes (ligne qui commence par #), sans compter dans les calculs",
+      "Quantités dans les étapes : « verser {167 g} de lait » suit le multiplicateur (×2 → 334 g) ; bouton « Quantité liée » dans « Modifier »",
+      "Rendement et allergènes s'impriment sur les PDF et dans les cahiers",
+      "Claude (accès MCP) lit et règle tout cela : allergènes, poids et prix des ingrédients en lot, rendement, coût et prix conseillé des recettes",
       "Le multiplicateur reste réglé quand on passe de l'onglet Recette à Préparation",
     ],
     fixes: [
