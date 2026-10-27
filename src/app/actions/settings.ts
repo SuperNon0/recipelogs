@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
+import { cleanAllergens } from "@/lib/allergens";
 import {
   recipePdfSettingsSchema,
   parseRecipePdfSettings,
@@ -252,9 +253,13 @@ export async function mergeIngredientBases(
   await prisma.$transaction(async (tx) => {
     await relinkIngredients(tx, sourceId, source.name, targetId, target.name);
     // La fiche fusionnée garde ce que la cible n'avait pas encore (poids d'une pièce…).
-    if (target.pieceG == null && source.pieceG != null) {
-      await tx.ingredientBase.update({ where: { id: targetId }, data: { pieceG: source.pieceG } });
-    }
+    await tx.ingredientBase.update({
+      where: { id: targetId },
+      data: {
+        pieceG: target.pieceG ?? source.pieceG,
+        allergens: cleanAllergens([...target.allergens, ...source.allergens]),
+      },
+    });
     await tx.ingredientBase.delete({ where: { id: sourceId } });
   });
 
@@ -271,6 +276,16 @@ export async function setIngredientPieceWeight(id: number, pieceG: number | null
   const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
   if (!exists) return { ok: false, error: "Ingrédient introuvable." };
   await prisma.ingredientBase.update({ where: { id }, data: { pieceG } });
+  revalidatePath(`/settings/ingredients/${id}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Allergènes cochés d'un ingrédient (remplace la liste). */
+export async function setIngredientAllergens(id: number, allergens: string[]): Promise<ActionResult> {
+  const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) return { ok: false, error: "Ingrédient introuvable." };
+  await prisma.ingredientBase.update({ where: { id }, data: { allergens: cleanAllergens(allergens) } });
   revalidatePath(`/settings/ingredients/${id}`);
   revalidatePath("/");
   return { ok: true };

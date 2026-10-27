@@ -50,6 +50,8 @@ export type RecipeSnap = {
   totalMassGMax?: number;
   /** Rendement déjà mis à l'échelle (« 60 financiers »). */
   yield?: { count: number; label: string } | null;
+  /** Allergènes INCO (libellés), sous-recettes comprises. */
+  allergens?: string[];
   subRecipes: {
     label: string | null;
     childName: string;
@@ -58,6 +60,7 @@ export type RecipeSnap = {
     totalMassGMin?: number;
     totalMassGMax?: number;
     steps: string | null;
+    allergens?: string[];
   }[];
   multiplier?: number;
 };
@@ -984,6 +987,11 @@ export function renderRecipeCard(
       : `<div class="portion">Rendement : <span class="portion-value">${esc(yieldText)}</span></div>`
     : "";
 
+  // Mention obligatoire dès qu'on vend : affichée quel que soit le thème.
+  const allergensHtml = snap.allergens && snap.allergens.length > 0
+    ? `<div class="portion allergens">Allergènes : <span class="portion-value">${esc(snap.allergens.join(", "))}</span></div>`
+    : "";
+
   const sourceHtml = theme.showSource && snap.source
     ? `<div class="source">Source : ${esc(snap.source)}</div>`
     : "";
@@ -1005,6 +1013,7 @@ export function renderRecipeCard(
       ${tagsHtml}
       ${ratingHtml}
       ${portionHtml}
+      ${allergensHtml}
       <div class="columns">
         <div class="col col-ing">
           <div class="col-title">Ingrédients</div>
@@ -1103,6 +1112,7 @@ function subSnapsOf(entry: Extract<CookbookEntryUnion, { type: "recipe" }>): Rec
     totalMassG: sr.totalMassG,
     totalMassGMin: sr.totalMassGMin,
     totalMassGMax: sr.totalMassGMax,
+    allergens: sr.allergens,
     subRecipes: [],
   }));
 }
@@ -1305,6 +1315,7 @@ export function buildSingleRecipeHtml(
         totalMassG: sr.totalMassG,
         totalMassGMin: sr.totalMassGMin,
         totalMassGMax: sr.totalMassGMax,
+        allergens: sr.allergens,
         subRecipes: [],
       };
       return renderRecipeCard(subSnap, "single", null, "", theme, snap.name);

@@ -85,6 +85,8 @@ model IngredientBase {
   category    String?  // "base" | "fruit" | "preparation" | null = à classer
   /** Poids d'une pièce en grammes (œuf ≈ 50 g) : les pièces comptent alors dans la masse. */
   pieceG      Decimal? @map("piece_g") @db.Decimal(10, 3)
+  /** Allergènes INCO cochés (clés de lib/allergens.ts : "gluten", "lait"…). */
+  allergens   String[] @default([])
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 

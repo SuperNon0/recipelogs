@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getRecipeDetail, listAllFolders, loadRecipeTree } from "@/lib/recipes";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { recipeMass } from "@/lib/massAdjust";
+import { collectAllergens } from "@/lib/allergens";
 import type { SubRecipeRow } from "@/components/RecipeBody";
 import { RecipeView } from "@/components/recipe/RecipeView";
 import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
@@ -80,6 +81,7 @@ export default async function RecipePage({
         }}
         ingredients={ingredients}
         subRecipes={subRecipes}
+        allergens={tree ? collectAllergens(tree) : []}
         yieldInfo={recipe.yieldCount ? { count: recipe.yieldCount, label: recipe.yieldLabel?.trim() || "pièces" } : null}
         comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
         usedIn={recipe.childLinks.map((l) => ({ id: l.parent.id, name: l.parent.name, label: l.label }))}

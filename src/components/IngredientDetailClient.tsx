@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Check, ChevronRight, Merge, Pencil } from "lucide-react";
-import { renameIngredientBase, mergeIngredientBases, setIngredientPieceWeight } from "@/app/actions/settings";
+import { renameIngredientBase, mergeIngredientBases, setIngredientAllergens, setIngredientPieceWeight } from "@/app/actions/settings";
+import { ALLERGENS } from "@/lib/allergens";
 import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
@@ -17,7 +18,7 @@ export function IngredientDetailClient({
   recipes,
   otherBases,
 }: {
-  base: { id: number; name: string; pieceG: number | null };
+  base: { id: number; name: string; pieceG: number | null; allergens: string[] };
   recipes: Recipe[];
   otherBases: { id: number; name: string; count?: number }[];
 }) {
@@ -56,6 +57,7 @@ export function IngredientDetailClient({
       </div>
 
       <section className="fl-card ing-facts">
+        <AllergensField id={base.id} initial={base.allergens} />
         <PieceWeightField id={base.id} initial={base.pieceG} />
       </section>
 
@@ -168,6 +170,56 @@ function PieceWeightField({ id, initial }: { id: number; initial: number | null 
           />
           <span className="x">g</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Les 14 allergènes : un clic coche ou décoche, enregistré tout de suite. */
+function AllergensField({ id, initial }: { id: number; initial: string[] }) {
+  const [on, setOn] = useState<string[]>(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  const toggle = (key: string) => {
+    const next = on.includes(key) ? on.filter((k) => k !== key) : [...on, key];
+    const prev = on;
+    setOn(next);
+    setError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const r = await setIngredientAllergens(id, next);
+      if (!r.ok) {
+        setOn(prev);
+        return setError(r.error);
+      }
+      setSaved(true);
+    });
+  };
+
+  return (
+    <div className="ing-fact ing-fact-col">
+      <div className="ing-fact-l">
+        <b>
+          Allergènes
+          <Help title="Allergènes" example="Beurre : Lait. Farine de blé : Gluten. Praliné : Fruits à coque.">
+            Les 14 allergènes à déclarer (règlement INCO). Coche ceux que contient cet ingrédient :
+            chaque recette qui l&apos;utilise, même en sous-recette, les affiche toute seule, sur la
+            fiche et dans le PDF.
+          </Help>
+          <span style={{ marginLeft: "auto", fontWeight: 400 }}>
+            <SaveState pending={pending} saved={saved} error={error} />
+          </span>
+        </b>
+        <small>{on.length === 0 ? "Aucun allergène coché" : `${on.length} coché${on.length > 1 ? "s" : ""}`}</small>
+      </div>
+      <div className="ing-allergens" role="group" aria-label="Allergènes">
+        {ALLERGENS.map((a) => (
+          <button key={a.key} type="button" className="fl-chip" aria-pressed={on.includes(a.key)} onClick={() => toggle(a.key)}>
+            {a.label}
+          </button>
+        ))}
       </div>
     </div>
   );

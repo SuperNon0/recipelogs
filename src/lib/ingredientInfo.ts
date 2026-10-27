@@ -8,6 +8,8 @@ import { prisma } from "./prisma";
 export type IngredientInfo = {
   /** Poids d'une pièce en grammes (unité « pièce »). */
   pieceG: number | null;
+  /** Allergènes INCO cochés (clés de lib/allergens.ts). */
+  allergens: string[];
 };
 
 const key = (name: string) => name.trim().toLowerCase();
@@ -19,10 +21,10 @@ export async function loadIngredientInfo(names: Iterable<string>): Promise<Map<s
   if (wanted.length === 0) return out;
   const bases = await prisma.ingredientBase.findMany({
     where: { name: { in: wanted, mode: "insensitive" } },
-    select: { name: true, pieceG: true },
+    select: { name: true, pieceG: true, allergens: true },
   });
   for (const b of bases) {
-    out.set(key(b.name), { pieceG: b.pieceG != null ? Number(b.pieceG) : null });
+    out.set(key(b.name), { pieceG: b.pieceG != null ? Number(b.pieceG) : null, allergens: b.allergens });
   }
   return out;
 }
@@ -44,4 +46,9 @@ export async function listPieceWeights(): Promise<Record<string, number>> {
     select: { name: true, pieceG: true },
   });
   return Object.fromEntries(rows.map((r) => [key(r.name), Number(r.pieceG)]));
+}
+
+/** Allergènes d'un ingrédient d'après sa fiche (liste vide si inconnu). */
+export function allergensOf(info: Map<string, IngredientInfo>, name: string): string[] {
+  return info.get(key(name))?.allergens ?? [];
 }

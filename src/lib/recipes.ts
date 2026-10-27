@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { recipeMass } from "./massAdjust";
 import type { TreeNode } from "./recipeTree";
-import { loadIngredientInfo, pieceWeightOf } from "./ingredientInfo";
+import { allergensOf, loadIngredientInfo, pieceWeightOf } from "./ingredientInfo";
 
 export function normalizeForSearch(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -154,12 +154,15 @@ export function treeNodes(node: TreeNode): TreeNode[] {
   return [node, ...node.subLinks.flatMap((l) => treeNodes(l.child))];
 }
 
-/** Complète les ingrédients de l'arbre avec leur fiche (poids par pièce…). 1 requête. */
+/** Complète les ingrédients de l'arbre avec leur fiche (poids par pièce, allergènes). 1 requête. */
 async function attachIngredientInfo(tree: TreeNode) {
   const nodes = treeNodes(tree);
   const info = await loadIngredientInfo(nodes.flatMap((n) => n.ingredients.map((i) => i.name)));
   for (const n of nodes) {
-    for (const ing of n.ingredients) ing.pieceG = pieceWeightOf(info, ing.name, ing.unit);
+    for (const ing of n.ingredients) {
+      ing.pieceG = pieceWeightOf(info, ing.name, ing.unit);
+      ing.allergens = allergensOf(info, ing.name);
+    }
   }
 }
 
@@ -237,7 +240,7 @@ export async function listAllIngredientBases() {
 export async function getIngredientBaseDetail(id: number) {
   const base = await prisma.ingredientBase.findUnique({
     where: { id },
-    select: { id: true, name: true, pieceG: true },
+    select: { id: true, name: true, pieceG: true, allergens: true },
   });
   if (!base) return null;
 
@@ -259,7 +262,7 @@ export async function getIngredientBaseDetail(id: number) {
   });
 
   return {
-    base: { id: base.id, name: base.name, pieceG: base.pieceG != null ? Number(base.pieceG) : null },
+    base: { id: base.id, name: base.name, pieceG: base.pieceG != null ? Number(base.pieceG) : null, allergens: base.allergens },
     recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name ?? base.name })),
   };
 }

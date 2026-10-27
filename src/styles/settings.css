@@ -916,3 +916,18 @@ button.set-row:first-child {
 .ing-fact-msg[data-err="true"] {
   color: var(--danger);
 }
+
+.ing-fact-col {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ing-fact-col .ing-fact-l {
+  flex: none;
+}
+
+.ing-allergens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

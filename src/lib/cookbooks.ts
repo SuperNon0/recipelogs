@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { scaleQty, recipeMass, type AdjIngredient } from "./massAdjust";
 import { resolveLink } from "./recipeTree";
+import { collectAllergens } from "./allergens";
 import { loadRecipeTree } from "./recipes";
 
 export async function listCookbooks() {
@@ -93,6 +94,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       totalMassGMin: res.min,
       totalMassGMax: res.max,
       steps: link.child.steps,
+      allergens: collectAllergens(link.child).map((a) => a.label),
     };
   });
 
@@ -113,6 +115,8 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
     subRecipes,
     multiplier: k,
     yield: yieldOf(r.yieldCount, r.yieldLabel, k),
+    /** Allergènes de la recette entière (sous-recettes comprises). */
+    allergens: collectAllergens(tree).map((a) => a.label),
   };
 }
 
