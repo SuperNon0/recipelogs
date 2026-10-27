@@ -3,6 +3,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getIngredientBaseDetail, listAllIngredientBases } from "@/lib/recipes";
 import { INGREDIENT_UNITS } from "@/lib/validation";
+
+/** Unités par défaut possibles pour un ingrédient (« titre » n'en est pas une). */
+const BASE_UNITS = INGREDIENT_UNITS.filter((u) => u !== "titre") as [string, ...string[]];
 import { mergeIngredientBasesBulk, renameIngredientBase } from "@/app/actions/settings";
 import { duplicateKey } from "../duplicates";
 import { ALLERGENS, cleanAllergens } from "@/lib/allergens";
@@ -128,7 +131,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
       properties: {
         noms: js.strs("Noms des ingrédients à ajouter"),
         categorie: js.enum(CATEGORY_LABELS, "Catégorie donnée aux nouveaux ingrédients"),
-        unite_par_defaut: js.enum(INGREDIENT_UNITS, "Unité proposée à la saisie (g par défaut)"),
+        unite_par_defaut: js.enum(BASE_UNITS, "Unité proposée à la saisie (g par défaut)"),
       },
       required: ["noms"],
     },
@@ -138,7 +141,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
         z.object({
           noms: z.array(z.string().trim().min(1).max(200)).min(1).max(500),
           categorie: z.enum(CATEGORY_LABELS).optional(),
-          unite_par_defaut: z.enum(INGREDIENT_UNITS).optional(),
+          unite_par_defaut: z.enum(BASE_UNITS).optional(),
         }),
         args,
       );
@@ -190,7 +193,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
         ids: js.ints("Ids des ingrédients (voir lister_ingredients)"),
         noms: js.strs("Noms exacts des ingrédients, sans tenir compte de la casse"),
         categorie: js.enum(CATEGORY_LABELS, "Nouvelle catégorie"),
-        unite_par_defaut: js.enum(INGREDIENT_UNITS, "Unité proposée à la saisie"),
+        unite_par_defaut: js.enum(BASE_UNITS, "Unité proposée à la saisie"),
       },
     },
     annotations: { ...WRITE, idempotentHint: true },
@@ -201,7 +204,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
             ids: z.array(id).max(500).optional(),
             noms: z.array(z.string().trim().min(1)).max(500).optional(),
             categorie: z.enum(CATEGORY_LABELS).optional(),
-            unite_par_defaut: z.enum(INGREDIENT_UNITS).optional(),
+            unite_par_defaut: z.enum(BASE_UNITS).optional(),
           })
           .refine((a) => a.ids?.length || a.noms?.length, { message: "donne au moins un id ou un nom" })
           .refine((a) => a.categorie !== undefined || a.unite_par_defaut !== undefined, {

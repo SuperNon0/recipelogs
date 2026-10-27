@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { recipeFormSchema } from "@/lib/validation";
+import { isSectionTitle, recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
 import { normalizeForSearch } from "@/lib/recipes";
 import { scaleQty, adjustToTarget } from "@/lib/massAdjust";
@@ -17,6 +17,11 @@ import { ensureIngredientBases } from "@/lib/ingredientBases";
  */
 function hasMeaningfulSteps(raw: unknown): raw is string {
   return typeof raw === "string" && !isStepsHtmlEffectivelyEmpty(raw);
+}
+
+/** Noms à ajouter à la base d'ingrédients : les intertitres n'en sont pas. */
+function ingredientNames(list: { name: string; unit?: string }[]): string[] {
+  return list.filter((i) => !isSectionTitle(i.unit)).map((i) => i.name);
 }
 
 function parseForm(formData: FormData) {
@@ -63,11 +68,11 @@ function parseForm(formData: FormData) {
   for (let i = 0; i < names.length; i++) {
     const n = names[i]?.trim();
     const unit = units[i] ?? "g";
-    const q = unit === "QS" ? 0 : Number(qtys[i]);
+    const q = unit === "QS" || unit === "titre" ? 0 : Number(qtys[i]);
     const qMaxRaw = qtyMaxs[i]?.trim();
     const qMax = qMaxRaw ? Number(qMaxRaw) : null;
-    const quantityGMax = (qMax !== null && Number.isFinite(qMax) && qMax > q) ? qMax : null;
-    if (n && (unit === "QS" || (Number.isFinite(q) && q >= 0))) {
+    const quantityGMax = unit !== "titre" && qMax !== null && Number.isFinite(qMax) && qMax > q ? qMax : null;
+    if (n && (unit === "QS" || unit === "titre" || (Number.isFinite(q) && q >= 0))) {
       ingredients.push({ name: n, quantityG: q, quantityGMax, unit });
     }
   }
@@ -127,7 +132,7 @@ export async function createRecipe(formData: FormData) {
     },
   });
 
-  await ensureIngredientBases(data.ingredients.map((i) => i.name));
+  await ensureIngredientBases(ingredientNames(data.ingredients));
 
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -202,7 +207,7 @@ export async function updateRecipe(id: number, formData: FormData) {
     }
   });
 
-  await ensureIngredientBases(data.ingredients.map((i) => i.name));
+  await ensureIngredientBases(ingredientNames(data.ingredients));
 
   revalidatePath("/");
   revalidatePath("/favorites");
@@ -266,7 +271,7 @@ export async function applyMultiplierToRecipe(
 
   let scaled = ingredients.map((ing) => {
     const unit = ing.unit ?? "g";
-    if (unit === "QS") return { id: ing.id, quantityG: 0, quantityGMax: null, unit };
+    if (unit === "QS" || unit === "titre") return { id: ing.id, quantityG: 0, quantityGMax: null, unit };
     const s = scaleQty(Number(ing.quantityG), unit, multiplier);
     const sMax = ing.quantityGMax != null
       ? scaleQty(Number(ing.quantityGMax), unit, multiplier).quantityG

@@ -400,7 +400,8 @@ export async function deleteIngredientBase(id: number): Promise<ActionResult> {
 
 export async function syncAllIngredientBases(): Promise<ActionResult & { created?: number }> {
   const rows = await prisma.ingredient.findMany({
-    where: { name: { not: null } },
+    // Les intertitres (« Pâte », « Crème ») ne sont pas des ingrédients.
+    where: { name: { not: null }, unit: { not: "titre" } },
     select: { name: true },
     distinct: ["name"],
   });

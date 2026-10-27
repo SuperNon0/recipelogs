@@ -17,7 +17,7 @@ import {
 import { addSubRecipe, removeSubRecipe } from "@/app/actions/subRecipes";
 import { DELETE, READ, WRITE, formData, id, idFromPath, js, parseArgs, runAction, text, type McpTool } from "./helpers";
 
-const UNIT_HELP = "Unités : g, L, cc (cuillère à café), cs (cuillère à soupe), pièce, QS (quantité suffisante, sans quantité).";
+const UNIT_HELP = "Unités : g, L, cc (cuillère à café), cs (cuillère à soupe), pièce, QS (quantité suffisante, sans quantité), titre (intertitre de section comme « Pâte » ou « Crème », quantité 0, ignoré des calculs). Dans les étapes (une par ligne), une ligne qui commence par « # » est un intertitre.";
 
 const ingredientSchema = z.object({
   nom: z.string().trim().min(1).max(200),

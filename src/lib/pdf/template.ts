@@ -13,6 +13,7 @@ import {
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
 import { formatG, formatQty, formatYield } from "../format";
+import { parseStepLines } from "../stepLines";
 
 /** Slug historique conservé pour compatibilité descendante. */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
@@ -414,6 +415,16 @@ export function buildCss(
       font-size: ${baseSize + 3}pt; font-weight: 700; color: ${theme.accentColor};
       margin-bottom: 3mm;
     }
+    .ing-section {
+      margin: 2.5mm 0 1.2mm;
+      font-size: 0.85em;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: ${theme.accentColor};
+    }
+    .ing-section:first-child { margin-top: 0; }
+    tr.ing-section td { padding-top: 2.2mm; }
     .ing-item {
       display: flex;
       align-items: baseline;
@@ -829,6 +840,7 @@ function renderIngredientsTable(
   const avgTotal = (totalMinG + totalMaxG) / 2;
   const rows = items
     .map((i) => {
+      if (i.unit === "titre") return `<tr class="ing-section"><td colspan="3">${esc(i.name)}</td></tr>`;
       const { avg } = recipeMass([i]);
       const pct = avgTotal > 0 && avg > 0 ? ((avg / avgTotal) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %" : "";
       const qty = `<td class="num">${ingQtyHtml(i)}</td>`;
@@ -851,6 +863,7 @@ function renderIngredients(
 ): string {
   const list = items
     .map((i) => {
+      if (i.unit === "titre") return `<div class="ing-section">${esc(i.name)}</div>`;
       const qty = ingQtyHtml(i);
       return `
       <div class="ing-item">
@@ -903,17 +916,10 @@ function renderSteps(raw: string): string {
   }
   // Mode texte brut (legacy) : converti en <p> pour profiter aussi de la
   // numérotation auto via CSS.
-  const lines = raw
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((line) => {
-      // strip "1. " / "1) " / "1- " en début de ligne si présent
-      const m = line.match(/^\d+\s*[.)\-]\s+(.+)$/);
-      return m ? m[1] : line;
-    });
+  // Les intertitres (« # Crème ») deviennent des <h4>, hors numérotation.
+  const lines = parseStepLines(raw);
   if (lines.length === 0) return "";
-  const html = lines.map((l) => `<p>${esc(l)}</p>`).join("");
+  const html = lines.map((l) => (l.kind === "title" ? `<h4>${esc(l.text)}</h4>` : `<p>${esc(l.text)}</p>`)).join("");
   return `<div class="steps-rich">${html}</div>`;
 }
 
@@ -951,7 +957,7 @@ export function renderRecipeCard(
   const ficheLabelHtml = layout === "fiche-technique" || theme.showInfoBox
     ? `<div class="fiche-label">
         <div><span class="k">Masse totale</span><span class="v">${totalMinG > 0 ? totalText(totalMinG, totalMaxG) : "—"}</span></div>
-        <div><span class="k">Ingrédients</span><span class="v">${snap.ingredients.length}</span></div>
+        <div><span class="k">Ingrédients</span><span class="v">${snap.ingredients.filter((i) => i.unit !== "titre").length}</span></div>
         <div><span class="k">Date</span><span class="v">${new Date().toLocaleDateString("fr-FR")}</span></div>
       </div>`
     : "";
