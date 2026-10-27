@@ -11,6 +11,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.5",
+    date: "2026-10-27",
+    title: "Moules, variantes, production et mode labo",
+    summary:
+      "Des outils pour le travail au labo : changer de moule en un clic, garder ses essais sous la recette d'origine, sortir une fiche de production pour une quantité donnée, suivre une recette en grand sur le téléphone avec des minuteurs, et retrouver une recette par ce qui est écrit dedans.",
+    features: [
+      "Conversion de moule : un mode « Moule » dans le multiplicateur passe d'un cercle Ø18 à un Ø24, d'un cadre 40×60 à des cercles, ou à plusieurs moules (au volume si les hauteurs sont données) ; le moule d'origine se note dans « Modifier »",
+    ],
+    migrations: ["Ajout du moule d'origine sur les recettes ; rien à faire"],
+  },
+  {
     version: "V2.4",
     date: "2026-10-27",
     title: "Rendement, allergènes et coût de revient",

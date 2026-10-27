@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { MoldPicker } from "./MoldPicker";
+import type { Mold } from "@/lib/mold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -59,6 +61,7 @@ export type RecipeFormInitial = {
   folderId?: number | null;
   yieldCount?: number | null;
   yieldLabel?: string | null;
+  mold?: Mold | null;
   ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
 };
 
@@ -123,6 +126,7 @@ export function RecipeForm({
   };
 
   const markDirty = useCallback(() => setDirty(true), []);
+  const [mold, setMold] = useState<Mold | null>(initial?.mold ?? null);
 
   // Prévient avant de quitter la page avec des modifications non enregistrées.
   useEffect(() => {
@@ -351,6 +355,27 @@ export function RecipeForm({
               aria-label="Nom des pièces"
             />
           </div>
+        </Field>
+
+        <Field
+          label="Moule d'origine"
+          hint="Facultatif. Le moule pour lequel la recette est écrite."
+          help={{
+            title: "Moule d'origine",
+            text: "Le moule ou le cadre de la recette telle qu'elle est écrite (×1). Le mode « Moule » du multiplicateur part de lui pour passer à un autre moule. La hauteur est facultative : si les deux moules en ont une, le calcul se fait au volume.",
+            example: "Recette pour un cercle Ø18 : pour un Ø24, le multiplicateur passe à ×1,78.",
+          }}
+        >
+          <MoldPicker
+            value={mold}
+            allowNone
+            label="Moule d'origine"
+            onChange={(m) => {
+              setMold(m);
+              markDirty();
+            }}
+          />
+          <input type="hidden" name="mold" value={mold ? JSON.stringify(mold) : ""} />
         </Field>
 
         <Field

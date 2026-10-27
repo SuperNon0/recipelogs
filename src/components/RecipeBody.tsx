@@ -28,6 +28,8 @@ import {
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
 import { applyMultiplierToRecipe, setRecipeSaleCoef } from "@/app/actions/recipes";
+import { MOLD_PRESETS, moldCoef, moldLabel, moldsFilled, type Mold } from "@/lib/mold";
+import { MoldPicker } from "./MoldPicker";
 import { DEFAULT_SALE_COEF, costOf, formatEuro, type IngredientPrice } from "@/lib/cost";
 import { ModalOverlay } from "./ModalOverlay";
 import { Help } from "./ui/Help";
@@ -77,8 +79,15 @@ export type SubRecipeRow = {
 };
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
-/** Modes du multiplicateur : ceux des sous-recettes + « Pièces » (viser un rendement). */
-type MultMode = Mode | "pieces";
+/** Modes du multiplicateur : ceux des sous-recettes + « Pièces » (viser un rendement) et « Moule ». */
+type MultMode = Mode | "pieces" | "mold";
+
+/** Moule proposé par défaut en arrivée : le modèle courant suivant (Ø18 → Ø20). */
+function nextMold(from: Mold): Mold {
+  const same = MOLD_PRESETS.filter((p) => p.shape === from.shape && p.a > from.a);
+  return same[0] ?? MOLD_PRESETS.find((p) => p.shape === "cercle" && p.a === 24)!;
+}
+const DEFAULT_FROM: Mold = { shape: "cercle", a: 18 };
 
 const fmtNum = (n: number, max = 2) => n.toLocaleString("fr-FR", { maximumFractionDigits: max });
 
@@ -96,6 +105,7 @@ export function RecipeBody({
   ingredients,
   subRecipes,
   yieldInfo,
+  mold,
   saleCoef,
   onScaleChange,
 }: {
@@ -103,6 +113,8 @@ export function RecipeBody({
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
   yieldInfo?: YieldInfo | null;
+  /** Moule d'origine de la recette (mode « Moule »). */
+  mold?: Mold | null;
   /** Coefficient de vente enregistré sur la recette (null = défaut). */
   saleCoef?: number | null;
   /** Prévient la fiche quand le multiplicateur change (étapes). */
@@ -120,6 +132,9 @@ export function RecipeBody({
   const [pivotInput, setPivotInput] = useState(
     weighable[0] ? String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))) : "0",
   );
+  const [moldFrom, setMoldFrom] = useState<Mold | null>(mold ?? DEFAULT_FROM);
+  const [moldTo, setMoldTo] = useState<Mold | null>(nextMold(mold ?? DEFAULT_FROM));
+  const [moldCount, setMoldCount] = useState("1");
   const [decimals, setDecimals] = useState(true);
   const [locks, setLocks] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
@@ -144,6 +159,11 @@ export function RecipeBody({
       if (!yieldInfo || !Number.isFinite(wanted) || wanted <= 0) return 1;
       return wanted / yieldInfo.count;
     }
+    if (mode === "mold") {
+      const count = num(moldCount);
+      if (!moldFrom || !moldTo || !Number.isFinite(count) || count <= 0) return 1;
+      return moldCoef(moldFrom, moldTo, count);
+    }
     const pivot = ingredients.find((i) => i.id === pivotId);
     const target = num(pivotInput);
     // La quantité voulue est saisie en grammes : on compare à la masse en
@@ -151,13 +171,16 @@ export function RecipeBody({
     const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g", pivot.pieceG) : 0;
     if (!pivot || !Number.isFinite(target) || target <= 0 || pivotBaseG <= 0) return 1;
     return target / pivotBaseG;
-  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, baseTotalG]);
+  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, baseTotalG, moldFrom, moldTo, moldCount]);
 
   const reset = () => {
     setMode("coefficient");
     setCoefInput("1");
     setMassInput(String(Math.round(baseTotalG)));
     setPiecesInput(String(yieldInfo?.count ?? ""));
+    setMoldFrom(mold ?? DEFAULT_FROM);
+    setMoldTo(nextMold(mold ?? DEFAULT_FROM));
+    setMoldCount("1");
     if (weighable[0]) {
       setPivotId(weighable[0].id);
       setPivotInput(String(Math.round(ingMass(weighable[0].quantityG, weighable[0].unit ?? "g", weighable[0].pieceG))));
@@ -308,6 +331,13 @@ export function RecipeBody({
           yieldInfo={yieldInfo ?? null}
           piecesInput={piecesInput}
           setPiecesInput={setPiecesInput}
+          moldFrom={moldFrom}
+          setMoldFrom={setMoldFrom}
+          moldTo={moldTo}
+          setMoldTo={setMoldTo}
+          moldCount={moldCount}
+          setMoldCount={setMoldCount}
+          hasOriginMold={!!mold}
           globalCoef={globalCoef}
           onReset={reset}
           decimals={decimals}
@@ -324,6 +354,7 @@ export function RecipeBody({
           </div>
           <div className="kpi-v num">{formatG(grandBase)}</div>
           {globalCoef !== 1 && <div className="kpi-s">{formatCoef(globalCoef)} appliqué</div>}
+          {mold && <div className="kpi-s">Moule : {moldLabel(mold)}</div>}
         </div>
       </div>
 
@@ -709,6 +740,13 @@ function MultiplierCard({
   yieldInfo,
   piecesInput,
   setPiecesInput,
+  moldFrom,
+  setMoldFrom,
+  moldTo,
+  setMoldTo,
+  moldCount,
+  setMoldCount,
+  hasOriginMold,
   globalCoef,
   onReset,
   decimals,
@@ -730,6 +768,13 @@ function MultiplierCard({
   yieldInfo: YieldInfo | null;
   piecesInput: string;
   setPiecesInput: (v: string) => void;
+  moldFrom: Mold | null;
+  setMoldFrom: (m: Mold | null) => void;
+  moldTo: Mold | null;
+  setMoldTo: (m: Mold | null) => void;
+  moldCount: string;
+  setMoldCount: (v: string) => void;
+  hasOriginMold: boolean;
   globalCoef: number;
   onReset: () => void;
   decimals: boolean;
@@ -780,6 +825,9 @@ function MultiplierCard({
               <br />• <b>Pièces</b> : tu tapes le nombre de {yieldInfo.label} voulu (rendement de la recette).
             </>
           )}
+          <br />• <b>Moule</b> : tu passes d&apos;un moule à un autre (Ø18 → Ø24), ou à plusieurs
+          moules plus petits. Le calcul se fait sur la surface, ou sur le volume si les deux
+          hauteurs sont données.
           <br />
           <br />
           <b>Entiers</b> arrondit chaque quantité au gramme supérieur ; en mode Masse, l&apos;écart
@@ -795,9 +843,9 @@ function MultiplierCard({
       </div>
       <div className="mrow">
         <div className="fl-seg">
-          {(["coefficient", "mass_target", "pivot_ingredient", ...(yieldInfo ? (["pieces"] as const) : [])] as const).map((m) => (
+          {(["coefficient", "mass_target", "pivot_ingredient", ...(yieldInfo ? (["pieces"] as const) : []), "mold"] as const).map((m) => (
             <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} disabled={m === "pivot_ingredient" && ingredients.length === 0}>
-              {m === "coefficient" ? "Coef." : m === "mass_target" ? "Masse" : m === "pieces" ? "Pièces" : "Pivot"}
+              {m === "coefficient" ? "Coef." : m === "mass_target" ? "Masse" : m === "pieces" ? "Pièces" : m === "mold" ? "Moule" : "Pivot"}
             </button>
           ))}
         </div>
@@ -826,6 +874,31 @@ function MultiplierCard({
           </div>
         )}
       </div>
+      {mode === "mold" && (
+        <div className="mold-mult">
+          <div className="mold-line">
+            <span className="mold-tag">De</span>
+            <MoldPicker compact label="Moule de départ" value={moldFrom} onChange={setMoldFrom} />
+          </div>
+          <div className="mold-line">
+            <span className="mold-tag">Vers</span>
+            <MoldPicker compact label="Moule voulu" value={moldTo} onChange={setMoldTo} />
+          </div>
+          <div className="mold-line">
+            <span className="mold-tag">Nombre</span>
+            <div className="stepper mold-count">
+              <input value={moldCount} inputMode="numeric" onChange={(e) => setMoldCount(e.target.value)} aria-label="Nombre de moules voulus" />
+            </div>
+          </div>
+          {moldFrom && moldTo && (
+            <p className="mold-hint">
+              À ×1, la recette remplit environ {fmtNum(moldsFilled(moldFrom, moldTo), 1)} × {moldLabel(moldTo, false)}
+              {moldFrom.h && moldTo.h ? " (au volume)" : ""}.
+              {!hasOriginMold && " Note le moule d'origine dans « Modifier » pour ne plus avoir à le choisir."}
+            </p>
+          )}
+        </div>
+      )}
       {mode === "pivot_ingredient" && (
         <div className="mrow" style={{ marginTop: 8 }}>
           <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g", ing.pieceG)))); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
