@@ -1,6 +1,7 @@
 import type { McpTool } from "../protocol";
 import { COOKBOOK_TOOLS } from "./cookbooks";
 import { INGREDIENT_TOOLS } from "./ingredients";
+import { LABO_TOOLS } from "./labo";
 import { ORGANISATION_TOOLS } from "./organisation";
 import { RECIPE_TOOLS } from "./recipes";
 import { SHOPPING_TOOLS } from "./shopping";
@@ -11,6 +12,7 @@ import { VIDEO_TOOLS } from "./video";
 export const MCP_TOOL_GROUPS: { title: string; tools: McpTool[] }[] = [
   { title: "Ingrédients", tools: INGREDIENT_TOOLS },
   { title: "Recettes", tools: RECIPE_TOOLS },
+  { title: "Variantes, moules, production et recherche", tools: LABO_TOOLS },
   { title: "Vidéos et liens", tools: VIDEO_TOOLS },
   { title: "Dossiers et catégories", tools: ORGANISATION_TOOLS },
   { title: "Listes de courses", tools: SHOPPING_TOOLS },

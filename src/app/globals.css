@@ -2204,7 +2204,8 @@ button.fl-row:hover {
 
 @media (max-width: 699px) {
   .irow {
-    grid-template-columns: 24px minmax(0, 1fr) auto 30px;
+    grid-template-columns: 24px minmax(0, 1fr) auto 38px 30px;
+    gap: 6px;
     padding: 6px 6px 6px 6px;
   }
   .iadd {
@@ -2506,6 +2507,28 @@ button.fl-row:hover {
 }
 .variants-here {
   color: var(--accent);
+}
+.rvariants {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.variants-in-dialog {
+  margin-top: 0;
+}
+.variants-in-dialog .variants-list li:first-child {
+  border-top: none;
+}
+.variants-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 6px;
 }
 .variants-cmp {
   height: 30px;

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { DEFAULT_SALE_COEF, costOf } from "@/lib/cost";
-import { recipeMass } from "@/lib/massAdjust";
+import { ingMass, recipeMass } from "@/lib/massAdjust";
 import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { getRecipeDetail, listRecipes } from "@/lib/recipes";
 import { htmlToPlainText } from "@/lib/stepsText";
@@ -237,6 +237,13 @@ export const RECIPE_TOOLS: McpTool[] = [
       const cost = snap ? costOf([...snap.ingredients, ...snap.subRecipes.flatMap((s) => s.ingredients)]) : null;
       const coef = r.saleCoef != null ? Number(r.saleCoef) : DEFAULT_SALE_COEF;
       const round2 = (v: number) => Math.round(v * 100) / 100;
+      // Part de chaque ligne dans la masse totale (sous-recettes comprises), comme la colonne % de l'appli.
+      const grand = snap ? snap.totalMassG + snap.subRecipes.reduce((t, x) => t + x.totalMassG, 0) : 0;
+      const pct = (i: { quantityG: number; quantityGMax?: number | null; unit: string | null; pieceG?: number | null }, total: number) => {
+        if (i.unit === "titre" || i.unit === "QS" || !(total > 0)) return null;
+        const g = ingMass((i.quantityG + (i.quantityGMax ?? i.quantityG)) / 2, i.unit ?? "g", i.pieceG);
+        return g > 0 ? Math.round((g / total) * 1000) / 10 : null;
+      };
       return text({
         id: r.id,
         nom: r.name,
@@ -248,7 +255,8 @@ export const RECIPE_TOOLS: McpTool[] = [
         categories: r.categories.map((c) => ({ id: c.category.id, nom: c.category.name })),
         tags: r.tags.map((t) => t.name),
         multiplicateur: a.multiplicateur,
-        masse_totale_g: snap ? Math.round(snap.totalMassG) : null,
+        masse_totale_g: snap ? Math.round(grand) : null,
+        masse_ingredients_g: snap ? Math.round(snap.totalMassG) : null,
         rendement: snap?.yield ? { nombre: snap.yield.count, libelle: snap.yield.label } : null,
         moule: moldArg(r.mold),
         variantes: family ? family.members.map((m) => ({ id: m.id, nom: m.name, essai: m.note, version_principale: m.isRoot })) : [],
@@ -269,6 +277,7 @@ export const RECIPE_TOOLS: McpTool[] = [
           quantite: i.quantityG,
           quantite_max: i.quantityGMax,
           unite: i.unit,
+          pourcent: pct(i, grand),
         })),
         etapes: r.stepsBlock ? htmlToPlainText(r.stepsBlock.content) : null,
         sous_recettes: r.parentLinks.map((l, idx) => {
@@ -281,7 +290,8 @@ export const RECIPE_TOOLS: McpTool[] = [
             valeur: Number(l.calcValue),
             verrouillee: l.isLocked,
             masse_g: s ? Math.round(s.totalMassG) : null,
-            ingredients: (s?.ingredients ?? []).map((i) => ({ nom: i.name, quantite: i.quantityG, unite: i.unit })),
+            pourcent: s && grand > 0 ? Math.round((s.totalMassG / grand) * 1000) / 10 : null,
+            ingredients: (s?.ingredients ?? []).map((i) => ({ nom: i.name, quantite: i.quantityG, unite: i.unit, pourcent_de_la_sous_recette: pct(i, s?.totalMassG ?? 0) })),
           };
         }),
         utilisee_dans: r.childLinks.map((l) => ({ id: l.parent.id, nom: l.parent.name, libelle: l.label })),

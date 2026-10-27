@@ -363,11 +363,13 @@ export function RecipeBody({
           <span />
           <span>Ingrédient</span>
           <span className="q">Quantité</span>
-          <span className="p desk-only">
-            % masse
+          <span className="p">
+            <span className="desk-only">% masse</span>
+            <span className="mob-only">%</span>
             <Help title="% de la masse" calc="% = masse de la ligne ÷ masse totale × 100" example="300 g de purée dans une recette de 1 500 g : 20 %.">
               La part de chaque ingrédient ou sous-recette dans la masse totale (sous-recettes
-              comprises). Pratique pour comparer deux recettes.
+              comprises). Pratique pour comparer deux recettes. Les ingrédients d&apos;une
+              sous-recette dépliée affichent leur part dans cette sous-recette.
             </Help>
           </span>
           <span />
@@ -411,7 +413,7 @@ export function RecipeBody({
           <span className="q num">
             {own.min !== own.max && subs.length === 0 ? `${fmt(own.min)} à ${fmt(own.max)}` : fmt(grandTotal)}
           </span>
-          <span className="p desk-only" />
+          <span className="p num">{grandTotal > 0 ? "100 %" : ""}</span>
           <span />
         </div>
       </div>
@@ -463,7 +465,7 @@ function OwnRow({
           </>
         )}
       </span>
-      <span className="p desk-only num">{mass > 0 ? pct(mass) : ""}</span>
+      <span className="p num">{mass > 0 ? pct(mass) : ""}</span>
       <span />
     </div>
   );
@@ -510,6 +512,12 @@ function SubRows({
   const [, startTransition] = useTransition();
   const avg = (calc.min + calc.max) / 2;
   const mass = calc.min !== calc.max ? `${formatG(calc.min)}–${formatG(calc.max)}` : formatG(calc.min);
+  // Part d'un ingrédient dans sa sous-recette (pas dans la recette entière).
+  const childPct = (ing: (typeof calc.ingredients)[number]) => {
+    if (ing.unit === "QS" || avg <= 0) return "";
+    const g = ingMass((ing.quantityG + (ing.quantityGMax ?? ing.quantityG)) / 2, ing.unit ?? "g", ing.pieceG);
+    return g > 0 ? `${Math.round((g / avg) * 100)} %` : "";
+  };
   const pivotName = sr.pivotIngredientId ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)?.name : null;
 
   const setLock = (v: boolean) => {
@@ -579,7 +587,7 @@ function SubRows({
           {tag}
         </span>
         <span className="q num">{mass}</span>
-        <span className="p desk-only num">{pct(avg)}</span>
+        <span className="p num">{pct(avg)}</span>
         <MoreButton spec={spec} label={`Actions pour la sous-recette ${sr.label}`} />
       </ContextArea>
       {open &&
@@ -600,7 +608,7 @@ function SubRows({
                 </>
               )}
             </span>
-            <span className="p desk-only" />
+            <span className="p num" title={`de « ${sr.label} »`}>{childPct(ing)}</span>
             <span />
           </div>
           ),

@@ -86,6 +86,7 @@ function RecipeRow({
     folderId: r.folderId,
     totalMassG: r.totalMassG,
     color,
+    variantCount: r.variantCount,
     subtitle: [folder?.name, r.totalMassG > 0 ? formatG(Math.round(r.totalMassG)) : null, r.subCount ? `${r.subCount} sous-recette${r.subCount > 1 ? "s" : ""}` : null].filter(Boolean).join(" · "),
   });
   const href = from ? `/recipes/${r.id}?from=${encodeURIComponent(from)}` : `/recipes/${r.id}`;

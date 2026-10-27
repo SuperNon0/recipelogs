@@ -14,6 +14,7 @@ import {
   Library,
   Link2,
   Pencil,
+  Plus,
   ShoppingBasket,
   Star,
   StarOff,
@@ -23,7 +24,8 @@ import type { MenuEntry, MenuSpec } from "@/components/ui/Menu";
 import { AddToCookbookDialog } from "@/components/AddToCookbookModal";
 import { AddToShoppingListDialog } from "@/components/AddToShoppingListModal";
 import { RecipePdfDialog, type PdfThemeOption } from "@/components/RecipePdfDialog";
-import { LinkVariantDialog, NewVariantDialog } from "./Variants";
+import { LinkVariantDialog, NewVariantDialog, VariantsDialog } from "./Variants";
+import type { VariantFamily } from "@/lib/variants";
 import { ProductionDialog } from "@/components/ProductionDialog";
 import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/app/actions/recipes";
 import { assignRecipesToFolder } from "@/app/actions/settings";
@@ -52,16 +54,19 @@ export type RecipeMenuTarget = {
   /** Couleur de la vignette dans la feuille téléphone. */
   color?: string;
   subtitle?: string;
+  /** Nombre de variantes (liste des recettes), pour l'entrée « Voir les variantes ». */
+  variantCount?: number;
 };
 
-type Dialog = "pdf" | "cookbook" | "shopping" | "variant" | "link-variant" | "production" | null;
+export type RecipeDialog = "pdf" | "cookbook" | "shopping" | "variants" | "variant" | "link-variant" | "production" | null;
+type Dialog = RecipeDialog;
 
 /**
  * Menu d'actions d'une recette (clic droit, bouton « ⋯ », appui long) et les
  * fenêtres qu'il ouvre. `onPage` : on est sur la fiche de la recette
  * (supprimer redirige vers l'accueil, « Ouvrir » est masqué).
  */
-export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = {}) {
+export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; variants?: VariantFamily | null } = {}) {
   const { folders, themes } = useContext(RecipeMenuCtx);
   const router = useRouter();
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -103,6 +108,22 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
       });
     };
 
+    // Sur la fiche : la famille est connue ; dans la liste : seulement le nombre (la fiche ouvre la fenêtre).
+    const nVariants = opts.variants ? opts.variants.members.length - 1 : (r.variantCount ?? 0);
+    const variantsLabel = nVariants > 0 ? `Variantes · ${nVariants}` : "Variantes";
+    const variantsMenu: MenuEntry[] = [
+      ...(nVariants > 0
+        ? [
+            opts.variants
+              ? { label: "Voir les variantes", icon: GitBranch, onSelect: () => setDialog("variants") }
+              : { label: "Voir les variantes", icon: GitBranch, href: `/recipes/${r.id}?variantes=1` },
+            { separator: true as const },
+          ]
+        : []),
+      { label: "Nouvelle variante…", icon: Plus, onSelect: () => setDialog("variant") },
+      { label: "Relier une recette existante…", icon: Link2, onSelect: () => setDialog("link-variant") },
+    ];
+
     return {
       title: r.name,
       icon: BookOpen,
@@ -129,8 +150,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
           icon: Copy,
           onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
         },
-        { label: "Nouvelle variante…", icon: GitBranch, onSelect: () => setDialog("variant") },
-        { label: "Relier une variante…", icon: Link2, onSelect: () => setDialog("link-variant") },
+        { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },
         { separator: true },
         { label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") },
         { label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") },
@@ -151,7 +171,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
         { label: "Supprimer…", icon: Trash2, danger: true, onSelect: remove },
       ],
     };
-  }, [r, folders, opts.onPage, router]);
+  }, [r, folders, opts.onPage, opts.variants, router]);
 
   const dialogs =
     dialog === "pdf" ? (
@@ -162,6 +182,14 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
       <AddToShoppingListDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "production" ? (
       <ProductionDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
+    ) : dialog === "variants" && opts.variants ? (
+      <VariantsDialog
+        family={opts.variants}
+        currentId={r.id}
+        onClose={() => setDialog(null)}
+        onNew={() => setDialog("variant")}
+        onLink={() => setDialog("link-variant")}
+      />
     ) : dialog === "variant" ? (
       <NewVariantDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "link-variant" ? (

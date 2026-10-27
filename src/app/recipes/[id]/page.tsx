@@ -16,10 +16,10 @@ export default async function RecipePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; variantes?: string }>;
 }) {
   const { id } = await params;
-  const { from } = await searchParams;
+  const { from, variantes } = await searchParams;
   const recipeId = Number(id);
   if (!Number.isInteger(recipeId)) notFound();
 
@@ -87,6 +87,7 @@ export default async function RecipePage({
         subRecipes={subRecipes}
         mold={parseMold(recipe.mold)}
         variants={variants}
+        openVariants={variantes === "1"}
         allergens={tree ? collectAllergens(tree) : []}
         yieldInfo={recipe.yieldCount ? { count: recipe.yieldCount, label: recipe.yieldLabel?.trim() || "pièces" } : null}
         comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
