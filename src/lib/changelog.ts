@@ -24,6 +24,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Intertitres dans les ingrédients (bouton « Intertitre » dans « Modifier ») pour regrouper « Pâte », « Crème », « Montage » sans créer de sous-recette ; ils s'affichent sur la fiche et le PDF et ne comptent dans aucun calcul",
       "Une ligne déjà saisie (par ex. un titre importé à 0 g) se transforme en intertitre depuis son menu « ⋯ »",
       "Intertitres dans les étapes : une ligne qui commence par # (« # Crème ») devient un titre, non numéroté",
+      "Quantités liées dans les étapes : « verser {167 g} de lait » suit le multiplicateur (×2 → 334 g) sur la fiche, dans les PDF et les cahiers ; bouton « Quantité liée » dans « Modifier »",
+      "Le multiplicateur reste réglé quand on passe de l'onglet Recette à Préparation",
     ],
     fixes: [
       "Quand on multiplie une recette, les pièces sont arrondies à la plus proche (5,06 jaunes → 5) au lieu de passer à la pièce au-dessus",

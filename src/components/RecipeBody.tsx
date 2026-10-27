@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -53,6 +53,14 @@ export type IngredientRow = {
 /** Rendement de la recette à ×1 : « 40 financiers ». */
 export type YieldInfo = { count: number; label: string };
 
+/** Échelle courante de la fiche, pour les quantités liées des étapes. */
+export type RecipeScale = {
+  coef: number;
+  wholeNumbers: boolean;
+  /** Coefficient effectif de chaque sous-recette (par id du lien). */
+  subCoefs: Record<number, number>;
+};
+
 export type SubRecipeRow = {
   id: number;
   childId: number;
@@ -89,6 +97,7 @@ export function RecipeBody({
   subRecipes,
   yieldInfo,
   saleCoef,
+  onScaleChange,
 }: {
   recipeId: number;
   ingredients: IngredientRow[];
@@ -96,6 +105,8 @@ export function RecipeBody({
   yieldInfo?: YieldInfo | null;
   /** Coefficient de vente enregistré sur la recette (null = défaut). */
   saleCoef?: number | null;
+  /** Prévient la fiche quand le multiplicateur change (étapes). */
+  onScaleChange?: (s: RecipeScale) => void;
 }) {
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
   // Ingrédients utilisables comme pivot (les intertitres n'en sont pas).
@@ -216,6 +227,14 @@ export function RecipeBody({
       }, 0),
     [subRecipes, locks],
   );
+
+  useEffect(() => {
+    onScaleChange?.({
+      coef: globalCoef,
+      wholeNumbers: !decimals,
+      subCoefs: Object.fromEntries(subs.map((x) => [x.sr.id, x.calc.effectiveCoef])),
+    });
+  }, [globalCoef, decimals, subs, onScaleChange]);
 
   const ownAvg = (own.min + own.max) / 2;
   const subsAvg = subs.reduce((s, x) => s + (x.calc.min + x.calc.max) / 2, 0);

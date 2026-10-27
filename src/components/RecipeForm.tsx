@@ -106,6 +106,21 @@ export function RecipeForm({
   const [freeText, setFreeText] = useState("");
   const [focusKey, setFocusKey] = useState<number | null>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
+  const stepsRef = useRef<HTMLTextAreaElement>(null);
+
+  // Insère une quantité liée « {100 g} » au curseur, nombre sélectionné pour le retaper.
+  const insertStepQty = () => {
+    const ta = stepsRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? start;
+    const picked = ta.value.slice(start, end).trim();
+    const num = /^\d+(?:[.,]\d+)?$/.test(picked) ? picked : "100";
+    ta.focus();
+    ta.setRangeText(`{${num} g}`, start, end, "end");
+    ta.setSelectionRange(start + 1, start + 1 + num.length);
+    setDirty(true);
+  };
 
   const markDirty = useCallback(() => setDirty(true), []);
 
@@ -651,7 +666,18 @@ export function RecipeForm({
         title="Préparation"
         help="Écris une étape par ligne. La numérotation (1, 2, 3…) est ajoutée automatiquement à l'affichage et dans le PDF. Commence une ligne par # pour en faire un intertitre (« # Crème ») : il n'est pas numéroté."
       >
+        <div className="rf-steps-tools">
+          <button type="button" className="fl-btn fl-btn-ghost" onClick={insertStepQty}>
+            <Scale size={15} /> Quantité liée
+          </button>
+          <Help title="Quantité liée" example="« Verser {167 g} de lait chaud » : à ×2, la fiche affiche « Verser 334 g de lait chaud ».">
+            Une quantité écrite entre accolades suit le multiplicateur de la recette, comme les
+            ingrédients (et l&apos;option Entiers). Le bouton en insère une au curseur : tape le nombre,
+            et change l&apos;unité si besoin (g, kg, ml, cl, L, cc, cs, pièces).
+          </Help>
+        </div>
         <textarea
+          ref={stepsRef}
           name="steps"
           className="fl-input rf-textarea"
           rows={10}

@@ -95,6 +95,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       totalMassGMax: res.max,
       steps: link.child.steps,
       allergens: collectAllergens(link.child).map((a) => a.label),
+      coef: res.effectiveCoef,
     };
   });
 
