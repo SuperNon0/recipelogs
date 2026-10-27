@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
-import { computeLocalCoef } from "./subRecipes";
-import { scaleQty, adjustToTarget, recipeMass, ingMass } from "./massAdjust";
+import { scaleQty, recipeMass } from "./massAdjust";
+import { resolveLink } from "./recipeTree";
+import { loadRecipeTree } from "./recipes";
 
 export async function listCookbooks() {
   return prisma.cookbook.findMany({
@@ -90,59 +91,39 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   });
   const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);
 
-  const subRecipes = r.parentLinks.map((link) => {
-    // Masse de base de la sous-recette (quantités brutes non scalées)
-    const rawIngredients = link.child.ingredients;
-    // Même définition que la fiche recette : moyenne min/max des fourchettes.
-    const childBaseTotalG = recipeMass(rawIngredients).avg;
-    // Ingrédient pivot (mode pivot_ingredient) : masse voulue en grammes, donc
-    // on convertit la quantité du pivot en grammes (ingMass gère L/cc/cs).
-    const pivotIng = link.pivotIngredientId
-      ? rawIngredients.find((i) => i.id === link.pivotIngredientId)
-      : null;
-    const pivotBaseQtyG = pivotIng
-      ? ingMass(Number(pivotIng.quantityG), pivotIng.unit ?? "g") || null
-      : null;
-    // Coefficient propre à la sous-recette (calcMode + calcValue définis lors de l'ajout)
-    const localCoef = computeLocalCoef(
-      link.calcMode,
-      Number(link.calcValue),
-      childBaseTotalG,
-      pivotBaseQtyG,
-    );
-    // Si verrouillée : le coefficient parent ne s'applique pas
-    const effectiveCoef = link.isLocked ? localCoef : localCoef * k;
-
-    let childIngredients = rawIngredients.map((i) => {
-      const unit = i.unit ?? "g";
-      const scaled = scaleQty(Number(i.quantityG), unit, effectiveCoef);
-      const scaledMax = i.quantityGMax != null ? scaleQty(Number(i.quantityGMax), unit, effectiveCoef) : null;
+  // Chaque sous-recette est résolue sur son arbre complet (sous-recettes
+  // imbriquées comprises) : plus rien n'est oublié au-delà du 1er niveau.
+  const subRecipes = await Promise.all(
+    r.parentLinks.map(async (link) => {
+      const childTree = await loadRecipeTree(link.childId);
+      const res = childTree
+        ? resolveLink(
+            {
+              calcMode: link.calcMode,
+              calcValue: Number(link.calcValue),
+              pivotIngredientId: link.pivotIngredientId,
+              isLocked: link.isLocked,
+              isExact: link.isExact,
+              child: childTree,
+            },
+            k,
+          )
+        : { effectiveCoef: 1, ingredients: [], min: 0, max: 0 };
       return {
-        name: i.name ?? i.ingredientBase?.name ?? "—",
-        quantityG: scaled.quantityG,
-        quantityGMax: scaledMax?.quantityG ?? null,
-        unit: scaled.unit,
+        label: link.label,
+        childName: link.child.name,
+        calcMode: link.calcMode,
+        calcValue: Number(link.calcValue),
+        isLocked: link.isLocked,
+        isExact: link.isExact,
+        ingredients: res.ingredients,
+        totalMassG: (res.min + res.max) / 2,
+        totalMassGMin: res.min,
+        totalMassGMax: res.max,
+        steps: link.child.stepsBlock?.content ?? null,
       };
-    });
-    if (link.isExact && link.calcMode === "mass_target") {
-      const effectiveTargetG = link.isLocked ? Number(link.calcValue) : Number(link.calcValue) * k;
-      childIngredients = adjustToTarget(childIngredients, effectiveTargetG).ingredients;
-    }
-    const { min: childTotalGMin, max: childTotalGMax } = recipeMass(childIngredients);
-    return {
-      label: link.label,
-      childName: link.child.name,
-      calcMode: link.calcMode,
-      calcValue: Number(link.calcValue),
-      isLocked: link.isLocked,
-      isExact: link.isExact,
-      ingredients: childIngredients,
-      totalMassG: (childTotalGMin + childTotalGMax) / 2,
-      totalMassGMin: childTotalGMin,
-      totalMassGMax: childTotalGMax,
-      steps: link.child.stepsBlock?.content ?? null,
-    };
-  });
+    }),
+  );
 
   return {
     recipeId: r.id,
