@@ -5,6 +5,7 @@ import { getIngredientBaseDetail, listAllIngredientBases } from "@/lib/recipes";
 import { INGREDIENT_UNITS } from "@/lib/validation";
 import { mergeIngredientBasesBulk, renameIngredientBase } from "@/app/actions/settings";
 import { duplicateKey } from "../duplicates";
+import { ALLERGENS, cleanAllergens } from "@/lib/allergens";
 import { DELETE, READ, WRITE, formData, id, ids, js, parseArgs, runAction, text, type McpTool } from "./helpers";
 
 /** Catégories d'ingrédients telles qu'affichées (« fruit » s'affiche « Arôme »). */
@@ -238,6 +239,76 @@ export const INGREDIENT_TOOLS: McpTool[] = [
         ...(unite_par_defaut ? { unite_par_defaut } : {}),
         ...(introuvables.length ? { introuvables } : {}),
       });
+    },
+  },
+
+  {
+    name: "regler_fiches_ingredients",
+    title: "Régler les fiches d'ingrédients",
+    description:
+      "Règle, pour un ou plusieurs ingrédients (par id ou nom exact sans casse), ce que leur fiche apporte aux calculs : les allergènes INCO (la liste donnée REMPLACE celle de l'ingrédient ; [] pour tout décocher) et le poids d'une pièce en grammes (null pour l'effacer). Les recettes en tiennent compte toutes seules (allergènes cumulés, pièces comptées dans la masse). " +
+      `Clés d'allergènes : ${ALLERGENS.map((a) => `${a.key} (${a.label})`).join(", ")}.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        fiches: {
+          type: "array",
+          description: "Une entrée par ingrédient",
+          items: {
+            type: "object",
+            properties: {
+              ...idOrNameJs,
+              allergenes: { type: "array", items: { type: "string", enum: ALLERGENS.map((a) => a.key) }, description: "Allergènes contenus (remplace la liste)" },
+              poids_piece_g: { type: ["number", "null"], description: "Poids d'une pièce en g (œuf ≈ 50), null pour effacer" },
+            },
+          },
+        },
+      },
+      required: ["fiches"],
+    },
+    annotations: { ...WRITE, idempotentHint: true },
+    run: async (args) => {
+      const { fiches } = parseArgs(
+        z.object({
+          fiches: z
+            .array(
+              idOrName.extend({
+                allergenes: z.array(z.string()).optional(),
+                poids_piece_g: z.number().positive().max(100_000).nullable().optional(),
+              }),
+            )
+            .min(1)
+            .max(500),
+        }),
+        args,
+      );
+      const modifies: { nom: string; allergenes?: string[]; poids_piece_g?: number | null }[] = [];
+      const introuvables: string[] = [];
+      for (const f of fiches) {
+        let found;
+        try {
+          found = await findIngredient(f);
+        } catch {
+          introuvables.push(String(f.id ?? f.nom));
+          continue;
+        }
+        const allergens = f.allergenes !== undefined ? cleanAllergens(f.allergenes) : undefined;
+        await prisma.ingredientBase.update({
+          where: { id: found.id },
+          data: {
+            ...(allergens !== undefined ? { allergens } : {}),
+            ...(f.poids_piece_g !== undefined ? { pieceG: f.poids_piece_g } : {}),
+          },
+        });
+        modifies.push({
+          nom: found.name,
+          ...(allergens !== undefined ? { allergenes: allergens } : {}),
+          ...(f.poids_piece_g !== undefined ? { poids_piece_g: f.poids_piece_g } : {}),
+        });
+      }
+      revalidatePath("/settings/ingredients");
+      revalidatePath("/");
+      return text({ modifies, ...(introuvables.length ? { introuvables } : {}) });
     },
   },
 

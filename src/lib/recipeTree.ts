@@ -16,6 +16,8 @@ export type TreeIngredient = {
   unit: string;
   /** Poids d'une pièce (fiche de l'ingrédient), pour compter les pièces dans la masse. */
   pieceG?: number | null;
+  /** Allergènes cochés sur la fiche de l'ingrédient. */
+  allergens?: string[];
 };
 
 export type TreeLink = {

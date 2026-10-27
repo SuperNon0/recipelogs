@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, FileDown, Layers, Library, Pencil, Star } from "lucide-react";
+import { ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
+import type { AllergenHit } from "@/lib/allergens";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
 import { RecipeBody, type IngredientRow, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
@@ -32,6 +33,7 @@ type Props = {
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
   yieldInfo: YieldInfo | null;
+  allergens: AllergenHit[];
   comments: { id: number; content: string; createdAt: string }[];
   usedIn: { id: number; name: string; label: string }[];
   back: { href: string; label: string };
@@ -40,7 +42,7 @@ type Props = {
 type Tab = "recipe" | "steps" | "notes";
 
 /** Fiche recette : en-tête, actions, onglets Recette / Préparation / Notes. */
-export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, comments, usedIn, back }: Props) {
+export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, allergens, comments, usedIn, back }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
@@ -143,6 +145,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, comment
       {tab === "recipe" && (
         <>
           <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} />
+          <AllergensCard allergens={allergens} />
           {usedIn.length > 0 && (
             <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <Layers size={16} style={{ color: "var(--accent)" }} />
@@ -206,5 +209,34 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, comment
 
       {menu.dialogs}
     </article>
+  );
+}
+
+/** Allergènes de la recette (sous-recettes comprises), calculés depuis les fiches des ingrédients. */
+function AllergensCard({ allergens }: { allergens: AllergenHit[] }) {
+  return (
+    <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <TriangleAlert size={16} style={{ color: allergens.length ? "var(--accent)" : "var(--muted)" }} />
+      <span style={{ color: "var(--soft)", fontSize: 13.5, display: "flex", alignItems: "center" }}>
+        Allergènes
+        <Help
+          title="Allergènes"
+          calc={allergens.length ? allergens.map((a) => `${a.label.padEnd(15)}${a.sources.join(", ")}`).join("\n") : undefined}
+        >
+          Calculés tout seuls à partir des allergènes cochés sur chaque ingrédient (Réglages →
+          Ingrédients), sous-recettes comprises. Un ingrédient sans case cochée ne compte pas :
+          vérifie que ses fiches sont à jour avant de vendre.
+        </Help>
+      </span>
+      {allergens.length === 0 ? (
+        <span style={{ color: "var(--muted)", fontSize: 13 }}>Aucun allergène coché sur ses ingrédients</span>
+      ) : (
+        allergens.map((a) => (
+          <span key={a.key} className="fl-tag" style={{ color: "var(--accent)" }} title={a.sources.join(", ")}>
+            {a.label}
+          </span>
+        ))
+      )}
+    </div>
   );
 }
