@@ -88,7 +88,9 @@ export function RecipeBody({
   const [coefInput, setCoefInput] = useState("1");
   const [massInput, setMassInput] = useState(String(Math.round(baseTotalG)));
   const [pivotId, setPivotId] = useState<number | null>(ingredients[0]?.id ?? null);
-  const [pivotInput, setPivotInput] = useState(ingredients[0]?.quantityG ? String(ingredients[0].quantityG) : "0");
+  const [pivotInput, setPivotInput] = useState(
+    ingredients[0] ? String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g"))) : "0",
+  );
   const [decimals, setDecimals] = useState(true);
   const [locks, setLocks] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
@@ -110,8 +112,11 @@ export function RecipeBody({
     }
     const pivot = ingredients.find((i) => i.id === pivotId);
     const target = num(pivotInput);
-    if (!pivot || !Number.isFinite(target) || target <= 0 || pivot.quantityG <= 0) return 1;
-    return target / pivot.quantityG;
+    // La quantité voulue est saisie en grammes : on compare à la masse en
+    // grammes du pivot (ingMass convertit L/cc/cs), pas à sa valeur brute.
+    const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g") : 0;
+    if (!pivot || !Number.isFinite(target) || target <= 0 || pivotBaseG <= 0) return 1;
+    return target / pivotBaseG;
   }, [mode, coefInput, massInput, pivotId, pivotInput, ingredients, baseTotalG]);
 
   const reset = () => {
@@ -120,7 +125,7 @@ export function RecipeBody({
     setMassInput(String(Math.round(baseTotalG)));
     if (ingredients[0]) {
       setPivotId(ingredients[0].id);
-      setPivotInput(String(ingredients[0].quantityG));
+      setPivotInput(String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g"))));
     }
   };
 
@@ -623,7 +628,7 @@ function MultiplierCard({
       </div>
       {mode === "pivot_ingredient" && (
         <div className="mrow" style={{ marginTop: 8 }}>
-          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => setPivotId(Number(e.target.value))} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
+          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g")))); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
             {ingredients.map((i) => (
               <option key={i.id} value={i.id}>{i.name}</option>
             ))}

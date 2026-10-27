@@ -42,19 +42,25 @@ export function computeSubRecipe(
   locked: boolean,
 ): { effectiveCoef: number; ingredients: AdjIngredient[]; min: number; max: number } {
   const base = recipeMass(sr.childIngredients).avg;
-  const pivotQty = sr.pivotIngredientId
-    ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)?.quantityG ?? null
+  // Le pivot est une masse voulue en grammes : convertir la quantité du pivot
+  // en grammes (ingMass gère L/cc/cs) avant d'en déduire le coefficient.
+  const pivotIng = sr.pivotIngredientId
+    ? sr.childIngredients.find((i) => i.id === sr.pivotIngredientId)
     : null;
+  const pivotQty = pivotIng ? ingMass(pivotIng.quantityG, pivotIng.unit ?? "g") : null;
   const localCoef = computeLocalCoef(sr.calcMode, sr.calcValue, base, pivotQty);
   const effectiveCoef = locked ? localCoef : localCoef * globalCoef;
 
+  // À ×1 (effectiveCoef === 1) on garde la valeur exacte ; dès qu'on multiplie,
+  // on arrondit au gramme supérieur (comportement inchangé).
+  const round = effectiveCoef === 1 ? (x: number) => x : Math.ceil;
   let ingredients: AdjIngredient[] = sr.childIngredients.map((ing) => {
     const unit = ing.unit === "L" ? "g" : (ing.unit ?? "g");
     const k = ing.unit === "L" ? effectiveCoef * 1000 : effectiveCoef;
     return {
       name: ing.name,
-      quantityG: Math.ceil(ing.quantityG * k),
-      quantityGMax: ing.quantityGMax != null ? Math.ceil(ing.quantityGMax * k) : null,
+      quantityG: round(ing.quantityG * k),
+      quantityGMax: ing.quantityGMax != null ? round(ing.quantityGMax * k) : null,
       unit,
     };
   });

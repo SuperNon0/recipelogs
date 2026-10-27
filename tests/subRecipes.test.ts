@@ -79,4 +79,32 @@ describe("computeSubRecipe", () => {
     ] }, 1, false);
     expect(r.ingredients[0]).toMatchObject({ quantityG: 500, unit: "g" });
   });
+  it("garde les décimales à ×1 et arrondit dès qu'on multiplie", () => {
+    const base = { ...sr, calcMode: "coefficient" as const, calcValue: 1, childIngredients: [
+      { id: 1, name: "Gélatine", quantityG: 9.7, unit: "g" },
+    ] };
+    const r1 = computeSubRecipe(base, 1, false); // ×1 → valeur exacte
+    expect(r1.ingredients[0].quantityG).toBe(9.7);
+    expect(r1.min).toBeCloseTo(9.7);
+    const r2 = computeSubRecipe(base, 2, false); // ×2 → ceil(19,4) = 20
+    expect(r2.ingredients[0].quantityG).toBe(20);
+  });
+  it("mode pivot : quantité voulue (g) sur un ingrédient en litres → bon coef", () => {
+    // Pivot sur le lait : 0,5 L = 500 g. On veut 1000 g → ×2 (et non ×2000).
+    const r = computeSubRecipe({ ...sr, calcMode: "pivot_ingredient", calcValue: 1000, pivotIngredientId: 1, childIngredients: [
+      { id: 1, name: "Lait", quantityG: 0.5, unit: "L" },
+      { id: 2, name: "Sucre", quantityG: 100, unit: "g" },
+    ] }, 1, true);
+    expect(r.effectiveCoef).toBeCloseTo(2);
+    expect(r.ingredients[0]).toMatchObject({ quantityG: 1000, unit: "g" });
+    expect(r.min).toBe(1200);
+  });
+  it("mode pivot : quantité voulue (g) sur un ingrédient en cuillères → bon coef", () => {
+    // Pivot sur 2 cc = 10 g. On veut 30 g → ×3 (et non ×15).
+    const r = computeSubRecipe({ ...sr, calcMode: "pivot_ingredient", calcValue: 30, pivotIngredientId: 1, childIngredients: [
+      { id: 1, name: "Vanille", quantityG: 2, unit: "cc" },
+      { id: 2, name: "Sucre", quantityG: 100, unit: "g" },
+    ] }, 1, true);
+    expect(r.effectiveCoef).toBeCloseTo(3);
+  });
 });
