@@ -2598,6 +2598,34 @@ button.fl-row:hover {
   font-weight: 600;
   border-bottom: 0;
 }
+/* Téléphone : les 4 colonnes tiennent dans l'écran (pas de défilement de côté). */
+@media (max-width: 699px) {
+  .cmp-table {
+    min-width: 0;
+    font-size: 13px;
+  }
+  .cmp-table th,
+  .cmp-table td {
+    padding: 9px 6px;
+  }
+  .cmp-table th:first-child,
+  .cmp-table td:first-child {
+    padding-left: 10px;
+  }
+  .cmp-table th.num {
+    white-space: normal;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .cmp-diff small {
+    display: block;
+    margin-left: 0;
+  }
+  .cmp-sub {
+    display: block;
+    margin-left: 0;
+  }
+}
 .cmp-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
