@@ -20,8 +20,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Conversion de moule : un mode « Moule » dans le multiplicateur passe d'un cercle Ø18 à un Ø24, d'un cadre 40×60 à des cercles, ou à plusieurs moules (au volume si les hauteurs sont données) ; le moule d'origine se note dans « Modifier »",
       "Variantes : « Nouvelle variante » (menu ⋯) copie la recette pour un essai rangé sous la version principale ; le bloc « Variantes » de la fiche les liste, les compare côte à côte (écarts en grammes et en %, étapes modifiées en couleur) et peut faire d'un essai la nouvelle version principale. Des recettes existantes peuvent aussi être reliées",
       "Les variantes ne s'affichent plus dans la liste des recettes ni dans les compteurs des dossiers (lien « variantes rangées sous leur recette » pour les voir) ; la recherche les trouve toujours",
+      "Fiche de production : « 60 éclairs » (menu ⋯ → Fiche de production) donne toutes les pesées à l'échelle, sous-recettes comprises, une préparation par encadré dans l'ordre où on les fait, avec cases à cocher et étapes en option ; un PDF à imprimer pour le labo",
+      "Page « Production » (menu de gauche ou recherche) : plusieurs recettes à produire en même temps, les préparations communes additionnées et le total par ingrédient à sortir",
     ],
-    migrations: ["Ajout du moule d'origine sur les recettes ; rien à faire"],
+    migrations: ["Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire"],
   },
   {
     version: "V2.4",

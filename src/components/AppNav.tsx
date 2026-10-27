@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import {
   BookOpen,
   ChefHat,
+  ClipboardList,
   Library,
   Palette,
   Plus,
@@ -24,6 +25,7 @@ export type NavCounts = {
   favorites: number;
   cookbooks: number;
   lists: number;
+  production: number;
   noFolder: number;
   folders: { id: number; name: string; color: string; count: number }[];
 };
@@ -47,6 +49,7 @@ const NAV: NavItem[] = [
   { href: "/favorites", label: "Favoris", icon: Star, match: (p) => p.startsWith("/favorites"), count: (c) => c.favorites },
   { href: "/cookbooks", label: "Cahiers", icon: Library, match: (p) => p.startsWith("/cookbooks"), count: (c) => c.cookbooks },
   { href: "/shopping", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
+  { href: "/production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
   { href: "/settings/ingredients", label: "Ingrédients", icon: Wheat, match: (p) => p.startsWith("/settings/ingredients") },
 ];
 
