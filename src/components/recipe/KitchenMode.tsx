@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, Pause, Play, RotateCcw, Sun, Timer, X } from "lucide-react";
 import type { IngredientRow, RecipeScale, SubRecipeRow } from "@/components/RecipeBody";
@@ -11,11 +11,12 @@ import { parseStepLines } from "@/lib/stepLines";
 import { scaleStepParts } from "@/lib/stepQty";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { findDurations, formatClock } from "@/lib/durations";
+import { useEscape } from "@/components/ui/useMedia";
+import { loadStored, saveStored, type LabTimers } from "./labTimers";
 
 type Line = { key: string; name: string; qty: string } | { key: string; title: string };
 type Section = { key: string; title: string; lines: Line[] };
 type Step = { key: string; section: string; title?: string; no?: number; text: string };
-type TimerState = { id: string; label: string; total: number; endsAt: number | null; left: number };
 
 const num = (n: number) => Math.round(n * 100) / 100;
 
@@ -92,56 +93,12 @@ function useWakeLock(): boolean {
   return on;
 }
 
-/** Son de fin de minuteur (trois bips), sans fichier audio. */
-function useBeep() {
-  const ctx = useRef<AudioContext | null>(null);
-  const unlock = useCallback(() => {
-    if (ctx.current) return;
-    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (AC) ctx.current = new AC();
-  }, []);
-  const beep = useCallback(() => {
-    const c = ctx.current;
-    if (c) {
-      void c.resume();
-      for (let i = 0; i < 3; i++) {
-        const o = c.createOscillator();
-        const g = c.createGain();
-        o.frequency.value = 880;
-        g.gain.setValueAtTime(0.0001, c.currentTime + i * 0.45);
-        g.gain.exponentialRampToValueAtTime(0.4, c.currentTime + i * 0.45 + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + i * 0.45 + 0.3);
-        o.connect(g).connect(c.destination);
-        o.start(c.currentTime + i * 0.45);
-        o.stop(c.currentTime + i * 0.45 + 0.32);
-      }
-    }
-    navigator.vibrate?.([300, 150, 300, 150, 300]);
-  }, []);
-  return { unlock, beep };
-}
-
-function load<T>(key: string, fallback: T): T {
-  try {
-    const v = sessionStorage.getItem(key);
-    return v ? (JSON.parse(v) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function save(key: string, v: unknown) {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(v));
-  } catch {
-    /* navigation privée : rien n'est gardé */
-  }
-}
-
 /**
  * Mode labo : la recette en grand, au multiplicateur de la fiche, écran gardé
  * allumé. Pesées à cocher, étape en cours mise en avant, durées des étapes
  * transformées en minuteurs. Rien n'est enregistré dans la recette ; cases et
- * minuteurs sont gardés sur le téléphone jusqu'à la fermeture de l'onglet.
+ * minuteurs sont gardés sur le téléphone jusqu'à la fermeture de l'onglet (les
+ * minuteurs sont tenus par la fiche : ils sonnent même mode labo fermé).
  */
 export function KitchenMode({
   recipeId,
@@ -150,6 +107,7 @@ export function KitchenMode({
   ingredients,
   subRecipes,
   scale,
+  lab,
   onClose,
 }: {
   recipeId: number;
@@ -158,66 +116,67 @@ export function KitchenMode({
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
   scale: RecipeScale;
+  lab: LabTimers;
   onClose: () => void;
 }) {
   const sections = useMemo(() => weighSections(name, ingredients, subRecipes, scale), [name, ingredients, subRecipes, scale]);
   const stepList = useMemo(() => allSteps(name, steps, subRecipes, scale), [name, steps, subRecipes, scale]);
   const numbered = stepList.filter((s) => s.no !== undefined);
 
-  const store = `labo:${recipeId}:${scale.coef.toFixed(4)}`;
-  const [checked, setChecked] = useState<Record<string, boolean>>(() => load(`${store}:checked`, {}));
-  const [current, setCurrent] = useState<string | null>(() => load(`${store}:step`, numbered[0]?.key ?? null));
-  const [timers, setTimers] = useState<TimerState[]>(() => load(`labo:${recipeId}:timers`, []));
+  // Cases cochées gardées par recette, avec le multiplicateur où elles ont été cochées :
+  // si la page a été rechargée (retour à ×1), on propose de les garder.
+  const store = `labo:${recipeId}:progress`;
+  type Progress = { coef: number; checked: Record<string, boolean>; step: string | null };
+  const [saved] = useState<Progress | null>(() => loadStored<Progress | null>(store, null));
+  const sameCoef = !!saved && Math.abs(saved.coef - scale.coef) < 1e-6;
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => (sameCoef ? saved!.checked : {}));
+  const [current, setCurrent] = useState<string | null>(() => (sameCoef ? saved!.step : null) ?? numbered[0]?.key ?? null);
+  const [offer, setOffer] = useState<Progress | null>(() =>
+    saved && !sameCoef && Object.values(saved.checked).some(Boolean) ? saved : null,
+  );
   const [tab, setTab] = useState<"weigh" | "steps">("weigh");
-  const [now, setNow] = useState(() => Date.now());
   const awake = useWakeLock();
-  const { unlock, beep } = useBeep();
-  // Minuteurs déjà finis à l'ouverture : pas de nouvelle sonnerie.
-  const rang = useRef<Set<string>>(new Set(timers.filter((t) => t.endsAt && t.endsAt <= Date.now()).map((t) => t.id)));
+  const closeRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => save(`${store}:checked`, checked), [store, checked]);
-  useEffect(() => save(`${store}:step`, current), [store, current]);
-  useEffect(() => save(`labo:${recipeId}:timers`, timers), [recipeId, timers]);
-
-  // Horloge des minuteurs.
   useEffect(() => {
-    if (!timers.some((t) => t.endsAt)) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, [timers]);
-  useEffect(() => {
-    for (const t of timers) {
-      if (t.endsAt && t.endsAt <= now && !rang.current.has(t.id)) {
-        rang.current.add(t.id);
-        beep();
-      }
-    }
-  }, [now, timers, beep]);
+    if (!offer) saveStored(store, { coef: scale.coef, checked, step: current });
+  }, [store, scale.coef, checked, current, offer]);
 
-  // Échap pour fermer, page derrière figée.
+  // Échap pour fermer (seulement si aucune autre fenêtre n'est par-dessus), page derrière figée.
+  useEscape(true, () => closeRef.current?.click());
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
+    const before = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
+      before?.focus?.();
     };
-  }, [onClose]);
+  }, []);
+
+  // Bouton retour du téléphone : ferme le mode labo au lieu de quitter la fiche.
+  // Une entrée d'historique est ajoutée à l'ouverture ; fermer (croix, Échap) revient
+  // en arrière, et c'est ce retour qui ferme.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!history.state?.labo) history.pushState({ ...(history.state ?? {}), labo: true }, "");
+    const onPop = () => {
+      if (!history.state?.labo) onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const close = () => (history.state?.labo ? history.back() : onClose());
 
   // L'étape en cours reste visible.
   useEffect(() => {
     if (current) document.querySelector(`[data-step="${current}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [current]);
 
-  const startTimer = (label: string, seconds: number) => {
-    unlock();
-    const id = `${Date.now()}`;
-    setTimers((ts) => [...ts, { id, label, total: seconds, endsAt: Date.now() + seconds * 1000, left: seconds }]);
-    setNow(Date.now());
-  };
-  const left = (t: TimerState) => (t.endsAt ? Math.max(0, (t.endsAt - now) / 1000) : t.left);
+  const startTimer = lab.start;
+  const left = lab.left;
 
   const total = sections.reduce((s, x) => s + x.lines.filter((l) => "qty" in l).length, 0);
   const done = Object.values(checked).filter(Boolean).length;
@@ -229,9 +188,9 @@ export function KitchenMode({
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="lab" role="dialog" aria-label={`Mode labo : ${name}`}>
+    <div className="lab" role="dialog" aria-modal="true" aria-label={`Mode labo : ${name}`}>
       <header className="lab-top">
-        <button type="button" className="lab-icon" onClick={onClose} aria-label="Quitter le mode labo">
+        <button ref={closeRef} type="button" className="lab-icon" onClick={close} aria-label="Quitter le mode labo">
           <X size={22} />
         </button>
         <div className="lab-title">
@@ -258,6 +217,28 @@ export function KitchenMode({
           <RotateCcw size={19} />
         </button>
       </header>
+
+      {offer && (
+        <div className="lab-offer" role="status">
+          <span>
+            {Object.values(offer.checked).filter(Boolean).length} pesée(s) cochée(s) à {formatCoef(offer.coef)} ; la fiche est à {formatCoef(scale.coef)}.
+          </span>
+          <button
+            type="button"
+            className="fl-btn fl-btn-secondary"
+            onClick={() => {
+              setChecked(offer.checked);
+              if (offer.step) setCurrent(offer.step);
+              setOffer(null);
+            }}
+          >
+            Garder les cases
+          </button>
+          <button type="button" className="fl-btn fl-btn-ghost" onClick={() => setOffer(null)}>
+            Repartir de zéro
+          </button>
+        </div>
+      )}
 
       <div className="lab-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === "weigh"} onClick={() => setTab("weigh")}>
@@ -342,9 +323,9 @@ export function KitchenMode({
         </div>
       </div>
 
-      {timers.length > 0 && (
+      {lab.timers.length > 0 && (
         <div className="lab-timers">
-          {timers.map((t) => {
+          {lab.timers.map((t) => {
             const l = left(t);
             const over = l <= 0;
             return (
@@ -356,18 +337,12 @@ export function KitchenMode({
                     type="button"
                     className="lab-icon"
                     aria-label={t.endsAt ? "Mettre en pause" : "Reprendre"}
-                    onClick={() =>
-                      setTimers((ts) =>
-                        ts.map((x) =>
-                          x.id !== t.id ? x : x.endsAt ? { ...x, endsAt: null, left: left(x) } : { ...x, endsAt: Date.now() + x.left * 1000 },
-                        ),
-                      )
-                    }
+                    onClick={() => lab.toggle(t.id)}
                   >
                     {t.endsAt ? <Pause size={18} /> : <Play size={18} />}
                   </button>
                 )}
-                <button type="button" className="lab-icon" aria-label="Arrêter le minuteur" onClick={() => setTimers((ts) => ts.filter((x) => x.id !== t.id))}>
+                <button type="button" className="lab-icon" aria-label="Arrêter le minuteur" onClick={() => lab.stop(t.id)}>
                   <X size={18} />
                 </button>
               </div>

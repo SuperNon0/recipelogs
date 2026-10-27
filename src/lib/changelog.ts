@@ -58,6 +58,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fenêtre Variantes : la masse de chaque version compte les sous-recettes et le poids des œufs, comme la fiche",
       "Claude : « ajuster à 2 190 g » vise la masse de toute la recette, sous-recettes comprises ; un moule « cadre » sans largeur ou de moins d'1 cm est refusé au lieu d'effacer le moule",
       "Claude : messages clairs quand une recette ou une ligne n'existe pas, filtre ingrédient sans accents, et changer une quantité de la fiche de production ne demande plus une confirmation de suppression (retirer une ligne passe par retirer_de_production)",
+      "Mode labo : les minuteurs continuent et sonnent même mode labo fermé ; une bulle en bas de la fiche montre le temps restant et ramène au mode labo. Le son se réveille au retour sur l'appli (iPhone)",
+      "Mode labo : si la page a été rechargée (retour à ×1), il propose de garder les pesées déjà cochées",
+      "Mode labo : le bouton retour du téléphone ferme le mode labo au lieu de quitter la fiche",
+      "Échap ne ferme plus que la fenêtre du dessus (« Renommer l'essai » sans fermer la fenêtre Variantes)",
+      "Mode Moule : un message dit pourquoi on reste à ×1 (nombre à 0, dimension manquante), et la ligne « Autre dimension → Cadre » tient sur téléphone",
+      "Fiche de production : après un ajout, le bouton devient « Mettre à jour la fiche »",
+      "Le coefficient d'une sous-recette (×0,692) ne se coupe plus en deux sur téléphone",
     ],
     migrations: [
       "Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire",

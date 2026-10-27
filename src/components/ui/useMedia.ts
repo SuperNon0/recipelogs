@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Vrai quand l'écran est un téléphone (menus et aides en feuille du bas). */
 export const PHONE_QUERY = "(max-width: 699px)";
@@ -21,14 +21,24 @@ export function useIsPhone(): boolean {
   return useMediaQuery(PHONE_QUERY);
 }
 
-/** Ferme sur Échap. */
+/** Fenêtres ouvertes qui écoutent Échap, de la plus ancienne à la plus récente. */
+const escapeStack: symbol[] = [];
+
+/** Ferme sur Échap. Seule la fenêtre ouverte en dernier se ferme (« Renommer » sans la fenêtre Variantes derrière). */
 export function useEscape(active: boolean, onEscape: () => void) {
+  const cb = useRef(onEscape);
+  cb.current = onEscape;
   useEffect(() => {
     if (!active) return;
+    const me = Symbol();
+    escapeStack.push(me);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onEscape();
+      if (e.key === "Escape" && escapeStack[escapeStack.length - 1] === me) cb.current();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, onEscape]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      escapeStack.splice(escapeStack.indexOf(me), 1);
+    };
+  }, [active]);
 }
