@@ -89,13 +89,25 @@ export async function handleMcpMessage(msg: unknown, tools: McpTool[]): Promise<
       try {
         return ok(id, await tool.run(args));
       } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        return ok(id, { content: [{ type: "text", text: `Erreur : ${message}` }], isError: true });
+        return ok(id, { content: [{ type: "text", text: `Erreur : ${toolErrorMessage(e)}` }], isError: true });
       }
     }
     default:
       return fail(id, METHOD_NOT_FOUND, `Méthode non prise en charge : ${msg.method}`);
   }
+}
+
+/**
+ * Message lisible pour une erreur d'outil : les erreurs de la base (ligne
+ * inexistante, recette encore utilisée…) sont traduites au lieu d'être
+ * renvoyées brutes.
+ */
+export function toolErrorMessage(e: unknown): string {
+  const code = (e as { code?: unknown })?.code;
+  if (code === "P2025") return "élément introuvable (vérifie l'id : il a peut-être été supprimé).";
+  if (code === "P2003") return "lien impossible : un des éléments n'existe pas, ou il est encore utilisé ailleurs.";
+  if (code === "P2002") return "cet élément existe déjà.";
+  return e instanceof Error ? e.message : String(e);
 }
 
 /**

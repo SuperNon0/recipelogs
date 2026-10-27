@@ -1,5 +1,6 @@
 "use client";
 
+import { foldText } from "@/lib/textSearch";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -257,7 +258,7 @@ export function CommandPalette() {
 
 function Highlight({ text, term }: { text: string; term: string }) {
   if (!term) return <>{text}</>;
-  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const norm = foldText;
   const i = norm(text).indexOf(norm(term));
   if (i < 0) return <>{text}</>;
   return (

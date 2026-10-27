@@ -53,10 +53,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Prix d'un ingrédient : 1 000 000 € ou plus est refusé avec un message, au lieu de faire planter l'enregistrement",
       "Fusion d'ingrédients : l'historique des prix ne mélange plus deux produits",
       "Export/import JSON : le moule, le dossier, les catégories, les étiquettes, le favori et la note sont gardés ; une fourchette inversée à l'import est ignorée",
+      "Recherche : « oeufs » trouve « œufs » (et l'inverse), les accents copiés depuis un Mac sont reconnus, et dossiers, ingrédients, cahiers et listes se trouvent sans les accents",
+      "Recherche : le petit nom d'un essai (« moins sucré ») trouve la variante",
+      "Fenêtre Variantes : la masse de chaque version compte les sous-recettes et le poids des œufs, comme la fiche",
+      "Claude : « ajuster à 2 190 g » vise la masse de toute la recette, sous-recettes comprises ; un moule « cadre » sans largeur ou de moins d'1 cm est refusé au lieu d'effacer le moule",
+      "Claude : messages clairs quand une recette ou une ligne n'existe pas, filtre ingrédient sans accents, et changer une quantité de la fiche de production ne demande plus une confirmation de suppression (retirer une ligne passe par retirer_de_production)",
     ],
     migrations: [
       "Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire",
       "Une recette n'appartient qu'à une famille de variantes, et la fiche de production retient le rendement au moment de l'ajout ; rien à faire",
+      "Les noms de recettes avec « œ » ou « æ » sont ré-indexés pour la recherche ; rien à faire",
     ],
   },
   {

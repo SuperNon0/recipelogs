@@ -1,11 +1,13 @@
+import { foldText } from "./textSearch";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { recipeMass } from "./massAdjust";
 import type { TreeNode } from "./recipeTree";
 import { allergensOf, costOfIngredient, loadIngredientInfo, pieceWeightOf } from "./ingredientInfo";
 
+/** Nom replié pour la recherche (sans accents, « œ » → « oe »), rangé dans `nameNormalized`. */
 export function normalizeForSearch(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return foldText(s).trim();
 }
 
 export type RecipeListItem = {
@@ -43,6 +45,8 @@ export async function listRecipes(opts: {
     where.OR = [
       { nameNormalized: { contains: normalized, mode: "insensitive" } },
       { name: { contains: opts.q.trim(), mode: "insensitive" } },
+      // Petit nom d'un essai (« moins sucré »).
+      { variantTargets: { some: { note: { contains: opts.q.trim(), mode: "insensitive" } } } },
     ];
   }
   if (opts.favoritesOnly) where.favorite = true;

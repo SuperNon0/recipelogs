@@ -1,5 +1,6 @@
 "use client";
 
+import { foldText } from "@/lib/textSearch";
 import { useEffect, useMemo, useState } from "react";
 import { Layers, Search } from "lucide-react";
 import { ModalOverlay } from "./ModalOverlay";
@@ -46,7 +47,7 @@ export function AddSubRecipeDialog({ parentId, onClose }: { parentId: number; on
   }, [childId]);
 
   const filtered = useMemo(() => {
-    const n = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const n = foldText;
     const q = n(query);
     return (recipes ?? []).filter((r) => n(r.name).includes(q)).slice(0, 80);
   }, [recipes, query]);

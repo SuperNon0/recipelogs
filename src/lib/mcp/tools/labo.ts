@@ -20,12 +20,15 @@ import { DELETE, READ, WRITE, id, js, parseArgs, runAction, text, type McpTool }
 
 const round = (n: number, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
 
-const moldSchema = z.object({
-  forme: z.enum(["cercle", "cadre", "carre"]),
-  a: z.number().positive().max(1000),
-  b: z.number().positive().max(1000).optional(),
-  h: z.number().positive().max(1000).optional(),
-});
+// Au moins 1 cm, et la largeur d'un cadre est obligatoire (sinon le moule serait refusé, ou effacé en silence).
+const moldSchema = z
+  .object({
+    forme: z.enum(["cercle", "cadre", "carre"]),
+    a: z.number().min(1).max(1000),
+    b: z.number().min(1).max(1000).optional(),
+    h: z.number().min(1).max(1000).optional(),
+  })
+  .refine((m) => m.forme !== "cadre" || m.b != null, { message: "un cadre a besoin de sa largeur b (cm)" });
 const moldJs = (description: string) => ({
   type: "object",
   description,
@@ -274,7 +277,7 @@ export const LABO_TOOLS: McpTool[] = [
     },
     annotations: WRITE,
     run: async (args) => {
-      const a = parseArgs(z.object({ recette_id: id, quantite: z.number().positive().max(100_000) }), args);
+      const a = parseArgs(z.object({ recette_id: id, quantite: z.number().min(0.01).max(100_000) }), args);
       await runAction(() => addToProduction(a.recette_id, a.quantite));
       return text({ ajoutee: a.recette_id, quantite: a.quantite });
     },
@@ -282,38 +285,47 @@ export const LABO_TOOLS: McpTool[] = [
 
   {
     name: "modifier_production",
-    title: "Modifier ou vider la fiche de production",
+    title: "Changer une quantité de la fiche de production",
     description:
-      "Change la quantité d'une ligne (ligne_id + quantite), retire une ligne (ligne_id + retirer) ou vide toute la fiche (vider). Les recettes ne sont jamais touchées.",
+      "Change la quantité d'une ligne de la fiche de production (ligne_id donné par voir_fiche_production). Pour retirer une ligne ou vider la fiche : retirer_de_production. Les recettes ne sont jamais touchées.",
     inputSchema: {
       type: "object",
       properties: {
         ligne_id: js.int("ligne_id donné par voir_fiche_production"),
-        quantite: js.num("Nouvelle quantité"),
-        retirer: js.bool("Retirer cette ligne"),
+        quantite: js.num("Nouvelle quantité (pièces si la ligne est en pièces, sinon multiplicateur)"),
+      },
+      required: ["ligne_id", "quantite"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ ligne_id: id, quantite: z.number().min(0.01).max(100_000) }), args);
+      await runAction(() => setProductionAmount(a.ligne_id, a.quantite));
+      return text({ ligne_id: a.ligne_id, quantite: a.quantite });
+    },
+  },
+
+  {
+    name: "retirer_de_production",
+    title: "Retirer de la fiche de production",
+    description: "Retire une ligne de la fiche de production (ligne_id), ou vide toute la fiche (vider). Les recettes ne sont jamais touchées.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ligne_id: js.int("ligne_id donné par voir_fiche_production"),
         vider: js.bool("Vider toute la fiche"),
       },
     },
     annotations: DELETE,
     run: async (args) => {
-      const a = parseArgs(
-        z.object({ ligne_id: id.optional(), quantite: z.number().positive().max(100_000).optional(), retirer: z.boolean().default(false), vider: z.boolean().default(false) }),
-        args,
-      );
+      const a = parseArgs(z.object({ ligne_id: id.optional(), vider: z.boolean().default(false) }), args);
       if (a.vider) {
         await runAction(() => clearProduction());
         return text({ fiche: "vidée" });
       }
       if (!a.ligne_id) throw new Error("ligne_id manquant (ou vider: true).");
       const ligne = a.ligne_id;
-      if (a.retirer) {
-        await runAction(() => removeProductionItem(ligne));
-        return text({ retiree: ligne });
-      }
-      if (a.quantite == null) throw new Error("quantite manquante.");
-      const q = a.quantite;
-      await runAction(() => setProductionAmount(ligne, q));
-      return text({ ligne_id: ligne, quantite: q });
+      await runAction(() => removeProductionItem(ligne));
+      return text({ retiree: ligne });
     },
   },
 
