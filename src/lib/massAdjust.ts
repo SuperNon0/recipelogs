@@ -1,10 +1,23 @@
-/** Masse en grammes d'une quantité selon son unité. */
-export function ingMass(q: number, unit: string): number {
+/**
+ * Masse en grammes d'une quantité selon son unité. Une pièce ne compte que si
+ * l'ingrédient a un poids par pièce (`pieceG`, réglé sur sa fiche) ; QS jamais.
+ */
+export function ingMass(q: number, unit: string, pieceG?: number | null): number {
   if (!unit || unit === "g") return q;
   if (unit === "cc") return q * 5;
   if (unit === "cs") return q * 15;
   if (unit === "L") return q * 1000;
+  if (unit === "pièce" && pieceG && pieceG > 0) return q * pieceG;
   return 0;
+}
+
+/**
+ * Arrondi d'une quantité multipliée : au gramme supérieur, sauf les pièces,
+ * arrondies à la pièce la plus proche (5,06 jaunes → 5, et non 6 ; au moins 1).
+ */
+export function roundScaled(x: number, unit: string | null | undefined): number {
+  if (unit === "pièce") return x > 0 ? Math.max(1, Math.round(x)) : 0;
+  return Math.ceil(x);
 }
 
 /**
@@ -17,19 +30,20 @@ export function scaleQty(
   unit: string,
   coef: number,
 ): { quantityG: number; unit: string } {
-  const round = coef === 1 ? (x: number) => x : Math.ceil;
+  const round = coef === 1 ? (x: number) => x : (x: number) => roundScaled(x, unit);
   if (unit === "L") return { quantityG: round(qty * coef * 1000), unit: "g" };
   return { quantityG: round(qty * coef), unit };
 }
 
 /**
  * Masse totale d'une liste d'ingrédients — SEULE source de vérité du calcul.
- * - g, cc (≈5 g), cs (≈15 g), L (×1000) comptent ; pièce et QS sont exclus.
+ * - g, cc (≈5 g), cs (≈15 g), L (×1000) comptent ; une pièce compte si son
+ *   poids est connu (`pieceG`) ; QS est exclu.
  * - Fourchettes : `min` utilise quantityG, `max` utilise quantityGMax,
  *   `avg` est la moyenne des deux (valeur affichée comme « masse totale »).
  */
 export function recipeMass(
-  ingredients: { quantityG: number | string | { toString(): string }; quantityGMax?: number | string | { toString(): string } | null; unit?: string | null }[],
+  ingredients: { quantityG: number | string | { toString(): string }; quantityGMax?: number | string | { toString(): string } | null; unit?: string | null; pieceG?: number | null }[],
 ): { min: number; max: number; avg: number } {
   let min = 0;
   let max = 0;
@@ -37,8 +51,8 @@ export function recipeMass(
     const unit = i.unit ?? "g";
     const q = Number(i.quantityG);
     const qMax = i.quantityGMax != null ? Number(i.quantityGMax) : q;
-    min += ingMass(q, unit);
-    max += ingMass(qMax, unit);
+    min += ingMass(q, unit, i.pieceG);
+    max += ingMass(qMax, unit, i.pieceG);
   }
   return { min, max, avg: (min + max) / 2 };
 }
@@ -54,6 +68,8 @@ export type AdjIngredient = {
   quantityG: number;
   quantityGMax: number | null;
   unit: string;
+  /** Poids d'une pièce en g (unité « pièce » seulement), s'il est connu. */
+  pieceG?: number | null;
 };
 
 /** Au-dessous de ce poids, un ingrédient n'est jamais retouché par l'ajustement
@@ -113,10 +129,6 @@ export function adjustToTarget(
     }
   }
 
-  const totalMassGMin = result.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-  const totalMassGMax = result.reduce(
-    (s, i) => s + ingMass(i.quantityGMax != null ? i.quantityGMax : i.quantityG, i.unit),
-    0,
-  );
+  const { min: totalMassGMin, max: totalMassGMax } = recipeMass(result);
   return { ingredients: result, totalMassGMin, totalMassGMax };
 }

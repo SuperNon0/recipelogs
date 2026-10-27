@@ -61,3 +61,13 @@ export function formatRelativeDate(date: Date | string, now: Date = new Date()):
   const y = Math.floor(days / 365);
   return `${y} an${y > 1 ? "s" : ""}`;
 }
+
+/**
+ * Rendement lisible : « 40 financiers de 25 g ». Le poids d'une pièce est
+ * la masse totale divisée par le nombre de pièces (omis si la masse est nulle).
+ */
+export function formatYield(count: number, label: string, totalMassG: number): string {
+  const n = count.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  const each = count > 0 && totalMassG > 0 ? ` de ${formatG(Math.round((totalMassG / count) * 10) / 10)}` : "";
+  return `${n} ${label}${each}`;
+}

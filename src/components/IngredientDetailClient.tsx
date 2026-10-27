@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChevronRight, Merge, Pencil } from "lucide-react";
-import { renameIngredientBase, mergeIngredientBases } from "@/app/actions/settings";
+import { BookOpen, Check, ChevronRight, Merge, Pencil } from "lucide-react";
+import { renameIngredientBase, mergeIngredientBases, setIngredientPieceWeight } from "@/app/actions/settings";
+import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
 
@@ -16,7 +17,7 @@ export function IngredientDetailClient({
   recipes,
   otherBases,
 }: {
-  base: { id: number; name: string };
+  base: { id: number; name: string; pieceG: number | null };
   recipes: Recipe[];
   otherBases: { id: number; name: string; count?: number }[];
 }) {
@@ -53,6 +54,10 @@ export function IngredientDetailClient({
             : `${recipes.length} recette${recipes.length > 1 ? "s utilisent" : " utilise"} cet ingrédient`}
         </p>
       </div>
+
+      <section className="fl-card ing-facts">
+        <PieceWeightField id={base.id} initial={base.pieceG} />
+      </section>
 
       <div className="sect-title" style={{ marginTop: 8 }}>
         <h2>Recettes</h2>
@@ -103,5 +108,67 @@ export function IngredientDetailClient({
         />
       )}
     </>
+  );
+}
+
+/** Petit état « enregistré / erreur » commun aux champs de la fiche. */
+function SaveState({ pending, saved, error }: { pending: boolean; saved: boolean; error: string | null }) {
+  if (error) return <span className="ing-fact-msg" data-err="true">{error}</span>;
+  if (pending) return <span className="ing-fact-msg">…</span>;
+  if (saved) return <span className="ing-fact-msg"><Check size={13} /> Enregistré</span>;
+  return null;
+}
+
+/** Poids d'une pièce : enregistré quand on quitte le champ (ou Entrée). */
+function PieceWeightField({ id, initial }: { id: number; initial: number | null }) {
+  const [value, setValue] = useState(initial != null ? String(initial).replace(".", ",") : "");
+  const [last, setLast] = useState(value);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const save = () => {
+    const v = value.trim();
+    if (v === last) return;
+    const n = v === "" ? null : Number(v.replace(",", "."));
+    if (n != null && (!Number.isFinite(n) || n <= 0)) return setError("Poids invalide.");
+    setError(null);
+    startTransition(async () => {
+      const r = await setIngredientPieceWeight(id, n);
+      if (!r.ok) return setError(r.error);
+      setLast(v);
+      setSaved(true);
+    });
+  };
+
+  return (
+    <div className="ing-fact">
+      <div className="ing-fact-l">
+        <b>
+          Poids d&apos;une pièce
+          <Help title="Poids d'une pièce" example="Œuf entier ≈ 50 g, jaune ≈ 20 g, blanc ≈ 30 g, feuille de gélatine ≈ 2 g.">
+            Quand une recette compte cet ingrédient à la pièce, chaque pièce pèse ce poids : elle
+            entre alors dans la masse totale, les pourcentages et le multiplicateur. Laisse vide si
+            l&apos;ingrédient ne s&apos;utilise pas à la pièce.
+          </Help>
+        </b>
+        <small>Pour les recettes qui l&apos;utilisent à la pièce</small>
+      </div>
+      <div className="ing-fact-v">
+        <SaveState pending={pending} saved={saved && value.trim() === last} error={error} />
+        <div className="stepper">
+          <input
+            value={value}
+            inputMode="decimal"
+            placeholder="—"
+            aria-label="Poids d'une pièce en grammes"
+            onChange={(e) => { setValue(e.target.value); setSaved(false); }}
+            onBlur={save}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          />
+          <span className="x">g</span>
+        </div>
+      </div>
+    </div>
   );
 }

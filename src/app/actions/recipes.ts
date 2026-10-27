@@ -50,6 +50,11 @@ function parseForm(formData: FormData) {
     raw.folderId = null;
   }
 
+  // Rendement : vide = pas de rendement.
+  const yieldRaw = String(formData.get("yieldCount") ?? "").trim();
+  raw.yieldCount = yieldRaw ? Math.round(Number(yieldRaw.replace(",", "."))) || null : null;
+  raw.yieldLabel = String(formData.get("yieldLabel") ?? "");
+
   const names = formData.getAll("ingredientName").map((v) => String(v));
   const qtys = formData.getAll("ingredientQty").map((v) => String(v));
   const units = formData.getAll("ingredientUnit").map((v) => String(v));
@@ -97,6 +102,8 @@ export async function createRecipe(formData: FormData) {
       favorite: data.favorite ?? false,
       rating: data.rating ?? null,
       folderId: data.folderId ?? null,
+      yieldCount: data.yieldCount ?? null,
+      yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
       ingredients: {
         create: data.ingredients.map((ing, idx) => ({
           name: ing.name,
@@ -149,6 +156,8 @@ export async function updateRecipe(id: number, formData: FormData) {
         favorite: data.favorite ?? false,
         rating: data.rating ?? null,
         folderId: data.folderId ?? null,
+        yieldCount: data.yieldCount ?? null,
+        yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
       },
     });
 
@@ -325,6 +334,8 @@ export async function duplicateRecipe(id: number) {
       name: source.name + " (copie)",
       nameNormalized: normalizeForSearch(source.name + " (copie)"),
       folderId: source.folderId,
+      yieldCount: source.yieldCount,
+      yieldLabel: source.yieldLabel,
       source: source.source,
       notesTips: source.notesTips,
       favorite: false,

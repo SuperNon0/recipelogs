@@ -12,7 +12,7 @@ import {
 } from "./theme";
 import { sanitizeRichText, looksLikeHtml } from "../sanitizeRichText";
 import { recipeMass } from "../massAdjust";
-import { formatG, formatQty } from "../format";
+import { formatG, formatQty, formatYield } from "../format";
 
 /** Slug historique conservé pour compatibilité descendante. */
 export type TemplateSlug = "classique" | "moderne" | "fiche-technique" | "magazine";
@@ -43,15 +43,17 @@ export type RecipeSnap = {
   photoPath?: string | null;
   tags?: string[];
   categories?: string[];
-  ingredients: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
+  ingredients: PdfIngredient[];
   steps: string | null;
   totalMassG: number;
   totalMassGMin?: number;
   totalMassGMax?: number;
+  /** Rendement déjà mis à l'échelle (« 60 financiers »). */
+  yield?: { count: number; label: string } | null;
   subRecipes: {
     label: string | null;
     childName: string;
-    ingredients: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
+    ingredients: PdfIngredient[];
     totalMassG: number;
     totalMassGMin?: number;
     totalMassGMax?: number;
@@ -782,7 +784,7 @@ function layoutCss(
 
 // ─── Rendu des morceaux ──────────────────────────────────────────────────────
 
-type PdfIngredient = { name: string; quantityG: number; quantityGMax?: number | null; unit?: string };
+type PdfIngredient = { name: string; quantityG: number; quantityGMax?: number | null; unit?: string; pieceG?: number | null };
 
 /**
  * Quantité affichée dans un PDF (QS, fourchette, équivalent g des cuillères),
@@ -791,7 +793,7 @@ type PdfIngredient = { name: string; quantityG: number; quantityGMax?: number | 
 function ingQtyHtml(i: PdfIngredient): string {
   const unit = i.unit ?? "g";
   if (unit === "QS") return `<span class="ing-qty ing-qs">QS</span>`;
-  const factor = unit === "cc" ? 5 : unit === "cs" ? 15 : 0;
+  const factor = unit === "cc" ? 5 : unit === "cs" ? 15 : unit === "pièce" ? (i.pieceG ?? 0) : 0;
   let inner = formatQty(i.quantityG, unit);
   if (i.quantityGMax != null) inner += ` / ${formatQty(i.quantityGMax, unit)}`;
   if (factor) {
@@ -973,8 +975,13 @@ export function renderRecipeCard(
 
   const ratingHtml = theme.showRating ? renderRating(snap.rating) : "";
 
-  const portionHtml = theme.showPortion && portion
-    ? `<div class="portion">Taille de portion: <span class="portion-value">${esc(portion)}</span></div>`
+  // Poids d'une pièce : sur la masse complète (sous-recettes comprises).
+  const fullMassG = (totalMinG + totalMaxG) / 2 + snap.subRecipes.reduce((s, sr) => s + sr.totalMassG, 0);
+  const yieldText = snap.yield ? formatYield(snap.yield.count, snap.yield.label, fullMassG) : "";
+  const portionHtml = theme.showPortion && (portion || yieldText)
+    ? portion
+      ? `<div class="portion">Taille de portion: <span class="portion-value">${esc(portion)}</span></div>`
+      : `<div class="portion">Rendement : <span class="portion-value">${esc(yieldText)}</span></div>`
     : "";
 
   const sourceHtml = theme.showSource && snap.source

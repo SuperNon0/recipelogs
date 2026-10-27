@@ -18,9 +18,9 @@ import {
   SlidersHorizontal,
   XCircle,
 } from "lucide-react";
-import { formatCoef, formatG, formatGDecimal } from "@/lib/format";
+import { formatCoef, formatG, formatGDecimal, formatYield } from "@/lib/format";
 import { resolveLink, type TreeNode } from "@/lib/recipeTree";
-import { adjustToTarget, ingMass, recipeMass, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
+import { adjustToTarget, ingMass, recipeMass, roundScaled, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
   moveSubRecipe,
   removeSubRecipe,
@@ -43,7 +43,12 @@ export type IngredientRow = {
   quantityG: number;
   quantityGMax?: number | null;
   unit?: string;
+  /** Poids d'une pièce (fiche de l'ingrédient), si l'unité est « pièce ». */
+  pieceG?: number | null;
 };
+
+/** Rendement de la recette à ×1 : « 40 financiers ». */
+export type YieldInfo = { count: number; label: string };
 
 export type SubRecipeRow = {
   id: number;
@@ -61,6 +66,8 @@ export type SubRecipeRow = {
 };
 
 type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
+/** Modes du multiplicateur : ceux des sous-recettes + « Pièces » (viser un rendement). */
+type MultMode = Mode | "pieces";
 
 const fmtNum = (n: number, max = 2) => n.toLocaleString("fr-FR", { maximumFractionDigits: max });
 
@@ -77,19 +84,22 @@ export function RecipeBody({
   recipeId,
   ingredients,
   subRecipes,
+  yieldInfo,
 }: {
   recipeId: number;
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
+  yieldInfo?: YieldInfo | null;
 }) {
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
 
-  const [mode, setMode] = useState<Mode>("coefficient");
+  const [mode, setMode] = useState<MultMode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
+  const [piecesInput, setPiecesInput] = useState(String(yieldInfo?.count ?? ""));
   const [massInput, setMassInput] = useState(String(Math.round(baseTotalG)));
   const [pivotId, setPivotId] = useState<number | null>(ingredients[0]?.id ?? null);
   const [pivotInput, setPivotInput] = useState(
-    ingredients[0] ? String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g"))) : "0",
+    ingredients[0] ? String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g", ingredients[0].pieceG))) : "0",
   );
   const [decimals, setDecimals] = useState(true);
   const [locks, setLocks] = useState<Record<number, boolean>>(() =>
@@ -110,35 +120,42 @@ export function RecipeBody({
       if (!Number.isFinite(target) || target <= 0 || baseTotalG <= 0) return 1;
       return target / baseTotalG;
     }
+    if (mode === "pieces") {
+      const wanted = num(piecesInput);
+      if (!yieldInfo || !Number.isFinite(wanted) || wanted <= 0) return 1;
+      return wanted / yieldInfo.count;
+    }
     const pivot = ingredients.find((i) => i.id === pivotId);
     const target = num(pivotInput);
     // La quantité voulue est saisie en grammes : on compare à la masse en
-    // grammes du pivot (ingMass convertit L/cc/cs), pas à sa valeur brute.
-    const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g") : 0;
+    // grammes du pivot (ingMass convertit L/cc/cs/pièces), pas à sa valeur brute.
+    const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g", pivot.pieceG) : 0;
     if (!pivot || !Number.isFinite(target) || target <= 0 || pivotBaseG <= 0) return 1;
     return target / pivotBaseG;
-  }, [mode, coefInput, massInput, pivotId, pivotInput, ingredients, baseTotalG]);
+  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, baseTotalG]);
 
   const reset = () => {
     setMode("coefficient");
     setCoefInput("1");
     setMassInput(String(Math.round(baseTotalG)));
+    setPiecesInput(String(yieldInfo?.count ?? ""));
     if (ingredients[0]) {
       setPivotId(ingredients[0].id);
-      setPivotInput(String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g"))));
+      setPivotInput(String(Math.round(ingMass(ingredients[0].quantityG, ingredients[0].unit ?? "g", ingredients[0].pieceG))));
     }
   };
 
   // Quantités des ingrédients de la recette elle-même
   const own = useMemo(() => {
-    const r = decimals ? (x: number) => x : Math.ceil;
     const scaled: AdjIngredient[] = ingredients.map((ing) => {
+      const r = decimals ? (x: number) => x : (x: number) => roundScaled(x, ing.unit);
       const k = ing.unit === "L" ? globalCoef * 1000 : globalCoef;
       return {
         name: ing.name,
         quantityG: r(ing.quantityG * k),
         quantityGMax: ing.quantityGMax != null ? r(ing.quantityGMax * k) : null,
         unit: scaledUnit(ing.unit),
+        pieceG: ing.pieceG ?? null,
       };
     });
     if (mode === "mass_target" && !decimals) {
@@ -148,8 +165,7 @@ export function RecipeBody({
         return { rows: a.ingredients, min: a.totalMassGMin, max: a.totalMassGMax };
       }
     }
-    const min = scaled.reduce((s, i) => s + ingMass(i.quantityG, i.unit), 0);
-    const max = scaled.reduce((s, i) => s + ingMass(i.quantityGMax ?? i.quantityG, i.unit), 0);
+    const { min, max } = recipeMass(scaled);
     return { rows: scaled, min, max };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingredients, globalCoef, decimals, mode, massInput]);
@@ -221,8 +237,8 @@ export function RecipeBody({
               example={<>Au multiplicateur ×2, une recette de 570 g passe à 1 140 g (sauf les sous-recettes verrouillées, qui gardent leur poids).</>}
             >
               Le poids de tout ce qui se pèse dans la recette, sous-recettes comprises, avec le
-              multiplicateur appliqué. Les pièces (œufs entiers…) et « QS » ne sont pas comptés ;
-              1 cc ≈ 5 g, 1 cs ≈ 15 g, 1 L = 1 000 g.
+              multiplicateur appliqué. 1 cc ≈ 5 g, 1 cs ≈ 15 g, 1 L = 1 000 g. Une pièce (œuf…)
+              compte si son poids est réglé sur la fiche de l&apos;ingrédient ; « QS » ne compte pas.
             </Help>
           </div>
           <div className="kpi-v num">
@@ -238,6 +254,11 @@ export function RecipeBody({
           {subs.length > 0 && (
             <div className="kpi-s">
               dont {fmt(ownAvg)} d&apos;ingrédients · {formatG(subsAvg)} de sous-recettes
+            </div>
+          )}
+          {yieldInfo && (
+            <div className="kpi-s" style={{ color: "var(--soft)" }}>
+              Rendement : {formatYield(Math.round(yieldInfo.count * globalCoef * 10) / 10, yieldInfo.label, grandTotal)}
             </div>
           )}
         </div>
@@ -256,6 +277,9 @@ export function RecipeBody({
           pivotInput={pivotInput}
           setPivotInput={setPivotInput}
           ingredients={ingredients}
+          yieldInfo={yieldInfo ?? null}
+          piecesInput={piecesInput}
+          setPiecesInput={setPiecesInput}
           globalCoef={globalCoef}
           onReset={reset}
           decimals={decimals}
@@ -353,10 +377,10 @@ function OwnRow({
   decimals: boolean;
   pct: (g: number) => string;
 }) {
-  const show = (n: number) => (decimals ? fmtNum(n) : Math.ceil(n).toLocaleString("fr-FR"));
-  const spoon = ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : 0;
+  const show = (n: number) => (decimals ? fmtNum(n) : roundScaled(n, adj.unit).toLocaleString("fr-FR"));
+  const spoon = ing.unit === "cc" ? 5 : ing.unit === "cs" ? 15 : ing.unit === "pièce" ? (ing.pieceG ?? 0) : 0;
   const avg = (adj.quantityG + (adj.quantityGMax ?? adj.quantityG)) / 2;
-  const mass = ingMass(avg, adj.unit);
+  const mass = ingMass(avg, adj.unit, adj.pieceG);
   return (
     <div className="irow">
       <span />
@@ -523,6 +547,9 @@ function MultiplierCard({
   pivotInput,
   setPivotInput,
   ingredients,
+  yieldInfo,
+  piecesInput,
+  setPiecesInput,
   globalCoef,
   onReset,
   decimals,
@@ -530,8 +557,8 @@ function MultiplierCard({
 }: {
   recipeId: number;
   hasSubRecipes: boolean;
-  mode: Mode;
-  setMode: (m: Mode) => void;
+  mode: MultMode;
+  setMode: (m: MultMode) => void;
   coefInput: string;
   setCoefInput: (v: string) => void;
   massInput: string;
@@ -541,6 +568,9 @@ function MultiplierCard({
   pivotInput: string;
   setPivotInput: (v: string) => void;
   ingredients: IngredientRow[];
+  yieldInfo: YieldInfo | null;
+  piecesInput: string;
+  setPiecesInput: (v: string) => void;
   globalCoef: number;
   onReset: () => void;
   decimals: boolean;
@@ -586,6 +616,11 @@ function MultiplierCard({
           <br />• <b>Masse</b> : tu tapes la masse voulue des ingrédients
           {hasSubRecipes ? " (hors sous-recettes)" : ""}.
           <br />• <b>Pivot</b> : tu fixes la quantité d&apos;un ingrédient.
+          {yieldInfo && (
+            <>
+              <br />• <b>Pièces</b> : tu tapes le nombre de {yieldInfo.label} voulu (rendement de la recette).
+            </>
+          )}
           <br />
           <br />
           <b>Entiers</b> arrondit chaque quantité au gramme supérieur ; en mode Masse, l&apos;écart
@@ -601,9 +636,9 @@ function MultiplierCard({
       </div>
       <div className="mrow">
         <div className="fl-seg">
-          {(["coefficient", "mass_target", "pivot_ingredient"] as const).map((m) => (
+          {(["coefficient", "mass_target", "pivot_ingredient", ...(yieldInfo ? (["pieces"] as const) : [])] as const).map((m) => (
             <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} disabled={m === "pivot_ingredient" && ingredients.length === 0}>
-              {m === "coefficient" ? "Coef." : m === "mass_target" ? "Masse" : "Pivot"}
+              {m === "coefficient" ? "Coef." : m === "mass_target" ? "Masse" : m === "pieces" ? "Pièces" : "Pivot"}
             </button>
           ))}
         </div>
@@ -625,10 +660,16 @@ function MultiplierCard({
             <span className="x">g</span>
           </div>
         )}
+        {mode === "pieces" && yieldInfo && (
+          <div className="stepper" style={{ minWidth: 150 }}>
+            <input value={piecesInput} inputMode="decimal" onChange={(e) => setPiecesInput(e.target.value)} aria-label={`Nombre de ${yieldInfo.label} voulu`} style={{ width: 70 }} />
+            <span className="x">{yieldInfo.label}</span>
+          </div>
+        )}
       </div>
       {mode === "pivot_ingredient" && (
         <div className="mrow" style={{ marginTop: 8 }}>
-          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g")))); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
+          <select className="fl-input" value={pivotId ?? ""} onChange={(e) => { const id = Number(e.target.value); setPivotId(id); const ing = ingredients.find((i) => i.id === id); if (ing) setPivotInput(String(Math.round(ingMass(ing.quantityG, ing.unit ?? "g", ing.pieceG)))); }} style={{ flex: "2 1 150px", minHeight: 34, height: 34, padding: "0 30px 0 10px", fontSize: 13 }} aria-label="Ingrédient pivot">
             {ingredients.map((i) => (
               <option key={i.id} value={i.id}>{i.name}</option>
             ))}

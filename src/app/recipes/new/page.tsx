@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { RecipeForm } from "@/components/RecipeForm";
 import { createRecipe } from "@/app/actions/recipes";
 import { listAllCategories, listAllFolders } from "@/lib/recipes";
+import { listPieceWeights } from "@/lib/ingredientInfo";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,10 @@ export default async function NewRecipePage({
       ? Number(sp.folder)
       : undefined;
 
-  const [categories, folders] = await Promise.all([
+  const [categories, folders, pieceWeights] = await Promise.all([
     listAllCategories(),
     listAllFolders(),
+    listPieceWeights(),
   ]);
 
   return (
@@ -34,6 +36,7 @@ export default async function NewRecipePage({
       <RecipeForm
         categories={categories}
         folders={folders}
+        pieceWeights={pieceWeights}
         action={createRecipe}
         submitLabel="Créer la recette"
         initial={preselectFolderId ? { folderId: preselectFolderId } : undefined}

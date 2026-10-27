@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { recipeMass } from "./massAdjust";
 import type { TreeNode } from "./recipeTree";
+import { loadIngredientInfo, pieceWeightOf } from "./ingredientInfo";
 
 export function normalizeForSearch(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -55,11 +56,14 @@ export async function listRecipes(opts: {
     include: {
       tags: true,
       categories: { include: { category: true } },
-      ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } },
+      ingredients: { select: { name: true, quantityG: true, quantityGMax: true, unit: true } },
       _count: { select: { parentLinks: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
+  const info = await loadIngredientInfo(
+    recipes.flatMap((r) => r.ingredients.filter((i) => i.unit === "pièce").map((i) => i.name ?? "")),
+  );
 
   return recipes.map((r) => ({
     id: r.id,
@@ -67,7 +71,9 @@ export async function listRecipes(opts: {
     photoPath: r.photoPath,
     favorite: r.favorite,
     rating: r.rating,
-    totalMassG: recipeMass(r.ingredients).avg,
+    totalMassG: recipeMass(
+      r.ingredients.map((i) => ({ ...i, pieceG: pieceWeightOf(info, i.name ?? "", i.unit) })),
+    ).avg,
     tags: r.tags.map((t) => t.name),
     categories: r.categories.map((c) => ({
       id: c.category.id,
@@ -137,10 +143,27 @@ export async function getRecipeDetail(id: number) {
  * sous-recettes à tous les niveaux. `visited` casse les cycles éventuels
  * (une recette qui se contiendrait indirectement elle-même).
  */
-export async function loadRecipeTree(
-  recipeId: number,
-  visited: Set<number> = new Set(),
-): Promise<TreeNode | null> {
+export async function loadRecipeTree(recipeId: number): Promise<TreeNode | null> {
+  const tree = await loadTreeNode(recipeId, new Set());
+  if (tree) await attachIngredientInfo(tree);
+  return tree;
+}
+
+/** Tous les nœuds d'un arbre (la racine puis ses sous-recettes, à tous les niveaux). */
+export function treeNodes(node: TreeNode): TreeNode[] {
+  return [node, ...node.subLinks.flatMap((l) => treeNodes(l.child))];
+}
+
+/** Complète les ingrédients de l'arbre avec leur fiche (poids par pièce…). 1 requête. */
+async function attachIngredientInfo(tree: TreeNode) {
+  const nodes = treeNodes(tree);
+  const info = await loadIngredientInfo(nodes.flatMap((n) => n.ingredients.map((i) => i.name)));
+  for (const n of nodes) {
+    for (const ing of n.ingredients) ing.pieceG = pieceWeightOf(info, ing.name, ing.unit);
+  }
+}
+
+async function loadTreeNode(recipeId: number, visited: Set<number>): Promise<TreeNode | null> {
   if (visited.has(recipeId)) return null;
   const next = new Set(visited);
   next.add(recipeId);
@@ -157,7 +180,7 @@ export async function loadRecipeTree(
 
   const subLinks = [];
   for (const link of r.parentLinks) {
-    const child = await loadRecipeTree(link.childId, next);
+    const child = await loadTreeNode(link.childId, next);
     if (!child) continue; // cycle ou enfant introuvable → ignoré
     subLinks.push({
       id: link.id,
@@ -214,7 +237,7 @@ export async function listAllIngredientBases() {
 export async function getIngredientBaseDetail(id: number) {
   const base = await prisma.ingredientBase.findUnique({
     where: { id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, pieceG: true },
   });
   if (!base) return null;
 
@@ -236,7 +259,7 @@ export async function getIngredientBaseDetail(id: number) {
   });
 
   return {
-    base,
+    base: { id: base.id, name: base.name, pieceG: base.pieceG != null ? Number(base.pieceG) : null },
     recipes: usages.map((u) => ({ id: u.recipe.id, name: u.recipe.name, ingredientName: u.name ?? base.name })),
   };
 }
