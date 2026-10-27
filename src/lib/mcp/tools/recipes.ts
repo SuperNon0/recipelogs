@@ -5,9 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { DEFAULT_SALE_COEF, costOf } from "@/lib/cost";
-import { ingMass, recipeMass } from "@/lib/massAdjust";
-import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
-import { getRecipeDetail, listRecipes } from "@/lib/recipes";
+import { ingMass } from "@/lib/massAdjust";
+import { getRecipeDetail, listRecipes, loadRecipeTree } from "@/lib/recipes";
+import { treeBaseMass } from "@/lib/recipeTree";
+import { foldText } from "@/lib/textSearch";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { INGREDIENT_UNITS } from "@/lib/validation";
 import {
@@ -63,7 +64,9 @@ const recipeFields = {
   rendement_libelle: z.string().trim().max(60).optional(),
   coef_vente: z.number().positive().max(100).optional(),
   moule: z
-    .object({ forme: z.enum(["cercle", "cadre", "carre"]), a: z.number().positive().max(1000), b: z.number().positive().max(1000).optional(), h: z.number().positive().max(1000).optional() })
+    .object({ forme: z.enum(["cercle", "cadre", "carre"]), a: z.number().min(1).max(1000), b: z.number().min(1).max(1000).optional(), h: z.number().min(1).max(1000).optional() })
+    // Sans largeur, le cadre serait effacé en silence.
+    .refine((m) => m.forme !== "cadre" || m.b != null, { message: "un cadre a besoin de sa largeur b (cm)" })
     .nullable()
     .optional(),
 };
@@ -157,7 +160,7 @@ export const RECIPE_TOOLS: McpTool[] = [
     name: "chercher_recettes",
     title: "Chercher des recettes",
     description:
-      "Cherche des recettes par nom, dossier, catégorie, étiquette, ingrédient ou favoris. Renvoie id, nom, favori, note, masse totale (g), dossier et catégories. Sans filtre : toutes les recettes, les plus récemment modifiées d'abord.",
+      "Cherche des recettes par nom, dossier, catégorie, étiquette, ingrédient ou favoris. Renvoie id, nom, favori, note, masse des ingrédients propres (g ; sans les sous-recettes, voir lire_recette pour le total), nombre de sous-recettes, dossier et catégories. Sans filtre : toutes les recettes, les plus récemment modifiées d'abord.",
     inputSchema: {
       type: "object",
       properties: {
@@ -193,12 +196,10 @@ export const RECIPE_TOOLS: McpTool[] = [
         withVariants: true,
       });
       if (a.ingredient) {
-        const rows = await prisma.ingredient.findMany({
-          where: { name: { contains: a.ingredient, mode: "insensitive" } },
-          select: { recipeId: true },
-          distinct: ["recipeId"],
-        });
-        const keep = new Set(rows.map((r) => r.recipeId));
+        // Sans accents ni majuscules (« oeufs » trouve « Œufs »).
+        const term = foldText(a.ingredient);
+        const rows = await prisma.ingredient.findMany({ where: { name: { not: null } }, select: { recipeId: true, name: true } });
+        const keep = new Set(rows.filter((r) => foldText(r.name ?? "").includes(term)).map((r) => r.recipeId));
         list = list.filter((r) => keep.has(r.id));
       }
       const folders = new Map((await prisma.folder.findMany({ select: { id: true, name: true } })).map((f) => [f.id, f.name]));
@@ -209,7 +210,9 @@ export const RECIPE_TOOLS: McpTool[] = [
           nom: r.name,
           favori: r.favorite,
           note: r.rating,
-          masse_totale_g: Math.round(r.totalMassG),
+          // Ingrédients propres seulement (rapide) ; lire_recette donne la masse totale avec les sous-recettes.
+          masse_ingredients_g: Math.round(r.totalMassG),
+          ...(r.subCount ? { sous_recettes: r.subCount } : {}),
           dossier: r.folderId ? folders.get(r.folderId) ?? null : null,
           categories: r.categories.map((c) => c.name),
           tags: r.tags,
@@ -389,13 +392,13 @@ export const RECIPE_TOOLS: McpTool[] = [
     name: "ajuster_quantites_recette",
     title: "Multiplier les quantités",
     description:
-      "Change pour de bon les quantités d'une recette : par un multiplicateur (ex. 1.5) ou pour viser une masse totale en grammes. Les sous-recettes gardent leurs réglages. Pour un simple calcul sans enregistrer, utiliser lire_recette avec un multiplicateur.",
+      "Change pour de bon les quantités d'une recette : par un multiplicateur (ex. 1.5) ou pour viser une masse totale en grammes (sous-recettes comprises, comme le mode Masse de la fiche). Seuls les ingrédients propres sont réécrits : les sous-recettes gardent leurs réglages et suivent le multiplicateur, sauf si elles sont verrouillées. Pour un simple calcul sans enregistrer, utiliser lire_recette avec un multiplicateur.",
     inputSchema: {
       type: "object",
       properties: {
         id: js.int("Id de la recette"),
         multiplicateur: js.num("Coefficient (ex. 2 pour doubler)"),
-        masse_cible_g: js.num("Ou masse totale visée, en grammes"),
+        masse_cible_g: js.num("Ou masse totale visée, en grammes, sous-recettes comprises"),
       },
       required: ["id"],
     },
@@ -407,21 +410,26 @@ export const RECIPE_TOOLS: McpTool[] = [
           .refine((v) => v.multiplicateur || v.masse_cible_g, { message: "donne un multiplicateur ou une masse_cible_g" }),
         args,
       );
-      // Masse avec le poids des pièces, comme sur la fiche.
+      // Masse de toute la recette (sous-recettes et poids des pièces compris), comme sur la fiche.
       const massNow = async () => {
-        const rows = await prisma.ingredient.findMany({ where: { recipeId: a.id }, select: { name: true, quantityG: true, quantityGMax: true, unit: true } });
-        const info = await loadIngredientInfo(rows.map((r) => r.name ?? ""));
-        return recipeMass(rows.map((r) => ({ ...r, pieceG: pieceWeightOf(info, r.name ?? "") }))).avg;
+        const tree = await loadRecipeTree(a.id);
+        if (!tree) throw new Error(`recette ${a.id} introuvable`);
+        const m = treeBaseMass(tree);
+        return { total: m.avg, fixed: (m.fixedMin + m.fixedMax) / 2, hasSubs: tree.subLinks.length > 0 };
       };
       const before = await massNow();
       let mult = a.multiplicateur ?? 1;
       if (a.masse_cible_g && !a.multiplicateur) {
-        if (before <= 0) throw new Error("masse actuelle nulle : impossible de viser une masse");
-        mult = a.masse_cible_g / before;
+        // La part verrouillée ne bouge pas : le reste vise la masse demandée.
+        const free = before.total - before.fixed;
+        if (free <= 0) throw new Error("masse actuelle nulle : impossible de viser une masse");
+        if (a.masse_cible_g <= before.fixed) throw new Error(`les sous-recettes verrouillées font déjà ${Math.round(before.fixed)} g`);
+        mult = (a.masse_cible_g - before.fixed) / free;
       }
-      await runAction(() => applyMultiplierToRecipe(a.id, mult, a.masse_cible_g));
+      // Ajustement au gramme près seulement sans sous-recette (elles ne sont pas réécrites).
+      await runAction(() => applyMultiplierToRecipe(a.id, mult, before.hasSubs ? undefined : a.masse_cible_g));
       const after = await massNow();
-      return text({ id: a.id, masse_avant_g: Math.round(before), masse_apres_g: Math.round(after) });
+      return text({ id: a.id, multiplicateur: Math.round(mult * 1000) / 1000, masse_avant_g: Math.round(before.total), masse_apres_g: Math.round(after.total) });
     },
   },
 

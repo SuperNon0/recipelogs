@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { foldChars, ingredientTerms, recipesWithIngredients, searchableText, snippet } from "@/lib/textSearch";
+import { foldText, ingredientTerms, recipesWithIngredients, searchableText, snippet } from "@/lib/textSearch";
 
 describe("recherche dans le texte", () => {
-  it("garde la longueur pour que les positions restent justes", () => {
-    expect(foldChars("Crème brûlée")).toBe("creme brulee");
+  it("replie accents et lettres liées", () => {
+    expect(foldText("Crème brûlée")).toBe("creme brulee");
+    expect(foldText("Œufs, nævus")).toBe("oeufs, naevus");
+    expect(foldText("Cre\u0300me")).toBe("creme");
+  });
+
+  it("« oeufs » trouve « œufs » (et l'inverse), accents décomposés compris, extrait juste", () => {
+    expect(snippet("Battre les œufs entiers.", "oeufs")?.match).toBe("œufs");
+    expect(snippet("Battre les oeufs entiers.", "œufs")?.match).toBe("oeufs");
+    const s = snippet("Ajouter la cre\u0300me et les œufs.", "crème");
+    expect(s?.match).toBe("cre\u0300me");
+    expect(s?.after).toBe(" et les œufs.");
   });
 
   it("extrait autour du mot, sans accents ni majuscules", () => {

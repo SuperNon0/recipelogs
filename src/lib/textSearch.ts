@@ -4,29 +4,59 @@
  * majuscules. Pur : la route /api/search charge les données et appelle ceci.
  */
 
-/** Normalise caractère par caractère (même longueur) : les positions trouvées restent valables dans le texte d'origine. */
-export function foldChars(s: string): string {
-  let out = "";
-  for (const c of s) out += (c.normalize("NFD")[0] ?? c).toLowerCase().slice(0, 1).padEnd(c.length, " ");
-  return out;
+/** Lettres liées et accents (même décomposés, copiés depuis un Mac) retirés, en minuscules : « Œufs » → « oeufs ». */
+export function foldText(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/œ/gi, "oe")
+    .replace(/æ/gi, "ae")
+    .toLowerCase();
 }
 
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+/**
+ * Comme foldText, avec pour chaque caractère du résultat sa position dans le
+ * texte d'origine : un extrait trouvé dans le texte replié se retrouve dans
+ * le texte d'origine (« œ » donne deux lettres, un accent décomposé aucune).
+ */
+function foldWithMap(s: string): { folded: string; map: number[] } {
+  let folded = "";
+  const map: number[] = [];
+  let i = 0;
+  for (const c of s) {
+    const f = foldText(c);
+    for (const ch of f) {
+      folded += ch;
+      map.push(i);
+    }
+    i += c.length;
+  }
+  map.push(s.length);
+  return { folded, map };
+}
+
+const fold = (s: string) => foldText(s).trim();
 
 /** Extrait d'environ `width` caractères autour du mot trouvé, ou null s'il n'y est pas. */
 export function snippet(text: string, term: string, width = 70): { before: string; match: string; after: string } | null {
-  const t = foldChars(term.trim());
+  const t = foldText(term.trim());
   if (!t.trim()) return null;
   const flat = text.replace(/\s+/g, " ");
-  const i = foldChars(flat).indexOf(t);
-  if (i < 0) return null;
-  const pad = Math.max(10, Math.floor((width - t.length) / 2));
+  const { folded, map } = foldWithMap(flat);
+  const k = folded.indexOf(t);
+  if (k < 0) return null;
+  const i = map[k];
+  // Fin : début du caractère d'origine suivant (un « œ » coupé en deux est pris en entier).
+  let end = map[k + t.length];
+  if (end === map[k + t.length - 1]) end = map.find((p, j) => j > k + t.length && p > end) ?? flat.length;
+  const len = end - i;
+  const pad = Math.max(10, Math.floor((width - len) / 2));
   const from = Math.max(0, i - pad);
-  const to = Math.min(flat.length, i + t.length + pad);
+  const to = Math.min(flat.length, end + pad);
   return {
     before: (from > 0 ? "…" : "") + flat.slice(from, i),
-    match: flat.slice(i, i + t.length),
-    after: flat.slice(i + t.length, to) + (to < flat.length ? "…" : ""),
+    match: flat.slice(i, end),
+    after: flat.slice(end, to) + (to < flat.length ? "…" : ""),
   };
 }
 

@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
-import { recipeMass } from "./massAdjust";
+import { loadRecipeTree } from "./recipes";
+import { treeBaseMass } from "./recipeTree";
 
 /**
  * Variantes d'une recette : une recette d'origine (« version principale ») et
@@ -38,8 +39,15 @@ export async function getVariantFamily(recipeId: number): Promise<VariantFamily 
   const ids = [rootId, ...links.map((l) => l.variantRecipeId)];
   const recipes = await prisma.recipe.findMany({
     where: { id: { in: ids } },
-    select: { id: true, name: true, updatedAt: true, ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } } },
+    select: { id: true, name: true, updatedAt: true },
   });
+  // Masse de toute la recette (sous-recettes et poids des pièces compris), comme la fiche.
+  const masses = new Map(
+    await Promise.all(ids.map(async (id) => {
+      const tree = await loadRecipeTree(id);
+      return [id, tree ? treeBaseMass(tree).avg : 0] as const;
+    })),
+  );
   const byId = new Map(recipes.map((r) => [r.id, r]));
   const notes = new Map(links.map((l) => [l.variantRecipeId, l.note]));
 
@@ -52,7 +60,7 @@ export async function getVariantFamily(recipeId: number): Promise<VariantFamily 
       name: r.name,
       note: id === rootId ? null : notes.get(id) ?? null,
       isRoot: id === rootId,
-      massG: recipeMass(r.ingredients).avg,
+      massG: masses.get(id) ?? 0,
       updatedAt: r.updatedAt.toISOString(),
     });
   }

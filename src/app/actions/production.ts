@@ -39,7 +39,8 @@ export async function setProductionAmount(id: number, amount: number): Promise<R
 }
 
 export async function removeProductionItem(id: number): Promise<Result> {
-  await prisma.productionItem.deleteMany({ where: { id } });
+  const { count } = await prisma.productionItem.deleteMany({ where: { id } });
+  if (!count) return { ok: false, error: "Ligne introuvable sur la fiche de production." };
   refresh();
   return { ok: true };
 }

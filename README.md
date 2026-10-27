@@ -192,7 +192,7 @@ Serveur MCP intégré à l'appli : `POST /api/mcp` (JSON-RPC sans état, écrit 
 |---|---|
 | Ingrédients | lister, classer, renommer, fusionner, supprimer les inutilisés, `regler_fiches_ingredients` (allergènes, poids pièce, prix en lot), recettes d'un ingrédient… |
 | Recettes | `chercher_recettes`, `lire_recette` (rendement, moule, variantes, allergènes, coût, **% de chaque ingrédient**), créer, modifier, dupliquer, supprimer, ajuster les quantités, sous-recettes, commentaires, favoris, import / export JSON |
-| Variantes, moules, production et recherche (V2.5) | `voir_variantes`, `creer_variante`, `relier_variante`, `gerer_variante` (renommer, principale, détacher), `comparer_recettes`, `adapter_au_moule`, `voir_fiche_production`, `ajouter_a_production`, `modifier_production`, `recherche_complete` |
+| Variantes, moules, production et recherche (V2.5) | `voir_variantes`, `creer_variante`, `relier_variante`, `gerer_variante` (renommer, principale, détacher), `comparer_recettes`, `adapter_au_moule`, `voir_fiche_production`, `ajouter_a_production`, `modifier_production`, `retirer_de_production`, `recherche_complete` |
 | Vidéos et liens | `lire_video` (TikTok, Instagram, YouTube, page web ; yt-dlp + ffmpeg sur le serveur) |
 | Dossiers et catégories, Listes de courses, Cahiers | création, rangement, couleurs, articles, recettes… |
 | Site | `infos_recipelog`, `lancer_mise_a_jour`, `etat_du_site` |
