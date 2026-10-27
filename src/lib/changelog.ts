@@ -19,6 +19,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Numéro de version complet : le dernier nombre est celui de la dernière mise à jour installée (V2.3.88 = PR n° 88)",
     ],
     fixes: [
+      "Multiplicateur « Pivot » : si l'ingrédient fixé est en litres ou en cuillères (cc/cs), la quantité voulue est bien lue en grammes et le coefficient est juste (avant, les quantités pouvaient être multipliées par 1000, 5 ou 15)",
+      "« Masse cible exacte » sur une recette avec des fourchettes : la masse obtenue est maintenant pile celle demandée, sans gonfler les petits ingrédients (gélatine, levure…)",
       "Les quantités à décimales (par ex. 9,7 g de gélatine) ne sont plus arrondies au gramme supérieur dans les PDF, les cahiers, le partage et les listes de courses quand la recette n'est pas multipliée (×1) : elles s'affichent exactement comme à l'écran",
     ],
     migrations: ["Les outils de lecture vidéo (yt-dlp, ffmpeg) s'installent tout seuls à la mise à jour"],
