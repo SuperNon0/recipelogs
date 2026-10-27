@@ -22,6 +22,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Les variantes ne s'affichent plus dans la liste des recettes ni dans les compteurs des dossiers (lien « variantes rangées sous leur recette » pour les voir) ; la recherche les trouve toujours",
       "Fiche de production : « 60 éclairs » (menu ⋯ → Fiche de production) donne toutes les pesées à l'échelle, sous-recettes comprises, une préparation par encadré dans l'ordre où on les fait, avec cases à cocher et étapes en option ; un PDF à imprimer pour le labo",
       "Page « Production » (menu de gauche ou recherche) : plusieurs recettes à produire en même temps, les préparations communes additionnées et le total par ingrédient à sortir",
+      "Mode labo (bouton sur la fiche) : la recette en grand au multiplicateur choisi, l'écran reste allumé, les pesées se cochent, l'étape en cours est mise en avant et les durées des étapes (« cuire 18 min », « 1 h 30 ») deviennent des minuteurs avec sonnerie et vibration",
     ],
     migrations: ["Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire"],
   },

@@ -3,11 +3,12 @@
 import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
+import { ChefHat, ChevronLeft, FileDown, Layers, Library, Pencil, Star, TriangleAlert } from "lucide-react";
 import type { AllergenHit } from "@/lib/allergens";
 import type { Mold } from "@/lib/mold";
 import type { VariantFamily } from "@/lib/variants";
 import { VariantsCard } from "./Variants";
+import { KitchenMode } from "./KitchenMode";
 import { MoreButton } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
 import { RecipeBody, type IngredientRow, type RecipeScale, type SubRecipeRow, type YieldInfo } from "@/components/RecipeBody";
@@ -54,6 +55,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("recipe");
   const [fav, setFav] = useState(recipe.favorite);
+  const [lab, setLab] = useState(false);
   // Multiplicateur de l'onglet Recette, repris par les quantités liées des étapes.
   const [scale, setScale] = useState<RecipeScale>({ coef: 1, wholeNumbers: false, subCoefs: {} });
   const onScaleChange = useCallback((s: RecipeScale) => setScale(s), []);
@@ -97,6 +99,10 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
             }}
           >
             <Star size={17} fill={fav ? "var(--accent)" : "none"} style={{ color: fav ? "var(--accent)" : undefined }} />
+          </button>
+          <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setLab(true)} title="Mode labo : la recette en grand, écran allumé, pesées à cocher et minuteurs">
+            <ChefHat size={16} />
+            <span className="desk-only">Mode labo</span>
           </button>
           <button type="button" className="fl-btn fl-btn-secondary desk-only" onClick={() => menu.openDialog("pdf")}>
             <FileDown size={16} /> PDF
@@ -224,6 +230,17 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
       </p>
 
       {menu.dialogs}
+      {lab && (
+        <KitchenMode
+          recipeId={recipe.id}
+          name={recipe.name}
+          steps={recipe.steps}
+          ingredients={ingredients}
+          subRecipes={subRecipes}
+          scale={scale}
+          onClose={() => setLab(false)}
+        />
+      )}
     </article>
   );
 }
