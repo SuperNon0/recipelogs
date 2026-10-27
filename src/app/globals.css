@@ -1993,6 +1993,18 @@ button.fl-row:hover {
   background: var(--bg);
 }
 
+/* Champs du multiplicateur (coef., masse, pivot, pièces, nombre de moules) : même fond que les champs du moule. */
+.kpi-mult .stepper input {
+  background: var(--bg);
+  border-color: var(--border2);
+  border-radius: 10px;
+  height: 38px;
+  font-size: 18px;
+}
+.kpi-mult .stepper input:focus {
+  border-color: var(--accent);
+}
+
 /* Mode « Moule » du multiplicateur et choix d'un moule */
 .mold-pick {
   display: flex;
@@ -2597,6 +2609,34 @@ button.fl-row:hover {
 .cmp-total td {
   font-weight: 600;
   border-bottom: 0;
+}
+/* Téléphone : les 4 colonnes tiennent dans l'écran (pas de défilement de côté). */
+@media (max-width: 699px) {
+  .cmp-table {
+    min-width: 0;
+    font-size: 13px;
+  }
+  .cmp-table th,
+  .cmp-table td {
+    padding: 9px 6px;
+  }
+  .cmp-table th:first-child,
+  .cmp-table td:first-child {
+    padding-left: 10px;
+  }
+  .cmp-table th.num {
+    white-space: normal;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .cmp-diff small {
+    display: block;
+    margin-left: 0;
+  }
+  .cmp-sub {
+    display: block;
+    margin-left: 0;
+  }
 }
 .cmp-steps {
   display: grid;
