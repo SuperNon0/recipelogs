@@ -53,6 +53,7 @@ model Recipe {
   cookbookEntries    CookbookRecipe[]
   shoppingListRecipes ShoppingListRecipe[]
   shoppingListItems   ShoppingListItem[]
+  productionItem      ProductionItem?
 
   @@index([updatedAt(sort: Desc)])
   @@index([favorite])
@@ -397,6 +398,26 @@ model ShoppingListRecipe {
 
   @@unique([shoppingListId, recipeId])
   @@map("shopping_list_recipes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Fiche de production
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Recette à produire : `amount` = nombre de pièces si la recette a un rendement
+ * (« 60 éclairs »), sinon multiplicateur (×2). Une seule fiche en cours.
+ */
+model ProductionItem {
+  id        Int      @id @default(autoincrement())
+  recipeId  Int      @unique @map("recipe_id")
+  amount    Decimal  @db.Decimal(12, 3)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("production_items")
 }
 
 // ─────────────────────────────────────────────────────────────

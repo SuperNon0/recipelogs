@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   BookOpen,
+  ClipboardList,
   FileText,
   FolderOpen,
   Library,
@@ -50,6 +51,7 @@ const ACTIONS: Item[] = [
   { key: "a-fav", group: "Actions", label: "Favoris", href: "/favorites", icon: Star },
   { key: "a-cb", group: "Actions", label: "Nouveau cahier", href: "/cookbooks/new", icon: Library },
   { key: "a-sh", group: "Actions", label: "Nouvelle liste de courses", href: "/shopping/new", icon: ShoppingBasket },
+  { key: "a-prod", group: "Actions", label: "Fiche de production", href: "/production", icon: ClipboardList },
   { key: "a-th", group: "Actions", label: "Thèmes PDF", href: "/settings/themes", icon: Palette },
   { key: "a-set", group: "Actions", label: "Réglages", href: "/settings", icon: Settings2 },
 ];

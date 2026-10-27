@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useState, useTransition } from 
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
+  ClipboardList,
   Copy,
   ExternalLink,
   FileDown,
@@ -23,6 +24,7 @@ import { AddToCookbookDialog } from "@/components/AddToCookbookModal";
 import { AddToShoppingListDialog } from "@/components/AddToShoppingListModal";
 import { RecipePdfDialog, type PdfThemeOption } from "@/components/RecipePdfDialog";
 import { LinkVariantDialog, NewVariantDialog } from "./Variants";
+import { ProductionDialog } from "@/components/ProductionDialog";
 import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/app/actions/recipes";
 import { assignRecipesToFolder } from "@/app/actions/settings";
 import { formatG } from "@/lib/format";
@@ -52,7 +54,7 @@ export type RecipeMenuTarget = {
   subtitle?: string;
 };
 
-type Dialog = "pdf" | "cookbook" | "shopping" | "variant" | "link-variant" | null;
+type Dialog = "pdf" | "cookbook" | "shopping" | "variant" | "link-variant" | "production" | null;
 
 /**
  * Menu d'actions d'une recette (clic droit, bouton « ⋯ », appui long) et les
@@ -133,6 +135,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
         { label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") },
         { label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") },
         { label: "Télécharger le PDF…", icon: FileDown, onSelect: () => setDialog("pdf") },
+        { label: "Fiche de production…", icon: ClipboardList, onSelect: () => setDialog("production") },
         { separator: true },
         { label: "Déplacer vers", icon: FolderInput, submenu: moveTo },
         {
@@ -157,6 +160,8 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean } = 
       <AddToCookbookDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "shopping" ? (
       <AddToShoppingListDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
+    ) : dialog === "production" ? (
+      <ProductionDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "variant" ? (
       <NewVariantDialog recipeId={r.id} recipeName={r.name} onClose={() => setDialog(null)} />
     ) : dialog === "link-variant" ? (
