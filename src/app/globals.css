@@ -1977,6 +1977,57 @@ button.fl-row:hover {
   background: var(--bg);
 }
 
+/* Mode « Moule » du multiplicateur et choix d'un moule */
+.mold-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.mold-pick select {
+  width: auto;
+  max-width: 100%;
+}
+.mold-h {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mold-x {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.mold-mult {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.mold-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mold-tag {
+  width: 52px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mold-count {
+  margin-left: 0;
+}
+.mold-count input {
+  width: 44px;
+  font-size: 16px;
+}
+.mold-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .stepper .x {
   color: var(--muted);
   font-size: 15px;

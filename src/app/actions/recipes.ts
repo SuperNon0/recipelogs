@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isSectionTitle, recipeFormSchema } from "@/lib/validation";
 import { isStepsHtmlEffectivelyEmpty } from "@/lib/pdf/template";
@@ -12,6 +12,7 @@ import { scaleQty, adjustToTarget } from "@/lib/massAdjust";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { rescaleStepText } from "@/lib/stepQty";
+import { parseMold } from "@/lib/mold";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -61,6 +62,7 @@ function parseForm(formData: FormData) {
   const yieldRaw = String(formData.get("yieldCount") ?? "").trim();
   raw.yieldCount = yieldRaw ? Math.round(Number(yieldRaw.replace(",", "."))) || null : null;
   raw.yieldLabel = String(formData.get("yieldLabel") ?? "");
+  const mold = parseMold(formData.get("mold"));
 
   const names = formData.getAll("ingredientName").map((v) => String(v));
   const qtys = formData.getAll("ingredientQty").map((v) => String(v));
@@ -80,11 +82,11 @@ function parseForm(formData: FormData) {
   }
   raw.ingredients = ingredients;
 
-  return recipeFormSchema.parse(raw);
+  return { ...recipeFormSchema.parse(raw), mold };
 }
 
 /** parseForm avec un message d'erreur lisible (création ET modification). */
-function parseFormOrThrow(formData: FormData): z.infer<typeof recipeFormSchema> {
+function parseFormOrThrow(formData: FormData): ReturnType<typeof parseForm> {
   try {
     return parseForm(formData);
   } catch (err) {
@@ -111,6 +113,7 @@ export async function createRecipe(formData: FormData) {
       folderId: data.folderId ?? null,
       yieldCount: data.yieldCount ?? null,
       yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
+      mold: data.mold ?? Prisma.DbNull,
       ingredients: {
         create: data.ingredients.map((ing, idx) => ({
           name: ing.name,
@@ -165,6 +168,7 @@ export async function updateRecipe(id: number, formData: FormData) {
         folderId: data.folderId ?? null,
         yieldCount: data.yieldCount ?? null,
         yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
+        mold: data.mold ?? Prisma.DbNull,
       },
     });
 
@@ -370,6 +374,7 @@ export async function duplicateRecipe(id: number) {
       yieldCount: source.yieldCount,
       yieldLabel: source.yieldLabel,
       saleCoef: source.saleCoef,
+      mold: source.mold ?? Prisma.DbNull,
       source: source.source,
       notesTips: source.notesTips,
       favorite: false,

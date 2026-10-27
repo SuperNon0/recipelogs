@@ -1,3 +1,4 @@
+import { parseMold } from "@/lib/mold";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -57,6 +58,7 @@ export default async function EditRecipePage({
           folderId: recipe.folderId,
           yieldCount: recipe.yieldCount,
           yieldLabel: recipe.yieldLabel,
+          mold: parseMold(recipe.mold),
           ingredients: recipe.ingredients.map((i) => ({
             name: i.name ?? i.ingredientBase?.name ?? "",
             quantityG: Number(i.quantityG),

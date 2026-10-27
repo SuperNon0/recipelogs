@@ -1,3 +1,4 @@
+import { parseMold } from "@/lib/mold";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,10 @@ const recipeFields = {
   rendement_nombre: z.number().int().positive().max(100_000).nullable().optional(),
   rendement_libelle: z.string().trim().max(60).optional(),
   coef_vente: z.number().positive().max(100).optional(),
+  moule: z
+    .object({ forme: z.enum(["cercle", "cadre", "carre"]), a: z.number().positive().max(1000), b: z.number().positive().max(1000).optional(), h: z.number().positive().max(1000).optional() })
+    .nullable()
+    .optional(),
 };
 
 const recipeFieldsJs = {
@@ -76,6 +81,17 @@ const recipeFieldsJs = {
   rendement_nombre: js.int("Rendement : nombre de pièces ou de portions que donne la recette (ex. 60), null pour aucun"),
   rendement_libelle: js.str("Ce que compte le rendement (« financiers », « parts »… ; « pièces » par défaut)"),
   coef_vente: js.num(`Coefficient de vente : prix conseillé = coût matière × coef (${DEFAULT_SALE_COEF} par défaut)`),
+  moule: {
+    type: ["object", "null"],
+    description: "Moule d'origine de la recette, en cm : cercle (a = diamètre), carre (a = côté) ou cadre (a × b), hauteur h facultative. null pour aucun.",
+    properties: {
+      forme: js.enum(["cercle", "cadre", "carre"] as const, "Forme du moule"),
+      a: js.num("Diamètre (cercle), côté (carré) ou longueur (cadre), en cm"),
+      b: js.num("Largeur du cadre en cm"),
+      h: js.num("Hauteur en cm, facultative"),
+    },
+    required: ["forme", "a"],
+  },
 };
 
 type RecipeValues = {
@@ -92,6 +108,7 @@ type RecipeValues = {
   rendement_nombre?: number | null;
   rendement_libelle?: string;
   coef_vente?: number;
+  moule?: { forme: "cercle" | "cadre" | "carre"; a: number; b?: number; h?: number } | null;
 };
 
 /** Construit le même formulaire que l'écran de saisie d'une recette. */
@@ -109,6 +126,7 @@ function recipeForm(v: RecipeValues): FormData {
     folderId: v.dossier_id ?? undefined,
     yieldCount: v.rendement_nombre ?? "",
     yieldLabel: v.rendement_libelle ?? "",
+    mold: v.moule ? JSON.stringify({ shape: v.moule.forme, a: v.moule.a, b: v.moule.b, h: v.moule.h }) : "",
   });
   for (const ing of v.ingredients) {
     fd.append("ingredientName", ing.nom);
@@ -126,6 +144,12 @@ async function requireRecipe(recipeId: number) {
 }
 
 const qty = (v: unknown) => (v == null ? null : Number(v));
+
+/** Moule enregistré → format MCP ({ forme, a, b, h }). */
+function moldArg(raw: unknown): RecipeValues["moule"] {
+  const m = parseMold(raw);
+  return m ? { forme: m.shape, a: m.a, ...(m.b ? { b: m.b } : {}), ...(m.h ? { h: m.h } : {}) } : null;
+}
 
 export const RECIPE_TOOLS: McpTool[] = [
   {
@@ -224,6 +248,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         multiplicateur: a.multiplicateur,
         masse_totale_g: snap ? Math.round(snap.totalMassG) : null,
         rendement: snap?.yield ? { nombre: snap.yield.count, libelle: snap.yield.label } : null,
+        moule: moldArg(r.mold),
         allergenes: snap?.allergens ?? [],
         cout:
           cost && cost.detail.length > 0
@@ -304,6 +329,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         note: r.rating,
         rendement_nombre: r.yieldCount,
         rendement_libelle: r.yieldLabel ?? "",
+        moule: moldArg(r.mold),
       };
       const next: RecipeValues = { ...current };
       for (const [k, v] of Object.entries(a)) if (k !== "id" && v !== undefined) Object.assign(next, { [k]: v });
