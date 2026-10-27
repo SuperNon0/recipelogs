@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, Euro, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -10,10 +10,11 @@ import { SiteSettings } from "@/components/settings/SiteSettings";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [folderCount, categoryCount, ingredientBaseCount, themes, siteUrl, mcpToken] = await Promise.all([
+  const [folderCount, categoryCount, ingredientBaseCount, pricedCount, themes, siteUrl, mcpToken] = await Promise.all([
     prisma.folder.count(),
     prisma.category.count(),
     prisma.ingredientBase.count(),
+    prisma.ingredientBase.count({ where: { price: { not: null } } }),
     listPdfThemes(),
     getSiteUrl(),
     getMcpToken(),
@@ -49,6 +50,12 @@ export default async function SettingsPage() {
           icon={Wheat}
           title="Ingrédients"
           sub={`${plural(ingredientBaseCount, "ingrédient")} · proposés à la saisie des recettes`}
+        />
+        <Row
+          href="/settings/ingredients/prix"
+          icon={Euro}
+          title="Prix des ingrédients"
+          sub={`${pricedCount} sur ${ingredientBaseCount} renseignés · pour le coût de revient`}
         />
       </div>
 

@@ -73,6 +73,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       quantityGMax: scaledMax?.quantityG ?? null,
       unit: scaled.unit,
       pieceG: i.pieceG ?? null,
+      cost: i.cost ?? null,
     };
   });
   const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);

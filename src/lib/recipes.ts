@@ -286,6 +286,32 @@ export async function getIngredientBaseDetail(id: number) {
   };
 }
 
+/** Tous les ingrédients avec leur prix actuel et le précédent (page « Prix des ingrédients »). */
+export async function listIngredientPrices() {
+  const bases = await prisma.ingredientBase.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      defaultUnit: true,
+      price: true,
+      priceUnit: true,
+      prices: { orderBy: { createdAt: "desc" }, take: 2, select: { price: true, priceUnit: true, createdAt: true } },
+    },
+  });
+  return bases.map((b) => {
+    const [cur, prev] = b.prices;
+    return {
+      id: b.id,
+      name: b.name,
+      price: b.price != null ? Number(b.price) : null,
+      priceUnit: b.priceUnit ?? (b.defaultUnit === "pièce" ? "pièce" : b.defaultUnit === "L" ? "L" : "kg"),
+      since: b.price != null && cur ? cur.createdAt.toISOString() : null,
+      previous: b.price != null && prev ? { price: Number(prev.price), unit: prev.priceUnit } : null,
+    };
+  });
+}
+
 export async function listAllTags(): Promise<string[]> {
   const rows = await prisma.tag.findMany({
     distinct: ["name"],
