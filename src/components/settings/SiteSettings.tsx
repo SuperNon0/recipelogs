@@ -122,27 +122,6 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalOverlay title="Nouveautés" onClose={onClose}>
       <div className="set-log">
-        {prs.length > 0 && (
-          <section>
-            <h4>
-              <span className="fl-tag" style={{ color: "var(--accent)" }}>
-                PR
-              </span>
-              Dernières mises à jour installées
-            </h4>
-            <ul>
-              {prs.map((pr) => (
-                <li key={pr.number}>
-                  <span className="fl-kbd" style={{ flex: "none" }}>#{pr.number}</span>
-                  {pr.title}
-                  <small style={{ marginLeft: "auto", flex: "none", color: "var(--muted)" }}>
-                    {formatDate(pr.date)}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
         {CHANGELOG.map((v) => (
           <section key={v.version}>
             <h4>
@@ -152,6 +131,7 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
               {v.title}
               <small>{formatDate(v.date)}</small>
             </h4>
+            {v.summary && <p className="set-log-sum">{v.summary}</p>}
             {!!(v.features?.length || v.fixes?.length) && (
               <ul>
                 {v.features?.map((f, i) => (
@@ -170,6 +150,27 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
             )}
           </section>
         ))}
+        {prs.length > 0 && (
+          <section>
+            <h4>
+              <span className="fl-tag" style={{ color: "var(--accent)" }}>
+                PR
+              </span>
+              Dernières mises à jour installées
+            </h4>
+            <ul>
+              {prs.map((pr) => (
+                <li key={pr.number}>
+                  <span className="fl-kbd" style={{ flex: "none", alignSelf: "flex-start" }}>#{pr.number}</span>
+                  {pr.title}
+                  <small style={{ marginLeft: "auto", flex: "none", color: "var(--muted)" }}>
+                    {formatDate(pr.date)}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </ModalOverlay>
   );
