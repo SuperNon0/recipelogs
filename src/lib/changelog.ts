@@ -29,6 +29,12 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
     fixes: [
       "Quand on multiplie une recette, les pièces sont arrondies à la plus proche (5,06 jaunes → 5) au lieu de passer à la pièce au-dessus",
+      "« Masse cible » enregistrée comme nouvelle base : le poids des œufs et autres pièces est compté, la farine n'est plus doublée par erreur",
+      "Enregistrer le multiplicateur comme nouvelle base met aussi à jour le rendement (40 → 60 financiers) et les quantités liées des étapes",
+      "Recette figée dans un cahier : changer sa masse compte les pièces, arrondit les pièces à la plus proche et met le rendement à l'échelle ; le pivot en litres ou à la pièce est juste",
+      "Fusionner plusieurs ingrédients d'un coup garde leurs allergènes, leur poids par pièce, leur prix et l'historique des prix",
+      "Import JSON : les intertitres, les fourchettes, le rendement et le coefficient de vente sont repris (avant, un intertitre devenait un ingrédient à 0 g)",
+      "Effacer puis remettre le même prix n'ajoute plus de doublon dans l'historique",
     ],
     migrations: ["Ajout du poids par pièce, des allergènes et des prix (ingrédients), du rendement et du coefficient de vente (recettes) ; rien à faire"],
   },
