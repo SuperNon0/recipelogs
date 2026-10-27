@@ -7,14 +7,19 @@ export function ingMass(q: number, unit: string): number {
   return 0;
 }
 
-/** Applique un coefficient à une quantité — Math.ceil + L converti en g entier. */
+/**
+ * Applique un coefficient à une quantité. Quand on multiplie (coef ≠ 1) : arrondi
+ * au gramme supérieur. Quand on ne multiplie pas (×1) : valeur exacte conservée,
+ * pour ne pas arrondir en silence une recette affichée telle quelle. L → g.
+ */
 export function scaleQty(
   qty: number,
   unit: string,
   coef: number,
 ): { quantityG: number; unit: string } {
-  if (unit === "L") return { quantityG: Math.ceil(qty * coef * 1000), unit: "g" };
-  return { quantityG: Math.ceil(qty * coef), unit };
+  const round = coef === 1 ? (x: number) => x : Math.ceil;
+  if (unit === "L") return { quantityG: round(qty * coef * 1000), unit: "g" };
+  return { quantityG: round(qty * coef), unit };
 }
 
 /**
