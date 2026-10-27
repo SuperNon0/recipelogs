@@ -26,13 +26,23 @@ const CATEGORY_HELP =
   "Catégories : base = ingrédients de fond (farine, sucre, beurre, œufs…) ; arome = ce qui donne le goût (fruits, épices, chocolat, vanille…) ; preparation = préparation déjà faite utilisée comme ingrédient (crème pâtissière, pâte sucrée…) ; a_classer = pas encore rangé.";
 
 async function ingredientRows() {
-  const bases = await listAllIngredientBases();
-  return bases.map((b) => ({
-    id: b.id,
-    nom: b.name,
-    categorie: categoryLabel(b.category),
-    recettes: b._count.usages,
-  }));
+  const [bases, facts] = await Promise.all([
+    listAllIngredientBases(),
+    prisma.ingredientBase.findMany({ select: { id: true, pieceG: true, allergens: true, price: true, priceUnit: true } }),
+  ]);
+  const byId = new Map(facts.map((f) => [f.id, f]));
+  return bases.map((b) => {
+    const f = byId.get(b.id);
+    return {
+      id: b.id,
+      nom: b.name,
+      categorie: categoryLabel(b.category),
+      recettes: b._count.usages,
+      poids_piece_g: f?.pieceG != null ? Number(f.pieceG) : null,
+      allergenes: f?.allergens ?? [],
+      prix: f?.price != null ? { prix: Number(f.price), unite: f.priceUnit } : null,
+    };
+  });
 }
 
 /** Retrouve un ingrédient par id ou par nom exact (sans casse). */
@@ -56,7 +66,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
   {
     name: "lister_ingredients",
     title: "Lister les ingrédients",
-    description: `Liste les ingrédients de la base (id, nom, catégorie, nombre de recettes qui l'utilisent), triés par nom. Filtre possible par texte et par catégorie. ${CATEGORY_HELP}`,
+    description: `Liste les ingrédients de la base (id, nom, catégorie, nombre de recettes qui l'utilisent, poids d'une pièce, allergènes, prix d'achat en € par kg, L ou pièce), triés par nom. Filtre possible par texte et par catégorie. ${CATEGORY_HELP}`,
     inputSchema: {
       type: "object",
       properties: {
@@ -301,6 +311,8 @@ export const INGREDIENT_TOOLS: McpTool[] = [
           continue;
         }
         const allergens = f.allergenes !== undefined ? cleanAllergens(f.allergenes) : undefined;
+        const before = await prisma.ingredientBase.findUnique({ where: { id: found.id }, select: { price: true, priceUnit: true } });
+        const priceChanged = f.prix != null && (before?.price == null || Number(before.price) !== f.prix || before.priceUnit !== f.unite_prix);
         await prisma.ingredientBase.update({
           where: { id: found.id },
           data: {
@@ -309,8 +321,8 @@ export const INGREDIENT_TOOLS: McpTool[] = [
             ...(f.prix !== undefined ? { price: f.prix, priceUnit: f.prix != null ? f.unite_prix : null } : {}),
           },
         });
-        if (f.prix != null) {
-          await prisma.ingredientPrice.create({ data: { baseId: found.id, price: f.prix, priceUnit: f.unite_prix } });
+        if (priceChanged) {
+          await prisma.ingredientPrice.create({ data: { baseId: found.id, price: f.prix!, priceUnit: f.unite_prix } });
         }
         modifies.push({
           nom: found.name,

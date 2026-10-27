@@ -8,6 +8,7 @@ import {
   Check,
   CheckCheck,
   CookingPot,
+  Euro,
   ExternalLink,
   FolderInput,
   Inbox,
@@ -278,6 +279,11 @@ export function IngredientBaseManager({
             pour ses actions ; « Sélectionner » pour agir sur plusieurs à la fois.
           </Help>
         </h1>
+        {optimisticBases.length > 0 && !selectionMode && (
+          <Link href="/settings/ingredients/prix" className="fl-btn fl-btn-ghost">
+            <Euro size={16} /> Prix
+          </Link>
+        )}
         {optimisticBases.length > 0 && (
           <button
             type="button"

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { DEFAULT_SALE_COEF, costOf } from "@/lib/cost";
 import { recipeMass } from "@/lib/massAdjust";
 import { getRecipeDetail, listRecipes } from "@/lib/recipes";
 import { htmlToPlainText } from "@/lib/stepsText";
@@ -12,6 +13,7 @@ import {
   createRecipe,
   deleteRecipes,
   duplicateRecipe,
+  setRecipeSaleCoef,
   updateRecipe,
 } from "@/app/actions/recipes";
 import { addSubRecipe, removeSubRecipe } from "@/app/actions/subRecipes";
@@ -54,6 +56,9 @@ const recipeFields = {
   tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
   favori: z.boolean().optional(),
   note: z.number().int().min(1).max(5).nullable().optional(),
+  rendement_nombre: z.number().int().positive().max(100_000).nullable().optional(),
+  rendement_libelle: z.string().trim().max(60).optional(),
+  coef_vente: z.number().positive().max(100).optional(),
 };
 
 const recipeFieldsJs = {
@@ -67,6 +72,9 @@ const recipeFieldsJs = {
   tags: js.strs("Étiquettes libres (remplace les actuelles)"),
   favori: js.bool("Recette favorite"),
   note: js.int("Note de 1 à 5, null pour aucune"),
+  rendement_nombre: js.int("Rendement : nombre de pièces ou de portions que donne la recette (ex. 60), null pour aucun"),
+  rendement_libelle: js.str("Ce que compte le rendement (« financiers », « parts »… ; « pièces » par défaut)"),
+  coef_vente: js.num(`Coefficient de vente : prix conseillé = coût matière × coef (${DEFAULT_SALE_COEF} par défaut)`),
 };
 
 type RecipeValues = {
@@ -80,6 +88,9 @@ type RecipeValues = {
   tags?: string[];
   favori?: boolean;
   note?: number | null;
+  rendement_nombre?: number | null;
+  rendement_libelle?: string;
+  coef_vente?: number;
 };
 
 /** Construit le même formulaire que l'écran de saisie d'une recette. */
@@ -95,6 +106,8 @@ function recipeForm(v: RecipeValues): FormData {
     tags: (v.tags ?? []).join(","),
     categoryIds: v.categorie_ids ?? [],
     folderId: v.dossier_id ?? undefined,
+    yieldCount: v.rendement_nombre ?? "",
+    yieldLabel: v.rendement_libelle ?? "",
   });
   for (const ing of v.ingredients) {
     fd.append("ingredientName", ing.nom);
@@ -183,7 +196,7 @@ export const RECIPE_TOOLS: McpTool[] = [
     name: "lire_recette",
     title: "Lire une recette",
     description:
-      "Donne une recette complète : ingrédients, étapes, notes, source, dossier, catégories, étiquettes, sous-recettes (avec leurs quantités calculées), commentaires et recettes qui l'utilisent. Un multiplicateur facultatif recalcule les quantités sans rien enregistrer.",
+      "Donne une recette complète : ingrédients, étapes, rendement, allergènes (sous-recettes comprises), coût matière et prix de vente conseillé, notes, source, dossier, catégories, étiquettes, sous-recettes (avec leurs quantités calculées), commentaires et recettes qui l'utilisent. Un multiplicateur facultatif recalcule les quantités sans rien enregistrer.",
     inputSchema: {
       type: "object",
       properties: { id: js.int("Id de la recette"), multiplicateur: js.num("Coefficient appliqué aux quantités (1 par défaut)") },
@@ -194,6 +207,9 @@ export const RECIPE_TOOLS: McpTool[] = [
       const a = parseArgs(z.object({ id, multiplicateur: z.number().positive().max(1000).default(1) }), args);
       const r = await requireRecipe(a.id);
       const snap = await buildRecipeSnapshot(a.id, a.multiplicateur);
+      const cost = snap ? costOf([...snap.ingredients, ...snap.subRecipes.flatMap((s) => s.ingredients)]) : null;
+      const coef = r.saleCoef != null ? Number(r.saleCoef) : DEFAULT_SALE_COEF;
+      const round2 = (v: number) => Math.round(v * 100) / 100;
       return text({
         id: r.id,
         nom: r.name,
@@ -206,6 +222,18 @@ export const RECIPE_TOOLS: McpTool[] = [
         tags: r.tags.map((t) => t.name),
         multiplicateur: a.multiplicateur,
         masse_totale_g: snap ? Math.round(snap.totalMassG) : null,
+        rendement: snap?.yield ? { nombre: snap.yield.count, libelle: snap.yield.label } : null,
+        allergenes: snap?.allergens ?? [],
+        cout:
+          cost && cost.detail.length > 0
+            ? {
+                cout_matiere_eur: round2(cost.total),
+                coef_vente: coef,
+                prix_conseille_eur: round2(cost.total * coef),
+                ...(snap?.yield ? { cout_par_piece_eur: round2(cost.total / snap.yield.count), prix_conseille_par_piece_eur: round2((cost.total * coef) / snap.yield.count) } : {}),
+                ...(cost.missing.length ? { ingredients_sans_prix: cost.missing } : {}),
+              }
+            : null,
         ingredients: (snap?.ingredients ?? []).map((i, idx) => ({
           id: r.ingredients[idx]?.id,
           nom: i.name,
@@ -242,7 +270,9 @@ export const RECIPE_TOOLS: McpTool[] = [
     run: async (args) => {
       const a = parseArgs(z.object(recipeFields), args);
       const { redirectTo } = await runAction(() => createRecipe(recipeForm(a)));
-      return text({ creee: a.nom, id: idFromPath(redirectTo) });
+      const newId = idFromPath(redirectTo);
+      if (a.coef_vente !== undefined && newId) await runAction(() => setRecipeSaleCoef(newId, a.coef_vente!));
+      return text({ creee: a.nom, id: newId });
     },
   },
 
@@ -271,10 +301,13 @@ export const RECIPE_TOOLS: McpTool[] = [
         tags: r.tags.map((t) => t.name),
         favori: r.favorite,
         note: r.rating,
+        rendement_nombre: r.yieldCount,
+        rendement_libelle: r.yieldLabel ?? "",
       };
       const next: RecipeValues = { ...current };
       for (const [k, v] of Object.entries(a)) if (k !== "id" && v !== undefined) Object.assign(next, { [k]: v });
       await runAction(() => updateRecipe(a.id, recipeForm(next)));
+      if (a.coef_vente !== undefined) await runAction(() => setRecipeSaleCoef(a.id, a.coef_vente!));
       return text({ modifiee: next.nom, id: a.id, champs: Object.keys(a).filter((k) => k !== "id") });
     },
   },
