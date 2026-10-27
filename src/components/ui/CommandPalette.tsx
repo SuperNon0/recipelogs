@@ -32,6 +32,8 @@ type Item = {
   key: string;
   group: string;
   label: string;
+  /** Ligne sous le nom : extrait du texte trouvé, ou l'ingrédient et sa quantité. */
+  detail?: React.ReactNode;
   href: string;
   icon: LucideIcon;
   side?: string;
@@ -44,6 +46,8 @@ type Results = {
   ingredients: { id: number; name: string; uses: number }[];
   cookbooks: { id: number; name: string }[];
   lists: { id: number; name: string }[];
+  withIngredient: { id: number; name: string; detail: string }[];
+  inText: { id: number; name: string; where: string; before: string; match: string; after: string }[];
 };
 
 const ACTIONS: Item[] = [
@@ -124,6 +128,21 @@ export function CommandPalette() {
         key: `r${r.id}`, group: "Recettes", label: r.name, href: `/recipes/${r.id}`,
         icon: BookOpen, side: r.folder ?? undefined, color: r.color,
       })),
+      ...res.withIngredient.map((r) => ({
+        key: `ri${r.id}`, group: q.includes("+") ? "Recettes avec tous ces ingrédients" : "Recettes avec cet ingrédient", label: r.name, href: `/recipes/${r.id}`,
+        icon: Wheat, detail: r.detail,
+      })),
+      ...res.inText.map((r) => ({
+        key: `rt${r.id}`, group: "Trouvé dans le texte", label: r.name, href: `/recipes/${r.id}`,
+        icon: FileText, side: r.where,
+        detail: (
+          <>
+            {r.before}
+            <mark>{r.match}</mark>
+            {r.after}
+          </>
+        ),
+      })),
       ...res.folders.map((f) => ({
         key: `f${f.id}`, group: "Dossiers", label: f.name, href: `/?folder=${f.id}`,
         icon: FolderOpen, side: `${f.count} recette${f.count > 1 ? "s" : ""}`, color: f.color,
@@ -167,7 +186,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={q}
-            placeholder="Rechercher une recette, un ingrédient, un cahier…"
+            placeholder="Recette, ingrédient (jaunes + crème), mot dans les étapes…"
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") close();
@@ -208,8 +227,11 @@ export function CommandPalette() {
                   onClick={() => go(it)}
                 >
                   <Icon size={17} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <Highlight text={it.label} term={q.trim()} />
+                  <span className="cmdk-label">
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <Highlight text={it.label} term={q.trim()} />
+                    </span>
+                    {it.detail && <small className="cmdk-detail">{it.detail}</small>}
                   </span>
                   {it.side && (
                     <small style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

@@ -23,6 +23,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fiche de production : « 60 éclairs » (menu ⋯ → Fiche de production) donne toutes les pesées à l'échelle, sous-recettes comprises, une préparation par encadré dans l'ordre où on les fait, avec cases à cocher et étapes en option ; un PDF à imprimer pour le labo",
       "Page « Production » (menu de gauche ou recherche) : plusieurs recettes à produire en même temps, les préparations communes additionnées et le total par ingrédient à sortir",
       "Mode labo (bouton sur la fiche) : la recette en grand au multiplicateur choisi, l'écran reste allumé, les pesées se cochent, l'étape en cours est mise en avant et les durées des étapes (« cuire 18 min », « 1 h 30 ») deviennent des minuteurs avec sonnerie et vibration",
+      "Recherche complète (Ctrl K ou loupe) : trouve aussi les recettes par ce qui est écrit dans les étapes, les notes et les essais (avec l'extrait), et par ingrédient, sous-recettes comprises ; « jaunes + crème » cherche les recettes qui ont les deux",
+      "Fiche d'un ingrédient : la quantité utilisée par chaque recette, et les recettes qui l'utilisent à travers une sous-recette",
     ],
     migrations: ["Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire"],
   },

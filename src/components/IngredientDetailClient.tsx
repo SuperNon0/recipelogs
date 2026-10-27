@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Check, ChevronRight, Merge, Pencil } from "lucide-react";
+import { BookOpen, Check, ChevronRight, Layers, Merge, Pencil } from "lucide-react";
+import { formatQty } from "@/lib/format";
 import { renameIngredientBase, mergeIngredientBases, setIngredientAllergens, setIngredientPieceWeight } from "@/app/actions/settings";
 import { formatEuro } from "@/lib/cost";
 import { PriceInput, SaveState } from "@/components/PriceInput";
@@ -12,12 +13,13 @@ import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
 
-type Recipe = { id: number; name: string; ingredientName: string };
+type Recipe = { id: number; name: string; ingredientName: string; quantityG: number; unit: string };
 
 /** Fiche d'un ingrédient de la base : renommer, fusionner, recettes qui l'utilisent. */
 export function IngredientDetailClient({
   base,
   recipes,
+  viaRecipes = [],
   otherBases,
 }: {
   base: {
@@ -30,6 +32,8 @@ export function IngredientDetailClient({
     priceHistory: { price: number; unit: string; date: string }[];
   };
   recipes: Recipe[];
+  /** Recettes qui l'utilisent à travers une sous-recette. */
+  viaRecipes?: { id: number; name: string; via: string }[];
   otherBases: { id: number; name: string; count?: number }[];
 }) {
   const router = useRouter();
@@ -94,10 +98,35 @@ export function IngredientDetailClient({
                 </b>
                 {r.ingredientName !== base.name && <small>Écrit « {r.ingredientName} » dans la recette</small>}
               </span>
+              <span className="num" style={{ color: "var(--soft)", fontSize: 13, whiteSpace: "nowrap" }}>{formatQty(r.quantityG, r.unit)}</span>
               <ChevronRight size={16} className="set-chev" />
             </Link>
           ))}
         </div>
+      )}
+
+      {viaRecipes.length > 0 && (
+        <>
+          <div className="sect-title" style={{ marginTop: 8 }}>
+            <h2>Dans une sous-recette</h2>
+          </div>
+          <div className="fl-list">
+            {viaRecipes.map((r) => (
+              <Link key={r.id} href={`/recipes/${r.id}`} className="fl-row">
+                <span className="ic">
+                  <Layers size={16} />
+                </span>
+                <span className="set-tx">
+                  <b>
+                    <span>{r.name}</span>
+                  </b>
+                  <small>Par la sous-recette « {r.via} »</small>
+                </span>
+                <ChevronRight size={16} className="set-chev" />
+              </Link>
+            ))}
+          </div>
+        </>
       )}
 
       {renaming && (
