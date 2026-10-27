@@ -301,6 +301,16 @@ export async function applyMultiplierToRecipe(
   return { ok: true };
 }
 
+/** Coefficient de vente d'une recette (prix conseillé = coût matière × coef). */
+export async function setRecipeSaleCoef(
+  id: number,
+  coef: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isFinite(coef) || coef <= 0 || coef > 100) return { ok: false, error: "Coefficient invalide." };
+  await prisma.recipe.update({ where: { id }, data: { saleCoef: Math.round(coef * 100) / 100 } });
+  return { ok: true };
+}
+
 export async function toggleFavorite(id: number) {
   const r = await prisma.recipe.findUnique({
     where: { id },
@@ -336,6 +346,7 @@ export async function duplicateRecipe(id: number) {
       folderId: source.folderId,
       yieldCount: source.yieldCount,
       yieldLabel: source.yieldLabel,
+      saleCoef: source.saleCoef,
       source: source.source,
       notesTips: source.notesTips,
       favorite: false,

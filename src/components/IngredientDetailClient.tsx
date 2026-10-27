@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Check, ChevronRight, Merge, Pencil } from "lucide-react";
-import { renameIngredientBase, mergeIngredientBases, setIngredientAllergens, setIngredientPieceWeight } from "@/app/actions/settings";
+import { renameIngredientBase, mergeIngredientBases, setIngredientAllergens, setIngredientPieceWeight, setIngredientPrice } from "@/app/actions/settings";
+import { PRICE_UNITS, formatEuro } from "@/lib/cost";
 import { ALLERGENS } from "@/lib/allergens";
 import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
@@ -18,7 +19,15 @@ export function IngredientDetailClient({
   recipes,
   otherBases,
 }: {
-  base: { id: number; name: string; pieceG: number | null; allergens: string[] };
+  base: {
+    id: number;
+    name: string;
+    pieceG: number | null;
+    allergens: string[];
+    price: number | null;
+    priceUnit: string;
+    priceHistory: { price: number; unit: string; date: string }[];
+  };
   recipes: Recipe[];
   otherBases: { id: number; name: string; count?: number }[];
 }) {
@@ -57,6 +66,7 @@ export function IngredientDetailClient({
       </div>
 
       <section className="fl-card ing-facts">
+        <PriceField id={base.id} initial={base.price} initialUnit={base.priceUnit} history={base.priceHistory} />
         <AllergensField id={base.id} initial={base.allergens} />
         <PieceWeightField id={base.id} initial={base.pieceG} />
       </section>
@@ -220,6 +230,90 @@ function AllergensField({ id, initial }: { id: number; initial: string[] }) {
             {a.label}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Prix d'achat (€ par kg, L ou pièce), enregistré en quittant le champ ; les anciens prix restent en historique. */
+function PriceField({
+  id,
+  initial,
+  initialUnit,
+  history,
+}: {
+  id: number;
+  initial: number | null;
+  initialUnit: string;
+  history: { price: number; unit: string; date: string }[];
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(initial != null ? String(initial).replace(".", ",") : "");
+  const [unit, setUnit] = useState(initialUnit);
+  const [last, setLast] = useState({ value, unit });
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const save = (nextUnit = unit) => {
+    const v = value.trim();
+    if (v === last.value && nextUnit === last.unit) return;
+    const n = v === "" ? null : Number(v.replace(",", "."));
+    if (n != null && (!Number.isFinite(n) || n < 0)) return setError("Prix invalide.");
+    setError(null);
+    startTransition(async () => {
+      const r = await setIngredientPrice(id, n, nextUnit);
+      if (!r.ok) return setError(r.error);
+      setLast({ value: v, unit: nextUnit });
+      setSaved(true);
+      router.refresh();
+    });
+  };
+
+  // L'historique commence par le prix actuel : on montre les précédents.
+  const older = history.slice(1, 4);
+
+  return (
+    <div className="ing-fact">
+      <div className="ing-fact-l">
+        <b>
+          Prix d&apos;achat
+          <Help title="Prix d'achat" example="Beurre à 7,90 € le kg : 250 g de beurre coûtent 1,98 €.">
+            Le prix payé pour cet ingrédient (hors taxes si tu raisonnes en HT). Il sert au coût de
+            revient de chaque recette qui l&apos;utilise, sous-recettes comprises. Les anciens prix
+            sont gardés en dessous.
+          </Help>
+        </b>
+        <small>
+          {older.length > 0
+            ? "Avant : " + older.map((h) => `${formatEuro(h.price)}/${h.unit} (${new Date(h.date).toLocaleDateString("fr-FR")})`).join(" · ")
+            : "Pour le coût de revient des recettes"}
+        </small>
+      </div>
+      <div className="ing-fact-v">
+        <SaveState pending={pending} saved={saved && value.trim() === last.value && unit === last.unit} error={error} />
+        <div className="stepper">
+          <input
+            value={value}
+            inputMode="decimal"
+            placeholder="—"
+            aria-label="Prix d'achat en euros"
+            onChange={(e) => { setValue(e.target.value); setSaved(false); }}
+            onBlur={() => save()}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          />
+          <span className="x">€ /</span>
+        </div>
+        <select
+          className="fl-input ing-fact-unit"
+          value={unit}
+          aria-label="Unité du prix"
+          onChange={(e) => { setUnit(e.target.value); setSaved(false); if (value.trim()) save(e.target.value); }}
+        >
+          {PRICE_UNITS.map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
       </div>
     </div>
   );

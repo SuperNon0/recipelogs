@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { isPriceUnit, type IngredientPrice } from "./cost";
 
 /**
  * Ce que la fiche d'un ingrédient (Réglages → Ingrédients) apporte aux calculs
@@ -10,6 +11,8 @@ export type IngredientInfo = {
   pieceG: number | null;
   /** Allergènes INCO cochés (clés de lib/allergens.ts). */
   allergens: string[];
+  /** Prix d'achat, s'il est renseigné. */
+  cost: IngredientPrice | null;
 };
 
 const key = (name: string) => name.trim().toLowerCase();
@@ -21,22 +24,30 @@ export async function loadIngredientInfo(names: Iterable<string>): Promise<Map<s
   if (wanted.length === 0) return out;
   const bases = await prisma.ingredientBase.findMany({
     where: { name: { in: wanted, mode: "insensitive" } },
-    select: { name: true, pieceG: true, allergens: true },
+    select: { name: true, pieceG: true, allergens: true, price: true, priceUnit: true },
   });
   for (const b of bases) {
-    out.set(key(b.name), { pieceG: b.pieceG != null ? Number(b.pieceG) : null, allergens: b.allergens });
+    out.set(key(b.name), {
+      pieceG: b.pieceG != null ? Number(b.pieceG) : null,
+      allergens: b.allergens,
+      cost: b.price != null && isPriceUnit(b.priceUnit) ? { price: Number(b.price), unit: b.priceUnit } : null,
+    });
   }
   return out;
 }
 
-/** Poids d'une pièce d'un ingrédient (null si inconnu ou si l'unité n'est pas « pièce »). */
-export function pieceWeightOf(
-  info: Map<string, IngredientInfo>,
-  name: string,
-  unit: string | null | undefined,
-): number | null {
-  if (unit !== "pièce") return null;
+/**
+ * Poids d'une pièce d'un ingrédient (null si inconnu). Gardé quelle que soit
+ * l'unité de la ligne : la masse ne s'en sert que pour « pièce », le coût
+ * aussi pour convertir des grammes en pièces (prix à la pièce).
+ */
+export function pieceWeightOf(info: Map<string, IngredientInfo>, name: string): number | null {
   return info.get(key(name))?.pieceG ?? null;
+}
+
+/** Prix d'achat d'un ingrédient d'après sa fiche (null si inconnu). */
+export function costOfIngredient(info: Map<string, IngredientInfo>, name: string): IngredientPrice | null {
+  return info.get(key(name))?.cost ?? null;
 }
 
 /** Poids par pièce de tous les ingrédients qui en ont un (pour le formulaire de recette). */

@@ -27,7 +27,8 @@ import {
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
-import { applyMultiplierToRecipe } from "@/app/actions/recipes";
+import { applyMultiplierToRecipe, setRecipeSaleCoef } from "@/app/actions/recipes";
+import { DEFAULT_SALE_COEF, costOf, formatEuro, type IngredientPrice } from "@/lib/cost";
 import { ModalOverlay } from "./ModalOverlay";
 import { Help } from "./ui/Help";
 import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
@@ -43,8 +44,10 @@ export type IngredientRow = {
   quantityG: number;
   quantityGMax?: number | null;
   unit?: string;
-  /** Poids d'une pièce (fiche de l'ingrédient), si l'unité est « pièce ». */
+  /** Poids d'une pièce (fiche de l'ingrédient). */
   pieceG?: number | null;
+  /** Prix d'achat (fiche de l'ingrédient). */
+  cost?: IngredientPrice | null;
 };
 
 /** Rendement de la recette à ×1 : « 40 financiers ». */
@@ -85,11 +88,14 @@ export function RecipeBody({
   ingredients,
   subRecipes,
   yieldInfo,
+  saleCoef,
 }: {
   recipeId: number;
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
   yieldInfo?: YieldInfo | null;
+  /** Coefficient de vente enregistré sur la recette (null = défaut). */
+  saleCoef?: number | null;
 }) {
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
 
@@ -156,6 +162,7 @@ export function RecipeBody({
         quantityGMax: ing.quantityGMax != null ? r(ing.quantityGMax * k) : null,
         unit: scaledUnit(ing.unit),
         pieceG: ing.pieceG ?? null,
+        cost: ing.cost ?? null,
       };
     });
     if (mode === "mass_target" && !decimals) {
@@ -357,6 +364,13 @@ export function RecipeBody({
         </div>
       </div>
 
+      <CostCard
+        recipeId={recipeId}
+        lines={[...own.rows, ...subs.flatMap((x) => x.calc.ingredients)]}
+        pieces={yieldInfo ? { count: yieldInfo.count * globalCoef, label: yieldInfo.label } : null}
+        initialCoef={saleCoef ?? DEFAULT_SALE_COEF}
+      />
+
       {adding && <AddSubRecipeDialog parentId={recipeId} onClose={() => setAdding(false)} />}
     </div>
   );
@@ -526,6 +540,115 @@ function SubRows({
         ))}
       {editing && <EditSubRecipeModal subRecipe={sr} parentId={parentId} onClose={() => setEditing(false)} />}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Coût de revient et prix de vente conseillé
+// ─────────────────────────────────────────────
+
+/** Singulier approximatif d'un nom de pièces (« financiers » → « financier »). */
+const singular = (label: string) => (/[^s]s$/i.test(label) && !label.includes(" ") ? label.slice(0, -1) : label);
+
+function CostCard({
+  recipeId,
+  lines,
+  pieces,
+  initialCoef,
+}: {
+  recipeId: number;
+  lines: AdjIngredient[];
+  pieces: { count: number; label: string } | null;
+  initialCoef: number;
+}) {
+  const [coefInput, setCoefInput] = useState(String(initialCoef).replace(".", ","));
+  const [savedCoef, setSavedCoef] = useState(initialCoef);
+  const [, startTransition] = useTransition();
+  const cost = useMemo(() => costOf(lines), [lines]);
+  const priced = cost.detail.length > 0 || lines.some((l) => l.cost);
+
+  const v = Number(coefInput.replace(",", "."));
+  const coef = Number.isFinite(v) && v > 0 ? v : savedCoef;
+  const saveCoef = () => {
+    if (!Number.isFinite(v) || v <= 0 || v > 100 || v === savedCoef) return;
+    setSavedCoef(v);
+    startTransition(async () => { await setRecipeSaleCoef(recipeId, v); });
+  };
+
+  if (!priced) {
+    return (
+      <div className="fl-card cost-card cost-empty">
+        <span className="kpi-l">Coût matière</span>
+        <span>
+          Renseigne le prix d&apos;achat des ingrédients (Réglages → Ingrédients) pour voir le coût de revient et un prix de vente conseillé.
+        </span>
+      </div>
+    );
+  }
+
+  const per = pieces && pieces.count > 0 ? pieces : null;
+  const each = per ? ` / ${singular(per.label)}` : "";
+  const calc = [
+    ...cost.detail
+      .slice()
+      .sort((a, b) => b.cost - a.cost)
+      .map((d) => d.name.slice(0, 24).padEnd(26) + formatEuro(d.cost)),
+    "─".repeat(34),
+    "Coût matière".padEnd(26) + formatEuro(cost.total),
+    ...(per ? [`÷ ${fmtNum(per.count, 1)} ${per.label}`.slice(0, 25).padEnd(26) + formatEuro(cost.total / per.count)] : []),
+    `Prix conseillé (×${fmtNum(coef)})`.padEnd(26) + formatEuro(cost.total * coef),
+  ].join("\n");
+
+  return (
+    <div className="fl-card cost-card">
+      <div className="cost-cell">
+        <div className="kpi-l">
+          Coût matière
+          <Help
+            title="Coût matière"
+            calc={calc}
+            example="250 g de beurre à 7,90 €/kg = 1,98 €. Avec un coefficient ×4, le prix de vente conseillé est 4 fois le coût matière."
+          >
+            Le prix des ingrédients de la recette, sous-recettes comprises, avec le multiplicateur
+            appliqué. Il vient des prix d&apos;achat réglés sur la fiche de chaque ingrédient
+            (Réglages → Ingrédients). Hors main-d&apos;œuvre, énergie et emballage.
+          </Help>
+        </div>
+        <div className="cost-v num">{formatEuro(cost.total)}</div>
+        {per && <div className="kpi-s">{formatEuro(cost.total / per.count)}{each}</div>}
+      </div>
+      <div className="cost-cell">
+        <div className="kpi-l">
+          Prix conseillé
+          <Help title="Prix de vente conseillé" calc={"prix conseillé = coût matière × coefficient"} example="Coût 12,40 € × 4 = 49,60 €.">
+            Le coût matière multiplié par ton coefficient (souvent ×3 à ×5 en pâtisserie). Le
+            coefficient est gardé pour cette recette.
+          </Help>
+          <span className="stepper cost-coef">
+            <span className="x">×</span>
+            <input
+              value={coefInput}
+              inputMode="decimal"
+              aria-label="Coefficient de vente"
+              onChange={(e) => setCoefInput(e.target.value)}
+              onBlur={saveCoef}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+          </span>
+        </div>
+        <div className="cost-v num" style={{ color: "var(--accent)" }}>{formatEuro(cost.total * coef)}</div>
+        {per && <div className="kpi-s">{formatEuro((cost.total * coef) / per.count)}{each}</div>}
+      </div>
+      {cost.missing.length > 0 && (
+        <div className="cost-missing">
+          {cost.missing.length} ingrédient{cost.missing.length > 1 ? "s" : ""} sans prix, non compté{cost.missing.length > 1 ? "s" : ""}
+          <Help title="Ingrédients sans prix" calc={cost.missing.join("\n")}>
+            Ces ingrédients n&apos;ont pas de prix d&apos;achat (ou sont à la pièce sans poids connu) : le coût
+            affiché est donc un peu sous-estimé. Règle-les dans Réglages → Ingrédients.
+          </Help>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { cleanAllergens } from "@/lib/allergens";
+import { isPriceUnit } from "@/lib/cost";
 import {
   recipePdfSettingsSchema,
   parseRecipePdfSettings,
@@ -257,6 +258,7 @@ export async function mergeIngredientBases(
       where: { id: targetId },
       data: {
         pieceG: target.pieceG ?? source.pieceG,
+        ...(target.price == null && source.price != null ? { price: source.price, priceUnit: source.priceUnit } : {}),
         allergens: cleanAllergens([...target.allergens, ...source.allergens]),
       },
     });
@@ -276,6 +278,27 @@ export async function setIngredientPieceWeight(id: number, pieceG: number | null
   const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
   if (!exists) return { ok: false, error: "Ingrédient introuvable." };
   await prisma.ingredientBase.update({ where: { id }, data: { pieceG } });
+  revalidatePath(`/settings/ingredients/${id}`);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/**
+ * Prix d'achat d'un ingrédient (€ par kg, L ou pièce) ; null pour l'effacer.
+ * Chaque nouveau prix est ajouté à l'historique de l'ingrédient.
+ */
+export async function setIngredientPrice(id: number, price: number | null, unit: string): Promise<ActionResult> {
+  if (!isPriceUnit(unit)) return { ok: false, error: "Unité de prix invalide." };
+  if (price != null && (!Number.isFinite(price) || price < 0 || price > 1_000_000)) {
+    return { ok: false, error: "Prix invalide." };
+  }
+  const current = await prisma.ingredientBase.findUnique({ where: { id }, select: { price: true, priceUnit: true } });
+  if (!current) return { ok: false, error: "Ingrédient introuvable." };
+  const changed = price != null && (current.price == null || Number(current.price) !== price || current.priceUnit !== unit);
+  await prisma.$transaction([
+    prisma.ingredientBase.update({ where: { id }, data: { price, priceUnit: price != null ? unit : null } }),
+    ...(changed ? [prisma.ingredientPrice.create({ data: { baseId: id, price, priceUnit: unit } })] : []),
+  ]);
   revalidatePath(`/settings/ingredients/${id}`);
   revalidatePath("/");
   return { ok: true };
