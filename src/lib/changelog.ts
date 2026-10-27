@@ -32,7 +32,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fiche d'un ingrédient : la quantité utilisée par chaque recette, et les recettes qui l'utilisent à travers une sous-recette",
       "Claude (accès MCP) : nouveaux outils pour voir, créer, comparer et gérer les variantes, adapter une recette à un autre moule, remplir et lire la fiche de production, et faire la recherche complète ; lire_recette donne aussi le % de chaque ingrédient (reconnecter le connecteur RecipeLog pour les voir)",
     ],
-    fixes: ["Comparer deux variantes sur téléphone : le tableau tient dans l'écran (avant, il fallait le faire défiler de côté pour voir la 2e recette et l'écart)"],
+    fixes: [
+      "Comparer deux variantes sur téléphone : le tableau tient dans l'écran (avant, il fallait le faire défiler de côté pour voir la 2e recette et l'écart)",
+      "Multiplicateur : les champs du coefficient, de la masse, du pivot, des pièces et du nombre de moules ont maintenant un fond, comme les champs du moule",
+    ],
     migrations: ["Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire"],
   },
   {

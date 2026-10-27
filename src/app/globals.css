@@ -1993,6 +1993,18 @@ button.fl-row:hover {
   background: var(--bg);
 }
 
+/* Champs du multiplicateur (coef., masse, pivot, pièces, nombre de moules) : même fond que les champs du moule. */
+.kpi-mult .stepper input {
+  background: var(--bg);
+  border-color: var(--border2);
+  border-radius: 10px;
+  height: 38px;
+  font-size: 18px;
+}
+.kpi-mult .stepper input:focus {
+  border-color: var(--accent);
+}
+
 /* Mode « Moule » du multiplicateur et choix d'un moule */
 .mold-pick {
   display: flex;
