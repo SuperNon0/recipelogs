@@ -334,8 +334,11 @@ a {
 }
 
 .page-head h1 {
-  flex: 1;
+  /* Base de 12rem : sur téléphone, les boutons passent à la ligne au lieu
+     d'écraser le titre (qui débordait alors sous « Sélectionner »). */
+  flex: 1 1 12rem;
   min-width: 0;
+  overflow-wrap: anywhere;
   font: 400 28px/1.15 var(--font-serif);
   letter-spacing: -0.01em;
   color: var(--text);

@@ -65,6 +65,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Mode Moule : un message dit pourquoi on reste à ×1 (nombre à 0, dimension manquante), et la ligne « Autre dimension → Cadre » tient sur téléphone",
       "Fiche de production : après un ajout, le bouton devient « Mettre à jour la fiche »",
       "Le coefficient d'une sous-recette (×0,692) ne se coupe plus en deux sur téléphone",
+      "Page d'un dossier sur téléphone : le titre ne passe plus sous les boutons « Sélectionner » et « Ranger des recettes ici », qui vont à la ligne quand la place manque",
     ],
     migrations: [
       "Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire",
