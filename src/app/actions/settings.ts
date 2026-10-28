@@ -221,8 +221,9 @@ export async function renameIngredientBase(
   const current = await prisma.ingredientBase.findUnique({ where: { id } });
   if (!current) return { ok: false, error: "Ingrédient introuvable." };
 
+  // Sans casse : la base met toujours la majuscule (« lait » deviendrait « Lait »).
   const exists = await prisma.ingredientBase.findFirst({
-    where: { name, NOT: { id } },
+    where: { name: { equals: name, mode: "insensitive" }, NOT: { id } },
   });
   if (exists) return { ok: false, error: "Cet ingrédient existe déjà." };
 

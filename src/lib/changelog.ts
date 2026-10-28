@@ -18,6 +18,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "Multiplicateur : un « ? » à côté de « Entiers » explique l'arrondi (gramme supérieur, pièce la plus proche, demi-cuillère), le cas du mode Masse et que la recette enregistrée ne change pas",
     ],
+    fixes: [
+      "Ingrédients : tous commencent par une majuscule, et une même fiche s'écrit pareil dans toutes les recettes (avant, « purée de framboise » et « Purée de framboise » pouvaient se côtoyer, selon ce qui avait été tapé) ; les doublons ne différant que par la majuscule sont fusionnés",
+      "Page d'un dossier sur téléphone : le titre ne passe plus sous les boutons « Sélectionner » et « Ranger des recettes ici », qui vont à la ligne quand la place manque",
+    ],
   },
   {
     version: "V2.5",
@@ -74,7 +78,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Mode Moule : un message dit pourquoi on reste à ×1 (nombre à 0, dimension manquante), et la ligne « Autre dimension → Cadre » tient sur téléphone",
       "Fiche de production : après un ajout, le bouton devient « Mettre à jour la fiche »",
       "Le coefficient d'une sous-recette (×0,692) ne se coupe plus en deux sur téléphone",
-      "Page d'un dossier sur téléphone : le titre ne passe plus sous les boutons « Sélectionner » et « Ranger des recettes ici », qui vont à la ligne quand la place manque",
     ],
     migrations: [
       "Ajout du moule d'origine sur les recettes et de la fiche de production ; rien à faire",
