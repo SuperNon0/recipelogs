@@ -949,10 +949,28 @@ function MultiplierCard({
         </div>
       )}
       <div className="mrow" style={{ marginTop: 10, justifyContent: "space-between" }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--soft)" }}>
-          <button type="button" role="switch" aria-checked={!decimals} className="fl-switch" onClick={() => setDecimals(!decimals)} aria-label="Arrondir au gramme supérieur" />
-          Entiers
-        </label>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--soft)" }}>
+            <button type="button" role="switch" aria-checked={!decimals} className="fl-switch" onClick={() => setDecimals(!decimals)} aria-label="Arrondir au gramme supérieur" />
+            Entiers
+          </label>
+          <Help
+            title="Entiers"
+            calc={"grammes : arrondi au gramme supérieur\npièces : à la pièce la plus proche (1 au moins)\ncuillères : à la ½ cuillère la plus proche"}
+            example={<>×1,5 sur 2,5 g de gélatine donne 3,75 g. Avec Entiers : 4 g. En mode Masse 1 000 g, si les arrondis font 1 003 g, 3 g sont retirés sur les gros ingrédients pour tomber pile sur 1 000 g.</>}
+          >
+            Option activée, les quantités s&apos;affichent en nombres ronds, plus faciles à peser.
+            Désactivée, elles gardent leurs décimales (le calcul exact).
+            <br />
+            <br />
+            Ça vaut pour les ingrédients de la recette et pour les quantités écrites dans les étapes
+            (mode labo compris). En mode <b>Masse</b>, l&apos;écart dû aux arrondis est repris sur les
+            gros ingrédients (20 g et plus) pour garder pile la masse voulue.
+            <br />
+            <br />
+            L&apos;option ne change que l&apos;affichage : la recette enregistrée ne bouge pas.
+          </Help>
+        </span>
         <span className="num" style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>{formatCoef(globalCoef)}</span>
         {dirty && (
           <button type="button" className="fl-btn fl-btn-edit" style={{ height: 30, fontSize: 12.5, padding: "0 10px" }} onClick={handleApply} disabled={savePending} title="Écrit les quantités affichées comme nouvelle base de la recette">
