@@ -11,6 +11,15 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.6",
+    date: "2026-10-28",
+    title: "Aide sur l'option « Entiers »",
+    summary: "Un petit « ? » à côté de l'option « Entiers » du multiplicateur explique ce qu'elle arrondit et comment.",
+    features: [
+      "Multiplicateur : un « ? » à côté de « Entiers » explique l'arrondi (gramme supérieur, pièce la plus proche, demi-cuillère), le cas du mode Masse et que la recette enregistrée ne change pas",
+    ],
+  },
+  {
     version: "V2.5",
     date: "2026-10-27",
     title: "Moules, variantes, production et mode labo",
