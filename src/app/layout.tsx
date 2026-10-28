@@ -4,6 +4,7 @@ import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/A
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
+import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
 export const dynamic = "force-dynamic";
@@ -12,10 +13,8 @@ export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
   appleWebApp: { capable: true, title: "RecipeLog", statusBarStyle: "black-translucent" },
-  // Icône de l'appli sur l'écran d'accueil de l'iPhone. Les icônes sont toutes rangées dans
-  // /icons/ pour qu'une seule règle Cloudflare Access « Bypass » suffise : l'iPhone les
-  // télécharge sans être connecté, sinon il reçoit la page de connexion et n'affiche pas de logo.
-  icons: { apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }] },
+  // Icône de l'écran d'accueil de l'iPhone, intégrée à la page (voir apple-touch-icon.ts).
+  icons: { apple: [{ url: APPLE_TOUCH_ICON, sizes: "180x180", type: "image/png" }] },
 };
 
 export const viewport: Viewport = {
