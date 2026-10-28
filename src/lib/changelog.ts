@@ -33,6 +33,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Claude (accès MCP) : nouveaux outils pour voir, créer, comparer et gérer les variantes, adapter une recette à un autre moule, remplir et lire la fiche de production, et faire la recherche complète ; lire_recette donne aussi le % de chaque ingrédient (reconnecter le connecteur RecipeLog pour les voir)",
     ],
     fixes: [
+      "Ingrédients : tous commencent par une majuscule, et une même fiche s'écrit pareil dans toutes les recettes (avant, « purée de framboise » et « Purée de framboise » pouvaient se côtoyer, selon ce qui avait été tapé) ; les doublons ne différant que par la majuscule sont fusionnés",
       "Comparer deux variantes sur téléphone : le tableau tient dans l'écran (avant, il fallait le faire défiler de côté pour voir la 2e recette et l'écart)",
       "Multiplicateur : les champs du coefficient, de la masse, du pivot, des pièces et du nombre de moules ont maintenant un fond, comme les champs du moule",
       "« Enregistrer comme base » après un changement de moule : le moule d'origine devient le nouveau moule (avant, il restait l'ancien et la conversion suivante multipliait une 2e fois). Vers plusieurs moules, l'ancien moule est effacé",
