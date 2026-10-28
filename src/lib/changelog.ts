@@ -11,6 +11,15 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.7",
+    date: "2026-10-28",
+    title: "Logo sur l'écran d'accueil de l'iPhone",
+    summary: "L'appli ajoutée à l'écran d'accueil de l'iPhone affiche le logo RecipeLog (la toque orange).",
+    features: [
+      "iPhone : l'icône de l'appli sur l'écran d'accueil est la toque orange de RecipeLog, en carré plein que l'iPhone arrondit lui-même (supprimer l'appli de l'écran d'accueil puis la réajouter depuis Safari pour la voir)",
+    ],
+  },
+  {
     version: "V2.6",
     date: "2026-10-28",
     title: "Aide sur l'option « Entiers »",

@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
   appleWebApp: { capable: true, title: "RecipeLog", statusBarStyle: "black-translucent" },
+  // Icône de l'appli sur l'écran d'accueil de l'iPhone. Les icônes sont toutes rangées dans
+  // /icons/ pour qu'une seule règle Cloudflare Access « Bypass » suffise : l'iPhone les
+  // télécharge sans être connecté, sinon il reçoit la page de connexion et n'affiche pas de logo.
+  icons: { apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }] },
 };
 
 export const viewport: Viewport = {
