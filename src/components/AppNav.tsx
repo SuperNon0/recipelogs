@@ -7,6 +7,7 @@ import {
   BookOpen,
   ChefHat,
   ClipboardList,
+  History,
   Library,
   Palette,
   Plus,
@@ -49,6 +50,7 @@ const NAV: NavItem[] = [
     count: (c) => c.recipes,
   },
   { href: "/favorites", label: "Favoris", icon: Star, match: (p) => p.startsWith("/favorites"), count: (c) => c.favorites },
+  { href: "/history", label: "Historique", icon: History, match: (p) => p.startsWith("/history") },
   { href: "/cookbooks", label: "Cahiers", icon: Library, match: (p) => p.startsWith("/cookbooks"), count: (c) => c.cookbooks },
   { href: "/shopping", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
   { href: "/production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
@@ -58,8 +60,8 @@ const NAV: NavItem[] = [
 const TABS: NavItem[] = [
   NAV[0],
   NAV[1],
-  NAV[2],
   NAV[3],
+  NAV[4],
   {
     href: "/settings",
     label: "Réglages",
@@ -192,6 +194,9 @@ export function AppTopBar() {
       <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" onClick={openSearch} aria-label="Rechercher">
         <Search size={20} />
       </button>
+      <Link href="/history" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Historique">
+        <History size={20} />
+      </Link>
       <Link href="/settings/themes" data-needs="organize.edit" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Thèmes PDF">
         <Palette size={20} />
       </Link>

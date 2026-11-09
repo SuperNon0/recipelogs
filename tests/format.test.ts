@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatG, formatCoef, formatQty, formatRelativeDate } from "@/lib/format";
+import { formatG, formatCoef, formatQty, formatRelativeDate, formatViewedAt } from "@/lib/format";
 
 describe("formatG", () => {
   it("affiche les grammes < 1000 avec une décimale", () => {
@@ -59,5 +59,23 @@ describe("formatRelativeDate", () => {
   });
   it("accepte une date en texte (ISO)", () => {
     expect(formatRelativeDate(ago(3).toISOString(), now)).toBe("il y a 3 j");
+  });
+});
+
+describe("formatViewedAt", () => {
+  // 9 nov. 2026, 15 h 00 à Paris (UTC+1).
+  const now = new Date("2026-11-09T14:00:00Z");
+  it("dit « à l'instant » sous une minute", () => {
+    expect(formatViewedAt(new Date("2026-11-09T13:59:30Z"), now)).toBe("à l'instant");
+  });
+  it("compte les minutes puis les heures du jour", () => {
+    expect(formatViewedAt(new Date("2026-11-09T13:55:00Z"), now)).toBe("il y a 5 min");
+    expect(formatViewedAt("2026-11-09T11:30:00Z", now)).toBe("il y a 2 h");
+  });
+  it("donne l'heure de Paris pour hier", () => {
+    expect(formatViewedAt("2026-11-08T13:30:00Z", now)).toBe("hier à 14 h 30");
+  });
+  it("donne le jour et l'heure au-delà", () => {
+    expect(formatViewedAt("2026-11-03T08:05:00Z", now)).toBe("mar. 3 nov. à 9 h 05");
   });
 });

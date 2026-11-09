@@ -8,7 +8,9 @@ import { STOP } from "./ui/Menu";
 
 /**
  * Fenêtre modale : centrée sur ordinateur, feuille qui remonte du bas sur
- * téléphone. Se ferme par la croix (ou Échap), jamais par un clic à côté.
+ * téléphone. Se ferme par la croix ou Échap, jamais par un clic à côté : un
+ * appui raté en dehors ne doit pas faire perdre ce qu'on est en train de
+ * remplir.
  */
 export function ModalOverlay({
   onClose,
@@ -19,7 +21,7 @@ export function ModalOverlay({
 }: {
   onClose: () => void;
   children: React.ReactNode;
-  /** Titre affiché avec un bouton de fermeture. */
+  /** Titre affiché à côté de la croix de fermeture. */
   title?: React.ReactNode;
   /** Fenêtre large (aperçus, éditeurs). */
   wide?: boolean;
@@ -39,7 +41,6 @@ export function ModalOverlay({
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    // Un clic à côté ne ferme pas : on perdait ce qu'on était en train de remplir.
     <div className="modal-veil" {...STOP}>
       <div
         role="dialog"
@@ -48,14 +49,13 @@ export function ModalOverlay({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-grab" />
-        {title && (
-          <div className="modal-head">
-            <h3>{title}</h3>
-            <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" onClick={onClose} aria-label="Fermer">
-              <X size={18} />
-            </button>
-          </div>
-        )}
+        {/* Toujours une croix : c'est le seul moyen de fermer au doigt. */}
+        <div className="modal-head">
+          <h3>{title}</h3>
+          <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" onClick={onClose} aria-label="Fermer">
+            <X size={18} />
+          </button>
+        </div>
         {children}
       </div>
     </div>,

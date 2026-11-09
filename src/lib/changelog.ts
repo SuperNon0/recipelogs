@@ -33,12 +33,29 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "V2.8",
+    date: "2026-11-09",
+    title: "Historique des recettes ouvertes",
+    summary:
+      "Une page « Historique » garde les 30 dernières recettes ouvertes, même sans les avoir modifiées : pratique pour retrouver une recette dont on a oublié le nom.",
+    features: [
+      "Historique : les 30 dernières recettes ouvertes, la plus récente en haut, avec l'heure d'ouverture (« il y a 5 min », « hier à 14 h 30 »), et un bouton « Vider »",
+      "Accès : « Historique » dans le menu sur ordinateur, icône d'horloge en haut de l'écran sur téléphone, ou en tapant « historique » dans la recherche",
+      "Accueil : les 5 dernières recettes ouvertes en haut, sous « Ouvertes récemment »",
+    ],
+    migrations: ["Base de données : une colonne ajoutée aux recettes pour noter leur dernière ouverture"],
+  },
+  {
     version: "V2.7",
     date: "2026-10-28",
     title: "Logo sur l'écran d'accueil de l'iPhone",
     summary: "L'appli ajoutée à l'écran d'accueil de l'iPhone affiche le logo RecipeLog (la toque orange).",
     features: [
       "iPhone : l'icône de l'appli sur l'écran d'accueil est la toque orange de RecipeLog, en carré plein que l'iPhone arrondit lui-même (supprimer l'appli de l'écran d'accueil puis la réajouter depuis Safari pour la voir)",
+    ],
+    fixes: [
+      "Téléphone : toucher une barre de recherche ou un champ ne fait plus zoomer la page, et le zoom au pincement ne dure que le temps du geste (dès qu'on lâche, la page revient à sa taille normale)",
+      "Fenêtres (ajout à un cahier, variantes, production, renommer, couleur, aperçus…) : un appui à côté ne les ferme plus et ne fait plus perdre ce qu'on était en train de remplir ; on les ferme avec la croix en haut à droite (ou Échap sur ordinateur)",
     ],
   },
   {

@@ -5,7 +5,7 @@ import { Check, Layers, Star } from "lucide-react";
 import { ContextArea, MoreButton } from "@/components/ui/Menu";
 import { useRecipeSelection } from "@/components/RecipeSelection";
 import { useRecipeMenu, type FolderOption } from "./RecipeMenu";
-import { formatG, formatRelativeDate } from "@/lib/format";
+import { formatG, formatRelativeDate, formatViewedAt } from "@/lib/format";
 
 export type RecipeRowData = {
   id: number;
@@ -21,6 +21,8 @@ export type RecipeRowData = {
   variantCount?: number;
   /** Date ISO (sérialisable). */
   updatedAt: string;
+  /** Dernière ouverture (date ISO) : montrée à la place de la date de modification avec `dates="viewed"`. */
+  lastViewedAt?: string | null;
 };
 
 /**
@@ -33,11 +35,14 @@ export function RecipeTable({
   folders,
   from,
   showFolder = true,
+  dates = "updated",
 }: {
   recipes: RecipeRowData[];
   folders: FolderOption[];
   from?: string;
   showFolder?: boolean;
+  /** Colonne date : dernière modification (par défaut) ou dernière ouverture (Historique). */
+  dates?: "updated" | "viewed";
 }) {
   const byId = new Map(folders.map((f) => [f.id, f]));
   return (
@@ -47,12 +52,12 @@ export function RecipeTable({
         <span>Recette</span>
         {showFolder && <span>Dossier</span>}
         <span className="r">Masse</span>
-        <span>Modifiée</span>
+        <span>{dates === "viewed" ? "Ouverte" : "Modifiée"}</span>
         <span>Note</span>
         <span />
       </div>
       {recipes.map((r) => (
-        <RecipeRow key={r.id} r={r} folder={r.folderId ? byId.get(r.folderId) ?? null : null} from={from} showFolder={showFolder} />
+        <RecipeRow key={r.id} r={r} folder={r.folderId ? byId.get(r.folderId) ?? null : null} from={from} showFolder={showFolder} viewed={dates === "viewed"} />
       ))}
     </div>
   );
@@ -63,15 +68,20 @@ function RecipeRow({
   folder,
   from,
   showFolder,
+  viewed = false,
 }: {
   r: RecipeRowData;
   folder: FolderOption | null;
   from?: string;
   showFolder: boolean;
+  viewed?: boolean;
 }) {
   const { selectionMode, isSelected, toggle } = useRecipeSelection();
   const color = folder?.color ?? r.categories[0]?.color ?? "#3b475e";
+  const viewedLabel = viewed && r.lastViewedAt ? formatViewedAt(r.lastViewedAt) : null;
   const sub = [
+    // Historique sur téléphone (la colonne date n'y est pas affichée).
+    viewedLabel ? `Ouverte ${viewedLabel}` : null,
     r.subCount > 0 ? `${r.subCount} sous-recette${r.subCount > 1 ? "s" : ""}` : null,
     r.variantCount ? `${r.variantCount} variante${r.variantCount > 1 ? "s" : ""}` : null,
     ...r.categories.map((c) => c.name),
@@ -119,7 +129,7 @@ function RecipeRow({
         </span>
       )}
       <span className="rmass num">{r.totalMassG > 0 ? formatG(Math.round(r.totalMassG)) : "—"}</span>
-      <span className="rdate desk-only">{formatRelativeDate(r.updatedAt)}</span>
+      <span className="rdate desk-only">{viewedLabel ?? formatRelativeDate(r.updatedAt)}</span>
       <span className="rrating desk-only">
         {r.rating ? (
           <>

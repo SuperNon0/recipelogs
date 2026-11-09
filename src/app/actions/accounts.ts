@@ -83,7 +83,8 @@ export async function approveAccount(id: number, roleId: number): Promise<Action
   const me = await actingAdmin();
   const role = await findRole(roleId);
   const acc = await target(id);
-  await prisma.account.update({ where: { id }, data: { status: "active", roleId: role.id, approvedAt: new Date() } });
+  const approved = await prisma.account.updateMany({ where: { id, status: "pending" }, data: { status: "active", roleId: role.id, approvedAt: new Date() } });
+  if (!approved.count) return { ok: false, error: "Ce compte ne fait plus partie des demandes en attente." };
   await audit(me.email, "approve", acc.email, role.name);
   refresh();
   return { ok: true };
@@ -94,7 +95,8 @@ export async function refuseAccount(id: number): Promise<ActionResult> {
   const me = await actingAdmin();
   const acc = await target(id);
   if (acc.id === me.id) return { ok: false, error: "Tu ne peux pas refuser ton propre compte." };
-  await prisma.account.update({ where: { id }, data: { status: "refused" } });
+  const refused = await prisma.account.updateMany({ where: { id, status: "pending" }, data: { status: "refused" } });
+  if (!refused.count) return { ok: false, error: "Ce compte ne fait plus partie des demandes en attente." };
   await audit(me.email, "refuse", acc.email);
   refresh();
   return { ok: true };

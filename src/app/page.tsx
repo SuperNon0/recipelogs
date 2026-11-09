@@ -44,13 +44,15 @@ export default async function HomePage({
 
   const hasFilters = !!(q || tag || categoryId);
 
-  const [tags, categories, folders, recipes, themes, hiddenVariants] = await Promise.all([
+  const showRecent = folderFilter === undefined && !hasFilters;
+  const [tags, categories, folders, recipes, themes, hiddenVariants, recent] = await Promise.all([
     listAllTags(),
     listAllCategories(),
     listAllFolders(),
     listRecipes({ q, tag, categoryId, folderId: folderFilter, withVariants }),
     listPdfThemes(),
     hasFilters || withVariants ? 0 : countHiddenVariants(folderFilter),
+    showRecent ? listRecipes({ recentlyViewed: 5 }) : [],
   ]);
 
   const currentFolder =
@@ -123,6 +125,16 @@ export default async function HomePage({
               folders={folders.map((f) => ({ id: f.id, name: f.name, color: f.color, count: f._count.recipes }))}
               noFolderCount={noFolderCount}
             />
+          </>
+        )}
+
+        {showRecent && recent.length > 0 && (
+          <>
+            <div className="sect-title">
+              <h2>Ouvertes récemment</h2>
+              <Link href="/history">Tout l&apos;historique</Link>
+            </div>
+            <RecipeTable recipes={toRecipeRows(recent)} folders={folderOptions} from="/" dates="viewed" />
           </>
         )}
 

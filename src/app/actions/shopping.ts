@@ -5,8 +5,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
-import { aggregateIngredients, shoppingKey } from "@/lib/shopping";
+import { aggregateIngredients, shoppingKey, visibleShoppingListWhere } from "@/lib/shopping";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { requireVisibleCookbook, visibleRecipeWhere } from "@/lib/auth/visibility";
+
+async function requireShoppingList(id: number) {
+  if (!(await prisma.shoppingList.findFirst({ where: { id, ...(await visibleShoppingListWhere()) }, select: { id: true } }))) {
+    throw new Error("Liste introuvable.");
+  }
+}
 
 
 export async function createShoppingList(formData: FormData) {
@@ -24,6 +31,7 @@ export async function createShoppingList(formData: FormData) {
 
 export async function deleteShoppingList(id: number) {
   await requireAccess("shopping.edit");
+  await requireShoppingList(id);
   await prisma.shoppingList.delete({ where: { id } });
   revalidatePath("/shopping");
   redirect("/shopping");
@@ -35,7 +43,11 @@ export async function addRecipeToList(
   coefficient: number,
 ): Promise<ActionResult> {
   await requireAccess("shopping.edit");
-  if (coefficient <= 0) return { ok: false, error: "Le coefficient doit être positif." };
+  await requireShoppingList(listId);
+  if (!(await prisma.recipe.findFirst({ where: { AND: [{ id: recipeId }, await visibleRecipeWhere()] }, select: { id: true } }))) {
+    return { ok: false, error: "Recette introuvable." };
+  }
+  if (!Number.isFinite(coefficient) || coefficient <= 0) return { ok: false, error: "Le coefficient doit être positif." };
 
   await prisma.shoppingListRecipe.upsert({
     where: { shoppingListId_recipeId: { shoppingListId: listId, recipeId } },
@@ -53,6 +65,7 @@ export async function removeRecipeFromList(
   recipeId: number,
 ): Promise<ActionResult> {
   await requireAccess("shopping.edit");
+  await requireShoppingList(listId);
   await prisma.shoppingListRecipe.deleteMany({
     where: { shoppingListId: listId, recipeId },
   });
@@ -68,6 +81,7 @@ export async function addManualItem(
   quantityG: number | null,
 ): Promise<ActionResult> {
   await requireAccess("shopping.edit");
+  await requireShoppingList(listId);
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Le nom est obligatoire." };
 
@@ -91,7 +105,8 @@ export async function addManualItem(
 
 export async function toggleItem(itemId: number, listId: number): Promise<ActionResult> {
   await requireAccess("shopping.edit");
-  const item = await prisma.shoppingListItem.findUnique({ where: { id: itemId } });
+  await requireShoppingList(listId);
+  const item = await prisma.shoppingListItem.findFirst({ where: { id: itemId, shoppingListId: listId } });
   if (!item) return { ok: false, error: "Item introuvable." };
 
   await prisma.shoppingListItem.update({
@@ -105,13 +120,15 @@ export async function toggleItem(itemId: number, listId: number): Promise<Action
 
 export async function removeItem(itemId: number, listId: number): Promise<ActionResult> {
   await requireAccess("shopping.edit");
-  await prisma.shoppingListItem.delete({ where: { id: itemId } });
+  await requireShoppingList(listId);
+  await prisma.shoppingListItem.deleteMany({ where: { id: itemId, shoppingListId: listId } });
   revalidatePath(`/shopping/${listId}`);
   return { ok: true };
 }
 
 export async function uncheckAll(listId: number): Promise<ActionResult> {
   await requireAccess("shopping.edit");
+  await requireShoppingList(listId);
   await prisma.shoppingListItem.updateMany({
     where: { shoppingListId: listId },
     data: { checked: false },
@@ -122,6 +139,7 @@ export async function uncheckAll(listId: number): Promise<ActionResult> {
 
 export async function removeChecked(listId: number): Promise<ActionResult> {
   await requireAccess("shopping.edit");
+  await requireShoppingList(listId);
   await prisma.shoppingListItem.deleteMany({
     where: { shoppingListId: listId, checked: true },
   });
@@ -135,6 +153,7 @@ export async function addCookbookRecipesToList(
   newListName: string | null,
 ): Promise<{ ok: true; listId: number } | { ok: false; error: string }> {
   await requireAccess("shopping.edit");
+  await requireVisibleCookbook(cookbookId);
   const entries = await prisma.cookbookRecipe.findMany({
     where: { cookbookId },
     select: { recipeId: true },
@@ -147,8 +166,7 @@ export async function addCookbookRecipesToList(
   let listId: number;
 
   if (targetListId) {
-    const existing = await prisma.shoppingList.findUnique({ where: { id: targetListId } });
-    if (!existing) return { ok: false, error: "Liste introuvable." };
+    await requireShoppingList(targetListId);
     listId = targetListId;
   } else {
     const name = (newListName ?? "").trim();

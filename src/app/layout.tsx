@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/AppNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import { ZoomReset } from "@/components/ZoomReset";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
@@ -117,6 +118,7 @@ export default async function RootLayout({
         <AppTabBar />
         <CommandPalette />
         </PermissionsProvider>
+        <ZoomReset />
       </body>
     </html>
   );

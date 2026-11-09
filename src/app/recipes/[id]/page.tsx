@@ -12,6 +12,7 @@ import { requirePage } from "@/lib/auth/guard";
 import { viewerCan } from "@/lib/auth/viewer";
 import { stripTreeCosts } from "@/lib/recipeTree";
 import { requireVisibleRecipe, visibleRecipeIds } from "@/lib/auth/visibility";
+import { RecordRecipeView } from "@/components/recipe/RecordRecipeView";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export default async function RecipePage({
   // Retour : vers la liste d'où l'on vient, sinon vers le dossier de la recette.
   const back =
     from && from.startsWith("/")
-      ? { href: from, label: from.includes("folder=") ? recipe.folder?.name ?? "Dossier" : "Recettes" }
+      ? { href: from, label: from.includes("folder=") ? recipe.folder?.name ?? "Dossier" : from === "/history" ? "Historique" : "Recettes" }
       : recipe.folder
         ? { href: `/?folder=${recipe.folder.id}`, label: recipe.folder.name }
         : { href: "/", label: "Recettes" };
@@ -76,6 +77,7 @@ export default async function RecipePage({
 
   return (
     <RecipeMenuProvider folders={folders.map((f) => ({ id: f.id, name: f.name, color: f.color }))} themes={themes}>
+      <RecordRecipeView recipeId={recipe.id} />
       {/* `key` : repart d'un état neuf (multiplicateur, verrous) après chaque modification. */}
       <RecipeView
         key={recipe.updatedAt.toISOString() + recipe.parentLinks.map((l) => `${l.id}:${l.calcMode}:${l.calcValue}:${l.label}`).join(",")}

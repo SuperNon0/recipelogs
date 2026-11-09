@@ -17,6 +17,7 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model Recipe {
+  accountViews AccountRecipeView[]
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(200)
   photoPath  String?  @map("photo_path")
@@ -35,6 +36,8 @@ model Recipe {
   mold           Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  /** Dernière ouverture de la fiche (page Historique). Écrite en SQL brut pour ne pas toucher updatedAt. */
+  lastViewedAt   DateTime? @map("last_viewed_at")
 
   folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
@@ -56,6 +59,7 @@ model Recipe {
   productionItem      ProductionItem?
 
   @@index([updatedAt(sort: Desc)])
+  @@index([lastViewedAt(sort: Desc)])
   @@index([favorite])
   @@index([folderId])
   @@index([nameNormalized])
@@ -482,6 +486,7 @@ model Role {
 }
 
 model Account {
+  recipeViews AccountRecipeView[]
   id          Int           @id @default(autoincrement())
   email       String        @unique
   /** Rôle donné à l'acceptation (null tant que la demande est en attente). */
@@ -508,4 +513,17 @@ model AuditLog {
 
   @@index([at(sort: Desc)])
   @@map("audit_log")
+}
+
+model AccountRecipeView {
+  accountId Int @map("account_id")
+  recipeId  Int @map("recipe_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, recipeId])
+  @@index([accountId, viewedAt(sort: Desc)])
+  @@map("account_recipe_views")
 }
