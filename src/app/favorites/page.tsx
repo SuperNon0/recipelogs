@@ -9,10 +9,12 @@ import { RecipeTable } from "@/components/recipe/RecipeTable";
 import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
 import { listAllFolders, listRecipes, toRecipeRows } from "@/lib/recipes";
 import { listPdfThemes } from "@/lib/pdfThemes";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function FavoritesPage() {
+  await requirePage("read");
   const [recipes, folders, themes] = await Promise.all([
     listRecipes({ favoritesOnly: true }),
     listAllFolders(),
@@ -26,7 +28,7 @@ export default async function FavoritesPage() {
         <div className="page-head">
           <h1>Favoris</h1>
           {recipes.length > 0 && <RecipeSelectionToggle />}
-          <Link href="/recipes/new" className="fl-btn fl-btn-primary desk-only">
+          <Link href="/recipes/new" className="fl-btn fl-btn-primary desk-only" data-needs="recipes.edit">
             <Plus size={16} /> Nouvelle recette
           </Link>
           <p className="sub">
@@ -44,7 +46,7 @@ export default async function FavoritesPage() {
           <RecipeTable recipes={toRecipeRows(recipes)} folders={folderOptions} />
         )}
 
-        <Link href="/recipes/new" className="fab" aria-label="Créer une recette">
+        <Link href="/recipes/new" data-needs="recipes.edit" className="fab" aria-label="Créer une recette">
           <Plus size={24} />
         </Link>
       </RecipeSelectionProvider>

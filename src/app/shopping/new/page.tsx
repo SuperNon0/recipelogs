@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { createShoppingList } from "@/app/actions/shopping";
 import { Help } from "@/components/ui/Help";
+import { requirePage } from "@/lib/auth/guard";
 
-export default function NewShoppingListPage() {
+export default async function NewShoppingListPage() {
+  await requirePage("shopping.edit");
   return (
     <div className="sh-narrow">
       <Link href="/shopping" className="crumb">

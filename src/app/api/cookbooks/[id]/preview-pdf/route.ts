@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getCookbookDetail } from "@/lib/cookbooks";
 import { loadCookbookEntries, renderCookbookPdf } from "@/lib/pdf/cookbookPdf";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
+import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleCookbook } from "@/lib/auth/visibility";
 
 /**
  * Génère un PDF d'aperçu en utilisant la configuration NON enregistrée
@@ -12,8 +14,11 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   const { id } = await params;
   const cookbookId = Number(id);
+  await requireVisibleCookbook(cookbookId);
   if (isNaN(cookbookId)) {
     return new NextResponse("Not found", { status: 404 });
   }

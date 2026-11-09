@@ -64,6 +64,29 @@ export function formatRelativeDate(date: Date | string, now: Date = new Date()):
 }
 
 /**
+ * Heure d'ouverture d'une recette (page Historique) : « à l'instant »,
+ * « il y a 5 min », « il y a 2 h », « hier à 14 h 05 », « lun. 3 nov. à 9 h 30 ».
+ * Le jour est celui de Paris (le serveur tourne en UTC).
+ */
+export function formatViewedAt(date: Date | string, now: Date = new Date()): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const minutes = Math.floor((now.getTime() - d.getTime()) / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const tz = "Europe/Paris";
+  const dayKey = (x: Date) => x.toLocaleDateString("fr-CA", { timeZone: tz });
+  const hm = d
+    .toLocaleTimeString("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" })
+    .replace(":", " h ")
+    .replace(/^0/, "");
+  const yesterday = new Date(now.getTime() - 86_400_000);
+  if (dayKey(d) === dayKey(now)) return `il y a ${Math.floor(minutes / 60)} h`;
+  if (dayKey(d) === dayKey(yesterday)) return `hier à ${hm}`;
+  const day = d.toLocaleDateString("fr-FR", { timeZone: tz, weekday: "short", day: "numeric", month: "short" });
+  return `${day} à ${hm}`;
+}
+
+/**
  * Rendement lisible : « 40 financiers de 25 g ». Le poids d'une pièce est
  * la masse totale divisée par le nombre de pièces (omis si la masse est nulle).
  */

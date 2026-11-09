@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -52,6 +53,7 @@ async function relinkIngredients(
 const RECIPE_PDF_KEY = "recipePdfSettings";
 
 export async function getRecipePdfSettings(): Promise<RecipePdfSettings> {
+  await requireAccess("read");
   const row = await prisma.setting.findUnique({ where: { key: RECIPE_PDF_KEY } });
   if (!row) return DEFAULT_RECIPE_PDF_SETTINGS;
   return parseRecipePdfSettings(row.value);
@@ -60,6 +62,7 @@ export async function getRecipePdfSettings(): Promise<RecipePdfSettings> {
 export async function saveRecipePdfSettings(
   raw: unknown,
 ): Promise<ActionResult> {
+  await requireAccess("pdf.export");
   const parsed = recipePdfSettingsSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: "Réglages invalides." };
@@ -75,6 +78,7 @@ export async function saveRecipePdfSettings(
 }
 
 export async function createCategory(formData: FormData): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const name = String(formData.get("name") ?? "").trim();
   const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
@@ -97,6 +101,7 @@ export async function createCategoryInline(
   name: string,
   color: string,
 ): Promise<{ ok: true; category: { id: number; name: string; color: string } } | { ok: false; error: string }> {
+  await requireAccess("recipes.edit");
   const clean = name.trim().slice(0, 100);
   if (!clean) return { ok: false, error: "Le nom est obligatoire." };
   const select = { id: true, name: true, color: true } as const;
@@ -117,6 +122,7 @@ export async function updateCategory(
   id: number,
   formData: FormData,
 ): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const name = String(formData.get("name") ?? "").trim();
   const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
@@ -135,6 +141,7 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   await prisma.category.delete({ where: { id } });
   revalidatePath("/settings");
   return { ok: true };
@@ -143,6 +150,7 @@ export async function deleteCategory(id: number): Promise<ActionResult> {
 // ─── Dossiers ───────────────────────────────────────────────────────────────
 
 export async function createFolder(formData: FormData): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const name = String(formData.get("name") ?? "").trim();
   const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
@@ -162,6 +170,7 @@ export async function updateFolder(
   id: number,
   formData: FormData,
 ): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const name = String(formData.get("name") ?? "").trim();
   const color = parseColor(formData.get("color"));
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
@@ -181,6 +190,7 @@ export async function updateFolder(
 }
 
 export async function deleteFolder(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   // ON DELETE SET NULL : les recettes du dossier passent en « Sans dossier »,
   // elles ne sont pas supprimées.
   await prisma.folder.delete({ where: { id } });
@@ -192,6 +202,7 @@ export async function deleteFolder(id: number): Promise<ActionResult> {
 // ─── Base d'ingrédients ──────────────────────────────────────────────────────
 
 export async function capitalizeIngredientBase(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const current = await prisma.ingredientBase.findUnique({ where: { id } });
   if (!current) return { ok: false, error: "Ingrédient introuvable." };
 
@@ -215,6 +226,7 @@ export async function renameIngredientBase(
   id: number,
   formData: FormData,
 ): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Le nom est obligatoire." };
 
@@ -275,6 +287,7 @@ export async function mergeIngredientBases(
   sourceId: number,
   targetId: number,
 ): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   if (sourceId === targetId) return { ok: false, error: "Impossible de fusionner un ingrédient avec lui-même." };
 
   const [source, target] = await Promise.all([
@@ -296,6 +309,7 @@ export async function mergeIngredientBases(
 
 /** Poids d'une pièce (g) d'un ingrédient ; null pour l'effacer. */
 export async function setIngredientPieceWeight(id: number, pieceG: number | null): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   if (pieceG != null && (!Number.isFinite(pieceG) || pieceG <= 0 || pieceG > 100_000)) {
     return { ok: false, error: "Poids invalide." };
   }
@@ -312,6 +326,7 @@ export async function setIngredientPieceWeight(id: number, pieceG: number | null
  * Chaque nouveau prix est ajouté à l'historique de l'ingrédient.
  */
 export async function setIngredientPrice(id: number, price: number | null, unit: string): Promise<ActionResult> {
+  await requireAccess("costs.edit");
   if (!isPriceUnit(unit)) return { ok: false, error: "Unité de prix invalide." };
   if (price != null && (!Number.isFinite(price) || price < 0 || price >= 1_000_000)) {
     return { ok: false, error: "Prix invalide." };
@@ -336,6 +351,7 @@ export async function setIngredientPrice(id: number, price: number | null, unit:
 
 /** Allergènes cochés d'un ingrédient (remplace la liste). */
 export async function setIngredientAllergens(id: number, allergens: string[]): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
   if (!exists) return { ok: false, error: "Ingrédient introuvable." };
   await prisma.ingredientBase.update({ where: { id }, data: { allergens: cleanAllergens(allergens) } });
@@ -348,6 +364,7 @@ export async function setIngredientCategory(
   id: number,
   category: "base" | "fruit" | "preparation" | null,
 ): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const exists = await prisma.ingredientBase.findUnique({ where: { id }, select: { id: true } });
   if (!exists) return { ok: false, error: "Ingrédient introuvable." };
   await prisma.ingredientBase.update({ where: { id }, data: { category } });
@@ -359,6 +376,7 @@ export async function setIngredientCategoryBulk(
   ids: number[],
   category: "base" | "fruit" | "preparation" | null,
 ): Promise<ActionResult & { count?: number }> {
+  await requireAccess("organize.edit");
   if (ids.length === 0) return { ok: false, error: "Aucun ingrédient sélectionné." };
   const { count } = await prisma.ingredientBase.updateMany({
     where: { id: { in: ids } },
@@ -376,6 +394,7 @@ export async function setIngredientCategoryBulk(
 export async function deleteIngredientBasesBulk(
   ids: number[],
 ): Promise<ActionResult & { count?: number }> {
+  await requireAccess("organize.edit");
   const cleanIds = [...new Set(ids)].filter((n) => Number.isFinite(n) && n > 0);
   if (cleanIds.length === 0) return { ok: false, error: "Aucun ingrédient sélectionné." };
   const { count } = await prisma.ingredientBase.deleteMany({
@@ -395,6 +414,7 @@ export async function mergeIngredientBasesBulk(
   sourceIds: number[],
   targetId: number,
 ): Promise<ActionResult & { count?: number }> {
+  await requireAccess("organize.edit");
   const sources = [...new Set(sourceIds)].filter(
     (n) => Number.isFinite(n) && n > 0 && n !== targetId,
   );
@@ -422,6 +442,7 @@ export async function mergeIngredientBasesBulk(
 }
 
 export async function deleteIngredientBase(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   // ON DELETE SET NULL : les ingrédients des recettes gardent leur name,
   // seul le lien vers la base est supprimé.
   await prisma.ingredientBase.delete({ where: { id } });
@@ -430,6 +451,7 @@ export async function deleteIngredientBase(id: number): Promise<ActionResult> {
 }
 
 export async function syncAllIngredientBases(): Promise<ActionResult & { created?: number }> {
+  await requireAccess("organize.edit");
   const rows = await prisma.ingredient.findMany({
     // Les intertitres (« Pâte », « Crème ») ne sont pas des ingrédients.
     where: { name: { not: null }, unit: { not: "titre" } },
@@ -446,12 +468,14 @@ export async function syncAllIngredientBases(): Promise<ActionResult & { created
 const SITE_URL_KEY = "siteUrl";
 
 export async function getSiteUrl(): Promise<string | null> {
+  await requireAccess("read");
   const row = await prisma.setting.findUnique({ where: { key: SITE_URL_KEY } });
   if (!row || typeof row.value !== "string") return null;
   return row.value || null;
 }
 
 export async function saveSiteUrl(formData: FormData): Promise<void> {
+  await requireAccess("site.update");
   const url = String(formData.get("siteUrl") ?? "").trim();
   await prisma.setting.upsert({
     where: { key: SITE_URL_KEY },
@@ -470,6 +494,7 @@ export async function assignRecipesToFolder(
   folderId: number | null,
   recipeIds: number[],
 ): Promise<ActionResult & { count?: number }> {
+  await requireAccess("recipes.edit");
   const ids = recipeIds
     .map((n) => Number(n))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -498,6 +523,7 @@ export async function assignRecipesToFolder(
 export async function repairImportedIngredientsAction(): Promise<
   { ok: true; recipes: number; fixed: number; basesRemoved: number } | { ok: false; error: string }
 > {
+  await requireAccess("organize.edit");
   try {
     const { repairImportedIngredients } = await import("@/lib/ingredientRepairDb");
     const r = await repairImportedIngredients();

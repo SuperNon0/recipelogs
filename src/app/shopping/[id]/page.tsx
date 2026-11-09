@@ -5,6 +5,7 @@ import { getShoppingListDetail, listRecipesMinimalForShopping } from "@/lib/shop
 import { ShoppingListItems } from "@/components/ShoppingListItems";
 import { AddRecipeToListPanel } from "@/components/AddRecipeToListPanel";
 import { ShoppingListHeaderMenu } from "@/components/ShoppingListMenus";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function ShoppingListDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePage("read");
   const { id } = await params;
   const listId = Number(id);
   if (isNaN(listId)) notFound();

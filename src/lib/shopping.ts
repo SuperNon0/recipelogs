@@ -1,7 +1,21 @@
 import { prisma } from "./prisma";
+import { visibleRecipeIds, visibleRecipeWhere } from "./auth/visibility";
+import type { Prisma } from "@prisma/client";
+
+// Les quantités d’une liste agrègent plusieurs recettes. On protège la liste entière.
+export async function visibleShoppingListWhere(): Promise<Prisma.ShoppingListWhereInput> {
+  const ids = await visibleRecipeIds();
+  if (!ids) return {};
+  const hidden = { notIn: [...ids] };
+  return {
+    recipes: { none: { recipeId: hidden } },
+    items: { none: { recipeId: { not: null, ...hidden } } },
+  };
+}
 
 export async function listShoppingLists() {
   return prisma.shoppingList.findMany({
+    where: await visibleShoppingListWhere(),
     orderBy: { updatedAt: "desc" },
     include: {
       _count: { select: { items: true } },
@@ -13,8 +27,8 @@ export async function listShoppingLists() {
 }
 
 export async function getShoppingListDetail(id: number) {
-  return prisma.shoppingList.findUnique({
-    where: { id },
+  return prisma.shoppingList.findFirst({
+    where: { id, ...(await visibleShoppingListWhere()) },
     include: {
       items: { orderBy: { position: "asc" } },
       recipes: {
@@ -37,6 +51,7 @@ export async function getShoppingListDetail(id: number) {
 
 export async function listRecipesMinimalForShopping() {
   return prisma.recipe.findMany({
+    where: await visibleRecipeWhere(),
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

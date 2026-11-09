@@ -56,6 +56,39 @@ Exemples : levure fraîche 30 g → levure sèche instantanée 10 g (active 15 g
 
 ---
 
+## 13. Fiche de vente pour les vendeuses — effort moyen
+
+*Demandé par Noë le 09/11/2026.*
+
+**À quoi ça sert.** Une fiche à donner à la patronne et aux vendeuses pour chaque gâteau : ce qu'il y a dedans, dit simplement, pour qu'elles s'y retrouvent face aux clients.
+
+**Contenu.** Nom et photo éventuelle ; une phrase d'accroche ; les bases du gâteau (« biscuit joconde, crémeux chocolat, mousse vanille ») ; les ingrédients principaux, ceux qui comptent vraiment, plutôt que la liste complète ; les allergènes, calculés à partir des fiches d'ingrédients ; éventuellement le goût ou l'accord (« à quoi il est »). En PDF à imprimer ou à envoyer.
+
+---
+
+## 14. Fiche de coût de revient imprimable — effort petit
+
+*Demandé par Noë le 09/11/2026.* Rejoint le « Coût dans les PDF » des petits plus.
+
+**À quoi ça sert.** Un PDF par recette avec chaque ingrédient, son prix, le coût matière total, le coût par pièce et le prix de vente conseillé (coefficient), pour la patronne. Réservé aux rôles qui ont la permission « Voir les prix et les coûts ».
+
+---
+
+## 15. Plusieurs fournisseurs, factures et historique des prix — effort gros (2 ou 3 mises à jour)
+
+*Demandé par Noë le 09/11/2026.*
+
+**À quoi ça sert.** Au travail, il y a 3 fournisseurs, souvent pour les mêmes produits à des prix différents. Pouvoir comparer, et garder le prix à jour sans le retaper.
+
+**Ce qui est voulu.**
+1. **Fournisseurs** : une liste de fournisseurs ; pour chaque ingrédient, un prix par fournisseur (avec la date). Une page « Prix » qui montre tous les prix de tous les fournisseurs côte à côte, le moins cher en avant.
+2. **Import des tarifs** : Noë envoie la liste de prix d'un fournisseur à Claude, qui la range dans RecipeLog (outil MCP) avec le nom du fournisseur.
+3. **Factures** : Noë envoie une facture (photo ou PDF) à Claude, qui l'ajoute à un historique des factures et met à jour les prix des ingrédients qu'elle contient.
+4. **Historique des prix** : anciens et nouveaux prix avec leur date, et le prix moyen, par ingrédient et par fournisseur. Le coût de revient choisit le prix à utiliser (dernier prix, moins cher ou moyenne).
+5. Plus tard, peut-être : une gestion de stock à partir des factures.
+
+---
+
 ## Petits plus (déjà listés lors de l'audit)
 
 - **Calculette sirops / Brix** : rattraper un sorbet au réfractomètre, faire un sirop à 30 °B. Petit.

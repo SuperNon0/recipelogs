@@ -7,6 +7,7 @@ import {
   BookOpen,
   ChefHat,
   ClipboardList,
+  History,
   Library,
   Palette,
   Plus,
@@ -32,6 +33,8 @@ export type NavCounts = {
 
 type NavItem = {
   href: string;
+  /** Permission nécessaire (lien masqué sinon, voir styles/auth.css). */
+  needs?: string;
   label: string;
   icon: LucideIcon;
   match: (p: string, folder: string | null) => boolean;
@@ -47,17 +50,18 @@ const NAV: NavItem[] = [
     count: (c) => c.recipes,
   },
   { href: "/favorites", label: "Favoris", icon: Star, match: (p) => p.startsWith("/favorites"), count: (c) => c.favorites },
+  { href: "/history", label: "Historique", icon: History, match: (p) => p.startsWith("/history") },
   { href: "/cookbooks", label: "Cahiers", icon: Library, match: (p) => p.startsWith("/cookbooks"), count: (c) => c.cookbooks },
   { href: "/shopping", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
   { href: "/production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
-  { href: "/settings/ingredients", label: "Ingrédients", icon: Wheat, match: (p) => p.startsWith("/settings/ingredients") },
+  { href: "/settings/ingredients", needs: "organize.edit", label: "Ingrédients", icon: Wheat, match: (p) => p.startsWith("/settings/ingredients") },
 ];
 
 const TABS: NavItem[] = [
   NAV[0],
   NAV[1],
-  NAV[2],
   NAV[3],
+  NAV[4],
   {
     href: "/settings",
     label: "Réglages",
@@ -123,7 +127,7 @@ function SidebarInner({
 
       <div className="side-label">
         Dossiers
-        <Link href="/settings/folders" aria-label="Gérer les dossiers" title="Gérer les dossiers" style={{ display: "grid", color: "var(--muted)" }}>
+        <Link href="/settings/folders" data-needs="organize.edit" aria-label="Gérer les dossiers" title="Gérer les dossiers" style={{ display: "grid", color: "var(--muted)" }}>
           <Plus size={14} />
         </Link>
       </div>
@@ -151,7 +155,7 @@ function SidebarInner({
 
       <div style={{ marginTop: "auto", paddingTop: 16 }}>
         <SideLink
-          item={{ href: "/settings/themes", label: "Thèmes PDF", icon: Palette, match: (p) => p.startsWith("/settings/themes") }}
+          item={{ href: "/settings/themes", needs: "organize.edit", label: "Thèmes PDF", icon: Palette, match: (p) => p.startsWith("/settings/themes") }}
           counts={counts}
           active={pathname.startsWith("/settings/themes")}
         />
@@ -168,7 +172,7 @@ function SidebarInner({
 function SideLink({ item, counts, active }: { item: NavItem; counts: NavCounts; active: boolean }) {
   const Icon = item.icon;
   return (
-    <Link href={item.href} className="side-item" aria-current={active ? "page" : undefined}>
+    <Link href={item.href} data-needs={item.needs} className="side-item" aria-current={active ? "page" : undefined}>
       <Icon size={17} />
       {item.label}
       {item.count && <span className="c">{item.count(counts)}</span>}
@@ -190,7 +194,10 @@ export function AppTopBar() {
       <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" onClick={openSearch} aria-label="Rechercher">
         <Search size={20} />
       </button>
-      <Link href="/settings/themes" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Thèmes PDF">
+      <Link href="/history" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Historique">
+        <History size={20} />
+      </Link>
+      <Link href="/settings/themes" data-needs="organize.edit" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Thèmes PDF">
         <Palette size={20} />
       </Link>
     </header>

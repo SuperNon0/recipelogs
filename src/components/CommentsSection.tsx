@@ -39,7 +39,7 @@ export function CommentsSection({
         </Help>
       </h2>
 
-      <form ref={formRef} action={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <form ref={formRef} action={onSubmit} data-needs="recipes.edit" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <textarea
           name="content"
           value={value}

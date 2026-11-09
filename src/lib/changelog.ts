@@ -11,12 +11,51 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.8",
+    date: "2026-11-09",
+    title: "Comptes, rôles et permissions",
+    summary:
+      "Chaque personne a maintenant son compte : elle demande un accès, un administrateur l'accepte et lui donne un rôle (Apprenti, Chef, Patronne…) que tu crées toi-même en cochant ce qu'il permet.",
+    features: [
+      "Réglages → Comptes : tant que les comptes ne sont pas activés, rien ne change. Pour les activer, colle le nom de ton équipe Cloudflare et l'AUD de l'application (le « ? » explique où les trouver), « Tester », « Enregistrer », puis « Activer les comptes » : ton adresse devient Administrateur",
+      "Une adresse autorisée par Cloudflare qui arrive pour la première fois voit « Demander un accès », puis « Demande en attente » jusqu'à ce qu'un administrateur l'accepte ; un compte refusé ou bloqué voit une page qui le lui dit",
+      "Demandes en attente : choisir le rôle puis « Accepter », ou « Refuser ». Pour chaque compte : changer de rôle, « Voir comme », bloquer, débloquer ou supprimer",
+      "Rôles : « Nouveau rôle », un nom, puis les permissions à cocher, chacune avec un « ? » qui explique ce qu'elle permet (modifier ou supprimer des recettes, voir ou modifier les prix et les coûts, cahiers, courses, production, PDF, rangement, import, comptes, mise à jour du site, accès Claude). Le rôle Administrateur a tout et ne peut pas être supprimé",
+      "Recettes visibles par rôle : décoche « Voir toutes les recettes » et choisis les catégories (par exemple « Maison Chanka ») ; un apprenti ne voit alors que ces recettes et les sous-recettes qu'elles utilisent, partout (liste, recherche, compteurs, cahiers, production, PDF). Une recette cachée répond « introuvable »",
+      "Tout compte actif peut consulter les recettes qu'il voit ; les boutons de ce que son rôle ne permet pas disparaissent (Modifier, Supprimer, favoris, coût de revient…) et chaque action est aussi refusée côté serveur",
+      "Sans la permission « Voir les prix et les coûts », aucun prix ni coût de revient n'est envoyé au téléphone ou à l'ordinateur",
+      "« Voir comme » : l'administrateur voit le site avec les permissions d'un autre compte, sous un bandeau « Revenir à mon compte »",
+      "Journal des comptes : qui a demandé, accepté, refusé, bloqué, changé un rôle ou regardé « comme » un autre compte, et quand",
+      "L'accès de Claude (MCP) avec sa clé marche comme avant, comptes activés ou non",
+    ],
+    migrations: [
+      "Nouvelles tables des comptes, des rôles et du journal (le rôle Administrateur est créé tout seul). En cas de souci avec Cloudflare, RECIPELOG_AUTH_OFF=1 dans le .env du serveur coupe les comptes sans rien effacer",
+    ],
+  },
+  {
+    version: "V2.8",
+    date: "2026-11-09",
+    title: "Historique des recettes ouvertes",
+    summary:
+      "Une page « Historique » garde les 30 dernières recettes ouvertes, même sans les avoir modifiées : pratique pour retrouver une recette dont on a oublié le nom.",
+    features: [
+      "Historique : les 30 dernières recettes ouvertes, la plus récente en haut, avec l'heure d'ouverture (« il y a 5 min », « hier à 14 h 30 »), et un bouton « Vider »",
+      "Accès : « Historique » dans le menu sur ordinateur, icône d'horloge en haut de l'écran sur téléphone, ou en tapant « historique » dans la recherche",
+      "Accueil : les 5 dernières recettes ouvertes en haut, sous « Ouvertes récemment »",
+    ],
+    migrations: ["Base de données : une colonne ajoutée aux recettes pour noter leur dernière ouverture"],
+  },
+  {
     version: "V2.7",
     date: "2026-10-28",
     title: "Logo sur l'écran d'accueil de l'iPhone",
     summary: "L'appli ajoutée à l'écran d'accueil de l'iPhone affiche le logo RecipeLog (la toque orange).",
     features: [
       "iPhone : l'icône de l'appli sur l'écran d'accueil est la toque orange de RecipeLog, en carré plein que l'iPhone arrondit lui-même (supprimer l'appli de l'écran d'accueil puis la réajouter depuis Safari pour la voir)",
+    ],
+    fixes: [
+      "Téléphone : toucher une barre de recherche ou un champ ne fait plus zoomer la page, et le zoom au pincement ne dure que le temps du geste (dès qu'on lâche, la page revient à sa taille normale)",
+      "Fenêtres (ajout à un cahier, variantes, production, renommer, couleur, aperçus…) : un appui à côté ne les ferme plus et ne fait plus perdre ce qu'on était en train de remplir ; on les ferme avec la croix en haut à droite (ou Échap sur ordinateur)",
     ],
   },
   {

@@ -5,10 +5,12 @@ import { IngredientBaseManager } from "@/components/IngredientBaseManager";
 import { RepairIngredientsButton } from "@/components/RepairIngredientsButton";
 import { SyncIngredientsButton } from "@/components/SyncIngredientsButton";
 import { DeleteOrphanIngredientsButton } from "@/components/DeleteOrphanIngredientsButton";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function IngredientsSettingsPage() {
+  await requirePage("organize.edit");
   const ingredientBases = await listAllIngredientBases();
   const orphans = ingredientBases
     .filter((i) => i._count.usages === 0)

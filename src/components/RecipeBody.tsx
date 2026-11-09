@@ -33,6 +33,7 @@ import { MoldPicker } from "./MoldPicker";
 import { DEFAULT_SALE_COEF, costOf, formatEuro, type IngredientPrice } from "@/lib/cost";
 import { ModalOverlay } from "./ModalOverlay";
 import { Help } from "./ui/Help";
+import { useCan } from "./auth/Permissions";
 import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
 import { AddSubRecipeDialog, SUB_MODE_HELP } from "./AddSubRecipeModal";
 
@@ -134,6 +135,7 @@ export function RecipeBody({
   /** Prévient la fiche quand le multiplicateur change (étapes). */
   onScaleChange?: (s: RecipeScale) => void;
 }) {
+  const can = useCan();
   const baseTotalG = useMemo(() => recipeMass(ingredients).avg, [ingredients]);
   // Ingrédients utilisables comme pivot (les intertitres n'en sont pas).
   const weighable = useMemo(() => ingredients.filter((i) => i.unit !== "titre"), [ingredients]);
@@ -418,7 +420,7 @@ export function RecipeBody({
           />
         ))}
 
-        <button type="button" className="irow iadd" onClick={() => setAdding(true)}>
+        <button type="button" className="irow iadd" data-needs="recipes.edit" onClick={() => setAdding(true)}>
           <Plus size={15} />
           <span>Ajouter une sous-recette</span>
         </button>
@@ -434,12 +436,13 @@ export function RecipeBody({
         </div>
       </div>
 
-      <CostCard
+      {can("costs.view") && <CostCard
         recipeId={recipeId}
         lines={[...own.rows, ...subs.flatMap((x) => x.calc.ingredients)]}
         pieces={yieldInfo ? { count: yieldInfo.count * globalCoef, label: yieldInfo.label } : null}
         initialCoef={saleCoef ?? DEFAULT_SALE_COEF}
-      />
+        canEditCoef={can("costs.edit")}
+      />}
 
       {adding && <AddSubRecipeDialog parentId={recipeId} onClose={() => setAdding(false)} />}
     </div>
@@ -646,11 +649,14 @@ function CostCard({
   lines,
   pieces,
   initialCoef,
+  canEditCoef,
 }: {
   recipeId: number;
   lines: AdjIngredient[];
   pieces: { count: number; label: string } | null;
   initialCoef: number;
+  /** Permission « Modifier les prix » : sinon le coefficient se lit sans se changer. */
+  canEditCoef: boolean;
 }) {
   const [coefInput, setCoefInput] = useState(String(initialCoef).replace(".", ","));
   const [savedCoef, setSavedCoef] = useState(initialCoef);
@@ -661,6 +667,7 @@ function CostCard({
   const v = Number(coefInput.replace(",", "."));
   const coef = Number.isFinite(v) && v > 0 ? v : savedCoef;
   const saveCoef = () => {
+    if (!canEditCoef) return;
     if (!Number.isFinite(v) || v <= 0 || v > 100 || v === savedCoef) return;
     setSavedCoef(v);
     startTransition(async () => { await setRecipeSaleCoef(recipeId, v); });
@@ -723,6 +730,7 @@ function CostCard({
               aria-label="Coefficient de vente"
               onChange={(e) => setCoefInput(e.target.value)}
               onBlur={saveCoef}
+              readOnly={!canEditCoef}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
             />
           </span>
@@ -973,7 +981,7 @@ function MultiplierCard({
         </span>
         <span className="num" style={{ color: "var(--accent)", fontSize: 13, fontWeight: 600 }}>{formatCoef(globalCoef)}</span>
         {dirty && (
-          <button type="button" className="fl-btn fl-btn-edit" style={{ height: 30, fontSize: 12.5, padding: "0 10px" }} onClick={handleApply} disabled={savePending} title="Écrit les quantités affichées comme nouvelle base de la recette">
+          <button type="button" className="fl-btn fl-btn-edit" data-needs="recipes.edit" style={{ height: 30, fontSize: 12.5, padding: "0 10px" }} onClick={handleApply} disabled={savePending} title="Écrit les quantités affichées comme nouvelle base de la recette">
             <Save size={14} /> {savePending ? "…" : "Enregistrer comme base"}
           </button>
         )}

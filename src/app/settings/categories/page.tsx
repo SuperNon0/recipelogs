@@ -2,10 +2,12 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { CategoryManager } from "@/components/CategoryManager";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function CategoriesSettingsPage() {
+  await requirePage("organize.edit");
   const categories = await prisma.category.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { recipes: true } } },

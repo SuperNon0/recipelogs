@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ChevronLeft, Plus } from "lucide-react";
 import { createCookbook } from "@/app/actions/cookbooks";
 import { Help } from "@/components/ui/Help";
+import { requirePage } from "@/lib/auth/guard";
 
-export default function NewCookbookPage() {
+export default async function NewCookbookPage() {
+  await requirePage("cookbooks.edit");
   return (
     <div style={{ maxWidth: 640 }}>
       <Link href="/cookbooks" className="crumb">

@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { getShoppingListDetail } from "@/lib/shopping";
 import { renderHtmlToPdf } from "@/lib/pdf/renderer";
 import { formatQty } from "@/lib/format";
+import { apiDenied } from "@/lib/auth/guard";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   const { id } = await params;
   const listId = Number(id);
   if (isNaN(listId)) return new NextResponse("Not found", { status: 404 });

@@ -4,6 +4,7 @@
 @import "../styles/cookbooks.css";
 @import "../styles/shopping.css";
 @import "../styles/settings.css";
+@import "../styles/auth.css";
 
 /* ─────────────────────────────────────────────
    Design system RecipeLog V2 — « Encre & ambre »
@@ -85,6 +86,14 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Pas de zoom au double appui (le pincement reste possible, voir ZoomReset). */
+html {
+  touch-action: manipulation;
+  /* L'iPhone ne grossit pas le texte tout seul en mode paysage. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 button {
@@ -3122,5 +3131,18 @@ button.fl-row:hover {
   }
   .lab-weigh {
     border-right: 1px solid var(--border);
+  }
+}
+
+/* Téléphone : l'iPhone zoome tout seul sur un champ écrit en moins de 16 px
+   dès qu'on tape dedans. Tous les champs passent donc à 16 px sur écran tactile
+   (ceux déjà plus grands, comme les chiffres du multiplicateur, gardent leur taille). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(
+      .stepper input
+    ):not(.mold-count input):not(.cmdk-in input),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }

@@ -59,7 +59,9 @@ function Tile({ f }: { f: FolderTile }) {
           </small>
         </span>
       </Link>
-      <MoreButton spec={spec} label={`Actions pour le dossier ${f.name}`} horizontal />
+      <span data-needs="organize.edit" style={{ display: "contents" }}>
+        <MoreButton spec={spec} label={`Actions pour le dossier ${f.name}`} horizontal />
+      </span>
       {adding && <AddRecipesToFolderModal folder={f} onClose={() => setAdding(false)} />}
     </ContextArea>
   );

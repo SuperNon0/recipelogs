@@ -5,10 +5,12 @@ import { allPdfFontsHref, parseTheme } from "@/lib/pdf/theme";
 import { EmptyState } from "@/components/EmptyState";
 import { CookbookGrid } from "@/components/CookbookMenu";
 import { Help } from "@/components/ui/Help";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function CookbooksPage() {
+  await requirePage("read");
   const cookbooks = await listCookbooks();
   const fonts = allPdfFontsHref();
 
@@ -28,7 +30,7 @@ export default async function CookbooksPage() {
             recettes aux courses ou le supprimer.
           </Help>
         </h1>
-        <Link href="/cookbooks/new" className="fl-btn fl-btn-primary desk-only">
+        <Link href="/cookbooks/new" data-needs="cookbooks.edit" className="fl-btn fl-btn-primary desk-only">
           <Plus size={16} /> Nouveau cahier
         </Link>
         <p className="sub">
@@ -60,7 +62,7 @@ export default async function CookbooksPage() {
         />
       )}
 
-      <Link href="/cookbooks/new" className="fab" aria-label="Créer un cahier">
+      <Link href="/cookbooks/new" data-needs="cookbooks.edit" className="fab" aria-label="Créer un cahier">
         <Plus size={24} />
       </Link>
     </>

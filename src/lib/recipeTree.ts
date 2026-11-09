@@ -192,3 +192,9 @@ export function resolveLink(
   const { min, max } = recipeMass(ingredients);
   return { effectiveCoef, ingredients, min, max };
 }
+
+/** Retire les prix d'achat de tout l'arbre (rôle sans la permission « Voir les prix et les coûts »). */
+export function stripTreeCosts(node: TreeNode): void {
+  for (const ing of node.ingredients) ing.cost = null;
+  for (const link of node.subLinks) stripTreeCosts(link.child);
+}

@@ -4,7 +4,7 @@
 
 Outil conçu pour le travail d'un pâtissier pro (et quelques recettes perso). Il comble les manques de Recipe Keeper : précision au gramme, multiplicateur (coefficient, masse, pivot, pièces, moule), sous-recettes à tous les niveaux, fiches de production, allergènes, coût de revient, cahiers PDF et accès par Claude (MCP).
 
-**Version actuelle : V2.5** (le numéro complet, par ex. V2.5.106, est affiché dans le menu et dans Réglages → Version et nouveautés) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version actuelle : V2.8** (le numéro complet, par ex. V2.5.106, est affiché dans le menu et dans Réglages → Version et nouveautés) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la documentation du projet**. Le journal des nouveautés affiché dans l'appli est `src/lib/changelog.ts` (règles dans `CLAUDE.md`). Les idées mises de côté pour plus tard sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md).
 
@@ -240,7 +240,7 @@ src/
 ```
 
 ### Règles à respecter (pièges connus)
-1. **Pas d'auth dans l'appli** : la sécurité est assurée par Cloudflare Zero Trust. Toute page « publique » doit passer par `middleware.ts`.
+1. **Comptes dans l'appli** (`src/lib/auth/`) : Cloudflare Zero Trust décide qui atteint le site ; l'appli vérifie son jeton signé (équipe + AUD dans Réglages → Comptes) et applique les rôles et permissions (`permissions.ts`). Chaque Server Action, page et route commence par `requireAccess` / `requirePage` / `apiDenied` (vérifié par `tests/authGuards.test.ts`). Comptes désactivés = tous les droits, comme avant. Les outils MCP passent par `runAsService` (tous les droits avec la clé). Secours : `RECIPELOG_AUTH_OFF=1`.
 2. **`toggleSubRecipeLock` n'appelle pas `revalidatePath`** : sinon le panneau multiplicateur est réinitialisé. Le cadenas utilise un état optimiste.
 3. **`output: "standalone"` inconditionnel** dans `next.config.ts`. Le build ignore le typecheck (LXC trop lent) : **lancer `pnpm typecheck` avant chaque push**.
 4. **Le serveur standalone tourne dans `.next/standalone/`, effacé à chaque déploiement** : ne jamais y écrire de fichiers ; utiliser `UPLOAD_DIR`.

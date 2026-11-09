@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeForSearch } from "@/lib/recipes";
+import { apiDenied } from "@/lib/auth/guard";
+import { visibleRecipeWhere } from "@/lib/auth/visibility";
 
 /**
  * Liste légère des recettes pour l'autocomplétion de la modal
@@ -13,6 +15,8 @@ import { normalizeForSearch } from "@/lib/recipes";
  *  - limit            : max résultats (défaut 50, max 200)
  */
 export async function GET(req: Request) {
+  const denied = await apiDenied("read");
+  if (denied) return denied;
   const url = new URL(req.url);
   const q = url.searchParams.get("q") ?? "";
   const onlyNoFolder = url.searchParams.get("onlyNoFolder") === "1";
@@ -37,6 +41,8 @@ export async function GET(req: Request) {
     where.AND = [{ OR: [{ folderId: null }, { folderId: { not: fid } }] }];
   }
 
+  // Rôle limité à certaines catégories : seulement ses recettes.
+  Object.assign(where, await visibleRecipeWhere());
   const recipes = await prisma.recipe.findMany({
     where,
     select: {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleCookbook } from "@/lib/auth/visibility";
 
 /**
  * Renvoie les données de snapshot d'une entrée de cahier figée
@@ -11,8 +13,11 @@ export async function GET(
     params,
   }: { params: Promise<{ id: string; entryId: string }> },
 ) {
+  const denied = await apiDenied("read");
+  if (denied) return denied;
   const { id, entryId } = await params;
   const cookbookId = Number(id);
+  await requireVisibleCookbook(cookbookId);
   const eid = Number(entryId);
   if (isNaN(cookbookId) || isNaN(eid)) {
     return new NextResponse("Bad request", { status: 400 });

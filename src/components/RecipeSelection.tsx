@@ -154,6 +154,7 @@ export function RecipeSelectionToggle() {
       type="button"
       onClick={selectionMode ? exitSelection : enterSelection}
       className="fl-btn fl-btn-ghost"
+      data-needs="recipes.delete"
       title="Sélectionner plusieurs recettes pour les supprimer"
     >
       {selectionMode ? <X size={16} /> : <ListChecks size={16} />}

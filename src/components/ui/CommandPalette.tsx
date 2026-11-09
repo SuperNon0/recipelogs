@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FileText,
   FolderOpen,
+  History,
   Library,
   Palette,
   Plus,
@@ -54,6 +55,7 @@ type Results = {
 const ACTIONS: Item[] = [
   { key: "a-new", group: "Actions", label: "Nouvelle recette", href: "/recipes/new", icon: Plus },
   { key: "a-fav", group: "Actions", label: "Favoris", href: "/favorites", icon: Star },
+  { key: "a-hist", group: "Actions", label: "Historique (recettes ouvertes)", href: "/history", icon: History },
   { key: "a-cb", group: "Actions", label: "Nouveau cahier", href: "/cookbooks/new", icon: Library },
   { key: "a-sh", group: "Actions", label: "Nouvelle liste de courses", href: "/shopping/new", icon: ShoppingBasket },
   { key: "a-prod", group: "Actions", label: "Fiche de production", href: "/production", icon: ClipboardList },

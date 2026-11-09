@@ -30,6 +30,7 @@ import { ProductionDialog } from "@/components/ProductionDialog";
 import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/app/actions/recipes";
 import { assignRecipesToFolder } from "@/app/actions/settings";
 import { formatG } from "@/lib/format";
+import { useCan } from "@/components/auth/Permissions";
 
 export type FolderOption = { id: number; name: string; color: string };
 
@@ -71,6 +72,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
   const router = useRouter();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [, startTransition] = useTransition();
+  const can = useCan();
 
   const getSpec = useCallback((): MenuSpec => {
     const moveTo: MenuEntry[] = [
@@ -137,42 +139,53 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
           </div>
         </>
       ),
+      // Le menu ne propose que ce que le rôle du visiteur permet (comptes, Réglages → Comptes).
       quick: [
-        { label: "Modifier", icon: Pencil, href: `/recipes/${r.id}/edit` },
-        { label: "Cahier", icon: Library, onSelect: () => setDialog("cookbook") },
-        { label: "Courses", icon: ShoppingBasket, onSelect: () => setDialog("shopping") },
-        { label: "PDF", icon: FileDown, onSelect: () => setDialog("pdf") },
+        ...(can("recipes.edit") ? [{ label: "Modifier", icon: Pencil, href: `/recipes/${r.id}/edit` }] : []),
+        ...(can("cookbooks.edit") ? [{ label: "Cahier", icon: Library, onSelect: () => setDialog("cookbook") }] : []),
+        ...(can("shopping.edit") ? [{ label: "Courses", icon: ShoppingBasket, onSelect: () => setDialog("shopping") }] : []),
+        ...(can("pdf.export") ? [{ label: "PDF", icon: FileDown, onSelect: () => setDialog("pdf") }] : []),
       ],
-      items: [
+      items: tidySeparators([
         ...(!opts.onPage ? [{ label: "Ouvrir", icon: ExternalLink, href: `/recipes/${r.id}`, hint: "Entrée" }] : []),
-        { label: "Modifier", icon: Pencil, href: `/recipes/${r.id}/edit` },
-        {
-          label: "Dupliquer",
-          icon: Copy,
-          onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
-        },
-        { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },
+        ...(can("recipes.edit")
+          ? [
+              { label: "Modifier", icon: Pencil, href: `/recipes/${r.id}/edit` },
+              {
+                label: "Dupliquer",
+                icon: Copy,
+                onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
+              },
+              { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },
+            ]
+          : nVariants > 0
+            ? [{ label: variantsLabel, icon: GitBranch, submenu: variantsMenu.slice(0, 1) }]
+            : []),
         { separator: true },
-        { label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") },
-        { label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") },
-        { label: "Télécharger le PDF…", icon: FileDown, onSelect: () => setDialog("pdf") },
-        { label: "Fiche de production…", icon: ClipboardList, onSelect: () => setDialog("production") },
+        ...(can("cookbooks.edit") ? [{ label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") }] : []),
+        ...(can("shopping.edit") ? [{ label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") }] : []),
+        ...(can("pdf.export") ? [{ label: "Télécharger le PDF…", icon: FileDown, onSelect: () => setDialog("pdf") }] : []),
+        ...(can("pdf.export") ? [{ label: "Fiche de production…", icon: ClipboardList, onSelect: () => setDialog("production") }] : []),
         { separator: true },
-        { label: "Déplacer vers", icon: FolderInput, submenu: moveTo },
-        {
-          label: r.favorite ? "Retirer des favoris" : "Ajouter aux favoris",
-          icon: r.favorite ? StarOff : Star,
-          onSelect: () =>
-            startTransition(async () => {
-              await toggleFavorite(r.id);
-              router.refresh();
-            }),
-        },
+        ...(can("recipes.edit")
+          ? [
+              { label: "Déplacer vers", icon: FolderInput, submenu: moveTo },
+              {
+                label: r.favorite ? "Retirer des favoris" : "Ajouter aux favoris",
+                icon: r.favorite ? StarOff : Star,
+                onSelect: () =>
+                  startTransition(async () => {
+                    await toggleFavorite(r.id);
+                    router.refresh();
+                  }),
+              },
+            ]
+          : []),
         { separator: true },
-        { label: "Supprimer…", icon: Trash2, danger: true, onSelect: remove },
-      ],
+        ...(can("recipes.delete") ? [{ label: "Supprimer…", icon: Trash2, danger: true, onSelect: remove }] : []),
+      ]),
     };
-  }, [r, folders, opts.onPage, opts.variants, router]);
+  }, [r, folders, opts.onPage, opts.variants, router, can]);
 
   const dialogs =
     dialog === "pdf" ? (
@@ -198,4 +211,16 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
     ) : null;
 
   return { getSpec, dialogs, openDialog: setDialog };
+}
+
+/** Retire les séparateurs en double, en tête ou en fin (quand des entrées sont masquées). */
+function tidySeparators(entries: MenuEntry[]): MenuEntry[] {
+  const out: MenuEntry[] = [];
+  for (const e of entries) {
+    const sep = "separator" in e && e.separator;
+    if (sep && (out.length === 0 || ("separator" in out[out.length - 1] && (out[out.length - 1] as { separator?: boolean }).separator))) continue;
+    out.push(e);
+  }
+  while (out.length && "separator" in out[out.length - 1]) out.pop();
+  return out;
 }

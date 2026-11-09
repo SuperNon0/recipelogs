@@ -7,10 +7,12 @@ import { IMPORT_TAG } from "@/lib/mcp/tools/video";
 import { SHORTCUT_PROMPT } from "@/lib/shortcutPrompt";
 import { CopyPromptButton } from "@/components/settings/ShortcutGuide";
 import { Help } from "@/components/ui/Help";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportVideoSettingsPage() {
+  await requirePage("recipes.edit");
   const folderNames = Object.values(PLATFORM_FOLDER);
   const [ytDlp, ffmpeg, token, folders] = await Promise.all([
     toolVersion("yt-dlp"),

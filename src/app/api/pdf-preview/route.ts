@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookbookThemeSchema, parseTheme } from "@/lib/pdf/theme";
 import { previewSnap, renderRecipePdf } from "@/lib/pdf/recipePdf";
+import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 /**
  * Aperçu d'un thème en cours de modification (pas encore enregistré).
@@ -8,6 +10,8 @@ import { previewSnap, renderRecipePdf } from "@/lib/pdf/recipePdf";
  * recette récente, ou de la recette d'exemple.
  */
 export async function POST(req: Request) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -18,6 +22,7 @@ export async function POST(req: Request) {
   const theme = parsed.success ? parsed.data : parseTheme(body.config);
   const format = body.format === "A5" ? "A5" : "A4";
   const recipeId = Number(body.recipeId);
+  if (Number.isInteger(recipeId) && recipeId > 0) await requireVisibleRecipe(recipeId);
   const snap = await previewSnap(Number.isInteger(recipeId) && recipeId > 0 ? recipeId : null);
   const pdf = await renderRecipePdf(snap, theme, format);
   return new NextResponse(pdf.buffer as ArrayBuffer, {

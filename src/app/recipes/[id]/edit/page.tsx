@@ -6,6 +6,8 @@ import { RecipeForm } from "@/components/RecipeForm";
 import { updateRecipe } from "@/app/actions/recipes";
 import { getRecipeDetail, listAllCategories, listAllFolders } from "@/lib/recipes";
 import { listPieceWeights } from "@/lib/ingredientInfo";
+import { requirePage } from "@/lib/auth/guard";
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +16,10 @@ export default async function EditRecipePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePage("recipes.edit");
   const { id } = await params;
   const recipeId = Number(id);
+  await requireVisibleRecipe(recipeId);
   if (!Number.isFinite(recipeId)) notFound();
 
   const [recipe, categories, folders, pieceWeights] = await Promise.all([

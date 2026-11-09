@@ -1,24 +1,31 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import { recipeMass } from "@/lib/massAdjust";
+import { canSeeRecipe, hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 export async function fetchAvailableRecipes(excludeId: number): Promise<{ id: number; name: string }[]> {
+  await requireAccess("read");
   return prisma.recipe.findMany({
-    where: { id: { not: excludeId } },
+    where: { AND: [{ id: { not: excludeId } }, await visibleRecipeWhere()] },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 }
 
 export async function fetchCookbooksForModal(): Promise<{ id: number; name: string }[]> {
+  await requireAccess("read");
+  const hidden = await hiddenCookbookIds();
   return prisma.cookbook.findMany({
+    where: hidden.size ? { id: { notIn: [...hidden] } } : undefined,
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 }
 
 export async function fetchShoppingListsForModal(): Promise<{ id: number; name: string }[]> {
+  await requireAccess("read");
   return prisma.shoppingList.findMany({
     select: { id: true, name: true },
     orderBy: { updatedAt: "desc" },
@@ -29,6 +36,8 @@ export async function fetchShoppingListsForModal(): Promise<{ id: number; name: 
 export async function fetchRecipeMassInfo(
   recipeId: number,
 ): Promise<{ totalMassG: number; ingredients: { name: string; quantityG: number }[] } | null> {
+  await requireAccess("read");
+  if (!(await canSeeRecipe(recipeId))) return null;
   const r = await prisma.recipe.findUnique({
     where: { id: recipeId },
     select: {
@@ -54,6 +63,8 @@ export async function fetchRecipeMassInfo(
 export async function fetchRecipeIngredients(
   recipeId: number,
 ): Promise<{ id: number; name: string; quantityG: number; unit: string }[]> {
+  await requireAccess("read");
+  if (!(await canSeeRecipe(recipeId))) return [];
   const rows = await prisma.ingredient.findMany({
     where: { recipeId },
     orderBy: { position: "asc" },

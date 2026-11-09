@@ -3,11 +3,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { Help } from "@/components/ui/Help";
 import { ProductionBoard, ProductionSheetView } from "@/components/Production";
 import { buildProductionSheet, listProductionItems } from "@/lib/productionData";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 /** Fiche de production : les recettes à produire, leurs quantités, et toutes les pesées. */
 export default async function ProductionPage() {
+  await requirePage("read");
   const items = await listProductionItems();
   const sheet = items.length ? await buildProductionSheet(items.map((i) => ({ recipeId: i.recipeId, amount: i.amount, yieldCount: i.yieldCount }))) : null;
 

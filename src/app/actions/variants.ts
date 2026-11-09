@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { copyRecipe } from "@/lib/recipeCopy";
@@ -19,6 +20,7 @@ function refresh(...ids: number[]) {
  * à la version principale de sa famille. Renvoie l'id de la copie.
  */
 export async function createVariant(recipeId: number, note: string): Promise<Result> {
+  await requireAccess("recipes.edit");
   const source = await prisma.recipe.findUnique({ where: { id: recipeId }, select: { name: true } });
   if (!source) return { ok: false, error: "Recette introuvable." };
   const rootId = await variantRootOf(recipeId);
@@ -44,6 +46,7 @@ export async function createVariant(recipeId: number, note: string): Promise<Res
  * Si l'autre recette avait déjà ses propres variantes, elles suivent.
  */
 export async function linkVariant(recipeId: number, otherId: number, note: string): Promise<Result> {
+  await requireAccess("recipes.edit");
   if (recipeId === otherId) return { ok: false, error: "Choisis une autre recette." };
   const found = await prisma.recipe.count({ where: { id: { in: [recipeId, otherId] } } });
   if (found < 2) return { ok: false, error: "Recette introuvable." };
@@ -63,6 +66,7 @@ export async function linkVariant(recipeId: number, otherId: number, note: strin
 
 /** Détache une variante : elle redevient une recette indépendante. */
 export async function unlinkVariant(variantId: number): Promise<Result> {
+  await requireAccess("recipes.edit");
   const link = await prisma.variant.findFirst({ where: { variantRecipeId: variantId } });
   if (!link) return { ok: false, error: "Cette recette n'est pas une variante." };
   await prisma.variant.delete({ where: { id: link.id } });
@@ -72,6 +76,7 @@ export async function unlinkVariant(variantId: number): Promise<Result> {
 
 /** Renomme le petit nom d'une variante (« moins sucré »). */
 export async function setVariantNote(variantId: number, note: string): Promise<Result> {
+  await requireAccess("recipes.edit");
   const { count } = await prisma.variant.updateMany({ where: { variantRecipeId: variantId }, data: { note: cleanNote(note) } });
   if (!count) return { ok: false, error: "Cette recette n'est pas une variante." };
   refresh(variantId);
@@ -83,6 +88,7 @@ export async function setVariantNote(variantId: number, note: string): Promise<R
  * devient une variante (« ancienne version »), les autres essais suivent.
  */
 export async function promoteVariant(variantId: number): Promise<Result> {
+  await requireAccess("recipes.edit");
   const link = await prisma.variant.findFirst({ where: { variantRecipeId: variantId } });
   if (!link) return { ok: false, error: "Cette recette est déjà la version principale." };
   const oldRoot = link.sourceRecipeId;

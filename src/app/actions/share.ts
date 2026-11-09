@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { createShareToken, revokeShareToken } from "@/lib/share";
 import { SHARE_ENABLED } from "@/lib/features";
@@ -10,6 +11,7 @@ export async function generateShareToken(
   entityType: "recipe" | "cookbook",
   entityId: number,
 ): Promise<ShareActionResult> {
+  await requireAccess("site.update");
   if (!SHARE_ENABLED) return { ok: false, error: "Le partage est désactivé." };
   try {
     const token = await createShareToken(entityType, entityId);
@@ -27,6 +29,7 @@ export async function revokeToken(
   entityType: "recipe" | "cookbook",
   entityId: number,
 ): Promise<{ ok: boolean }> {
+  await requireAccess("site.update");
   await revokeShareToken(token);
   revalidatePath(
     entityType === "recipe" ? `/recipes/${entityId}` : `/cookbooks/${entityId}`,

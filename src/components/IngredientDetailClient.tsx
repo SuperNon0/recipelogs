@@ -8,6 +8,7 @@ import { formatQty } from "@/lib/format";
 import { renameIngredientBase, mergeIngredientBases, setIngredientAllergens, setIngredientPieceWeight } from "@/app/actions/settings";
 import { formatEuro } from "@/lib/cost";
 import { PriceInput, SaveState } from "@/components/PriceInput";
+import { useCan } from "@/components/auth/Permissions";
 import { ALLERGENS } from "@/lib/allergens";
 import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
@@ -37,6 +38,7 @@ export function IngredientDetailClient({
   otherBases: { id: number; name: string; count?: number }[];
 }) {
   const router = useRouter();
+  const can = useCan();
   const [renaming, setRenaming] = useState(false);
   const [merging, setMerging] = useState(false);
 
@@ -71,7 +73,7 @@ export function IngredientDetailClient({
       </div>
 
       <section className="fl-card ing-facts">
-        <PriceField id={base.id} initial={base.price} initialUnit={base.priceUnit} history={base.priceHistory} />
+        {can("costs.view") && <PriceField id={base.id} initial={base.price} initialUnit={base.priceUnit} history={base.priceHistory} />}
         <AllergensField id={base.id} initial={base.allergens} />
         <PieceWeightField id={base.id} initial={base.pieceG} />
       </section>

@@ -17,6 +17,7 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model Recipe {
+  accountViews AccountRecipeView[]
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(200)
   photoPath  String?  @map("photo_path")
@@ -35,6 +36,8 @@ model Recipe {
   mold           Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  /** Dernière ouverture de la fiche (page Historique). Écrite en SQL brut pour ne pas toucher updatedAt. */
+  lastViewedAt   DateTime? @map("last_viewed_at")
 
   folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
@@ -56,6 +59,7 @@ model Recipe {
   productionItem      ProductionItem?
 
   @@index([updatedAt(sort: Desc)])
+  @@index([lastViewedAt(sort: Desc)])
   @@index([favorite])
   @@index([folderId])
   @@index([nameNormalized])
@@ -449,4 +453,77 @@ model Setting {
   value Json
 
   @@map("settings")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Comptes et rôles (bibliothèque partagée : un rôle dit ce que le compte
+// a le droit de voir et de faire). Voir src/lib/auth/.
+// Cloudflare Access décide qui atteint le site, l'appli décide du reste.
+// ─────────────────────────────────────────────────────────────
+
+enum AccountStatus {
+  pending
+  active
+  refused
+  blocked
+}
+
+/** Rôle créé par l'administrateur (Apprenti, Chef…) : un nom et des permissions cochées. */
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(60)
+  /** Clés des permissions cochées (liste dans src/lib/auth/permissions.ts). */
+  permissions String[] @default([])
+  /** Sans la permission « Voir toutes les recettes » : ids des catégories dont le rôle voit les recettes. */
+  categoryIds Int[]    @default([]) @map("category_ids")
+  /** Rôle Administrateur intégré : toutes les permissions, ni modifiable ni supprimable. */
+  isAdmin     Boolean  @default(false) @map("is_admin")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  accounts Account[]
+
+  @@map("roles")
+}
+
+model Account {
+  recipeViews AccountRecipeView[]
+  id          Int           @id @default(autoincrement())
+  email       String        @unique
+  /** Rôle donné à l'acceptation (null tant que la demande est en attente). */
+  roleId      Int?          @map("role_id")
+  status      AccountStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  approvedAt  DateTime?     @map("approved_at")
+  lastSeenAt  DateTime?     @map("last_seen_at")
+
+  role Role? @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@map("accounts")
+}
+
+/** Journal des comptes : qui a accepté, refusé, bloqué, changé un rôle, « vu comme ». */
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  at          DateTime @default(now())
+  actorEmail  String?  @map("actor_email")
+  action      String   @db.VarChar(40)
+  targetEmail String?  @map("target_email")
+  detail      String?  @db.Text
+
+  @@index([at(sort: Desc)])
+  @@map("audit_log")
+}
+
+model AccountRecipeView {
+  accountId Int @map("account_id")
+  recipeId  Int @map("recipe_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([accountId, recipeId])
+  @@index([accountId, viewedAt(sort: Desc)])
+  @@map("account_recipe_views")
 }

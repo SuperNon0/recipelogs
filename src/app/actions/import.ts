@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import JSZip from "jszip";
 import { Prisma } from "@prisma/client";
@@ -25,6 +26,7 @@ export type ImportResult = {
 export async function importRecipeKeeperCsv(
   formData: FormData,
 ): Promise<ImportResult> {
+  await requireAccess("import.run");
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucun fichier fourni."] };
@@ -98,6 +100,7 @@ export async function importRecipeKeeperCsv(
 export async function importRecipeKeeperHtmlOrZip(
   formData: FormData,
 ): Promise<ImportResult> {
+  await requireAccess("import.run");
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucun fichier fourni."] };
@@ -302,6 +305,7 @@ function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; q
 export async function importRecipesFromJson(
   formData: FormData,
 ): Promise<ImportResult> {
+  await requireAccess("import.run");
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0)
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucun fichier fourni."] };

@@ -3,10 +3,12 @@ import { Help } from "@/components/ui/Help";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { prisma } from "@/lib/prisma";
 import { allPdfFontsHref } from "@/lib/pdf/theme";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ThemesPage() {
+  await requirePage("organize.edit");
   const [themes, recipes] = await Promise.all([
     listPdfThemes(),
     prisma.recipe.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 500 }),

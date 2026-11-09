@@ -97,6 +97,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
             type="button"
             className="fl-btn fl-btn-secondary fl-btn-icon desk-only"
             aria-pressed={fav}
+            data-needs="recipes.edit"
             aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
             title={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
             onClick={() => {
@@ -113,14 +114,14 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
             <ChefHat size={16} />
             <span className="desk-only">Mode labo</span>
           </button>
-          <button type="button" className="fl-btn fl-btn-secondary desk-only" onClick={() => menu.openDialog("pdf")}>
+          <button type="button" className="fl-btn fl-btn-secondary desk-only" data-needs="pdf.export" onClick={() => menu.openDialog("pdf")}>
             <FileDown size={16} /> PDF
           </button>
-          <Link href={`/recipes/${recipe.id}/edit`} className="fl-btn fl-btn-secondary desk-only">
+          <Link href={`/recipes/${recipe.id}/edit`} className="fl-btn fl-btn-secondary desk-only" data-needs="recipes.edit">
             <Pencil size={15} /> Modifier
           </Link>
           <MoreButton spec={menu.getSpec} label="Plus d'actions" horizontal className="fl-btn fl-btn-secondary fl-btn-icon" />
-          <button type="button" className="fl-btn fl-btn-primary" onClick={() => menu.openDialog("cookbook")} aria-label="Ajouter à un cahier">
+          <button type="button" className="fl-btn fl-btn-primary" data-needs="cookbooks.edit" onClick={() => menu.openDialog("cookbook")} aria-label="Ajouter à un cahier">
             <Library size={16} />
             <span className="desk-only">Ajouter au cahier</span>
           </button>
