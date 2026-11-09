@@ -3,9 +3,13 @@ import { scaleQty, recipeMass, type AdjIngredient } from "./massAdjust";
 import { resolveLink } from "./recipeTree";
 import { collectAllergens } from "./allergens";
 import { loadRecipeTree } from "./recipes";
+import { hiddenCookbookIds } from "./auth/visibility";
 
 export async function listCookbooks() {
+  // Rôle limité à certaines catégories : un cahier avec une recette cachée est caché.
+  const hidden = await hiddenCookbookIds();
   return prisma.cookbook.findMany({
+    where: hidden.size ? { id: { notIn: [...hidden] } } : undefined,
     orderBy: { updatedAt: "desc" },
     include: {
       template: true,

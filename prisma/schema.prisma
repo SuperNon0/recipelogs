@@ -470,6 +470,8 @@ model Role {
   name        String   @unique @db.VarChar(60)
   /** Clés des permissions cochées (liste dans src/lib/auth/permissions.ts). */
   permissions String[] @default([])
+  /** Sans la permission « Voir toutes les recettes » : ids des catégories dont le rôle voit les recettes. */
+  categoryIds Int[]    @default([]) @map("category_ids")
   /** Rôle Administrateur intégré : toutes les permissions, ni modifiable ni supprimable. */
   isAdmin     Boolean  @default(false) @map("is_admin")
   createdAt   DateTime @default(now()) @map("created_at")

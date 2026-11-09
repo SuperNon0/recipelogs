@@ -11,6 +11,7 @@ import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
 import { requirePage } from "@/lib/auth/guard";
 import { viewerCan } from "@/lib/auth/viewer";
 import { stripTreeCosts } from "@/lib/recipeTree";
+import { requireVisibleRecipe, visibleRecipeIds } from "@/lib/auth/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +27,20 @@ export default async function RecipePage({
   const { from, variantes } = await searchParams;
   const recipeId = Number(id);
   if (!Number.isInteger(recipeId)) notFound();
+  await requireVisibleRecipe(recipeId);
 
-  const [recipe, folders, themes, tree, variants] = await Promise.all([
+  const [recipe, folders, themes, tree, family, visible] = await Promise.all([
     getRecipeDetail(recipeId),
     listAllFolders(),
     listPdfThemes(),
     loadRecipeTree(recipeId),
     getVariantFamily(recipeId),
+    visibleRecipeIds(),
   ]);
+  // Rôle limité à certaines catégories : ni les variantes ni les recettes parentes cachées.
+  const seen = (rid: number) => !visible || visible.has(rid);
+  const shownMembers = family?.members.filter((m) => seen(m.id)) ?? [];
+  const variants = family && shownMembers.length > 1 ? { ...family, members: shownMembers } : null;
   if (!recipe) notFound();
   // Sans la permission « Voir les prix et les coûts », aucun prix ne quitte le serveur.
   const showCosts = viewerCan(viewer, "costs.view");
@@ -98,7 +105,7 @@ export default async function RecipePage({
         allergens={tree ? collectAllergens(tree) : []}
         yieldInfo={recipe.yieldCount ? { count: recipe.yieldCount, label: recipe.yieldLabel?.trim() || "pièces" } : null}
         comments={recipe.comments.map((c) => ({ id: c.id, content: c.content, createdAt: c.createdAt.toISOString() }))}
-        usedIn={recipe.childLinks.map((l) => ({ id: l.parent.id, name: l.parent.name, label: l.label }))}
+        usedIn={recipe.childLinks.filter((l) => seen(l.parent.id)).map((l) => ({ id: l.parent.id, name: l.parent.name, label: l.label }))}
       />
     </RecipeMenuProvider>
   );

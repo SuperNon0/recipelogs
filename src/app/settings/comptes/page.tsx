@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsSettingsPage() {
   const viewer = await requirePage("accounts.manage");
-  const [settings, roles, accounts, log] = await Promise.all([
+  const [settings, roles, accounts, log, categories] = await Promise.all([
     getAuthSettings(),
     prisma.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { _count: { select: { accounts: true } } } }),
     prisma.account.findMany({ orderBy: [{ createdAt: "asc" }] }),
     prisma.auditLog.findMany({ orderBy: { at: "desc" }, take: 40 }),
+    prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
   ]);
   const me = realAccountOf(viewer);
 
@@ -34,6 +35,7 @@ export default async function AccountsSettingsPage() {
     name: r.name,
     isAdmin: r.isAdmin,
     permissions: cleanPermissions(r.permissions),
+    categoryIds: r.categoryIds,
     accounts: r._count.accounts,
   }));
   const entries: AuditInfo[] = log.map((l) => ({
@@ -58,6 +60,7 @@ export default async function AccountsSettingsPage() {
         team={settings.team}
         aud={settings.aud}
         roles={roleRows}
+        categories={categories}
         accounts={rows}
         log={entries}
       />

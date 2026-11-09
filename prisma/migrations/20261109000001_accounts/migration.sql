@@ -8,6 +8,7 @@ CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
     "name" VARCHAR(60) NOT NULL,
     "permissions" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "category_ids" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
     "is_admin" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "roles_pkey" PRIMARY KEY ("id")

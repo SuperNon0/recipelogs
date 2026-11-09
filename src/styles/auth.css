@@ -227,6 +227,7 @@
 }
 
 /* Boutons masqués quand le rôle n'a pas la permission (attribut data-no du <body>). */
+body[data-no~="recipes.view_all"] [data-needs~="recipes.view_all"],
 body[data-no~="recipes.edit"] [data-needs~="recipes.edit"],
 body[data-no~="recipes.delete"] [data-needs~="recipes.delete"],
 body[data-no~="costs.view"] [data-needs~="costs.view"],
@@ -297,4 +298,44 @@ body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
 
 .set-page .page-head + .sect-title {
   margin-top: 0;
+}
+
+/* Catégories visibles d'un rôle (sans « Voir toutes les recettes ») */
+.role-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 8px 28px;
+  border-bottom: 1px solid var(--border);
+}
+.role-cat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.role-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  font-size: 13px;
+  color: var(--soft);
+  cursor: pointer;
+}
+.role-cat.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-dim);
+}
+.role-cat input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.role-cat .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }

@@ -4,6 +4,7 @@ import { normalizeForSearch } from "@/lib/recipes";
 import { searchByIngredient, searchInText } from "@/lib/fullSearch";
 import { foldText } from "@/lib/textSearch";
 import { apiDenied } from "@/lib/auth/guard";
+import { hiddenCookbookIds, visibleRecipeIds } from "@/lib/auth/visibility";
 
 /**
  * Recherche globale (fenêtre Ctrl K) : recettes, dossiers, ingrédients, cahiers et
@@ -24,9 +25,16 @@ export async function GET(req: Request) {
   // ces listes sont petites, on les filtre ici plutôt qu'en base.
   const has = (name: string) => foldText(name).includes(normalized);
 
+  // Rôle limité à certaines catégories (apprenti…) : seulement ses recettes et cahiers.
+  const visible = await visibleRecipeIds();
+  const vis = visible ? { id: { in: [...visible] } } : {};
+  const hiddenBooks = await hiddenCookbookIds();
+  const canSee = (id: number) => !visible || visible.has(id);
+
   const [byName, essays, folders, ingredients, cookbooks, lists] = await Promise.all([
     prisma.recipe.findMany({
       where: {
+        ...vis,
         OR: [
           { nameNormalized: { contains: normalized, mode: "insensitive" } },
           { name: contains },
@@ -48,7 +56,7 @@ export async function GET(req: Request) {
   ]);
   const recipes = [
     ...byName,
-    ...essays.filter((e) => has(e.note ?? "") && !byName.some((r) => r.id === e.variant.id)).map((e) => e.variant),
+    ...essays.filter((e) => canSee(e.variant.id) && has(e.note ?? "") && !byName.some((r) => r.id === e.variant.id)).map((e) => e.variant),
   ].slice(0, 8);
 
   const [withIngredient, inText] = await Promise.all([searchByIngredient(q), searchInText(q)]);
@@ -59,9 +67,9 @@ export async function GET(req: Request) {
     recipes: recipes.map((r) => ({ id: r.id, name: r.name, folder: r.folder?.name ?? null, color: r.folder?.color ?? null })),
     folders: folders.filter((f) => has(f.name)).slice(0, 4).map((f) => ({ id: f.id, name: f.name, color: f.color, count: f._count.recipes })),
     ingredients: ingredients.filter((i) => has(i.name)).slice(0, 5).map((i) => ({ id: i.id, name: i.name, uses: i._count.usages })),
-    cookbooks: cookbooks.filter((c) => has(c.name)).slice(0, 4),
+    cookbooks: cookbooks.filter((c) => !hiddenBooks.has(c.id) && has(c.name)).slice(0, 4),
     lists: lists.filter((l) => has(l.name)).slice(0, 4),
-    withIngredient: withIngredient.filter((r) => !shown.has(r.id)).slice(0, 8),
-    inText: inText.filter((r) => !shown.has(r.id) && !withIngredient.some((w) => w.id === r.id)).slice(0, 8),
+    withIngredient: withIngredient.filter((r) => canSee(r.id) && !shown.has(r.id)).slice(0, 8),
+    inText: inText.filter((r) => canSee(r.id) && !shown.has(r.id) && !withIngredient.some((w) => w.id === r.id)).slice(0, 8),
   });
 }

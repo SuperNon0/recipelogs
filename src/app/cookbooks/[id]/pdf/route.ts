@@ -3,6 +3,7 @@ import { getCookbookDetail } from "@/lib/cookbooks";
 import { loadCookbookEntries, renderCookbookPdf } from "@/lib/pdf/cookbookPdf";
 import { parseTheme } from "@/lib/pdf/theme";
 import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleCookbook } from "@/lib/auth/visibility";
 
 export async function GET(
   _req: Request,
@@ -12,6 +13,7 @@ export async function GET(
   if (denied) return denied;
   const { id } = await params;
   const cookbookId = Number(id);
+  await requireVisibleCookbook(cookbookId);
   if (isNaN(cookbookId)) {
     return new NextResponse("Not found", { status: 404 });
   }

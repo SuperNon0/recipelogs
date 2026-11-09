@@ -156,23 +156,27 @@ export async function saveRole(
   id: number | null,
   name: string,
   permissions: string[],
+  categoryIds: number[] = [],
 ): Promise<ActionResult & { id?: number }> {
   await requireAccess("accounts.manage");
   const me = await actingAdmin();
   const clean = cleanName(name);
   if (!clean) return { ok: false, error: "Donne un nom au rôle." };
   const perms = cleanPermissions(permissions);
+  // Catégories visibles : seulement utiles sans « Voir toutes les recettes ».
+  const known = await prisma.category.findMany({ where: { id: { in: categoryIds.filter(Number.isInteger) } }, select: { id: true } });
+  const cats = perms.includes("recipes.view_all") ? [] : known.map((c) => c.id);
   const same = await prisma.role.findFirst({ where: { name: { equals: clean, mode: "insensitive" }, id: id ? { not: id } : undefined } });
   if (same) return { ok: false, error: `Un rôle « ${same.name} » existe déjà.` };
   if (id) {
     const role = await findRole(id);
     if (role.isAdmin) return { ok: false, error: "Le rôle Administrateur a toujours toutes les permissions." };
-    await prisma.role.update({ where: { id }, data: { name: clean, permissions: perms } });
+    await prisma.role.update({ where: { id }, data: { name: clean, permissions: perms, categoryIds: cats } });
     await audit(me.email, "role_edit", null, `${role.name === clean ? clean : `${role.name} → ${clean}`} : ${perms.length} permission(s)`);
     refresh();
     return { ok: true, id };
   }
-  const role = await prisma.role.create({ data: { name: clean, permissions: perms } });
+  const role = await prisma.role.create({ data: { name: clean, permissions: perms, categoryIds: cats } });
   await audit(me.email, "role_create", null, `${clean} : ${perms.length} permission(s)`);
   refresh();
   return { ok: true, id: role.id };

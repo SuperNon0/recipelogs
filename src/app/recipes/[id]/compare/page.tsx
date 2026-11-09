@@ -7,6 +7,7 @@ import { compareRecipes, compareSteps } from "@/lib/compare";
 import { getVariantFamily } from "@/lib/variants";
 import { formatG } from "@/lib/format";
 import { requirePage } from "@/lib/auth/guard";
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export default async function ComparePage({
   const { with: withRaw } = await searchParams;
   const aId = Number(id);
   const bId = Number(withRaw);
+  await requireVisibleRecipe(aId);
+  if (Number.isInteger(bId) && bId > 0) await requireVisibleRecipe(bId);
   if (!Number.isInteger(aId) || !Number.isInteger(bId)) notFound();
 
   const [a, b, family] = await Promise.all([loadRecipeTree(aId), loadRecipeTree(bId), getVariantFamily(aId)]);

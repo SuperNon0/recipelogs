@@ -12,6 +12,7 @@ import { ALL_PERMISSIONS } from "@/lib/auth/permissions";
 import { PermissionsProvider } from "@/components/auth/Permissions";
 import { AccessGate } from "@/components/auth/AccessGate";
 import { ViewAsBanner } from "@/components/auth/AccessButtons";
+import { hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
 export const dynamic = "force-dynamic";
@@ -32,23 +33,26 @@ export const viewport: Viewport = {
 };
 
 async function loadNavCounts(): Promise<NavCounts> {
-  const [recipes, favorites, cookbooks, lists, production, noFolder, folders] = await Promise.all([
+  // Rôle limité à certaines catégories : les compteurs ne comptent que ses recettes.
+  const vis = await visibleRecipeWhere();
+  const [recipes, favorites, cookbooks, hiddenCookbooks, lists, production, noFolder, folders] = await Promise.all([
     // Les variantes sont rangées sous leur recette : comptées avec elle, pas à part.
-    prisma.recipe.count({ where: { variantTargets: { none: {} } } }),
-    prisma.recipe.count({ where: { favorite: true } }),
+    prisma.recipe.count({ where: { variantTargets: { none: {} }, ...vis } }),
+    prisma.recipe.count({ where: { favorite: true, ...vis } }),
     prisma.cookbook.count(),
+    hiddenCookbookIds(),
     prisma.shoppingList.count(),
-    prisma.productionItem.count(),
-    prisma.recipe.count({ where: { folderId: null, variantTargets: { none: {} } } }),
+    prisma.productionItem.count({ where: { recipe: vis } }),
+    prisma.recipe.count({ where: { folderId: null, variantTargets: { none: {} }, ...vis } }),
     prisma.folder.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, color: true, _count: { select: { recipes: { where: { variantTargets: { none: {} } } } } } },
+      select: { id: true, name: true, color: true, _count: { select: { recipes: { where: { variantTargets: { none: {} }, ...vis } } } } },
     }),
   ]);
   return {
     recipes,
     favorites,
-    cookbooks,
+    cookbooks: cookbooks - hiddenCookbooks.size,
     lists,
     production,
     noFolder,

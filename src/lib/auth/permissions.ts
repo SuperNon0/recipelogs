@@ -10,6 +10,12 @@
 
 export const PERMISSIONS = [
   {
+    key: "recipes.view_all",
+    group: "Recettes",
+    label: "Voir toutes les recettes",
+    help: "Coché : le rôle voit toutes les recettes. Décoché : il ne voit que les recettes des catégories choisies juste en dessous (par exemple « Maison Chanka »), et les sous-recettes qu'elles utilisent. Les cahiers qui contiennent une recette cachée et le reste de la production lui sont aussi cachés.",
+  },
+  {
     key: "recipes.edit",
     group: "Recettes",
     label: "Créer et modifier des recettes",

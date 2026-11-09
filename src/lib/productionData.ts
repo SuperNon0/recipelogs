@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { loadRecipeTree } from "./recipes";
 import { buildProduction, productionCoef, type ProductionInput } from "./production";
+import { visibleRecipeWhere } from "./auth/visibility";
 
 /** Ce qui est demandé, en clair : « 60 éclairs » ou « ×2 ». */
 export function productionTarget(amount: number, yieldCount: number | null, yieldLabel: string | null): string {
@@ -11,6 +12,8 @@ export function productionTarget(amount: number, yieldCount: number | null, yiel
 /** Recettes de la fiche de production en cours, dans l'ordre d'ajout. */
 export async function listProductionItems() {
   const rows = await prisma.productionItem.findMany({
+    // Rôle limité à certaines catégories : seulement ses recettes.
+    where: { recipe: await visibleRecipeWhere() },
     orderBy: [{ position: "asc" }, { id: "asc" }],
     select: { id: true, amount: true, yieldCount: true, recipe: { select: { id: true, name: true, yieldLabel: true } } },
   });

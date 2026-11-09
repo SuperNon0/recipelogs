@@ -3,6 +3,7 @@ import { buildProductionSheet } from "@/lib/productionData";
 import { renderProductionPdf } from "@/lib/pdf/productionPdf";
 import { getDefaultPdfTheme } from "@/lib/pdfThemes";
 import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 /**
  * Fiche de production d'une recette seule.
@@ -15,6 +16,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (denied) return denied;
   const { id } = await params;
   const recipeId = Number(id);
+  await requireVisibleRecipe(recipeId);
   const url = new URL(req.url);
   const amount = Number((url.searchParams.get("n") ?? "1").replace(",", "."));
   if (!Number.isInteger(recipeId) || !(amount > 0) || amount > 100_000) return new NextResponse("Not found", { status: 404 });

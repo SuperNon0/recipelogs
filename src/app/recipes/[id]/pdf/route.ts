@@ -3,6 +3,7 @@ import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { renderRecipePdf } from "@/lib/pdf/recipePdf";
 import { getDefaultPdfTheme, getPdfTheme } from "@/lib/pdfThemes";
 import { apiDenied } from "@/lib/auth/guard";
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 /**
  * PDF d'une recette.
@@ -17,6 +18,7 @@ export async function GET(
   if (denied) return denied;
   const { id } = await params;
   const recipeId = Number(id);
+  await requireVisibleRecipe(recipeId);
   if (!Number.isInteger(recipeId)) {
     return new NextResponse("Not found", { status: 404 });
   }

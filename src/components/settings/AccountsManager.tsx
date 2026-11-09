@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Ban, Check, Eye, History, KeyRound, Pencil, Plus, Power, Shield, Trash2, UserCheck, Users, X } from "lucide-react";
 import {
@@ -22,7 +22,15 @@ import { PERMISSIONS, permissionGroups, STATUS_LABEL } from "@/lib/auth/permissi
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 
-export type RoleInfo = { id: number; name: string; isAdmin: boolean; permissions: string[]; accounts: number };
+export type RoleInfo = {
+  id: number;
+  name: string;
+  isAdmin: boolean;
+  permissions: string[];
+  categoryIds: number[];
+  accounts: number;
+};
+export type CategoryInfo = { id: number; name: string; color: string | null };
 export type AccountInfo = {
   id: number;
   email: string;
@@ -44,6 +52,7 @@ export function AccountsManager({
   team,
   aud,
   roles,
+  categories,
   accounts,
   log,
 }: {
@@ -52,6 +61,7 @@ export function AccountsManager({
   team: string;
   aud: string;
   roles: RoleInfo[];
+  categories: CategoryInfo[];
   accounts: AccountInfo[];
   log: AuditInfo[];
 }) {
@@ -223,6 +233,14 @@ export function AccountsManager({
                 {r.isAdmin ? "Toutes les permissions" : `${r.permissions.length} permission${r.permissions.length > 1 ? "s" : ""} sur ${PERMISSIONS.length}`}
                 {" · "}
                 {r.accounts} compte{r.accounts > 1 ? "s" : ""}
+                {!r.isAdmin && !r.permissions.includes("recipes.view_all") && (
+                  <>
+                    <br />
+                    {r.categoryIds.length
+                      ? `Voit seulement : ${categories.filter((c) => r.categoryIds.includes(c.id)).map((c) => c.name).join(", ")}`
+                      : "Ne voit aucune recette (aucune catégorie cochée)"}
+                  </>
+                )}
               </span>
             </span>
             {!r.isAdmin && (
@@ -267,7 +285,7 @@ export function AccountsManager({
         </div>
       )}
 
-      {editing && <RoleEditor role={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && <RoleEditor role={editing === "new" ? null : editing} categories={categories} onClose={() => setEditing(null)} />}
     </>
   );
 }
@@ -463,10 +481,12 @@ function Connection({
 }
 
 /** Fenêtre « Nouveau rôle » / « Modifier le rôle » : un nom et les permissions cochées. */
-function RoleEditor({ role, onClose }: { role: RoleInfo | null; onClose: () => void }) {
+function RoleEditor({ role, categories, onClose }: { role: RoleInfo | null; categories: CategoryInfo[]; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState(role?.name ?? "");
-  const [checked, setChecked] = useState<Set<string>>(new Set(role?.permissions ?? []));
+  // Nouveau rôle : « Voir toutes les recettes » coché d'office, à décocher pour un apprenti.
+  const [checked, setChecked] = useState<Set<string>>(new Set(role?.permissions ?? ["recipes.view_all"]));
+  const [cats, setCats] = useState<Set<number>>(new Set(role?.categoryIds ?? []));
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -486,7 +506,7 @@ function RoleEditor({ role, onClose }: { role: RoleInfo | null; onClose: () => v
           setError(null);
           start(async () => {
             try {
-              const r = await saveRole(role?.id ?? null, name, [...checked]);
+              const r = await saveRole(role?.id ?? null, name, [...checked], [...cats]);
               if (!r.ok) return setError(r.error);
               router.refresh();
               onClose();
@@ -509,19 +529,53 @@ function RoleEditor({ role, onClose }: { role: RoleInfo | null; onClose: () => v
           />
         </label>
         <p className="set-note">
-          Coche ce que ce rôle peut faire ; ce qui reste décoché lui est interdit. Tout compte actif peut consulter les recettes.
+          Coche ce que ce rôle peut faire ; ce qui reste décoché lui est interdit. Tout compte actif peut consulter les recettes qu&apos;il voit.
         </p>
         {permissionGroups().map((g) => (
           <fieldset key={g.group} className="role-group">
             <legend>{g.group}</legend>
             {g.items.map((p) => (
-              <div key={p.key} className="role-perm">
+              <Fragment key={p.key}>
+              <div className="role-perm">
                 <label>
                   <input type="checkbox" checked={checked.has(p.key)} onChange={() => toggle(p.key)} />
                   <span>{p.label}</span>
                 </label>
                 <Help title={p.label}>{p.help}</Help>
               </div>
+              {p.key === "recipes.view_all" && !checked.has("recipes.view_all") && (
+                <div className="role-cats">
+                  <span className="fl-label">Catégories visibles</span>
+                  {categories.length === 0 ? (
+                    <p className="set-note">Aucune catégorie : crées-en une dans Réglages → Catégories (ex. « Maison Chanka »).</p>
+                  ) : (
+                    <div className="role-cat-list">
+                      {categories.map((c) => (
+                        <label key={c.id} className={`role-cat${cats.has(c.id) ? " on" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={cats.has(c.id)}
+                            onChange={() =>
+                              setCats((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(c.id)) next.delete(c.id);
+                                else next.add(c.id);
+                                return next;
+                              })
+                            }
+                          />
+                          <span className="dot" style={{ background: c.color ?? "var(--muted)" }} />
+                          {c.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <p className="set-note">
+                    Ce rôle ne voit que les recettes de ces catégories, et les sous-recettes qu&apos;elles utilisent.
+                  </p>
+                </div>
+              )}
+              </Fragment>
             ))}
           </fieldset>
         ))}

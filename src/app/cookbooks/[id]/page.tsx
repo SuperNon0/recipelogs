@@ -15,6 +15,7 @@ import { getActiveToken } from "@/lib/share";
 import { SHARE_ENABLED } from "@/lib/features";
 import { allPdfFontsHref, parseTheme } from "@/lib/pdf/theme";
 import { requirePage } from "@/lib/auth/guard";
+import { requireVisibleCookbook } from "@/lib/auth/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function CookbookDetailPage({
   await requirePage("read");
   const { id } = await params;
   const cookbookId = Number(id);
+  await requireVisibleCookbook(cookbookId);
   if (isNaN(cookbookId)) notFound();
 
   const [cookbook, shareToken, themes] = await Promise.all([

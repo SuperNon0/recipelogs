@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { recipeMass } from "./massAdjust";
 import type { TreeNode } from "./recipeTree";
 import { allergensOf, costOfIngredient, loadIngredientInfo, pieceWeightOf } from "./ingredientInfo";
+import { visibleRecipeWhere } from "./auth/visibility";
 
 /** Nom replié pour la recherche (sans accents, « œ » → « oe »), rangé dans `nameNormalized`. */
 export function normalizeForSearch(s: string): string {
@@ -60,6 +61,8 @@ export async function listRecipes(opts: {
     where.folderId = opts.folderId;
   }
 
+  // Rôle limité à certaines catégories (apprenti…) : seulement ses recettes.
+  Object.assign(where, await visibleRecipeWhere());
   const recipes = await prisma.recipe.findMany({
     where,
     include: {
@@ -106,6 +109,7 @@ export async function countHiddenVariants(folderId?: number | "none"): Promise<n
   return prisma.recipe.count({
     where: {
       variantTargets: { some: {} },
+      ...(await visibleRecipeWhere()),
       ...(folderId === "none" ? { folderId: null } : typeof folderId === "number" ? { folderId } : {}),
     },
   });
