@@ -117,7 +117,7 @@ export function treeBaseMass(node: TreeNode, memo: MassMemo = new Map()): BaseMa
 
 /** Applique un coefficient à un ingrédient (L → g). Exact à ×1, arrondi sinon. */
 function scaleLeaf(ing: TreeIngredient, coef: number): AdjIngredient {
-  const round = coef === 1 ? (x: number) => x : (x: number) => roundScaled(x, ing.unit);
+  const round = coef === 0 ? () => 0 : (x: number) => coef === 1 ? x : roundScaled(x, ing.unit);
   if (ing.unit === "L") {
     return {
       name: ing.name,
