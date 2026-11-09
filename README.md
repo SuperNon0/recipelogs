@@ -34,6 +34,13 @@ Choix de fond : pas de planning ni de calendrier, pas de photos, aucun service p
 
 Le détail complet de chaque version est dans l'appli (Réglages → Version et nouveautés), avec la liste des dernières PR fusionnées.
 
+### V2.8 (9 novembre 2026) : masse, comptes et sécurité
+
+- **Masse cible** : si un insert de 100 g est verrouillé, une cible de 100 g ou moins conserve les 100 g d’insert et ramène la part ajustable à zéro. [PR 121](https://github.com/SuperNon0/recipelogs/pull/121)
+- **Comptes et historique** : quand les comptes sont activés, chacun a son historique. Les courses proposent uniquement les recettes existantes accessibles au compte. Les actions sur les recettes, cahiers, PDF et lignes de production appliquent les règles de visibilité côté serveur. [PR 122](https://github.com/SuperNon0/recipelogs/pull/122) · [PR 123](https://github.com/SuperNon0/recipelogs/pull/123)
+- **Sécurité** : Next.js 15.5.29 corrige React2Shell. Le connecteur Claude transmet la clé MCP dans un en-tête. L’import de pages web refuse les adresses privées, même après redirection. [PR 120](https://github.com/SuperNon0/recipelogs/pull/120) · [PR 123](https://github.com/SuperNon0/recipelogs/pull/123)
+- **Déploiement** : script protégé dans `/usr/local/sbin`, sauvegardes privées et restauration du build en cas d’échec de redémarrage. La CI exécute Vitest et TypeScript avant le build. [PR 123](https://github.com/SuperNon0/recipelogs/pull/123)
+
 ### V2.5 (27 octobre 2026) : moules, variantes, production et mode labo
 
 **Moules**
@@ -366,7 +373,9 @@ chmod 0440 /etc/sudoers.d/recipelog-deploy
 visudo -c
 ```
 
-Adapte la configuration Nginx installée avec `deploy/nginx.conf` : écoute locale pour un tunnel sur le même conteneur et journal d’accès désactivé sur les anciennes URL MCP. Vérifie avec `nginx -t` avant de recharger Nginx. Si le tunnel tourne ailleurs, limite le port à son adresse source. Passe les clients MCP à `/api/mcp` avec un en-tête et renouvelle toute clé auparavant placée dans l’URL.
+Adapte la configuration Nginx installée avec `deploy/nginx.conf` : écoute locale pour un tunnel sur le même conteneur et journal d’accès désactivé sur les anciennes URL MCP. Vérifie avec `nginx -t` avant de recharger Nginx. Si le tunnel tourne dans un autre conteneur, fais écouter Nginx sur l’IP LAN de RecipeLog, autorise uniquement l’IP source du tunnel avec `allow`, puis ajoute `deny all;`. Teste `/api/health` depuis le conteneur du tunnel et ouvre le site par son adresse habituelle. Passe les clients MCP à `/api/mcp` avec un en-tête et renouvelle toute clé auparavant placée dans l’URL.
+
+Pour cette transition, sauvegarde la base et les photos, puis lance la première mise à jour en root avec `/usr/local/sbin/recipelog-deploy`. Le bouton de l’ancienne version utilise encore l’ancien chemin. Le bouton reprend son fonctionnement une fois la version mise à jour.
 
 Le script protégé doit être mis à jour par root à partir d’une source vérifiée. Les migrations SQL déjà appliquées restent en place si le script restaure un ancien build.
 Déroulé de `deploy.sh` :
