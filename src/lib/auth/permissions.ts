@@ -108,7 +108,7 @@ export function isPermission(v: unknown): v is Permission {
 
 /** Garde seulement les clés connues (une permission retirée du code disparaît des rôles). */
 export function cleanPermissions(list: readonly unknown[]): Permission[] {
-  return ALL_PERMISSIONS.filter((p) => p !== "accounts.manage" && list.includes(p));
+  return ALL_PERMISSIONS.filter((p) => p !== "accounts.manage" && p !== "mcp.manage" && list.includes(p));
 }
 
 /** Permissions effectives d'un rôle : toutes pour le rôle Administrateur. */
@@ -120,7 +120,7 @@ export function rolePermissions(role: { isAdmin: boolean; permissions: readonly 
 export function permissionGroups(): { group: string; items: (typeof PERMISSIONS)[number][] }[] {
   const out: { group: string; items: (typeof PERMISSIONS)[number][] }[] = [];
   for (const p of PERMISSIONS) {
-    if (p.key === "accounts.manage") continue;
+    if (p.key === "accounts.manage" || p.key === "mcp.manage") continue;
     const g = out.find((x) => x.group === p.group);
     if (g) g.items.push(p);
     else out.push({ group: p.group, items: [p] });

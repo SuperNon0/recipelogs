@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { visibleShoppingListWhere } from "@/lib/shopping";
 import { normalizeForSearch } from "@/lib/recipes";
 import { searchByIngredient, searchInText } from "@/lib/fullSearch";
 import { foldText } from "@/lib/textSearch";
@@ -52,7 +53,7 @@ export async function GET(req: Request) {
     prisma.folder.findMany({ select: { id: true, name: true, color: true, _count: { select: { recipes: true } } }, orderBy: { name: "asc" } }),
     prisma.ingredientBase.findMany({ select: { id: true, name: true, _count: { select: { usages: true } } }, orderBy: { name: "asc" } }),
     prisma.cookbook.findMany({ select: { id: true, name: true } }),
-    prisma.shoppingList.findMany({ select: { id: true, name: true } }),
+    prisma.shoppingList.findMany({ where: await visibleShoppingListWhere(), select: { id: true, name: true } }),
   ]);
   const recipes = [
     ...byName,

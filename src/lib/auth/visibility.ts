@@ -72,8 +72,8 @@ export async function filterVisible<T>(items: T[], recipeId: (t: T) => number): 
 export async function hiddenCookbookIds(): Promise<Set<number>> {
   const ids = await visibleRecipeIds();
   if (!ids) return new Set();
-  const entries = await prisma.cookbookRecipe.findMany({ select: { cookbookId: true, recipeId: true } });
-  return new Set(entries.filter((e) => e.recipeId != null && !ids.has(e.recipeId)).map((e) => e.cookbookId));
+  const entries = await prisma.cookbookRecipe.findMany({ select: { cookbookId: true, recipeId: true, linkMode: true } });
+  return new Set(entries.filter((e) => e.recipeId == null ? e.linkMode === "snapshot" : !ids.has(e.recipeId)).map((e) => e.cookbookId));
 }
 
 /** Cahier qui contient une recette cachée au visiteur : « introuvable ». */

@@ -4,12 +4,13 @@
 # À planifier dans cron (ex: quotidien à 3h)
 #
 # Crontab (root) :
-#   0 3 * * * bash /opt/recipelog/deploy/proxmox/backup.sh
+#   0 3 * * * /usr/local/sbin/recipelog-backup
 #
 # Usage :
-#   bash /opt/recipelog/deploy/proxmox/backup.sh [DEST_DIR]
+#   /usr/local/sbin/recipelog-backup [DEST_DIR]
 # ============================================================
 set -euo pipefail
+umask 077
 
 DB_NAME="recipelog"
 DB_USER="recipelog"

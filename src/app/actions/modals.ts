@@ -2,6 +2,7 @@
 
 import { requireAccess } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
+import { visibleShoppingListWhere } from "@/lib/shopping";
 import { recipeMass } from "@/lib/massAdjust";
 import { canSeeRecipe, hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
@@ -26,7 +27,7 @@ export async function fetchCookbooksForModal(): Promise<{ id: number; name: stri
 
 export async function fetchShoppingListsForModal(): Promise<{ id: number; name: string }[]> {
   await requireAccess("read");
-  return prisma.shoppingList.findMany({
+  return prisma.shoppingList.findMany({ where: await visibleShoppingListWhere(),
     select: { id: true, name: true },
     orderBy: { updatedAt: "desc" },
   });

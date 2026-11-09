@@ -1,3 +1,4 @@
+import { visibleRecipeWhere } from "@/lib/auth/visibility";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { prisma } from "@/lib/prisma";
 import { buildSingleRecipeHtml, type RecipeSnap } from "./template";
@@ -62,7 +63,7 @@ export async function previewSnap(recipeId?: number | null): Promise<RecipeSnap>
     if (s) return s;
   }
   const r = await prisma.recipe.findFirst({
-    where: { ingredients: { some: {} }, stepsBlock: { isNot: null } },
+    where: { ...(await visibleRecipeWhere()), ingredients: { some: {} }, stepsBlock: { isNot: null } },
     orderBy: { updatedAt: "desc" },
     select: { id: true },
   });

@@ -2,7 +2,7 @@
 # ============================================================
 # deploy.sh — Mise à jour de RecipeLog
 # Lancé par le bouton « Mettre à jour le site » (via sudo) ou à la main :
-#   bash /opt/recipelog/deploy/proxmox/deploy.sh [--force]
+#   /usr/local/sbin/recipelog-deploy [--force]
 # ============================================================
 # ⚠ Ne pas retirer le bloc de « # » ci-dessous : les anciennes versions de ce
 # script continuaient à lire CE fichier après leur `git pull`, à la position
@@ -30,7 +30,7 @@
 #  0. Lancé par le bouton du site, le script se relance dans sa propre unité
 #     systemd (recipelog-deploy) : sinon le redémarrage du site l'arrête.
 #  1. git pull ; si rien de nouveau depuis le dernier déploiement réussi → fin.
-#  2. Relance la NOUVELLE version de ce script (--after-pull).
+#  2. Poursuit avec le script installé dans /usr/local/sbin.
 #  3. pnpm install (sauté si pnpm-lock.yaml n'a pas changé) et prisma generate
 #     (sauté si le schéma n'a pas changé non plus).
 #  4. Nouvelle version dans .next-build (le site en ligne continue de tourner
@@ -52,10 +52,15 @@
 main() {
   set -Eeuo pipefail
 
+  if [ "$EUID" -ne 0 ] || [ "$(realpath -- "$0")" != /usr/local/sbin/recipelog-deploy ]; then
+    echo "Installer et lancer /usr/local/sbin/recipelog-deploy (voir le README)." >&2
+    exit 1
+  fi
+
   local APP_USER="recipelog"
   local APP_DIR="/opt/recipelog"
   local UPLOAD_DIR="/var/lib/recipelog/uploads"
-  local SELF="${APP_DIR}/deploy/proxmox/deploy.sh"
+  local SELF="/usr/local/sbin/recipelog-deploy"
   local STAMP="${APP_DIR}/.next/DEPLOYED_COMMIT"
   local CSS_STAMP_FILE="src/styles/build-stamp.css"
   local LOCK_HASH="node_modules/.deploy-lock-hash"
@@ -66,10 +71,9 @@ main() {
   local PREBUILT_WORKFLOW="server-build.yml"
   local PREBUILT_WAIT=600 # attente maximale d'un build GitHub en cours (s)
 
-  local STAGE="" FORCE=0 LOCAL_BUILD=0 arg
+  local FORCE=0 LOCAL_BUILD=0 arg
   for arg in "$@"; do
     case "${arg}" in
-      --after-pull) STAGE="--after-pull" ;;
       --force) FORCE=1 ;;
       --local-build) LOCAL_BUILD=1 ;;
     esac
@@ -127,22 +131,17 @@ main() {
   fi
   trap 'fail "commande en erreur (ligne ${LINENO})"' ERR
 
+  exec 9>/run/lock/recipelog-deploy.lock
+  flock -n 9 || fail "un déploiement est déjà en cours"
+
   # ── Étape 1 : récupération du code ──────────────────────
-  if [ "${STAGE}" != "--after-pull" ]; then
+  {
     echo "==> [$(now)] Démarrage du déploiement..."
     export RECIPELOG_DEPLOY_T0
     RECIPELOG_DEPLOY_T0="$(date +%s)"
 
     # Dossier des photos (hors du build, sinon effacé à chaque déploiement)
-    mkdir -p "${UPLOAD_DIR}"
-    local OLD_UPLOADS="${APP_DIR}/.next/standalone/public/uploads"
-    if [ -d "${OLD_UPLOADS}" ]; then
-      cp -rn "${OLD_UPLOADS}/." "${UPLOAD_DIR}/" || true
-    fi
-    chown -R "${APP_USER}:${APP_USER}" "$(dirname "${UPLOAD_DIR}")"
-    if ! grep -q '^UPLOAD_DIR=' "${APP_DIR}/.env"; then
-      echo "UPLOAD_DIR=\"${UPLOAD_DIR}\"" >> "${APP_DIR}/.env"
-    fi
+    as_app "mkdir -p ${UPLOAD_DIR}"
 
     echo "==> Git pull..."
     # Next.js peut réécrire tsconfig.json pendant le build : on le restaure
@@ -157,12 +156,7 @@ main() {
       echo "==> ✅ DÉJÀ À JOUR : aucune nouveauté depuis le dernier déploiement."
       exit 0
     fi
-    # La suite est faite par la version qui vient d'être téléchargée.
-    if [ "${LOCAL_BUILD}" = 1 ]; then
-      exec bash "${SELF}" --after-pull --local-build
-    fi
-    exec bash "${SELF}" --after-pull
-  fi
+  }
 
   local T0="${RECIPELOG_DEPLOY_T0:-$(date +%s)}"
   local HEAD
@@ -327,25 +321,21 @@ main() {
   switch_version() {
     echo "==> [$(now)] Bascule vers la nouvelle version et redémarrage..."
     cd "${APP_DIR}"
-    rm -rf .next-prev
-    [ -d .next ] && mv .next .next-prev
-    mv .next-build .next
-    chmod -R o+rX .next
-    systemctl restart recipelog
+    as_app "rm -rf .next-prev && { [ ! -d .next ] || mv .next .next-prev; }" || fail_switch "${LINENO}"
+    if as_app "mv .next-build .next && chmod -R o+rX .next" && systemctl restart recipelog; then
 
-    echo "==> [$(now)] Vérification du démarrage..."
-    for _ in $(seq 1 30); do
-      if curl -fsS -o /dev/null --max-time 10 "http://127.0.0.1:3000/api/health?db=1"; then
-        switched=1
-        return 0
-      fi
-      sleep 2
-    done
+      echo "==> [$(now)] Vérification du démarrage..."
+      for _ in $(seq 1 30); do
+        if curl -fsS -o /dev/null --max-time 10 "http://127.0.0.1:3000/api/health?db=1"; then
+          switched=1
+          return 0
+        fi
+        sleep 2
+      done
+    fi
     echo "==> [$(now)] ⚠ La nouvelle version ne répond pas : retour à l'ancienne..."
-    rm -rf .next-failed
-    mv .next .next-failed
-    [ -d .next-prev ] && mv .next-prev .next
-    systemctl restart recipelog
+    as_app "rm -rf .next-failed && { [ ! -d .next ] || mv .next .next-failed; } && mv .next-prev .next" || fail_switch "${LINENO}"
+    systemctl restart recipelog || fail_switch "${LINENO}"
   }
 
   # ── Étape 3 : nouvelle version dans .next-build ─────────
@@ -371,7 +361,7 @@ main() {
     echo "==> [$(now)] ⚠ La version de GitHub ne démarre pas ici : build sur le serveur, puis nouvel essai."
     trap 'fail "commande en erreur (ligne ${LINENO})"' ERR
     if [ -d "${APP_DIR}/.next-failed/cache" ] && [ ! -d "${APP_DIR}/.next/cache" ]; then
-      mv "${APP_DIR}/.next-failed/cache" "${APP_DIR}/.next/cache"
+      as_app "mv .next-failed/cache .next/cache"
     fi
     built_by="le serveur"
     build_locally
@@ -385,7 +375,7 @@ main() {
     exit 1
   fi
 
-  as_app "git rev-parse HEAD" > "${STAMP}"
+  as_app "git rev-parse HEAD > .next/DEPLOYED_COMMIT"
   local took=$(($(date +%s) - T0))
   echo "==> ✅ [$(now)] Déploiement terminé en $((took / 60)) min $((took % 60)) s (version construite par ${built_by})."
 }
