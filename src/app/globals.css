@@ -87,6 +87,11 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Pas de zoom au double appui (le pincement reste possible, voir ZoomReset). */
+html {
+  touch-action: manipulation;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -3122,5 +3127,18 @@ button.fl-row:hover {
   }
   .lab-weigh {
     border-right: 1px solid var(--border);
+  }
+}
+
+/* Téléphone : l'iPhone zoome tout seul sur un champ écrit en moins de 16 px
+   dès qu'on tape dedans. Tous les champs passent donc à 16 px sur écran tactile
+   (ceux déjà plus grands, comme les chiffres du multiplicateur, gardent leur taille). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(
+      .stepper input
+    ):not(.mold-count input):not(.cmdk-in input),
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }

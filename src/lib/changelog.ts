@@ -18,6 +18,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "iPhone : l'icône de l'appli sur l'écran d'accueil est la toque orange de RecipeLog, en carré plein que l'iPhone arrondit lui-même (supprimer l'appli de l'écran d'accueil puis la réajouter depuis Safari pour la voir)",
     ],
+    fixes: [
+      "Téléphone : toucher une barre de recherche ou un champ ne fait plus zoomer la page, et le zoom au pincement ne dure que le temps du geste (dès qu'on lâche, la page revient à sa taille normale)",
+    ],
   },
   {
     version: "V2.6",
