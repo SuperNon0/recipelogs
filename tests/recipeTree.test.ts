@@ -128,4 +128,19 @@ describe("masse cible avec une sous-recette verrouillée à l'intérieur", () =>
     expect(r.min).toBe(777);
     expect(r.ingredients.find((i) => i.name === "Fruit")!.quantityG).toBe(100);
   });
+  it.each([false, true])("respecte le minimum verrouillé en mode exact=%s", (isExact) => {
+    const child = n(3, [["Crème", 100]], [l(insert, "coefficient", 1, { isLocked: true })]);
+    for (const target of [80, 100]) {
+      const link = l(child, "mass_target", target, { isExact });
+      expect(treeBaseMass(n(4, [], [link])).avg).toBe(100);
+      const result = resolveLink(link, 1);
+      expect(result.min).toBe(100);
+      expect(result.ingredients.map((i) => i.quantityG)).toEqual([0, 100]);
+    }
+  });
+  it("applique le multiplicateur parent à la cible sans multiplier l’insert", () => {
+    const link = l(creme, "mass_target", 300);
+    expect(resolveLink(link, 2).min).toBe(600);
+    expect(resolveLink(link, 0.25).min).toBe(100);
+  });
 });
