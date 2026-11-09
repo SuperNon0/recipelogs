@@ -38,7 +38,7 @@ export async function GET(
   };
 
   return NextResponse.json({
-    ingredients: snap.ingredients ?? [],
+    ingredients: (snap.ingredients ?? []).map(({ name, quantityG }) => ({ name, quantityG })),
     totalMassG: snap.totalMassG ?? 0,
   });
 }

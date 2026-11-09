@@ -15,6 +15,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseHTML } from "linkedom";
+import { publicHttpUrl, readPublicPage } from "./publicWeb";
 
 const YT_DLP = process.env.YT_DLP_BIN || "yt-dlp";
 const FFMPEG = process.env.FFMPEG_BIN || "ffmpeg";
@@ -147,6 +148,9 @@ export async function readVideo(url: string, nbImages: number): Promise<VideoCon
     await run(
       YT_DLP,
       [
+        "--ignore-config",
+        "--ies",
+        "default,-generic",
         "--no-playlist",
         "--no-progress",
         "--no-cache-dir",
@@ -244,16 +248,7 @@ export function findJsonLdRecipes(html: string): unknown[] {
 }
 
 export async function readPage(url: string): Promise<PageContent> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; RecipeLog)",
-      "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok) throw new Error(`la page répond ${res.status}`);
-  const html = await res.text();
+  const { html, url: finalUrl } = await readPublicPage(url);
   const { document } = parseHTML(html);
   const meta = (name: string) =>
     document.querySelector(`meta[property="${name}"], meta[name="${name}"]`)?.getAttribute("content")?.trim() || null;
@@ -267,7 +262,7 @@ export async function readPage(url: string): Promise<PageContent> {
   return {
     type: "page",
     plateforme: detectPlatform(url),
-    lien: res.url || url,
+    lien: finalUrl,
     titre: meta("og:title") ?? (document.querySelector("title")?.textContent?.trim() || null),
     description: meta("og:description") ?? meta("description"),
     recettes_schema_org: recipes,
@@ -281,6 +276,7 @@ export async function readPage(url: string): Promise<PageContent> {
  * n'est pas tenté en vidéo : la page suffit presque toujours pour un site.
  */
 export async function readRecipeSource(url: string, nbImages: number): Promise<VideoContent | PageContent> {
+  url = publicHttpUrl(url).href;
   const platform = detectPlatform(url);
   if (platform === "web") return readPage(url);
   try {

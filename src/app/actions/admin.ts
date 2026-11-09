@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { BOOT_TIME } from "@/lib/bootTime";
 
-const DEPLOY_SCRIPT = "/opt/recipelog/deploy/proxmox/deploy.sh";
+const DEPLOY_SCRIPT = "/usr/local/sbin/recipelog-deploy";
 const LOCK_FILE = "/tmp/recipelog-deploy.lock";
 const LOG_FILE = "/tmp/recipelog-deploy.log";
 const LOCK_STALE_MS = 30 * 60 * 1000; // 30 min
@@ -58,10 +58,7 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
     return {
       ok: false,
       error: sudoErr,
-      hint:
-        "À lancer une fois dans le container LXC (en root) :\n" +
-        '  echo "recipelog ALL=(root) NOPASSWD: /opt/recipelog/deploy/proxmox/deploy.sh" | sudo tee /etc/sudoers.d/recipelog-deploy\n' +
-        "  sudo chmod 0440 /etc/sudoers.d/recipelog-deploy",
+      hint: "Installe le script de déploiement protégé en suivant le README.",
     };
   }
 
@@ -92,7 +89,7 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
   // Process détaché. La sortie va dans LOG_FILE. Le script supprimera le lock à la fin.
   // IMPORTANT : on appelle le script DIRECTEMENT (pas via /bin/bash <script>),
   // sinon sudo voit la commande comme "/bin/bash" et la règle NOPASSWD
-  // sur "/opt/recipelog/deploy/proxmox/deploy.sh" ne matche pas.
+  // sur "/usr/local/sbin/recipelog-deploy" ne matche pas.
   // Le script doit avoir son shebang (#!/usr/bin/env bash) et être exécutable.
   const cmd = `(sudo -n ${DEPLOY_SCRIPT} >> ${LOG_FILE} 2>&1; rm -f ${LOCK_FILE}) &`;
   const child = spawn("/bin/bash", ["-c", cmd], {

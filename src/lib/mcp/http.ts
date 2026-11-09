@@ -5,14 +5,13 @@ import { runAsService } from "@/lib/auth/service";
 
 /**
  * Réponse HTTP du point d'accès MCP. La clé arrive dans l'en-tête
- * « Authorization: Bearer <clé> » ou « X-API-Key: <clé> » (conseillé, comme
- * BotPanel), sinon dans l'adresse.
+ * « Authorization: Bearer <clé> » ou « X-API-Key: <clé> ».
  * Sans clé valide : 404, comme si l'adresse n'existait pas.
  */
-export async function mcpResponse(req: Request, urlToken?: string): Promise<Response> {
+export async function mcpResponse(req: Request): Promise<Response> {
   const expected = await getMcpToken();
   const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
-  const given = bearer ?? req.headers.get("x-api-key")?.trim() ?? urlToken;
+  const given = bearer ?? req.headers.get("x-api-key")?.trim();
   if (!expected || !given || !tokensMatch(given, expected)) {
     return new Response("Not found", { status: 404 });
   }

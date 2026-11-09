@@ -184,7 +184,7 @@ Saisie / import : `mL → g ×1`, `cl → g ×10`, `dl → g ×100`, `kg → g �
 
 ## 6. Accès Claude (MCP)
 
-Serveur MCP intégré à l'appli : `POST /api/mcp` (JSON-RPC sans état, écrit à la main). Clé dans **Réglages → Accès MCP**, envoyée en en-tête `Authorization: Bearer <clé>` ou `X-API-Key`, ou dans l'adresse `/api/mcp/<clé>`. Cloudflare Access doit avoir une règle **Bypass** sur `/api/mcp` et `/api/mcp/*`. Les outils sont dans `src/lib/mcp/tools/` (un fichier par groupe, liste dans `index.ts`).
+Serveur MCP intégré à l'appli : `POST /api/mcp` (JSON-RPC sans état, écrit à la main). Clé dans **Réglages → Accès MCP**, envoyée en en-tête `Authorization: Bearer <clé>` ou `X-API-Key`. Cloudflare Access doit avoir une règle **Bypass** sur `/api/mcp` uniquement. Les outils sont dans `src/lib/mcp/tools/` (un fichier par groupe, liste dans `index.ts`).
 
 **Après une mise à jour qui ajoute des outils, reconnecter le connecteur « RecipeLog » dans Claude** pour qu'ils apparaissent.
 
@@ -350,26 +350,43 @@ pnpm dev                      # http://localhost:3000
 ### Mise à jour
 Bouton **Réglages, Mettre à jour le site**, ou :
 ```bash
-bash /opt/recipelog/deploy/proxmox/deploy.sh   # --force : refait la mise à jour même sans nouveauté
+/usr/local/sbin/recipelog-deploy   # --force : refait la mise à jour même sans nouveauté
                                                # --local-build : construit sur le serveur, sans GitHub
 ```
 Le site n'est plus construit sur le serveur (15 à 20 min sur son disque dur) : à chaque mise à jour de `main`, GitHub Actions le construit (`.github/workflows/server-build.yml`, environ 2 min) et publie le paquet `recipelog-<commit>.tar.gz` dans la release **`server-builds`** du dépôt (10 derniers gardés, ne pas la supprimer).
 
+#### Installations Proxmox existantes
+
+Avant la première mise à jour avec ces protections, désactive l’ancienne règle sudo et installe le script depuis un checkout de confiance, hors de `/opt/recipelog` et accessible en écriture uniquement à root. Dans le conteneur, en root, avec le répertoire courant positionné dans ce checkout :
+
+```bash
+install -o root -g root -m 0755 deploy/proxmox/deploy.sh /usr/local/sbin/recipelog-deploy
+printf '%s\n' 'recipelog ALL=(root) NOPASSWD: /usr/local/sbin/recipelog-deploy ""' > /etc/sudoers.d/recipelog-deploy
+chmod 0440 /etc/sudoers.d/recipelog-deploy
+visudo -c
+```
+
+Adapte la configuration Nginx installée avec `deploy/nginx.conf` : écoute locale pour un tunnel sur le même conteneur et journal d’accès désactivé sur les anciennes URL MCP. Vérifie avec `nginx -t` avant de recharger Nginx. Si le tunnel tourne ailleurs, limite le port à son adresse source. Passe les clients MCP à `/api/mcp` avec un en-tête et renouvelle toute clé auparavant placée dans l’URL.
+
+Le script protégé doit être mis à jour par root à partir d’une source vérifiée. Les migrations SQL déjà appliquées restent en place si le script restaure un ancien build.
 Déroulé de `deploy.sh` :
 1. lancé par le bouton, il se relance dans sa propre unité systemd `recipelog-deploy` (sinon `systemctl restart recipelog` l'arrêtait à la bascule) ;
-2. dossier photos, `git pull` ; si le commit est déjà celui de `.next/DEPLOYED_COMMIT` → « Déjà à jour », fin ; sinon relance la version qui vient d'être téléchargée du script ;
+2. dossier photos, `git pull` ; si le commit est déjà celui de `.next/DEPLOYED_COMMIT` → « Déjà à jour », fin ; sinon continue avec le script installé par root ;
 3. `pnpm install` et `prisma generate`, seulement si `pnpm-lock.yaml` ou le schéma ont changé ;
 4. télécharge le paquet GitHub du commit dans **`.next-build`** (le site reste en ligne sur `.next`) ; si GitHub le construit encore, attend (10 min maximum) ; sans paquet (build GitHub en échec, absent…) : build sur le serveur, comme avant ;
 5. `prisma migrate deploy` ;
 6. bascule `.next` → `.next-prev` et `.next-build` → `.next`, redémarrage, vérification de `/api/health?db=1` (site et base, 60 s) ;
 7. si le site ne répond pas : retour automatique sur `.next-prev` ; si c'était le paquet GitHub, build sur le serveur puis nouvel essai.
 
-Les messages « ✅ Déploiement terminé », « ✅ DÉJÀ À JOUR » et « ❌ ÉCHEC DU DÉPLOIEMENT » sont lus par l'écran de maintenance : ne pas les reformuler. Les lignes « ==> » sont les étapes (affichées par l'écran et par l'outil MCP `etat_du_site`). Tout le code du script est dans `main()` (bash le lit en entier avant de l'exécuter) : le `git pull` peut réécrire le fichier sans danger.
+Les messages « ✅ Déploiement terminé », « ✅ DÉJÀ À JOUR » et « ❌ ÉCHEC DU DÉPLOIEMENT » sont lus par l'écran de maintenance : ne pas les reformuler. Les lignes « ==> » sont les étapes (affichées par l'écran et par l'outil MCP `etat_du_site`). Tout le code du script est dans `main()` (bash le lit en entier avant de l'exécuter).
 
 ### Sauvegardes
+Depuis le même checkout de confiance, installe le script en tant que root et adapte toute tâche cron existante.
+
 ```bash
+install -o root -g root -m 0755 deploy/proxmox/backup.sh /usr/local/sbin/recipelog-backup
 crontab -e
-0 3 * * * /opt/recipelog/deploy/proxmox/backup.sh >> /var/log/recipelog-backup.log 2>&1
+0 3 * * * /usr/local/sbin/recipelog-backup >> /var/log/recipelog-backup.log 2>&1
 ```
 Base (`pg_dump`) + photos dans `/var/backups/recipelog/`, rétention 30 jours.
 

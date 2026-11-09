@@ -41,7 +41,6 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
 
   const endpoint = `${origin}/api/mcp`;
   const header = token ? `Bearer ${token}` : "";
-  const urlWithKey = token ? `${endpoint}/${token}` : "";
 
   const regenerate = () => {
     if (token && !confirm("Changer la clé ? L'ancienne cessera aussitôt de marcher dans Claude.")) return;
@@ -152,23 +151,6 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
               {copyButton("header", header)}
             </div>
             <div className="fl-row">
-              <span className="ic mcp-ic" style={{ color: "var(--pending)" }}>
-                <Link2 size={17} />
-              </span>
-              <span className="set-tx">
-                <b>
-                  <span>Adresse avec la clé</span>
-                  <Help title="Adresse avec la clé">
-                    En secours, si l&apos;appli ne permet pas d&apos;ajouter un en-tête : la clé est à la fin
-                    de l&apos;adresse. Ça marche aussi, mais la clé apparaît alors dans les journaux de
-                    Cloudflare.
-                  </Help>
-                </b>
-                <small className="mcp-val">{urlWithKey}</small>
-              </span>
-              {copyButton("url", urlWithKey)}
-            </div>
-            <div className="fl-row">
               <span className="ic mcp-ic" style={{ color: "var(--danger)" }}>
                 <RefreshCw size={17} />
               </span>
@@ -258,7 +240,7 @@ function SetupHelp({ endpoint }: { endpoint: string }) {
       body: (
         <>
           Zero Trust → Access → Applications → <i>Add</i> → <i>Self-hosted</i>. Chemins{" "}
-          <code>api/mcp</code> et <code>api/mcp/*</code>, règle <b>Bypass / Everyone</b>, placée
+          <code>/api/mcp</code>, règle <b>Bypass / Everyone</b>, placée
           au-dessus de celle du site. Le reste du site reste protégé.
         </>
       ),
@@ -269,8 +251,7 @@ function SetupHelp({ endpoint }: { endpoint: string }) {
       title: "Vérifier",
       body: (
         <>
-          Ouvre l&apos;adresse avec la clé en navigation privée : « Method not allowed » = OK. Page de
-          connexion Cloudflare = la règle ne s&apos;applique pas encore.
+          Ouvre l&apos;adresse sans clé en navigation privée. Une réponse 404 est attendue. Une page de connexion Cloudflare indique que la règle ne s&apos;applique pas encore.
         </>
       ),
     },
@@ -282,7 +263,7 @@ function SetupHelp({ endpoint }: { endpoint: string }) {
         <>
           claude.ai : Paramètres → Connecteurs → <i>Ajouter un connecteur personnalisé</i>. URL ={" "}
           <b>Adresse</b>, puis dans « Request headers » : <code>Authorization</code> = l&apos;
-          <b>en-tête</b> copié. Sans cette section : mets l&apos;<b>adresse avec la clé</b> comme URL.
+          <b>en-tête</b> copié.
           <br />
           Claude Code : <code>claude mcp add --transport http recipelog {endpoint} --header &quot;Authorization: Bearer &lt;clé&gt;&quot;</code>
         </>

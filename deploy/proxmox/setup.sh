@@ -142,10 +142,11 @@ systemctl start recipelog
 # ── 10b. Sudoers (déclencher deploy.sh depuis l'app) ────
 echo "==> Sudoers : permettre à ${APP_USER} de lancer deploy.sh sans mot de passe..."
 SUDO_FILE="/etc/sudoers.d/recipelog-deploy"
+install -o root -g root -m 0755 "${APP_DIR}/deploy/proxmox/deploy.sh" /usr/local/sbin/recipelog-deploy
 cat > "${SUDO_FILE}" <<SUDOERS
 # Permet à l'app RecipeLog de déclencher sa propre mise à jour
 # depuis le bouton "Mise à jour" dans /settings.
-${APP_USER} ALL=(root) NOPASSWD: ${APP_DIR}/deploy/proxmox/deploy.sh
+${APP_USER} ALL=(root) NOPASSWD: /usr/local/sbin/recipelog-deploy ""
 SUDOERS
 chmod 0440 "${SUDO_FILE}"
 visudo -c -f "${SUDO_FILE}" >/dev/null && echo "    OK"
@@ -154,9 +155,14 @@ visudo -c -f "${SUDO_FILE}" >/dev/null && echo "    OK"
 echo "==> Configuration Nginx..."
 cp "$(dirname "$0")/../nginx.conf" /etc/nginx/sites-available/recipelog 2>/dev/null || \
 cat > /etc/nginx/sites-available/recipelog <<'NGINX'
+map $uri $recipelog_loggable {
+    default 1;
+    ~^/api/mcp/ 0;
+}
 server {
-    listen 80;
+    listen 127.0.0.1:80;
     server_name recipe.super-nono.cc;
+    access_log /var/log/nginx/recipelog.access.log if=$recipelog_loggable;
 
     location /_next/static/ {
         alias /opt/recipelog/.next/static/;
@@ -203,6 +209,6 @@ echo ""
 echo "  Commandes utiles :"
 echo "    systemctl status recipelog"
 echo "    journalctl -u recipelog -f"
-echo "    bash /opt/recipelog/deploy/proxmox/deploy.sh"
+echo "    /usr/local/sbin/recipelog-deploy"
 echo ""
 echo "  N'oubliez pas de configurer Cloudflare Zero Trust !"

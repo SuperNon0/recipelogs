@@ -310,8 +310,10 @@ export async function getIngredientBaseDetail(id: number) {
   if (!base) return null;
 
   // Recettes qui utilisent cet ingrédient (par ID ou par nom insensible à la casse)
+  const visibility = await visibleRecipeWhere();
   const usages = await prisma.ingredient.findMany({
     where: {
+      recipe: visibility,
       OR: [
         { ingredientBaseId: id },
         { name: { equals: base.name, mode: "insensitive" } },
@@ -345,7 +347,7 @@ export async function getIngredientBaseDetail(id: number) {
     frontier = next;
   }
   const viaRecipes = via.size
-    ? await prisma.recipe.findMany({ where: { id: { in: [...via.keys()] } }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    ? await prisma.recipe.findMany({ where: { AND: [{ id: { in: [...via.keys()] } }, visibility] }, select: { id: true, name: true }, orderBy: { name: "asc" } })
     : [];
 
   return {

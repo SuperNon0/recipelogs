@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAccess } from "@/lib/auth/guard";
+import { requireVisibleCookbook, requireVisibleRecipe } from "@/lib/auth/visibility";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
@@ -56,6 +57,7 @@ export async function updateCookbookConfig(
   formData: FormData,
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(id);
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const format = (String(formData.get("format") ?? "A4") === "A5"
@@ -106,6 +108,7 @@ export async function updateCookbookConfig(
 
 export async function deleteCookbook(id: number) {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(id);
   await prisma.cookbook.delete({ where: { id } });
   revalidatePath("/cookbooks");
   redirect("/cookbooks");
@@ -117,6 +120,8 @@ export async function addMultipleRecipesToCookbook(
   linkMode: "linked" | "snapshot",
 ): Promise<ActionResult & { added?: number; skipped?: number }> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
+  for (const id of recipeIds) await requireVisibleRecipe(id);
   if (!recipeIds.length) return { ok: false, error: "Aucune recette sélectionnée." };
 
   const cookbook = await prisma.cookbook.findUnique({ where: { id: cookbookId }, select: { id: true } });
@@ -174,6 +179,8 @@ export async function addMultipleRecipesWithMassTarget(
   forceExact = false,
 ): Promise<ActionResult & { added?: number; skipped?: number }> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
+  for (const id of recipeIds) await requireVisibleRecipe(id);
   if (!recipeIds.length) return { ok: false, error: "Aucune recette sélectionnée." };
   if (!Number.isFinite(targetMassG) || targetMassG <= 0)
     return { ok: false, error: "Masse cible invalide." };
@@ -248,6 +255,8 @@ export async function addRecipeToCookbook(
   multiplier = 1,
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
+  await requireVisibleRecipe(recipeId);
   const cookbook = await prisma.cookbook.findUnique({
     where: { id: cookbookId },
     select: { id: true },
@@ -285,7 +294,8 @@ export async function addRecipeToCookbook(
 
 export async function removeFromCookbook(entryId: number, cookbookId: number) {
   await requireAccess("cookbooks.edit");
-  await prisma.cookbookRecipe.delete({ where: { id: entryId } });
+  await requireVisibleCookbook(cookbookId);
+  await prisma.cookbookRecipe.delete({ where: { id: entryId, cookbookId } });
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
 
@@ -295,9 +305,10 @@ export async function setSectionTitle(
   cookbookId: number,
 ) {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   const t = title.trim().slice(0, 200);
   await prisma.cookbookRecipe.update({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     data: { sectionTitle: t || null },
   });
   revalidatePath(`/cookbooks/${cookbookId}`);
@@ -310,6 +321,7 @@ export async function addChapter(
   data: { title: string; intro?: string },
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   const title = data.title.trim();
   if (!title) return { ok: false, error: "Le titre du chapitre est obligatoire." };
 
@@ -333,11 +345,12 @@ export async function updateChapter(
   cookbookId: number,
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   const title = data.title.trim();
   if (!title) return { ok: false, error: "Le titre du chapitre est obligatoire." };
 
   await prisma.cookbookChapter.update({
-    where: { id: chapterId },
+    where: { id: chapterId, cookbookId },
     data: {
       title: title.slice(0, 200),
       intro: data.intro?.trim().slice(0, 5000) || null,
@@ -349,7 +362,8 @@ export async function updateChapter(
 
 export async function deleteChapter(chapterId: number, cookbookId: number) {
   await requireAccess("cookbooks.edit");
-  await prisma.cookbookChapter.delete({ where: { id: chapterId } });
+  await requireVisibleCookbook(cookbookId);
+  await prisma.cookbookChapter.delete({ where: { id: chapterId, cookbookId } });
   revalidatePath(`/cookbooks/${cookbookId}`);
 }
 
@@ -365,6 +379,7 @@ export async function reorderCookbookEntries(
   entries: { type: "recipe" | "chapter"; id: number }[],
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   // Vérifie que tout appartient bien au cahier
   const recipeIds = entries.filter((e) => e.type === "recipe").map((e) => e.id);
   const chapterIds = entries.filter((e) => e.type === "chapter").map((e) => e.id);
@@ -412,8 +427,9 @@ export async function reorderCookbookEntries(
 
 export async function refreshSnapshot(entryId: number, cookbookId: number) {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   const entry = await prisma.cookbookRecipe.findUnique({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     select: { recipeId: true, snapshotData: true },
   });
   if (!entry) return;
@@ -424,7 +440,7 @@ export async function refreshSnapshot(entryId: number, cookbookId: number) {
   const snap = await buildRecipeSnapshot(entry.recipeId, multiplier);
   if (!snap) return;
   await prisma.cookbookRecipe.update({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     data: {
       linkMode: "snapshot",
       snapshotData: snap as unknown as Prisma.InputJsonValue,
@@ -436,8 +452,9 @@ export async function refreshSnapshot(entryId: number, cookbookId: number) {
 
 export async function convertToLinked(entryId: number, cookbookId: number) {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   await prisma.cookbookRecipe.update({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     data: {
       linkMode: "linked",
       snapshotData: Prisma.JsonNull,
@@ -487,8 +504,9 @@ export async function updateSnapshotMass(
   cookbookId: number,
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
+  await requireVisibleCookbook(cookbookId);
   const entry = await prisma.cookbookRecipe.findUnique({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     select: { linkMode: true, snapshotData: true },
   });
   if (!entry) return { ok: false, error: "Entrée introuvable." };
@@ -576,7 +594,7 @@ export async function updateSnapshotMass(
   };
 
   await prisma.cookbookRecipe.update({
-    where: { id: entryId },
+    where: { id: entryId, cookbookId },
     data: {
       snapshotData: newSnap as unknown as Prisma.InputJsonValue,
       snapshotDate: new Date(),

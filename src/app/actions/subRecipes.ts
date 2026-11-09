@@ -1,5 +1,7 @@
 "use server";
 
+import { requireVisibleRecipe } from "@/lib/auth/visibility";
+
 import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +14,7 @@ export async function addSubRecipe(
   formData: FormData,
 ): Promise<SubRecipeActionResult> {
   await requireAccess("recipes.edit");
+  await requireVisibleRecipe(parentId);
   const childId = Number(formData.get("childId"));
   const label = String(formData.get("label") ?? "").trim();
   const calcMode = String(formData.get("calcMode") ?? "coefficient") as
@@ -40,6 +43,7 @@ export async function addSubRecipe(
     return { ok: false, error: "Sélectionnez un ingrédient pivot." };
   }
 
+  await requireVisibleRecipe(childId);
   if (await hasCycle(parentId, childId)) {
     return {
       ok: false,
@@ -74,6 +78,7 @@ export async function updateSubRecipe(
   formData: FormData,
 ): Promise<SubRecipeActionResult> {
   await requireAccess("recipes.edit");
+  await requireVisibleRecipe(parentId);
   const label = String(formData.get("label") ?? "").trim();
   const calcMode = String(formData.get("calcMode") ?? "coefficient") as
     | "coefficient"
@@ -95,7 +100,7 @@ export async function updateSubRecipe(
   }
 
   await prisma.subRecipe.update({
-    where: { id },
+    where: { id, parentId },
     data: {
       label: label.slice(0, 200),
       calcMode,
@@ -110,19 +115,21 @@ export async function updateSubRecipe(
 
 export async function removeSubRecipe(id: number, parentId: number) {
   await requireAccess("recipes.edit");
-  await prisma.subRecipe.delete({ where: { id } });
+  await requireVisibleRecipe(parentId);
+  await prisma.subRecipe.delete({ where: { id, parentId } });
   revalidatePath(`/recipes/${parentId}`);
 }
 
 export async function toggleSubRecipeLock(id: number, parentId: number) {
   await requireAccess("recipes.edit");
+  await requireVisibleRecipe(parentId);
   const current = await prisma.subRecipe.findUnique({
-    where: { id },
+    where: { id, parentId },
     select: { isLocked: true },
   });
   if (!current) return;
   await prisma.subRecipe.update({
-    where: { id },
+    where: { id, parentId },
     data: { isLocked: !current.isLocked },
   });
 }
@@ -134,6 +141,7 @@ export async function moveSubRecipe(
   dir: -1 | 1,
 ): Promise<SubRecipeActionResult> {
   await requireAccess("recipes.edit");
+  await requireVisibleRecipe(parentId);
   const list = await prisma.subRecipe.findMany({
     where: { parentId },
     orderBy: [{ position: "asc" }, { id: "asc" }],
