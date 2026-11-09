@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -33,6 +34,7 @@ async function nextPosition(): Promise<number> {
 export async function createPdfTheme(
   fromId?: number,
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+  await requireAccess("organize.edit");
   await ensureBuiltinThemes();
   const src = fromId ? await prisma.pdfTheme.findUnique({ where: { id: fromId } }) : null;
   const t = await prisma.pdfTheme.create({
@@ -49,6 +51,7 @@ export async function createPdfTheme(
 }
 
 export async function updatePdfTheme(id: number, input: ThemeInput): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const parsed = themeInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Thème invalide." };
   const { name, description, format, config } = parsed.data;
@@ -65,6 +68,7 @@ export async function updatePdfTheme(id: number, input: ThemeInput): Promise<Act
 }
 
 export async function renamePdfTheme(id: number, name: string): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const n = name.trim();
   if (!n) return { ok: false, error: "Donne un nom au thème." };
   await prisma.pdfTheme.update({ where: { id }, data: { name: n.slice(0, 80) } });
@@ -73,6 +77,7 @@ export async function renamePdfTheme(id: number, name: string): Promise<ActionRe
 }
 
 export async function setDefaultPdfTheme(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   await prisma.$transaction([
     prisma.pdfTheme.updateMany({ where: { isDefault: true }, data: { isDefault: false } }),
     prisma.pdfTheme.update({ where: { id }, data: { isDefault: true } }),
@@ -82,6 +87,7 @@ export async function setDefaultPdfTheme(id: number): Promise<ActionResult> {
 }
 
 export async function deletePdfTheme(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const total = await prisma.pdfTheme.count();
   if (total <= 1) return { ok: false, error: "Il faut garder au moins un thème." };
   const t = await prisma.pdfTheme.delete({ where: { id } }).catch(() => null);
@@ -95,6 +101,7 @@ export async function deletePdfTheme(id: number): Promise<ActionResult> {
 
 /** Remet un thème fourni dans son état d'origine. */
 export async function resetPdfTheme(id: number): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const t = await prisma.pdfTheme.findUnique({ where: { id } });
   const config = t?.presetKey ? presetConfig(t.presetKey) : null;
   if (!t || !config) return { ok: false, error: "Seuls les thèmes fournis peuvent être réinitialisés." };
@@ -105,6 +112,7 @@ export async function resetPdfTheme(id: number): Promise<ActionResult> {
 
 /** Déplace un thème d'un cran vers le haut (-1) ou le bas (+1) dans la liste. */
 export async function movePdfTheme(id: number, dir: -1 | 1): Promise<ActionResult> {
+  await requireAccess("organize.edit");
   const list = await prisma.pdfTheme.findMany({ orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
   const i = list.findIndex((t) => t.id === id);
   const j = i + dir;

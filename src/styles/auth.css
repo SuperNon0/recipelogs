@@ -1,0 +1,300 @@
+/* Comptes : pages d'accès, gestion des comptes, bandeau « Voir comme ».
+   D'après les maquettes de Site-base (docs/maquettes-auth-v2). */
+
+.access-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+.access-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.access-card h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 24px;
+  text-align: center;
+}
+.access-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 18px;
+}
+.access-logo .mk {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.access-icon {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border2);
+  background: var(--pop);
+}
+.mail-chip {
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--pop);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: 6px 14px;
+  word-break: break-all;
+  text-align: center;
+}
+.access-text {
+  color: var(--soft);
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.6;
+}
+.access-note {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.access-full {
+  width: 100%;
+}
+
+/* Bandeau « Voir comme » */
+.imp-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: rgba(143, 156, 240, 0.15);
+  border-bottom: 1px solid var(--pending);
+  color: var(--text);
+  font-size: 13px;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+.imp-banner svg {
+  color: var(--pending);
+  flex: none;
+}
+.imp-banner b {
+  color: var(--pending);
+  font-weight: 500;
+  word-break: break-all;
+}
+.imp-banner .imp-btn {
+  height: 30px;
+  padding: 0 12px;
+}
+/* Réglages → Comptes */
+.acct-row {
+  flex-wrap: wrap;
+}
+.acct-av {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--pop);
+  border: 1px solid var(--border2);
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+.acct-main {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.acct-mail {
+  font-size: 13.5px;
+  word-break: break-all;
+}
+.acct-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+.acct-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.acct-actions .fl-btn {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.acct-select {
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--pop);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.role-badge {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.role-admin {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.role-editor {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.role-blocked {
+  color: var(--accent-3);
+  border-color: var(--accent-3);
+}
+.acct-card {
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.acct-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--soft);
+}
+.acct-card input {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--pop);
+  color: var(--text);
+  font-size: 16px; /* 16 px : pas de zoom automatique sur iPhone */
+}
+.acct-msg {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.acct-msg.ok {
+  color: var(--accent-2);
+}
+.acct-msg.err {
+  color: var(--danger);
+}
+.acct-log {
+  font-size: 12.5px;
+  color: var(--soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.acct-log time {
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+/* Boutons masqués quand le rôle n'a pas la permission (attribut data-no du <body>). */
+body[data-no~="recipes.edit"] [data-needs~="recipes.edit"],
+body[data-no~="recipes.delete"] [data-needs~="recipes.delete"],
+body[data-no~="costs.view"] [data-needs~="costs.view"],
+body[data-no~="costs.edit"] [data-needs~="costs.edit"],
+body[data-no~="cookbooks.edit"] [data-needs~="cookbooks.edit"],
+body[data-no~="shopping.edit"] [data-needs~="shopping.edit"],
+body[data-no~="production.edit"] [data-needs~="production.edit"],
+body[data-no~="pdf.export"] [data-needs~="pdf.export"],
+body[data-no~="organize.edit"] [data-needs~="organize.edit"],
+body[data-no~="import.run"] [data-needs~="import.run"],
+body[data-no~="accounts.manage"] [data-needs~="accounts.manage"],
+body[data-no~="site.update"] [data-needs~="site.update"],
+body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
+  display: none !important;
+}
+
+/* Fenêtre d'un rôle : nom + permissions à cocher */
+.role-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.role-name {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.role-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 12px 10px;
+}
+.role-group legend {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.role-perm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.role-perm:last-child {
+  border-bottom: 0;
+}
+.role-perm label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.role-perm input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: none;
+}
+.acct-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.set-page .page-head + .sect-title {
+  margin-top: 0;
+}

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
@@ -15,6 +16,7 @@ function refresh() {
 
 /** Ajoute une recette à la fiche de production (ou change sa quantité si elle y est déjà). */
 export async function addToProduction(recipeId: number, amount: number): Promise<Result> {
+  await requireAccess("production.edit");
   if (!valid(amount)) return { ok: false, error: "Quantité invalide." };
   const recipe = await prisma.recipe.findUnique({ where: { id: recipeId }, select: { yieldCount: true } });
   if (!recipe) return { ok: false, error: "Recette introuvable." };
@@ -31,6 +33,7 @@ export async function addToProduction(recipeId: number, amount: number): Promise
 }
 
 export async function setProductionAmount(id: number, amount: number): Promise<Result> {
+  await requireAccess("production.edit");
   if (!valid(amount)) return { ok: false, error: "Quantité invalide." };
   const { count } = await prisma.productionItem.updateMany({ where: { id }, data: { amount } });
   if (!count) return { ok: false, error: "Ligne introuvable sur la fiche de production." };
@@ -39,6 +42,7 @@ export async function setProductionAmount(id: number, amount: number): Promise<R
 }
 
 export async function removeProductionItem(id: number): Promise<Result> {
+  await requireAccess("production.edit");
   const { count } = await prisma.productionItem.deleteMany({ where: { id } });
   if (!count) return { ok: false, error: "Ligne introuvable sur la fiche de production." };
   refresh();
@@ -47,6 +51,7 @@ export async function removeProductionItem(id: number): Promise<Result> {
 
 /** Vide la fiche de production (les recettes ne sont pas touchées). */
 export async function clearProduction(): Promise<Result> {
+  await requireAccess("production.edit");
   await prisma.productionItem.deleteMany({});
   refresh();
   return { ok: true };
@@ -54,6 +59,7 @@ export async function clearProduction(): Promise<Result> {
 
 /** Rendement d'une recette, pour la fenêtre « Fiche de production ». */
 export async function fetchRecipeYield(recipeId: number): Promise<{ count: number | null; label: string | null; inProduction: number | null }> {
+  await requireAccess("read");
   const r = await prisma.recipe.findUnique({
     where: { id: recipeId },
     select: { yieldCount: true, yieldLabel: true, productionItem: { select: { amount: true } } },

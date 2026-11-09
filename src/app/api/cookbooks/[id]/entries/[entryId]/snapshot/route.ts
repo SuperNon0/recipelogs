@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * Renvoie les données de snapshot d'une entrée de cahier figée
@@ -11,6 +12,8 @@ export async function GET(
     params,
   }: { params: Promise<{ id: string; entryId: string }> },
 ) {
+  const denied = await apiDenied("read");
+  if (denied) return denied;
   const { id, entryId } = await params;
   const cookbookId = Number(id);
   const eid = Number(entryId);

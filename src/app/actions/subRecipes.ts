@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasCycle } from "@/lib/subRecipes";
@@ -10,6 +11,7 @@ export async function addSubRecipe(
   parentId: number,
   formData: FormData,
 ): Promise<SubRecipeActionResult> {
+  await requireAccess("recipes.edit");
   const childId = Number(formData.get("childId"));
   const label = String(formData.get("label") ?? "").trim();
   const calcMode = String(formData.get("calcMode") ?? "coefficient") as
@@ -71,6 +73,7 @@ export async function updateSubRecipe(
   parentId: number,
   formData: FormData,
 ): Promise<SubRecipeActionResult> {
+  await requireAccess("recipes.edit");
   const label = String(formData.get("label") ?? "").trim();
   const calcMode = String(formData.get("calcMode") ?? "coefficient") as
     | "coefficient"
@@ -106,11 +109,13 @@ export async function updateSubRecipe(
 }
 
 export async function removeSubRecipe(id: number, parentId: number) {
+  await requireAccess("recipes.edit");
   await prisma.subRecipe.delete({ where: { id } });
   revalidatePath(`/recipes/${parentId}`);
 }
 
 export async function toggleSubRecipeLock(id: number, parentId: number) {
+  await requireAccess("recipes.edit");
   const current = await prisma.subRecipe.findUnique({
     where: { id },
     select: { isLocked: true },
@@ -128,6 +133,7 @@ export async function moveSubRecipe(
   parentId: number,
   dir: -1 | 1,
 ): Promise<SubRecipeActionResult> {
+  await requireAccess("recipes.edit");
   const list = await prisma.subRecipe.findMany({
     where: { parentId },
     orderBy: [{ position: "asc" }, { id: "asc" }],

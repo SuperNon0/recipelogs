@@ -5,6 +5,13 @@ import { CommandPalette } from "@/components/ui/CommandPalette";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
+import { headers } from "next/headers";
+import { getViewer, viewerCan, viewerPermissions } from "@/lib/auth/viewer";
+import { PATH_HEADER } from "@/lib/auth/path";
+import { ALL_PERMISSIONS } from "@/lib/auth/permissions";
+import { PermissionsProvider } from "@/components/auth/Permissions";
+import { AccessGate } from "@/components/auth/AccessGate";
+import { ViewAsBanner } from "@/components/auth/AccessButtons";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
 export const dynamic = "force-dynamic";
@@ -54,19 +61,46 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const path = (await headers()).get(PATH_HEADER) ?? "";
+  const viewer = await getViewer();
+  // Partage public : pas de compte demandé (le middleware le garde en lecture seule).
+  const gated = !path.startsWith("/share") && !viewerCan(viewer, "read");
+
+  const fonts = (
+    <head>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap"
+        rel="stylesheet"
+      />
+    </head>
+  );
+
+  // Comptes activés et visiteur sans accès : page de demande, d'attente, de refus ou de blocage.
+  if (gated) {
+    return (
+      <html lang="fr">
+        {fonts}
+        <body>
+          <AccessGate viewer={viewer} />
+        </body>
+      </html>
+    );
+  }
+
   const [siteUrl, counts] = await Promise.all([getSiteUrl(), loadNavCounts()]);
+  const viewingAs = viewer.kind === "account" && viewer.realAccount ? viewer.account : null;
+  const perms = viewerPermissions(viewer);
+  // Permissions absentes : les boutons marqués data-needs="…" sont masqués (styles/auth.css).
+  const missing = ALL_PERMISSIONS.filter((p) => !perms.includes(p));
 
   return (
     <html lang="fr">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
+      {fonts}
+      <body data-no={missing.length ? missing.join(" ") : undefined}>
+        {viewingAs && <ViewAsBanner email={viewingAs.email} role={viewingAs.role?.name ?? "sans rôle"} />}
+        <PermissionsProvider permissions={perms}>
         <div className="app">
           <AppSidebar siteUrl={siteUrl} counts={counts} />
           <div style={{ minWidth: 0 }}>
@@ -78,6 +112,7 @@ export default async function RootLayout({
         </div>
         <AppTabBar />
         <CommandPalette />
+        </PermissionsProvider>
       </body>
     </html>
   );

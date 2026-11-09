@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { imageMime, uploadFilePath } from "@/lib/uploads";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * Sert les fichiers du dossier d'upload. Nécessaire car Next.js ne sert que
@@ -9,6 +10,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const denied = await apiDenied("read");
+  if (denied) return denied;
   const { path } = await params;
   const file = uploadFilePath(path);
   const type = file ? imageMime(file) : null;

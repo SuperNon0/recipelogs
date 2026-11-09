@@ -20,6 +20,7 @@ import {
   toRecipeRows,
 } from "@/lib/recipes";
 import { listPdfThemes } from "@/lib/pdfThemes";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requirePage("read");
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : undefined;
   const tag = typeof sp.tag === "string" ? sp.tag : undefined;
@@ -76,7 +78,7 @@ export default async function HomePage({
               folder={{ id: currentFolder.id, name: currentFolder.name, color: currentFolder.color }}
             />
           )}
-          <Link href="/recipes/new" className="fl-btn fl-btn-primary desk-only">
+          <Link href="/recipes/new" className="fl-btn fl-btn-primary desk-only" data-needs="recipes.edit">
             <Plus size={16} /> Nouvelle recette
           </Link>
           <p className="sub">
@@ -115,7 +117,7 @@ export default async function HomePage({
                   dossier.
                 </Help>
               </h2>
-              <Link href="/settings/folders">Gérer</Link>
+              <Link href="/settings/folders" data-needs="organize.edit">Gérer</Link>
             </div>
             <FolderTiles
               folders={folders.map((f) => ({ id: f.id, name: f.name, color: f.color, count: f._count.recipes }))}
@@ -149,7 +151,7 @@ export default async function HomePage({
           <RecipeTable recipes={toRecipeRows(recipes)} folders={folderOptions} from={from} showFolder={!inFolder} />
         )}
 
-        <Link href="/recipes/new" className="fab" aria-label="Créer une recette">
+        <Link href="/recipes/new" data-needs="recipes.edit" className="fab" aria-label="Créer une recette">
           <Plus size={24} />
         </Link>
       </RecipeSelectionProvider>

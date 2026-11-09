@@ -450,3 +450,60 @@ model Setting {
 
   @@map("settings")
 }
+
+// ─────────────────────────────────────────────────────────────
+// Comptes et rôles (bibliothèque partagée : un rôle dit ce que le compte
+// a le droit de voir et de faire). Voir src/lib/auth/.
+// Cloudflare Access décide qui atteint le site, l'appli décide du reste.
+// ─────────────────────────────────────────────────────────────
+
+enum AccountStatus {
+  pending
+  active
+  refused
+  blocked
+}
+
+/** Rôle créé par l'administrateur (Apprenti, Chef…) : un nom et des permissions cochées. */
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(60)
+  /** Clés des permissions cochées (liste dans src/lib/auth/permissions.ts). */
+  permissions String[] @default([])
+  /** Rôle Administrateur intégré : toutes les permissions, ni modifiable ni supprimable. */
+  isAdmin     Boolean  @default(false) @map("is_admin")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  accounts Account[]
+
+  @@map("roles")
+}
+
+model Account {
+  id          Int           @id @default(autoincrement())
+  email       String        @unique
+  /** Rôle donné à l'acceptation (null tant que la demande est en attente). */
+  roleId      Int?          @map("role_id")
+  status      AccountStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  approvedAt  DateTime?     @map("approved_at")
+  lastSeenAt  DateTime?     @map("last_seen_at")
+
+  role Role? @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@map("accounts")
+}
+
+/** Journal des comptes : qui a accepté, refusé, bloqué, changé un rôle, « vu comme ». */
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  at          DateTime @default(now())
+  actorEmail  String?  @map("actor_email")
+  action      String   @db.VarChar(40)
+  targetEmail String?  @map("target_email")
+  detail      String?  @db.Text
+
+  @@index([at(sort: Desc)])
+  @@map("audit_log")
+}

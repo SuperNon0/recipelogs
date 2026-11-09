@@ -3,10 +3,12 @@ import { ChevronLeft } from "lucide-react";
 import { getMcpToken } from "@/lib/mcp/token";
 import { MCP_TOOL_GROUPS } from "@/lib/mcp/tools";
 import { McpAccess, type ToolGroupInfo } from "@/components/settings/McpAccess";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function McpSettingsPage() {
+  await requirePage("mcp.manage");
   const token = await getMcpToken();
   const groups: ToolGroupInfo[] = MCP_TOOL_GROUPS.map((g) => ({
     title: g.title,

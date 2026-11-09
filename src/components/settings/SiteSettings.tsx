@@ -11,7 +11,7 @@ import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 
 /** Section « Site » des réglages : lien du logo, mise à jour, version. */
-export function SiteSettings({ siteUrl }: { siteUrl: string | null }) {
+export function SiteSettings({ siteUrl, canUpdate = true }: { siteUrl: string | null; canUpdate?: boolean }) {
   const [editingUrl, setEditingUrl] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const current = CHANGELOG[0];
@@ -19,6 +19,8 @@ export function SiteSettings({ siteUrl }: { siteUrl: string | null }) {
   return (
     <>
       <div className="fl-list">
+        {canUpdate && (
+          <>
         <div className="fl-row">
           <span className="ic">
             <Link2 size={17} />
@@ -58,6 +60,8 @@ export function SiteSettings({ siteUrl }: { siteUrl: string | null }) {
           <DeployButton />
         </div>
 
+          </>
+        )}
         <button type="button" className="fl-row set-row" onClick={() => setShowLog(true)}>
           <span className="ic">
             <Sparkles size={17} />

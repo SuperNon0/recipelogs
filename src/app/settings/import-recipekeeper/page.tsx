@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { RecipeKeeperImport } from "@/components/RecipeKeeperImport";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-export default function ImportRecipeKeeperPage() {
+export default async function ImportRecipeKeeperPage() {
+  await requirePage("import.run");
   return (
     <div className="set-page">
       <Link href="/settings" className="crumb">

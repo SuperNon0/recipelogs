@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeForSearch } from "@/lib/recipes";
 import { searchByIngredient, searchInText } from "@/lib/fullSearch";
 import { foldText } from "@/lib/textSearch";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * Recherche globale (fenêtre Ctrl K) : recettes, dossiers, ingrédients, cahiers et
@@ -12,6 +13,8 @@ import { foldText } from "@/lib/textSearch";
  * contiennent (avec un extrait).
  */
 export async function GET(req: Request) {
+  const denied = await apiDenied("read");
+  if (denied) return denied;
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json({ recipes: [], folders: [], ingredients: [], cookbooks: [], lists: [], withIngredient: [], inText: [] });
 

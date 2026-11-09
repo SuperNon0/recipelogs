@@ -8,6 +8,9 @@ import { getVariantFamily } from "@/lib/variants";
 import type { SubRecipeRow } from "@/components/RecipeBody";
 import { RecipeView } from "@/components/recipe/RecipeView";
 import { RecipeMenuProvider } from "@/components/recipe/RecipeMenu";
+import { requirePage } from "@/lib/auth/guard";
+import { viewerCan } from "@/lib/auth/viewer";
+import { stripTreeCosts } from "@/lib/recipeTree";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +21,7 @@ export default async function RecipePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ from?: string; variantes?: string }>;
 }) {
+  const viewer = await requirePage("read");
   const { id } = await params;
   const { from, variantes } = await searchParams;
   const recipeId = Number(id);
@@ -31,6 +35,9 @@ export default async function RecipePage({
     getVariantFamily(recipeId),
   ]);
   if (!recipe) notFound();
+  // Sans la permission « Voir les prix et les coûts », aucun prix ne quitte le serveur.
+  const showCosts = viewerCan(viewer, "costs.view");
+  if (tree && !showCosts) stripTreeCosts(tree);
 
   // Retour : vers la liste d'où l'on vient, sinon vers le dossier de la recette.
   const back =
@@ -81,7 +88,7 @@ export default async function RecipePage({
           createdAt: recipe.createdAt.toISOString(),
           updatedAt: recipe.updatedAt.toISOString(),
           totalMassG: recipeMass(ingredients).avg,
-          saleCoef: recipe.saleCoef != null ? Number(recipe.saleCoef) : null,
+          saleCoef: showCosts && recipe.saleCoef != null ? Number(recipe.saleCoef) : null,
         }}
         ingredients={ingredients}
         subRecipes={subRecipes}

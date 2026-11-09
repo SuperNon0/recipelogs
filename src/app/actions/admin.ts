@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { BOOT_TIME } from "@/lib/bootTime";
@@ -42,6 +43,7 @@ function checkSudoers(): string | null {
  *   ce script sans mot de passe.
  */
 export async function triggerDeploy(): Promise<DeployActionResult> {
+  await requireAccess("site.update");
   if (!existsSync(DEPLOY_SCRIPT)) {
     return {
       ok: false,
@@ -104,6 +106,7 @@ export async function triggerDeploy(): Promise<DeployActionResult> {
 
 /** Supprime le lock — utile pour débloquer après un échec. */
 export async function clearDeployLock(): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAccess("site.update");
   if (!existsSync(LOCK_FILE)) return { ok: true };
   try {
     unlinkSync(LOCK_FILE);

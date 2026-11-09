@@ -11,6 +11,27 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.8",
+    date: "2026-11-09",
+    title: "Comptes, rôles et permissions",
+    summary:
+      "Chaque personne a maintenant son compte : elle demande un accès, un administrateur l'accepte et lui donne un rôle (Apprenti, Chef, Patronne…) que tu crées toi-même en cochant ce qu'il permet.",
+    features: [
+      "Réglages → Comptes : tant que les comptes ne sont pas activés, rien ne change. Pour les activer, colle le nom de ton équipe Cloudflare et l'AUD de l'application (le « ? » explique où les trouver), « Tester », « Enregistrer », puis « Activer les comptes » : ton adresse devient Administrateur",
+      "Une adresse autorisée par Cloudflare qui arrive pour la première fois voit « Demander un accès », puis « Demande en attente » jusqu'à ce qu'un administrateur l'accepte ; un compte refusé ou bloqué voit une page qui le lui dit",
+      "Demandes en attente : choisir le rôle puis « Accepter », ou « Refuser ». Pour chaque compte : changer de rôle, « Voir comme », bloquer, débloquer ou supprimer",
+      "Rôles : « Nouveau rôle », un nom, puis les permissions à cocher, chacune avec un « ? » qui explique ce qu'elle permet (modifier ou supprimer des recettes, voir ou modifier les prix et les coûts, cahiers, courses, production, PDF, rangement, import, comptes, mise à jour du site, accès Claude). Le rôle Administrateur a tout et ne peut pas être supprimé",
+      "Tout compte actif peut consulter les recettes ; les boutons de ce que son rôle ne permet pas disparaissent (Modifier, Supprimer, favoris, coût de revient…) et chaque action est aussi refusée côté serveur",
+      "Sans la permission « Voir les prix et les coûts », aucun prix ni coût de revient n'est envoyé au téléphone ou à l'ordinateur",
+      "« Voir comme » : l'administrateur voit le site avec les permissions d'un autre compte, sous un bandeau « Revenir à mon compte »",
+      "Journal des comptes : qui a demandé, accepté, refusé, bloqué, changé un rôle ou regardé « comme » un autre compte, et quand",
+      "L'accès de Claude (MCP) avec sa clé marche comme avant, comptes activés ou non",
+    ],
+    migrations: [
+      "Nouvelles tables des comptes, des rôles et du journal (le rôle Administrateur est créé tout seul). En cas de souci avec Cloudflare, RECIPELOG_AUTH_OFF=1 dans le .env du serveur coupe les comptes sans rien effacer",
+    ],
+  },
+  {
     version: "V2.7",
     date: "2026-10-28",
     title: "Logo sur l'écran d'accueil de l'iPhone",

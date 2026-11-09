@@ -6,6 +6,7 @@ import { loadRecipeTree } from "@/lib/recipes";
 import { compareRecipes, compareSteps } from "@/lib/compare";
 import { getVariantFamily } from "@/lib/variants";
 import { formatG } from "@/lib/format";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function ComparePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ with?: string }>;
 }) {
+  await requirePage("read");
   const { id } = await params;
   const { with: withRaw } = await searchParams;
   const aId = Number(id);

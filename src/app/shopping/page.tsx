@@ -4,10 +4,12 @@ import { listShoppingLists } from "@/lib/shopping";
 import { prisma } from "@/lib/prisma";
 import { EmptyState } from "@/components/EmptyState";
 import { ShoppingListRow } from "@/components/ShoppingListMenus";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShoppingPage() {
+  await requirePage("read");
   const [lists, checkedCounts] = await Promise.all([
     listShoppingLists(),
     prisma.shoppingListItem.groupBy({
@@ -22,7 +24,7 @@ export default async function ShoppingPage() {
     <>
       <div className="page-head">
         <h1>Listes de courses</h1>
-        <Link href="/shopping/new" className="fl-btn fl-btn-primary desk-only">
+        <Link href="/shopping/new" data-needs="shopping.edit" className="fl-btn fl-btn-primary desk-only">
           <Plus size={16} /> Nouvelle liste
         </Link>
         <p className="sub">
@@ -54,7 +56,7 @@ export default async function ShoppingPage() {
         </div>
       )}
 
-      <Link href="/shopping/new" className="fab" aria-label="Créer une liste">
+      <Link href="/shopping/new" data-needs="shopping.edit" className="fab" aria-label="Créer une liste">
         <Plus size={24} />
       </Link>
     </>

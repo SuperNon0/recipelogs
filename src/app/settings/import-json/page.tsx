@@ -3,6 +3,7 @@ import { Braces, ChevronLeft, FileJson } from "lucide-react";
 import { JsonRecipeImport } from "@/components/JsonRecipeImport";
 import { ConversionPromptSection } from "@/components/ConversionPromptSection";
 import { Help } from "@/components/ui/Help";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ const EXAMPLE = `[
   }
 ]`;
 
-export default function ImportJsonPage() {
+export default async function ImportJsonPage() {
+  await requirePage("import.run");
   return (
     <div className="set-page">
       <Link href="/settings" className="crumb">

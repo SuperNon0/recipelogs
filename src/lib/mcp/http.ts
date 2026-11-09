@@ -1,6 +1,7 @@
 import { handleMcpBody } from "./protocol";
 import { getMcpToken, tokensMatch } from "./token";
 import { MCP_TOOLS } from "./tools";
+import { runAsService } from "@/lib/auth/service";
 
 /**
  * Réponse HTTP du point d'accès MCP. La clé arrive dans l'en-tête
@@ -19,7 +20,9 @@ export async function mcpResponse(req: Request, urlToken?: string): Promise<Resp
     // Pas de flux serveur → client (SSE) : le protocole prévoit 405 dans ce cas.
     return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
   }
-  const out = await handleMcpBody(await req.text(), MCP_TOOLS);
+  const body = await req.text();
+  // Clé valide : les outils ont tous les droits, même quand les comptes sont activés.
+  const out = await runAsService("mcp", () => handleMcpBody(body, MCP_TOOLS));
   if (out === null) return new Response(null, { status: 202 });
   return Response.json(out, { headers: { "Cache-Control": "no-store" } });
 }

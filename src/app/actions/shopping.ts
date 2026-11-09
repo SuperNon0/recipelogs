@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,7 @@ import { buildRecipeSnapshot } from "@/lib/cookbooks";
 
 
 export async function createShoppingList(formData: FormData) {
+  await requireAccess("shopping.edit");
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Le nom est obligatoire.");
 
@@ -21,6 +23,7 @@ export async function createShoppingList(formData: FormData) {
 }
 
 export async function deleteShoppingList(id: number) {
+  await requireAccess("shopping.edit");
   await prisma.shoppingList.delete({ where: { id } });
   revalidatePath("/shopping");
   redirect("/shopping");
@@ -31,6 +34,7 @@ export async function addRecipeToList(
   recipeId: number,
   coefficient: number,
 ): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   if (coefficient <= 0) return { ok: false, error: "Le coefficient doit être positif." };
 
   await prisma.shoppingListRecipe.upsert({
@@ -48,6 +52,7 @@ export async function removeRecipeFromList(
   listId: number,
   recipeId: number,
 ): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   await prisma.shoppingListRecipe.deleteMany({
     where: { shoppingListId: listId, recipeId },
   });
@@ -62,6 +67,7 @@ export async function addManualItem(
   name: string,
   quantityG: number | null,
 ): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Le nom est obligatoire." };
 
@@ -84,6 +90,7 @@ export async function addManualItem(
 }
 
 export async function toggleItem(itemId: number, listId: number): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   const item = await prisma.shoppingListItem.findUnique({ where: { id: itemId } });
   if (!item) return { ok: false, error: "Item introuvable." };
 
@@ -97,12 +104,14 @@ export async function toggleItem(itemId: number, listId: number): Promise<Action
 }
 
 export async function removeItem(itemId: number, listId: number): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   await prisma.shoppingListItem.delete({ where: { id: itemId } });
   revalidatePath(`/shopping/${listId}`);
   return { ok: true };
 }
 
 export async function uncheckAll(listId: number): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   await prisma.shoppingListItem.updateMany({
     where: { shoppingListId: listId },
     data: { checked: false },
@@ -112,6 +121,7 @@ export async function uncheckAll(listId: number): Promise<ActionResult> {
 }
 
 export async function removeChecked(listId: number): Promise<ActionResult> {
+  await requireAccess("shopping.edit");
   await prisma.shoppingListItem.deleteMany({
     where: { shoppingListId: listId, checked: true },
   });
@@ -124,6 +134,7 @@ export async function addCookbookRecipesToList(
   targetListId: number | null,
   newListName: string | null,
 ): Promise<{ ok: true; listId: number } | { ok: false; error: string }> {
+  await requireAccess("shopping.edit");
   const entries = await prisma.cookbookRecipe.findMany({
     where: { cookbookId },
     select: { recipeId: true },

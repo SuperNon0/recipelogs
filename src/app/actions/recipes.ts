@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -101,6 +102,7 @@ function parseFormOrThrow(formData: FormData): ReturnType<typeof parseForm> {
 }
 
 export async function createRecipe(formData: FormData) {
+  await requireAccess("recipes.edit");
   const data = parseFormOrThrow(formData);
 
   const recipe = await prisma.recipe.create({
@@ -146,6 +148,7 @@ export async function createRecipe(formData: FormData) {
 }
 
 export async function updateRecipe(id: number, formData: FormData) {
+  await requireAccess("recipes.edit");
   const data = parseFormOrThrow(formData);
 
   await prisma.$transaction(async (tx) => {
@@ -263,6 +266,7 @@ async function prepareDeletion(ids: number[]): Promise<string | null> {
 }
 
 export async function deleteRecipe(id: number): Promise<{ ok: false; error: string } | void> {
+  await requireAccess("recipes.delete");
   const error = await prepareDeletion([id]);
   if (error) return { ok: false, error };
   await prisma.recipe.delete({ where: { id } });
@@ -279,6 +283,7 @@ export async function deleteRecipe(id: number): Promise<{ ok: false; error: stri
 export async function deleteRecipes(
   ids: number[],
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  await requireAccess("recipes.delete");
   const cleanIds = [...new Set(ids)].filter((n) => Number.isFinite(n) && n > 0);
   if (cleanIds.length === 0) {
     return { ok: false, error: "Aucune recette sélectionnée." };
@@ -309,6 +314,7 @@ export async function applyMultiplierToRecipe(
    * enregistré est effacé : les quantités ne correspondent plus à ce moule. */
   newMold?: unknown,
 ): Promise<{ ok: true; moldCleared?: boolean } | { ok: false; error: string }> {
+  await requireAccess("recipes.edit");
   if (!Number.isFinite(multiplier) || multiplier <= 0) {
     return { ok: false, error: "Multiplicateur invalide." };
   }
@@ -397,6 +403,7 @@ export async function setRecipeSaleCoef(
   id: number,
   coef: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAccess("costs.edit");
   // Au moins 0,01 : la base garde 2 décimales (0,004 deviendrait 0).
   if (!Number.isFinite(coef) || coef < 0.01 || coef > 100) return { ok: false, error: "Coefficient invalide (entre 0,01 et 100)." };
   const { count } = await prisma.recipe.updateMany({ where: { id }, data: { saleCoef: Math.round(coef * 100) / 100 } });
@@ -407,6 +414,7 @@ export async function setRecipeSaleCoef(
 }
 
 export async function toggleFavorite(id: number) {
+  await requireAccess("recipes.edit");
   const r = await prisma.recipe.findUnique({
     where: { id },
     select: { favorite: true },
@@ -422,6 +430,7 @@ export async function toggleFavorite(id: number) {
 }
 
 export async function duplicateRecipe(id: number) {
+  await requireAccess("recipes.edit");
   const source = await prisma.recipe.findUnique({ where: { id }, select: { name: true } });
   if (!source) throw new Error("Recette introuvable");
   const copyId = await copyRecipe(id, source.name + " (copie)");
@@ -431,6 +440,7 @@ export async function duplicateRecipe(id: number) {
 }
 
 export async function addComment(recipeId: number, formData: FormData) {
+  await requireAccess("recipes.edit");
   const content = String(formData.get("content") ?? "").trim();
   if (!content) return;
   await prisma.comment.create({
@@ -440,6 +450,7 @@ export async function addComment(recipeId: number, formData: FormData) {
 }
 
 export async function deleteComment(id: number, recipeId: number) {
+  await requireAccess("recipes.edit");
   await prisma.comment.delete({ where: { id } });
   revalidatePath(`/recipes/${recipeId}`);
 }

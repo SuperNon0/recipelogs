@@ -14,6 +14,7 @@ import { AddCookbookToShoppingListButton } from "@/components/AddCookbookToShopp
 import { getActiveToken } from "@/lib/share";
 import { SHARE_ENABLED } from "@/lib/features";
 import { allPdfFontsHref, parseTheme } from "@/lib/pdf/theme";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function CookbookDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePage("read");
   const { id } = await params;
   const cookbookId = Number(id);
   if (isNaN(cookbookId)) notFound();

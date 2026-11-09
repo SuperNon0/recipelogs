@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { renderRecipePdf } from "@/lib/pdf/recipePdf";
 import { getDefaultPdfTheme, getPdfTheme } from "@/lib/pdfThemes";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * PDF d'une recette.
@@ -12,6 +13,8 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   const { id } = await params;
   const recipeId = Number(id);
   if (!Number.isInteger(recipeId)) {

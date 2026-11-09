@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildProductionSheet } from "@/lib/productionData";
 import { renderProductionPdf } from "@/lib/pdf/productionPdf";
 import { getDefaultPdfTheme } from "@/lib/pdfThemes";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * Fiche de production d'une recette seule.
@@ -10,6 +11,8 @@ import { getDefaultPdfTheme } from "@/lib/pdfThemes";
  *  - ?inline=1 : affichage dans la page au lieu d'un téléchargement
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   const { id } = await params;
   const recipeId = Number(id);
   const url = new URL(req.url);

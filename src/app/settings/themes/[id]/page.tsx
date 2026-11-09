@@ -3,10 +3,12 @@ import { ThemeEditor } from "@/components/themes/ThemeEditor";
 import { getPdfTheme } from "@/lib/pdfThemes";
 import { prisma } from "@/lib/prisma";
 import { allPdfFontsHref } from "@/lib/pdf/theme";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function ThemeEditPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePage("organize.edit");
   const { id } = await params;
   const themeId = Number(id);
   if (!Number.isInteger(themeId)) notFound();

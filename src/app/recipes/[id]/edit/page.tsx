@@ -6,6 +6,7 @@ import { RecipeForm } from "@/components/RecipeForm";
 import { updateRecipe } from "@/app/actions/recipes";
 import { getRecipeDetail, listAllCategories, listAllFolders } from "@/lib/recipes";
 import { listPieceWeights } from "@/lib/ingredientInfo";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function EditRecipePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePage("recipes.edit");
   const { id } = await params;
   const recipeId = Number(id);
   if (!Number.isFinite(recipeId)) notFound();

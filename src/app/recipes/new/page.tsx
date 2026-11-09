@@ -4,6 +4,7 @@ import { RecipeForm } from "@/components/RecipeForm";
 import { createRecipe } from "@/app/actions/recipes";
 import { listAllCategories, listAllFolders } from "@/lib/recipes";
 import { listPieceWeights } from "@/lib/ingredientInfo";
+import { requirePage } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function NewRecipePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requirePage("recipes.edit");
   const sp = await searchParams;
   const preselectFolderId =
     typeof sp.folder === "string" && /^\d+$/.test(sp.folder)

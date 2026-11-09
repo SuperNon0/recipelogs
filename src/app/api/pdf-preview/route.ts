@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookbookThemeSchema, parseTheme } from "@/lib/pdf/theme";
 import { previewSnap, renderRecipePdf } from "@/lib/pdf/recipePdf";
+import { apiDenied } from "@/lib/auth/guard";
 
 /**
  * Aperçu d'un thème en cours de modification (pas encore enregistré).
@@ -8,6 +9,8 @@ import { previewSnap, renderRecipePdf } from "@/lib/pdf/recipePdf";
  * recette récente, ou de la recette d'exemple.
  */
 export async function POST(req: Request) {
+  const denied = await apiDenied("pdf.export");
+  if (denied) return denied;
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;

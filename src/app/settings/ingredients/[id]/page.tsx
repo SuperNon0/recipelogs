@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getIngredientBaseDetail, listAllIngredientBases } from "@/lib/recipes";
 import { IngredientDetailClient } from "@/components/IngredientDetailClient";
+import { requirePage } from "@/lib/auth/guard";
+import { viewerCan } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ export default async function IngredientDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const viewer = await requirePage("organize.edit");
   const { id } = await params;
   const baseId = Number(id);
   if (!Number.isFinite(baseId)) notFound();
@@ -29,7 +32,11 @@ export default async function IngredientDetailPage({
         <ChevronLeft size={14} /> Ingrédients
       </Link>
       <IngredientDetailClient
-        base={detail.base}
+        base={
+          viewerCan(viewer, "costs.view")
+            ? detail.base
+            : { ...detail.base, price: null, priceHistory: [] }
+        }
         recipes={detail.recipes}
         viaRecipes={detail.viaRecipes}
         otherBases={otherBases.map((b) => ({ id: b.id, name: b.name, count: b._count.usages }))}
