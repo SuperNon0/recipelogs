@@ -18,6 +18,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     features: [
       "iPhone : l'icône de l'appli sur l'écran d'accueil est la toque orange de RecipeLog, en carré plein que l'iPhone arrondit lui-même (supprimer l'appli de l'écran d'accueil puis la réajouter depuis Safari pour la voir)",
     ],
+    fixes: [
+      "Fenêtres (ajout à un cahier, variantes, production, renommer, couleur, aperçus…) : un appui à côté ne les ferme plus et ne fait plus perdre ce qu'on était en train de remplir ; on les ferme avec la croix en haut à droite (ou Échap sur ordinateur)",
+    ],
   },
   {
     version: "V2.6",
