@@ -35,6 +35,8 @@ model Recipe {
   mold           Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  /** Dernière ouverture de la fiche (page Historique). Écrite en SQL brut pour ne pas toucher updatedAt. */
+  lastViewedAt   DateTime? @map("last_viewed_at")
 
   folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
@@ -56,6 +58,7 @@ model Recipe {
   productionItem      ProductionItem?
 
   @@index([updatedAt(sort: Desc)])
+  @@index([lastViewedAt(sort: Desc)])
   @@index([favorite])
   @@index([folderId])
   @@index([nameNormalized])

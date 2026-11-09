@@ -25,6 +25,8 @@ export type RecipeListItem = {
   /** Nombre de variantes rangées sous cette recette. */
   variantCount: number;
   updatedAt: Date;
+  /** Dernière ouverture de la fiche (null = jamais ouverte depuis l'historique). */
+  lastViewedAt: Date | null;
 };
 
 export async function listRecipes(opts: {
@@ -36,9 +38,12 @@ export async function listRecipes(opts: {
   folderId?: number | "none";
   /** Montrer aussi les variantes (sinon rangées sous leur recette, sauf en recherche). */
   withVariants?: boolean;
+  /** Historique : les N dernières recettes ouvertes, de la plus récente à la plus ancienne (variantes comprises). */
+  recentlyViewed?: number;
 }): Promise<RecipeListItem[]> {
   const where: Prisma.RecipeWhereInput = {};
-  if (!opts.withVariants && !hasSearchFilter(opts)) where.variantTargets = { none: {} };
+  if (!opts.withVariants && !opts.recentlyViewed && !hasSearchFilter(opts)) where.variantTargets = { none: {} };
+  if (opts.recentlyViewed) where.lastViewedAt = { not: null };
 
   if (opts.q && opts.q.trim()) {
     const normalized = normalizeForSearch(opts.q);
@@ -68,7 +73,8 @@ export async function listRecipes(opts: {
       ingredients: { select: { name: true, quantityG: true, quantityGMax: true, unit: true } },
       _count: { select: { parentLinks: true, variantSources: true } },
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: opts.recentlyViewed ? { lastViewedAt: "desc" } : { updatedAt: "desc" },
+    ...(opts.recentlyViewed ? { take: opts.recentlyViewed } : {}),
   });
   const info = await loadIngredientInfo(
     recipes.flatMap((r) => r.ingredients.filter((i) => i.unit === "pièce").map((i) => i.name ?? "")),
@@ -93,6 +99,7 @@ export async function listRecipes(opts: {
     subCount: r._count.parentLinks,
     variantCount: r._count.variantSources,
     updatedAt: r.updatedAt,
+    lastViewedAt: r.lastViewedAt,
   }));
 }
 
@@ -113,7 +120,11 @@ export async function countHiddenVariants(folderId?: number | "none"): Promise<n
 
 /** Lignes sérialisables (date en texte ISO) pour le tableau des recettes. */
 export function toRecipeRows(list: RecipeListItem[]) {
-  return list.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }));
+  return list.map((r) => ({
+    ...r,
+    updatedAt: r.updatedAt.toISOString(),
+    lastViewedAt: r.lastViewedAt ? r.lastViewedAt.toISOString() : null,
+  }));
 }
 
 export async function listAllFolders() {
