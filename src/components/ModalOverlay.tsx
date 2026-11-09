@@ -8,7 +8,7 @@ import { STOP } from "./ui/Menu";
 
 /**
  * Fenêtre modale : centrée sur ordinateur, feuille qui remonte du bas sur
- * téléphone. Échap ou clic à côté pour fermer.
+ * téléphone. Se ferme par la croix (ou Échap), jamais par un clic à côté.
  */
 export function ModalOverlay({
   onClose,
@@ -39,7 +39,8 @@ export function ModalOverlay({
 
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="modal-veil" {...STOP} onClick={onClose}>
+    // Un clic à côté ne ferme pas : on perdait ce qu'on était en train de remplir.
+    <div className="modal-veil" {...STOP}>
       <div
         role="dialog"
         aria-modal="true"
