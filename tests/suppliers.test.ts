@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { articleKey, bestPrice, buildComparison, packLabel, priceStats, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
+import { articleKey, bestPrice, buildComparison, packLabel, packagingWarning, priceStats, readPackaging, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
 
 describe("unitPriceOf", () => {
   it("garde le prix unitaire donné", () => {
@@ -90,5 +90,27 @@ describe("petits utilitaires", () => {
     expect(packLabel(25, "kg")).toBe("colis de 25 kg");
     expect(packLabel(50, "pièce")).toBe("colis de 50");
     expect(packLabel(1, "kg")).toBeNull();
+  });
+});
+
+describe("readPackaging / packagingWarning", () => {
+  it("prend le poids net égoutté d'une boîte de conserve", () => {
+    expect(readPackaging("Abricot oreillon sirop 5/1 boîte 4,2 kg PNE 2,4 kg Brover").amount).toEqual({ value: 2.4, unit: "kg", drained: true });
+  });
+  it("lit ml, g, x N", () => {
+    expect(readPackaging("Crème sucrée 32% MG 700 ml UHT").amount).toEqual({ value: 0.7, unit: "L", drained: false });
+    expect(readPackaging("Levure pressée 500 g x 5").amount?.value).toBe(0.5);
+    expect(readPackaging("Boîte pâtissière Rendez-Vous 16 x 8 x 50").count).toBe(50);
+    expect(readPackaging("Carré raine 17 cm x 250").count).toBe(250);
+    expect(readPackaging("Poche pâtissière 30 x 54 cm x 100").count).toBe(100);
+    expect(readPackaging("Minuteur 20 heures")).toEqual({ amount: null, count: null });
+  });
+  it("prévient pour une boîte à la pièce, pas pour un prix au kg ou un colis donné", () => {
+    expect(packagingWarning({ product: "Demi poire Williams sirop boîte 5/1 4,25 kg PNE 2,3 kg", unit: "pièce" })).toMatch(/2,3 kg/);
+    expect(packagingWarning({ product: "Carré raine 17 cm x 250", unit: "pièce" })).toMatch(/contenance = 250/);
+    expect(packagingWarning({ product: "Carré raine 17 cm x 250", unit: "pièce", packSize: 250 })).toBeNull();
+    expect(packagingWarning({ product: "Chocolat noir 5 kg", unit: "kg" })).toBeNull();
+    expect(packagingWarning({ product: "Minuteur 20 heures", unit: "pièce" })).toBeNull();
+    expect(packagingWarning({ product: "Fuze Tea pêche 33 cl canette", unit: "pièce" })).toBeNull();
   });
 });

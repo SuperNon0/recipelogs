@@ -9,7 +9,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { isPriceUnit, type PriceUnit } from "./cost";
-import { packLabel, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
+import { packLabel, packagingWarning, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
 
 type Tx = Prisma.TransactionClient;
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
@@ -193,11 +193,12 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         (await tx.supplier.create({ data: { name: supplierName } }));
 
       let replacedId: number | null = null;
+      let keptNote: string | null = null;
       const touched: number[] = [];
       if (number) {
         const dup = await tx.purchaseOrder.findFirst({
           where: { supplierId: supplier.id, number: { equals: number, mode: "insensitive" } },
-          select: { id: true, lines: { select: { productId: true } } },
+          select: { id: true, note: true, lines: { select: { productId: true } } },
         });
         if (dup) {
           if (!input.replace) {
@@ -207,15 +208,18 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           }
           touched.push(...dup.lines.map((l) => l.productId));
           replacedId = dup.id;
+          // Sans nouvelle remarque, celle de la facture remplacée est gardée (le fichier joint aussi : même facture).
+          keptNote = dup.note;
         }
       }
 
-      const data = { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || null };
+      const data = { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || keptNote };
       const order = replacedId === null
         ? await tx.purchaseOrder.create({ data })
         : await tx.purchaseOrder.update({ where: { id: replacedId }, data: { ...data, lines: { deleteMany: {} } } });
 
       const created: string[] = [];
+      const warnings: string[] = [];
       const ignored: string[] = [];
       const notFound: string[] = [];
       const before = new Map<number, { name: string; price: number | null; unit: string }>();
@@ -269,6 +273,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         });
         lineCount++;
         touched.push(product.id);
+        const warn = packagingWarning({ product: name, unit: l.unit, packSize: l.packSize });
+        if (warn) warnings.push(warn);
         const lt = l.lineTotal ?? (l.quantity != null ? (l.packPrice ?? unitPrice * (l.packSize ?? 1)) * l.quantity : null);
         if (lt != null) computedTotal += lt;
 
@@ -301,6 +307,18 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           })
         ).map((b) => [b.id, num(b.price)]),
       );
+      if (replacedId !== null) {
+        // Produits de l'ancienne version qui ne sont plus sur aucune facture (nom corrigé…) : retirés.
+        const orphans = (
+          await tx.supplierProduct.findMany({ where: { id: { in: touched }, lines: { none: {} } }, select: { id: true } })
+        ).map((p) => p.id);
+        if (orphans.length) {
+          await tx.ingredientBase.updateMany({ where: { chosenProductId: { in: orphans } }, data: { chosenProductId: null } });
+          await tx.supplierProduct.deleteMany({ where: { id: { in: orphans } } });
+          for (const o of orphans) before.delete(o);
+          touched.splice(0, touched.length, ...touched.filter((t) => !orphans.includes(t)));
+        }
+      }
       await refreshProducts(tx, touched);
       for (const { baseId, productId } of linked) await autoChoose(tx, baseId, productId);
 
@@ -342,6 +360,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         ingredients_mis_a_jour: updated,
         ...(notFound.length ? { ingredients_introuvables: notFound } : {}),
         ...(ignored.length ? { lignes_ignorees: ignored } : {}),
+        ...(warnings.length ? { a_verifier: warnings } : {}),
         ...(replacedId !== null ? { remplace: true } : {}),
       };
     },

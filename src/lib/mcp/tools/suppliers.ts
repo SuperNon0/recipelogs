@@ -13,7 +13,8 @@ import {
   loadSupplier,
   recordPurchaseOrder,
 } from "@/lib/purchaseOrders";
-import { removeInvoiceFile } from "@/lib/invoiceFiles";
+import { attachInvoiceFile, createUploadLink, removeInvoiceFile } from "@/lib/invoiceFiles";
+import { currentOrigin } from "@/lib/auth/service";
 import { DELETE, READ, WRITE, id, js, parseArgs, text, type McpTool } from "./helpers";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date au format AAAA-MM-JJ");
@@ -58,11 +59,12 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     title: "Enregistrer une facture ou un bon de commande",
     description:
       "Enregistre une facture (ou un bon de commande / bon de livraison) d'un fournisseur en une fois : le fournisseur est créé s'il n'existe pas, chaque ligne devient un produit de ce fournisseur (même ceux qui ne servent pas en recette : emballages, boissons, matériel…) et son prix est gardé dans l'historique à la DATE DE LA FACTURE. Rien n'est jamais écrasé. " +
+      "LIS BIEN LE CONDITIONNEMENT de chaque ligne : dès qu'un poids ou un volume est connu, préfère un prix au kg ou au L (comparable entre fournisseurs) plutôt qu'à la pièce. Boîte de conserve (« 5/1 4,2 kg PNE 2,4 kg ») : unite_prix kg, contenance = poids net égoutté (PNE) s'il est écrit, sinon le poids net, et prix_colis = prix de la boîte. Bouteille, bidon, brique (« 700 ml », « 10 L ») : unite_prix L. Carton « x 50 », « x 250 » vendu au colis : unite_prix pièce, contenance = 50 ou 250, prix_colis = prix du carton. Garde « pièce » pour ce qui se compte (fougasse, canette, matériel). Si la réponse contient a_verifier, relis ces lignes et corrige avec remplacer=true. " +
       "Pour chaque ligne, donne le prix ramené à l'unité de prix (prix_unitaire, en € HT par kg, L ou pièce) OU le prix d'un colis (prix_colis) avec sa contenance (contenance = 25 pour un sac de 25 kg, 50 pour un carton de 50 pièces) OU le montant de la ligne avec la quantité : le serveur calcule le prix au kg / L / pièce. " +
       "article = nom commun court pour comparer le même produit entre fournisseurs (« Chocolat noir 64 % », « Crème 35 % », « Boîte pâtissière 20 × 8 ») : réutilise les articles existants (voir comparer_prix_fournisseurs). " +
       `${FAMILIES_HELP} ` +
       "ingredient = nom exact (ou id) d'un ingrédient des recettes auquel ce produit correspond (voir lister_ingredients) : il prend alors ce prix s'il n'avait pas encore de produit choisi. Ne crée JAMAIS d'ingrédient pour un produit qui ne sert pas en recette, et ne mets jamais les prix avec regler_fiches_ingredients. " +
-      "Réponse : nouveaux produits, prix qui ont changé (avant → après), ingrédients mis à jour. À montrer à l'utilisateur.",
+      "Réponse : nouveaux produits, prix qui ont changé (avant → après), ingrédients mis à jour, lignes à vérifier. À montrer à l'utilisateur. Ensuite, joins le PDF ou la photo de la facture avec joindre_fichier_facture.",
     inputSchema: {
       type: "object",
       properties: {
@@ -133,6 +135,46 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       });
       refresh();
       return text({ ...summary, voir: `/factures/${summary.facture_id}` });
+    },
+  },
+
+  {
+    name: "joindre_fichier_facture",
+    title: "Joindre le PDF ou la photo d'une facture",
+    description:
+      "Joint le PDF (ou la photo) d'une facture enregistrée, pour le voir sur sa page (remplace l'ancien fichier). " +
+      "Si tu as le contenu du fichier, passe-le en base64 dans fichier_base64. Sinon, l'outil renvoie un lien d'envoi à usage unique (30 min) : " +
+      "envoie le fichier dessus (curl -T facture.pdf <lien>) si tu peux lancer des commandes, ou donne à l'utilisateur le lien de la page de la facture pour qu'il touche « Joindre un PDF ».",
+    inputSchema: {
+      type: "object",
+      properties: {
+        facture_id: js.int("Id de la facture"),
+        fichier_base64: js.str("Contenu du PDF ou de la photo en base64 (facultatif)"),
+      },
+      required: ["facture_id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ facture_id: id, fichier_base64: z.string().trim().min(1).optional() }), args);
+      const order = await prisma.purchaseOrder.findUnique({ where: { id: a.facture_id }, select: { id: true } });
+      if (!order) throw new Error("facture introuvable");
+      const origin = currentOrigin() ?? "";
+      const page = `${origin}/factures/${order.id}`;
+      if (a.fichier_base64) {
+        const b64 = a.fichier_base64.replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
+        const { type } = await attachInvoiceFile(order.id, Buffer.from(b64, "base64"));
+        refresh();
+        return text({ ok: true, facture_id: order.id, fichier: type, voir: page });
+      }
+      const { token, expires } = createUploadLink(order.id);
+      return text({
+        facture_id: order.id,
+        lien_envoi: `${origin}/api/mcp/fichier/${token}`,
+        exemple: `curl -sS -T facture.pdf ${origin}/api/mcp/fichier/${token}`,
+        expire_a: expires.toISOString(),
+        page_facture: page,
+        a_dire_a_l_utilisateur: `Pour joindre le fichier toi-même : ouvre ${page} puis « Joindre un PDF ».`,
+      });
     },
   },
 
