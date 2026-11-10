@@ -99,11 +99,16 @@ model IngredientBase {
   /** Prix d'achat (€) par `priceUnit` : "kg", "L" ou "pièce". */
   price       Decimal? @db.Decimal(10, 4)
   priceUnit   String?  @map("price_unit")
+  /** Produit fournisseur dont le prix est utilisé (le prix ci-dessus suit alors ce produit). */
+  chosenProductId Int? @map("chosen_product_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   usages Ingredient[]
   prices IngredientPrice[]
+  /** Produits fournisseurs reliés à cet ingrédient (choix possibles). */
+  products      SupplierProduct[] @relation("LinkedProducts")
+  chosenProduct SupplierProduct?  @relation("ChosenProduct", fields: [chosenProductId], references: [id], onDelete: SetNull)
 
   @@map("ingredients_base")
 }
@@ -120,6 +125,88 @@ model IngredientPrice {
 
   @@index([baseId, createdAt(sort: Desc)])
   @@map("ingredient_prices")
+}
+
+/** Fournisseur (Metro, Promocash, Valrhona…). Créé tout seul au premier bon de commande. */
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  products SupplierProduct[]
+  orders   PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+/**
+ * Produit acheté chez un fournisseur, utilisé en recette ou non (boîtes, boissons…).
+ * `price` = dernier prix payé (€ par `priceUnit`), recalculé à partir des bons.
+ */
+model SupplierProduct {
+  id         Int       @id @default(autoincrement())
+  supplierId Int       @map("supplier_id")
+  name       String
+  reference  String?
+  /** Contenance d'un colis dans `priceUnit` (25 pour un sac de 25 kg). */
+  packSize   Decimal?  @map("pack_size") @db.Decimal(12, 4)
+  price      Decimal?  @db.Decimal(12, 4)
+  priceUnit  String    @default("kg") @map("price_unit")
+  priceDate  DateTime? @map("price_date") @db.Date
+  /** Ingrédient des recettes auquel ce produit correspond. */
+  baseId     Int?      @map("base_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  base     IngredientBase?     @relation("LinkedProducts", fields: [baseId], references: [id], onDelete: SetNull)
+  chosenBy IngredientBase[]    @relation("ChosenProduct")
+  lines    PurchaseOrderLine[]
+
+  @@unique([supplierId, name])
+  @@index([baseId])
+  @@map("supplier_products")
+}
+
+/** Bon de commande ou facture d'un fournisseur. */
+model PurchaseOrder {
+  id         Int      @id @default(autoincrement())
+  supplierId Int      @map("supplier_id")
+  date       DateTime @db.Date
+  number     String?
+  total      Decimal? @db.Decimal(12, 2)
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  lines    PurchaseOrderLine[]
+
+  @@index([supplierId, date(sort: Desc)])
+  @@map("purchase_orders")
+}
+
+/** Ligne d'un bon : un produit, combien, à quel prix. */
+model PurchaseOrderLine {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  productId Int      @map("product_id")
+  /** Nombre de colis (ou d'unités) achetés. */
+  quantity  Decimal? @db.Decimal(12, 3)
+  /** Prix d'un colis, en €. */
+  packPrice Decimal? @map("pack_price") @db.Decimal(12, 4)
+  /** Prix ramené à l'unité de prix du produit (€ par kg, L ou pièce). */
+  unitPrice Decimal  @map("unit_price") @db.Decimal(12, 4)
+  priceUnit String   @map("price_unit")
+  lineTotal Decimal? @map("line_total") @db.Decimal(12, 2)
+
+  order   PurchaseOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product SupplierProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([orderId])
+  @@map("purchase_order_lines")
 }
 
 model Ingredient {
