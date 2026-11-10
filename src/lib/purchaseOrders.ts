@@ -192,7 +192,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         (await tx.supplier.findFirst({ where: { name: { equals: supplierName, mode: "insensitive" } } })) ??
         (await tx.supplier.create({ data: { name: supplierName } }));
 
-      let replaced = false;
+      let replacedId: number | null = null;
       const touched: number[] = [];
       if (number) {
         const dup = await tx.purchaseOrder.findFirst({
@@ -206,14 +206,14 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             );
           }
           touched.push(...dup.lines.map((l) => l.productId));
-          await tx.purchaseOrder.delete({ where: { id: dup.id } });
-          replaced = true;
+          replacedId = dup.id;
         }
       }
 
-      const order = await tx.purchaseOrder.create({
-        data: { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || null },
-      });
+      const data = { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || null };
+      const order = replacedId === null
+        ? await tx.purchaseOrder.create({ data })
+        : await tx.purchaseOrder.update({ where: { id: replacedId }, data: { ...data, lines: { deleteMany: {} } } });
 
       const created: string[] = [];
       const ignored: string[] = [];
@@ -342,7 +342,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         ingredients_mis_a_jour: updated,
         ...(notFound.length ? { ingredients_introuvables: notFound } : {}),
         ...(ignored.length ? { lignes_ignorees: ignored } : {}),
-        ...(replaced ? { remplace: true } : {}),
+        ...(replacedId !== null ? { remplace: true } : {}),
       };
     },
     { timeout: 30_000 },
