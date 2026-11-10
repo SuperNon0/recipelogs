@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.10",
+    date: "2026-11-10",
+    title: "Sous-recettes pendant l'écriture d'une recette",
+    summary:
+      "En écrivant ou en modifiant une recette, tu ajoutes ses sous-recettes directement sous les ingrédients, sans devoir d'abord enregistrer la recette puis passer par sa fiche. Une sous-recette qui n'existe pas encore s'écrit dans une fenêtre, sans quitter la page.",
+    features: [
+      "Sous les ingrédients, une partie « Sous-recettes » avec deux boutons : « Sous-recette existante » (choisir une recette, son nom et sa quantité, comme depuis la fiche : masse cible, coefficient ou ingrédient pivot) et « Nouvelle sous-recette »",
+      "« Nouvelle sous-recette » : le nom, les ingrédients (un par ligne, la liste lue s'affiche pour vérifier) et la préparation si tu veux. Elle est enregistrée comme une vraie recette, dans le même dossier et les mêmes catégories, puis choisie comme sous-recette",
+      "Le bouton « Nouvelle recette » est aussi dans la fenêtre « Ajouter une sous-recette » de la fiche",
+      "Les sous-recettes choisies sont ajoutées quand tu enregistres la recette. Une recette faite seulement de sous-recettes (un entremets, par exemple) n'a plus besoin d'ingrédient",
+    ],
+  },
+  {
     version: "V2.9",
     date: "2026-11-10",
     title: "Fournisseurs, factures et comparaison des prix",

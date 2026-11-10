@@ -364,3 +364,43 @@
   gap: 4px;
   margin-bottom: -4px;
 }
+
+/* Sous-recettes, sous la liste d'ingrédients */
+.rf-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.rf-subs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.rf-subs-head svg:first-child { color: var(--accent); }
+.rf-subs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rf-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 14px;
+}
+.rf-sub[data-new] { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.rf-sub-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-sub-qty { flex: none; color: var(--soft); }
+.rf-sub-tag { flex: none; padding-right: 6px; }
