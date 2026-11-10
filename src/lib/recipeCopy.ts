@@ -28,6 +28,8 @@ export async function copyRecipe(id: number, name: string): Promise<number> {
       yieldCount: source.yieldCount,
       yieldLabel: source.yieldLabel,
       saleCoef: source.saleCoef,
+      salePrice: source.salePrice,
+      saleVat: source.saleVat,
       mold: source.mold ?? Prisma.DbNull,
       source: source.source,
       notesTips: source.notesTips,

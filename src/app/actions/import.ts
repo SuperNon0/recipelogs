@@ -270,6 +270,8 @@ type JsonRecipe = {
   yield_count?: number | null;
   yield_label?: string | null;
   sale_coef?: number | null;
+  sale_price?: number | null;
+  sale_vat?: number | null;
   ingredients: JsonIngredient[];
   steps?: string;
   notes?: string | null;
@@ -383,6 +385,8 @@ export async function importRecipesFromJson(
           yieldCount: r.yield_count && r.yield_count > 0 ? Math.round(r.yield_count) : null,
           yieldLabel: r.yield_count && r.yield_count > 0 ? r.yield_label?.trim() || null : null,
           saleCoef: r.sale_coef && r.sale_coef > 0 && r.sale_coef <= 100 ? r.sale_coef : null,
+          salePrice: r.sale_price && r.sale_price > 0 && r.sale_price <= 100_000 ? Math.round(r.sale_price * 100) / 100 : null,
+          saleVat: r.sale_vat != null && r.sale_vat >= 0 && r.sale_vat <= 50 ? r.sale_vat : null,
         },
       });
 

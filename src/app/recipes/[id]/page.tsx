@@ -98,6 +98,8 @@ export default async function RecipePage({
           updatedAt: recipe.updatedAt.toISOString(),
           totalMassG: recipeMass(ingredients).avg,
           saleCoef: showCosts && recipe.saleCoef != null ? Number(recipe.saleCoef) : null,
+          salePrice: showCosts && recipe.salePrice != null ? Number(recipe.salePrice) : null,
+          saleVat: showCosts && recipe.saleVat != null ? Number(recipe.saleVat) : null,
         }}
         ingredients={ingredients}
         subRecipes={subRecipes}

@@ -27,10 +27,10 @@ import {
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
-import { applyMultiplierToRecipe, setRecipeSaleCoef } from "@/app/actions/recipes";
+import { applyMultiplierToRecipe, setRecipeSaleCoef, setRecipeSalePrice } from "@/app/actions/recipes";
 import { MOLD_PRESETS, moldCoef, moldLabel, moldsFilled, type Mold } from "@/lib/mold";
 import { MoldPicker } from "./MoldPicker";
-import { DEFAULT_SALE_COEF, costOf, formatEuro, type IngredientPrice } from "@/lib/cost";
+import { DEFAULT_SALE_COEF, DEFAULT_SALE_VAT, SALE_VATS, costOf, formatEuro, formatVat, saleMargin, type IngredientPrice } from "@/lib/cost";
 import { ModalOverlay } from "./ModalOverlay";
 import { CostDetail } from "./suppliers/CostDetail";
 import { Help } from "./ui/Help";
@@ -123,6 +123,8 @@ export function RecipeBody({
   yieldInfo,
   mold,
   saleCoef,
+  salePrice,
+  saleVat,
   onScaleChange,
 }: {
   recipeId: number;
@@ -133,6 +135,9 @@ export function RecipeBody({
   mold?: Mold | null;
   /** Coefficient de vente enregistré sur la recette (null = défaut). */
   saleCoef?: number | null;
+  /** Prix de vente enregistré (produit fini) et TVA comprise dedans. */
+  salePrice?: number | null;
+  saleVat?: number | null;
   /** Prévient la fiche quand le multiplicateur change (étapes). */
   onScaleChange?: (s: RecipeScale) => void;
 }) {
@@ -441,7 +446,10 @@ export function RecipeBody({
         recipeId={recipeId}
         lines={[...own.rows, ...subs.flatMap((x) => x.calc.ingredients)]}
         pieces={yieldInfo ? { count: yieldInfo.count * globalCoef, label: yieldInfo.label } : null}
+        scale={globalCoef}
         initialCoef={saleCoef ?? DEFAULT_SALE_COEF}
+        initialPrice={salePrice ?? null}
+        initialVat={saleVat ?? DEFAULT_SALE_VAT}
         canEditCoef={can("costs.edit")}
       />}
 
@@ -649,13 +657,20 @@ function CostCard({
   recipeId,
   lines,
   pieces,
+  scale,
   initialCoef,
+  initialPrice,
+  initialVat,
   canEditCoef,
 }: {
   recipeId: number;
   lines: AdjIngredient[];
   pieces: { count: number; label: string } | null;
+  /** Multiplicateur appliqué (le prix d'une recette entière le suit). */
+  scale: number;
   initialCoef: number;
+  initialPrice: number | null;
+  initialVat: number;
   /** Permission « Modifier les prix » : sinon le coefficient se lit sans se changer. */
   canEditCoef: boolean;
 }) {
@@ -740,6 +755,15 @@ function CostCard({
         <div className="cost-v num" style={{ color: "var(--accent)" }}>{formatEuro(cost.total * coef)}</div>
         {per && <div className="kpi-s">{formatEuro((cost.total * coef) / per.count)}{each}</div>}
       </div>
+      <SalePriceBlock
+        recipeId={recipeId}
+        cost={cost.total}
+        per={per}
+        scale={scale}
+        initialPrice={initialPrice}
+        initialVat={initialVat}
+        canEdit={canEditCoef}
+      />
       <CostDetail lines={lines} />
       {cost.missing.length > 0 && (
         <div className="cost-missing">
@@ -749,6 +773,163 @@ function CostCard({
             affiché est donc un peu sous-estimé. Règle-les dans Réglages → Ingrédients.
           </Help>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Saisie d'un prix en euros : « 3,50 », « 3.5 », « 3,50 € ». */
+const parseEuro = (s: string) => {
+  const t = s.replace(/€/g, "").replace(/\s/g, "").replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
+};
+
+/**
+ * Prix de vente (produit fini) et marge, sous le coût matière.
+ * Par pièce quand la recette a un rendement, sinon pour la recette entière.
+ */
+function SalePriceBlock({
+  recipeId,
+  cost,
+  per,
+  scale,
+  initialPrice,
+  initialVat,
+  canEdit,
+}: {
+  recipeId: number;
+  cost: number;
+  per: { count: number; label: string } | null;
+  scale: number;
+  initialPrice: number | null;
+  initialVat: number;
+  canEdit: boolean;
+}) {
+  const [priceInput, setPriceInput] = useState(initialPrice != null ? initialPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
+  const [saved, setSaved] = useState<{ price: number | null; vat: number }>({ price: initialPrice, vat: initialVat });
+  const [vat, setVat] = useState(initialVat);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const parsed = parseEuro(priceInput);
+  const price = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+
+  const save = (nextPrice: number | null, nextVat: number) => {
+    if (!canEdit) return;
+    if (nextPrice === saved.price && nextVat === saved.vat) return;
+    setSaved({ price: nextPrice, vat: nextVat });
+    setError(null);
+    startTransition(async () => {
+      const r = await setRecipeSalePrice(recipeId, nextPrice, nextVat);
+      if (!r.ok) setError(r.error);
+    });
+  };
+  const onBlurPrice = () => {
+    if (parsed != null && (!Number.isFinite(parsed) || parsed <= 0)) return setError("Prix de vente invalide.");
+    save(price, vat);
+  };
+
+  // Ce qui est vendu : une pièce (rendement) ou la recette entière (multiplicateur compris).
+  const unitLabel = per ? singular(per.label) : "la recette";
+  const unitCost = per ? cost / per.count : cost / Math.max(scale, 1e-9);
+  const qty = per ? per.count : scale;
+  const m = price != null ? saleMargin(price, vat, unitCost) : null;
+  const bad = m != null && m.margin < 0;
+  const vatPart = vat > 0 && price != null ? price - price / (1 + vat / 100) : 0;
+
+  const calc = m
+    ? [
+        `Prix de vente (${formatVat(vat)})`.padEnd(26) + formatEuro(price!),
+        ...(vat > 0 ? [`− TVA ${fmtNum(vat)} %`.padEnd(26) + formatEuro(vatPart), "Prix HT".padEnd(26) + formatEuro(m.priceHT)] : []),
+        `− Coût matière`.padEnd(26) + formatEuro(unitCost),
+        "─".repeat(34),
+        `Marge / ${unitLabel}`.slice(0, 25).padEnd(26) + formatEuro(m.margin),
+        ...(m.rate != null ? ["Taux de marge".padEnd(26) + `${fmtNum(m.rate, 1)} %`] : []),
+        ...(qty !== 1 ? [`× ${fmtNum(qty, 1)} ${per ? per.label : "(multiplicateur)"}`.slice(0, 25).padEnd(26) + formatEuro(m.margin * qty)] : []),
+      ].join("\n")
+    : "Tape ton prix de vente pour voir le calcul.";
+
+  return (
+    <div className="cost-sale">
+      <div className="cost-sale-in">
+        <span className="kpi-l">
+          Prix de vente
+          <Help
+            title="Prix de vente"
+            example={per ? `Tu vends tes ${per.label} 3,50 € pièce : tape 3,50.` : "Tu vends l'entremets entier 32 € : tape 32."}
+          >
+            Le prix auquel tu vends ce produit fini. {per ? <>Comme la recette a un rendement ({per.label}), c&apos;est le prix d&apos;une pièce.</> : <>La recette n&apos;a pas de rendement : c&apos;est le prix de la recette entière (règle un rendement dans « Modifier » pour vendre à la pièce).</>}{" "}
+            Choisis la TVA comprise dans ce prix (5,5 % pour la vente à emporter, 10 % sur place) ou
+            « HT » si ton prix est déjà hors taxes. Laisse vide si la recette ne se vend pas.
+          </Help>
+        </span>
+        <span className="cost-sale-fields">
+          <span className="stepper cost-price">
+            <input
+              value={priceInput}
+              inputMode="decimal"
+              placeholder="—"
+              aria-label="Prix de vente"
+              readOnly={!canEdit}
+              onChange={(e) => { setPriceInput(e.target.value); setError(null); }}
+              onBlur={onBlurPrice}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+            <span className="x">€</span>
+          </span>
+          <span className="cost-sale-unit">/ {unitLabel}</span>
+          <select
+            className="cost-vat"
+            value={String(vat)}
+            aria-label="TVA comprise dans le prix"
+            disabled={!canEdit}
+            onChange={(e) => { const v = Number(e.target.value); setVat(v); save(price, v); }}
+          >
+            {SALE_VATS.map((v) => <option key={v} value={String(v)}>{formatVat(v)}</option>)}
+          </select>
+        </span>
+      </div>
+      {error && <div className="cost-sale-err">{error}</div>}
+      {m && (
+        <>
+          <div className="cost-cell">
+            <div className="kpi-l">
+              Marge
+              <Help
+                title="Marge"
+                calc={calc}
+                example="Financier vendu 2,00 € TTC (TVA 5,5 %) : 1,90 € HT. Coût matière 0,45 € → marge 1,45 €."
+              >
+                Ce qu&apos;il te reste sur chaque vente une fois payés les ingrédients : prix de vente
+                hors TVA moins le coût matière. La TVA n&apos;est pas à toi, elle est donc retirée
+                avant. Hors main-d&apos;œuvre, énergie et emballage, qui restent à payer avec cette marge.
+              </Help>
+            </div>
+            <div className="cost-v num" style={{ color: bad ? "var(--danger)" : "var(--accent-2)" }}>{formatEuro(m.margin)}</div>
+            <div className="kpi-s">
+              / {unitLabel}
+              {qty !== 1 && <> · {formatEuro(m.margin * qty)} {per ? `les ${fmtNum(qty, 1)}` : "en tout"}</>}
+            </div>
+          </div>
+          <div className="cost-cell">
+            <div className="kpi-l">
+              Taux de marge
+              <Help
+                title="Taux de marge"
+                calc={"taux = marge ÷ prix HT × 100\ncoefficient = prix de vente ÷ coût matière"}
+                example="Marge 1,45 € sur 1,90 € HT : 76 %. Prix 2,00 € pour 0,45 € de coût : coefficient ×4,4."
+              >
+                La part du prix (hors TVA) qui te reste après les ingrédients. Plus il est haut,
+                mieux c&apos;est : en pâtisserie on vise souvent 70 à 80 %. Le coefficient dit combien
+                de fois le prix de vente couvre le coût matière, comme celui du prix conseillé.
+              </Help>
+            </div>
+            <div className="cost-v num" style={{ color: bad ? "var(--danger)" : undefined }}>{m.rate != null ? `${fmtNum(m.rate, 1)} %` : "—"}</div>
+            {m.coef != null && <div className="kpi-s">coefficient ×{fmtNum(m.coef, 1)}</div>}
+          </div>
+        </>
       )}
     </div>
   );
