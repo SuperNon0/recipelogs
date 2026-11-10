@@ -689,6 +689,20 @@ function CostCard({
     startTransition(async () => { await setRecipeSaleCoef(recipeId, v); });
   };
 
+  const per = pieces && pieces.count > 0 ? pieces : null;
+  const sale = (
+    <SalePriceBlock
+      recipeId={recipeId}
+      cost={cost.total}
+      missing={cost.missing}
+      per={per}
+      scale={scale}
+      initialPrice={initialPrice}
+      initialVat={initialVat}
+      canEdit={canEditCoef}
+    />
+  );
+
   if (!priced) {
     return (
       <div className="fl-card cost-card cost-empty">
@@ -696,12 +710,12 @@ function CostCard({
         <span>
           Renseigne le prix d&apos;achat des ingrédients (Réglages → Ingrédients) ou enregistre tes factures pour voir le coût de revient et un prix de vente conseillé.
         </span>
+        {sale}
         <CostDetail lines={lines} />
       </div>
     );
   }
 
-  const per = pieces && pieces.count > 0 ? pieces : null;
   const each = per ? ` / ${singular(per.label)}` : "";
   const calc = [
     ...cost.detail
@@ -755,15 +769,7 @@ function CostCard({
         <div className="cost-v num" style={{ color: "var(--accent)" }}>{formatEuro(cost.total * coef)}</div>
         {per && <div className="kpi-s">{formatEuro((cost.total * coef) / per.count)}{each}</div>}
       </div>
-      <SalePriceBlock
-        recipeId={recipeId}
-        cost={cost.total}
-        per={per}
-        scale={scale}
-        initialPrice={initialPrice}
-        initialVat={initialVat}
-        canEdit={canEditCoef}
-      />
+      {sale}
       <CostDetail lines={lines} />
       {cost.missing.length > 0 && (
         <div className="cost-missing">
@@ -793,6 +799,7 @@ const parseEuro = (s: string) => {
 function SalePriceBlock({
   recipeId,
   cost,
+  missing,
   per,
   scale,
   initialPrice,
@@ -801,6 +808,8 @@ function SalePriceBlock({
 }: {
   recipeId: number;
   cost: number;
+  /** Ingrédients sans prix : la marge est calculée sans eux. */
+  missing: string[];
   per: { count: number; label: string } | null;
   scale: number;
   initialPrice: number | null;
@@ -845,9 +854,10 @@ function SalePriceBlock({
         ...(vat > 0 ? [`− TVA ${fmtNum(vat)} %`.padEnd(26) + formatEuro(vatPart), "Prix HT".padEnd(26) + formatEuro(m.priceHT)] : []),
         `− Coût matière`.padEnd(26) + formatEuro(unitCost),
         "─".repeat(34),
-        `Marge / ${unitLabel}`.slice(0, 25).padEnd(26) + formatEuro(m.margin),
+        `Marge brute / ${unitLabel}`.slice(0, 25).padEnd(26) + formatEuro(m.margin),
         ...(m.rate != null ? ["Taux de marge".padEnd(26) + `${fmtNum(m.rate, 1)} %`] : []),
         ...(qty !== 1 ? [`× ${fmtNum(qty, 1)} ${per ? per.label : "(multiplicateur)"}`.slice(0, 25).padEnd(26) + formatEuro(m.margin * qty)] : []),
+        ...(missing.length ? ["", "Sans prix, non comptés :", ...missing.map((n) => `  ${n}`)] : []),
       ].join("\n")
     : "Tape ton prix de vente pour voir le calcul.";
 
@@ -891,20 +901,28 @@ function SalePriceBlock({
           </select>
         </span>
       </div>
+      {m && vat > 0 && (
+        <div className="cost-sale-ht">
+          Prix hors TVA : <b className="num">{formatEuro(m.priceHT)}</b> / {unitLabel}
+          <span className="cost-sale-tva"> (TVA {formatEuro(vatPart)})</span>
+        </div>
+      )}
       {error && <div className="cost-sale-err">{error}</div>}
       {m && (
         <>
           <div className="cost-cell">
             <div className="kpi-l">
-              Marge
+              Marge brute
               <Help
-                title="Marge"
+                title="Marge brute"
                 calc={calc}
                 example="Financier vendu 2,00 € TTC (TVA 5,5 %) : 1,90 € HT. Coût matière 0,45 € → marge 1,45 €."
               >
                 Ce qu&apos;il te reste sur chaque vente une fois payés les ingrédients : prix de vente
                 hors TVA moins le coût matière. La TVA n&apos;est pas à toi, elle est donc retirée
                 avant. Hors main-d&apos;œuvre, énergie et emballage, qui restent à payer avec cette marge.
+                Si un ingrédient n&apos;a pas encore de prix, la marge est quand même calculée sans
+                lui (elle est alors un peu trop haute) et le nombre d&apos;ingrédients manquants est signalé.
               </Help>
             </div>
             <div className="cost-v num" style={{ color: bad ? "var(--danger)" : "var(--accent-2)" }}>{formatEuro(m.margin)}</div>
@@ -926,9 +944,14 @@ function SalePriceBlock({
                 de fois le prix de vente couvre le coût matière, comme celui du prix conseillé.
               </Help>
             </div>
-            <div className="cost-v num" style={{ color: bad ? "var(--danger)" : undefined }}>{m.rate != null ? `${fmtNum(m.rate, 1)} %` : "—"}</div>
+            <div className="cost-v num" style={{ color: bad ? "var(--danger)" : "var(--text)" }}>{m.rate != null ? `${fmtNum(m.rate, 1)} %` : "—"}</div>
             {m.coef != null && <div className="kpi-s">coefficient ×{fmtNum(m.coef, 1)}</div>}
           </div>
+          {missing.length > 0 && (
+            <div className="cost-sale-warn">
+              Calculée sans {missing.length} ingrédient{missing.length > 1 ? "s" : ""} sans prix ({missing.slice(0, 3).join(", ")}{missing.length > 3 ? "…" : ""}) : marge un peu surestimée
+            </div>
+          )}
         </>
       )}
     </div>

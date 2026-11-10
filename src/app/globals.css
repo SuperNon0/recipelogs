@@ -2492,6 +2492,26 @@ button.fl-row:hover {
   color: var(--text);
 }
 
+.cost-sale-ht,
+.cost-sale-warn {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.cost-sale-ht b {
+  color: var(--text);
+}
+
+.cost-sale-tva {
+  color: var(--muted);
+}
+
+.cost-sale-warn {
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
 .cost-sale-err {
   grid-column: 1 / -1;
   font-size: 12.5px;

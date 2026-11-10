@@ -254,7 +254,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         const vat = r.saleVat != null ? Number(r.saleVat) : DEFAULT_SALE_VAT;
         const unit = snap?.yield ? snap.yield.count : a.multiplicateur;
         const out: Record<string, unknown> = { prix_vente_eur: price, tva_pourcent: vat, par: snap?.yield ? "pièce" : "recette entière" };
-        if (cost && cost.detail.length > 0 && unit > 0) {
+        if (cost && unit > 0) {
           const m = saleMargin(price, vat, cost.total / unit);
           Object.assign(out, {
             prix_ht_eur: round2(m.priceHT),
@@ -262,6 +262,7 @@ export const RECIPE_TOOLS: McpTool[] = [
             marge_eur: round2(m.margin),
             taux_marge_pourcent: m.rate != null ? Math.round(m.rate * 10) / 10 : null,
             coefficient_reel: m.coef != null ? round2(m.coef) : null,
+            ...(cost.missing.length ? { calculee_sans_ingredients_sans_prix: cost.missing } : {}),
           });
         }
         return out;
