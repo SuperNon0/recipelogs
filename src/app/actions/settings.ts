@@ -279,6 +279,8 @@ async function mergeFacts(tx: Prisma.TransactionClient, target: BaseFacts, sourc
   // L'historique suit le prix gardé : celui des sources seulement si la cible n'avait pas de prix
   // (sinon on mélangerait deux produits dans une même courbe).
   const ids = sources.map((s) => s.id);
+  // Les produits fournisseurs reliés aux sources passent sur la cible.
+  await tx.supplierProduct.updateMany({ where: { baseId: { in: ids } }, data: { baseId: target.id } });
   if (target.price == null) await tx.ingredientPrice.updateMany({ where: { baseId: { in: ids } }, data: { baseId: target.id } });
   else await tx.ingredientPrice.deleteMany({ where: { baseId: { in: ids } } });
 }
@@ -341,7 +343,8 @@ export async function setIngredientPrice(id: number, price: number | null, unit:
   const lastPrice = current.prices[0];
   const changed = price != null && (!lastPrice || Number(lastPrice.price) !== price || lastPrice.priceUnit !== unit);
   await prisma.$transaction([
-    prisma.ingredientBase.update({ where: { id }, data: { price, priceUnit: price != null ? unit : null } }),
+    // Un prix saisi à la main remplace le produit fournisseur choisi.
+    prisma.ingredientBase.update({ where: { id }, data: { price, priceUnit: price != null ? unit : null, chosenProductId: null } }),
     ...(changed ? [prisma.ingredientPrice.create({ data: { baseId: id, price, priceUnit: unit } })] : []),
   ]);
   revalidatePath(`/settings/ingredients/${id}`);

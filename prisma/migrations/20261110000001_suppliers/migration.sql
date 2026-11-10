@@ -19,6 +19,8 @@ CREATE TABLE "supplier_products" (
     "supplier_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "reference" TEXT,
+    "article" TEXT,
+    "family" TEXT,
     "pack_size" DECIMAL(12,4),
     "price" DECIMAL(12,4),
     "price_unit" TEXT NOT NULL DEFAULT 'kg',
@@ -38,6 +40,7 @@ CREATE TABLE "purchase_orders" (
     "number" TEXT,
     "total" DECIMAL(12,2),
     "note" TEXT,
+    "file_path" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "purchase_orders_pkey" PRIMARY KEY ("id")

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, Users, Euro, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const viewer = await requirePage("read");
   const can = (p: Permission) => viewerCan(viewer, p);
-  const [folderCount, categoryCount, ingredientBaseCount, pricedCount, themes, siteUrl, mcpToken] = await Promise.all([
+  const [folderCount, categoryCount, ingredientBaseCount, pricedCount, themes, siteUrl, mcpToken, supplierCount, invoiceCount] = await Promise.all([
     prisma.folder.count(),
     prisma.category.count(),
     prisma.ingredientBase.count(),
@@ -24,6 +24,8 @@ export default async function SettingsPage() {
     listPdfThemes(),
     getSiteUrl(),
     getMcpToken(),
+    prisma.supplier.count(),
+    prisma.purchaseOrder.count(),
   ]);
   const auth = can("accounts.manage") ? await getAuthSettings() : null;
   const accountsWaiting = auth?.enabled ? await prisma.account.count({ where: { status: "pending" } }) : 0;
@@ -94,6 +96,22 @@ export default async function SettingsPage() {
                 title="Prix des ingrédients"
                 sub={`${pricedCount} sur ${ingredientBaseCount} renseignés · pour le coût de revient`}
               />
+            )}
+            {can("costs.view") && (
+              <>
+                <Row
+                  href="/fournisseurs"
+                  icon={Store}
+                  title="Comparer les prix des fournisseurs"
+                  sub={`${plural(supplierCount, "fournisseur")} · tableau des prix payés, article par article`}
+                />
+                <Row
+                  href="/factures"
+                  icon={Receipt}
+                  title="Factures"
+                  sub={`${plural(invoiceCount, "facture")} · envoyées à Claude, avec tout l'historique des prix`}
+                />
+              </>
             )}
           </div>
         </>

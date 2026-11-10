@@ -11,6 +11,24 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.9",
+    date: "2026-11-10",
+    title: "Fournisseurs, factures et comparaison des prix",
+    summary:
+      "Envoie une facture ou un bon de commande à Claude : tous les produits achetés, même ceux qui ne servent pas en recette, et leurs prix sont gardés par fournisseur, à la date de la facture. Un tableau compare les prix de 3 fournisseurs et, dans une recette, tu choisis le produit (et donc le fournisseur) dont le prix compte.",
+    features: [
+      "Factures : envoie la photo ou le PDF d'une facture à Claude (« enregistre cette facture dans RecipeLog »). Le fournisseur est créé tout seul, chaque ligne devient un produit de ce fournisseur avec son prix ramené au kg, au litre ou à la pièce, et Claude te dit ce qui a augmenté ou baissé",
+      "Rien n'est jamais écrasé : chaque prix reste dans l'historique avec la date de sa facture. Une même facture (même numéro) n'est pas enregistrée deux fois",
+      "Comparer les prix (menu « Prix fournisseurs » ou Réglages) : un tableau avec une ligne par article, rangé par famille (Chocolat, Crèmerie et œufs, Épicerie, Emballages…), et une colonne par fournisseur (3 au plus, à cocher en haut). Le moins cher est en vert, une croix ✕ quand le fournisseur n'a pas l'article, et une flèche rouge ou verte quand le prix a bougé depuis la facture précédente. Filtres « Tout » ou « Souvent commandés » et recherche",
+      "Touche un prix : tout son historique (dernier prix, moyenne, plus bas et plus haut), avec un filtre du… au…, et chaque prix ouvre sa facture. On peut aussi y relier le produit à un ingrédient des recettes, changer le nom sous lequel il est comparé et sa famille",
+      "Factures : la liste de toutes les factures, filtrable par fournisseur et par période (du… au…) avec le total, et pour chacune ses lignes, son total et la photo ou le PDF d'origine à joindre",
+      "Fiche fournisseur : ses produits avec le dernier prix, l'évolution et la moyenne, et toutes ses factures",
+      "Coût d'une recette : le détail ingrédient par ingrédient, avec le produit dont vient le prix (« Guanaja 70 % · Choframa »). Touche un ingrédient pour choisir parmi tous ses produits, chez tous les fournisseurs, avec ce qu'ils coûtent dans la recette ; le choix vaut pour toutes les recettes et suit les prochaines factures",
+      "Fiche d'un ingrédient : la liste de ses produits fournisseurs, le moins cher signalé, et celui qui est utilisé. Un prix tapé à la main remplace le produit choisi",
+    ],
+    migrations: ["Base de données : nouvelles tables des fournisseurs, de leurs produits et des factures, et le produit choisi pour chaque ingrédient"],
+  },
+  {
     version: "V2.8",
     date: "2026-11-09",
     title: "Comptes, rôles et permissions",

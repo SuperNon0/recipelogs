@@ -5,6 +5,7 @@ import { getIngredientBaseDetail, listAllIngredientBases } from "@/lib/recipes";
 import { IngredientDetailClient } from "@/components/IngredientDetailClient";
 import { requirePage } from "@/lib/auth/guard";
 import { viewerCan } from "@/lib/auth/viewer";
+import { productChoicesFor } from "@/lib/purchaseOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,8 @@ export default async function IngredientDetailPage({
   if (!detail) notFound();
 
   const otherBases = allBases.filter((b) => b.id !== baseId);
+  const showCosts = viewerCan(viewer, "costs.view");
+  const choice = showCosts ? ((await productChoicesFor([detail.base.name])).find((c) => c.baseId === baseId) ?? null) : null;
 
   return (
     <div className="set-page">
@@ -33,13 +36,14 @@ export default async function IngredientDetailPage({
       </Link>
       <IngredientDetailClient
         base={
-          viewerCan(viewer, "costs.view")
+          showCosts
             ? detail.base
             : { ...detail.base, price: null, priceHistory: [] }
         }
         recipes={detail.recipes}
         viaRecipes={detail.viaRecipes}
         otherBases={otherBases.map((b) => ({ id: b.id, name: b.name, count: b._count.usages }))}
+        productChoice={showCosts ? choice : undefined}
       />
     </div>
   );

@@ -150,6 +150,10 @@ model SupplierProduct {
   supplierId Int       @map("supplier_id")
   name       String
   reference  String?
+  /** Nom commun pour comparer entre fournisseurs (« Chocolat noir 64 % »). */
+  article    String?
+  /** Famille du tableau comparatif (Chocolat, Crèmerie, Emballages…). */
+  family     String?
   /** Contenance d'un colis dans `priceUnit` (25 pour un sac de 25 kg). */
   packSize   Decimal?  @map("pack_size") @db.Decimal(12, 4)
   price      Decimal?  @db.Decimal(12, 4)
@@ -178,6 +182,8 @@ model PurchaseOrder {
   number     String?
   total      Decimal? @db.Decimal(12, 2)
   note       String?
+  /** Photo ou PDF de la facture, dans le dossier d'upload (factures/…). */
+  filePath   String?  @map("file_path")
   createdAt  DateTime @default(now()) @map("created_at")
 
   supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)

@@ -260,7 +260,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
     name: "regler_fiches_ingredients",
     title: "Régler les fiches d'ingrédients",
     description:
-      "Règle, pour un ou plusieurs ingrédients (par id ou nom exact sans casse), ce que leur fiche apporte aux calculs : les allergènes INCO (la liste donnée REMPLACE celle de l'ingrédient ; [] pour tout décocher), le poids d'une pièce en grammes (null pour l'effacer) et le prix d'achat en € par kg, L ou pièce (null pour l'effacer ; l'ancien prix reste dans l'historique). Les recettes en tiennent compte toutes seules (allergènes cumulés, pièces comptées dans la masse, coût de revient). " +
+      "Règle, pour un ou plusieurs ingrédients (par id ou nom exact sans casse), ce que leur fiche apporte aux calculs : les allergènes INCO (la liste donnée REMPLACE celle de l'ingrédient ; [] pour tout décocher), le poids d'une pièce en grammes (null pour l'effacer) et le prix d'achat en € par kg, L ou pièce (null pour l'effacer ; l'ancien prix reste dans l'historique). Les recettes en tiennent compte toutes seules (allergènes cumulés, pièces comptées dans la masse, coût de revient). Pour les prix d'une facture ou d'un bon de commande, utilise enregistrer_facture à la place (un prix mis ici remplace le produit fournisseur choisi). " +
       `Clés d'allergènes : ${ALLERGENS.map((a) => `${a.key} (${a.label})`).join(", ")}.`,
     inputSchema: {
       type: "object",
@@ -318,7 +318,7 @@ export const INGREDIENT_TOOLS: McpTool[] = [
           data: {
             ...(allergens !== undefined ? { allergens } : {}),
             ...(f.poids_piece_g !== undefined ? { pieceG: f.poids_piece_g } : {}),
-            ...(f.prix !== undefined ? { price: f.prix, priceUnit: f.prix != null ? f.unite_prix : null } : {}),
+            ...(f.prix !== undefined ? { price: f.prix, priceUnit: f.prix != null ? f.unite_prix : null, chosenProductId: null } : {}),
           },
         });
         if (priceChanged) {
