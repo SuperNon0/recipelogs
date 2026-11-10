@@ -1,0 +1,423 @@
+/* Fournisseurs : tableau comparatif des prix, factures, historique. */
+
+.sup-page {
+  max-width: 1100px;
+}
+
+.sup-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 12px;
+}
+
+.sup-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sup-search {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Tableau comparatif */
+.sup-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow-x: auto;
+}
+
+.sup-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sup-table th,
+.sup-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sup-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.sup-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft);
+  background: var(--surface);
+}
+
+.sup-table th a:hover {
+  color: var(--accent);
+}
+
+.sup-table th:first-child,
+.sup-table td:first-child {
+  text-align: left;
+  white-space: normal;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
+  padding-left: 14px;
+}
+
+.sup-table th:first-child {
+  background: var(--surface);
+}
+
+.sup-table td:first-child b {
+  font-weight: 500;
+}
+
+.sup-table td:first-child small {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-top: 1px;
+}
+
+.sup-table tr.sup-fam td {
+  background: var(--pop, var(--surface));
+  padding: 7px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sup-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  font: inherit;
+}
+
+.sup-cell:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sup-cell.best {
+  color: var(--accent-2);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent-2) 13%, transparent);
+}
+
+.sup-unit {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.sup-none {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.sup-chg {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sup-chg.up {
+  color: var(--danger);
+}
+
+.sup-chg.down {
+  color: var(--accent-2);
+}
+
+.sup-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+.sup-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  margin-right: 5px;
+}
+
+@media (max-width: 640px) {
+  .sup-table th,
+  .sup-table td {
+    padding: 10px 6px;
+    font-size: 13.5px;
+  }
+
+  .sup-table th:first-child,
+  .sup-table td:first-child {
+    width: 38%;
+    padding-left: 12px;
+  }
+
+  .sup-table .sup-unit {
+    display: none;
+  }
+
+  .sup-cell {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    padding: 2px 5px;
+  }
+
+  .sup-table th {
+    font-size: 11.5px;
+    white-space: normal;
+  }
+}
+
+/* Historique d'un produit (fenêtre) */
+.sup-hist-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sup-hist-stats div {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+}
+
+.sup-hist-stats small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sup-hist-stats b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.sup-range {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sup-range > .sup-dates {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 280px;
+  min-width: 0;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sup-range input.fl-input {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+.sup-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--soft);
+  font-size: 13.5px;
+}
+
+.sup-num.strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sup-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border2);
+  font-weight: 600;
+}
+
+/* Lignes d'une facture */
+.inv-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: center;
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.inv-line:first-child {
+  border-top: 0;
+}
+
+.inv-line small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inv-line .r {
+  text-align: right;
+}
+
+.inv-file {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inv-preview {
+  margin-top: 12px;
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+/* Choix du produit (coût d'une recette, fiche ingrédient) */
+.pick-opt {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pick-opt[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.pick-rad {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  flex: none;
+}
+
+.pick-opt[aria-pressed="true"] .pick-rad {
+  border: 6px solid var(--accent);
+}
+
+.pick-opt .t {
+  flex: 1;
+  min-width: 0;
+}
+
+.pick-opt .t b {
+  font-weight: 500;
+}
+
+.pick-opt .t small,
+.pick-opt .p small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pick-opt .p {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pick-cheap {
+  color: var(--accent-2);
+  font-weight: 600;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.cost-lines {
+  display: grid;
+}
+
+.cost-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  width: 100%;
+}
+
+.cost-line:first-child {
+  border-top: 0;
+}
+
+button.cost-line {
+  cursor: pointer;
+}
+
+button.cost-line:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cost-line b {
+  font-weight: 500;
+}
+
+.cost-line small {
+  display: block;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.cost-line small.none {
+  color: var(--muted);
+}
+
+.cost-line .v {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

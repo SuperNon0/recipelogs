@@ -13,6 +13,8 @@ import { ALLERGENS } from "@/lib/allergens";
 import { Help } from "@/components/ui/Help";
 import { EmptyState } from "@/components/EmptyState";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
+import { IngredientProducts } from "@/components/suppliers/IngredientProducts";
+import type { ProductChoice } from "@/lib/purchaseOrders";
 
 type Recipe = { id: number; name: string; ingredientName: string; quantityG: number; unit: string };
 
@@ -22,6 +24,7 @@ export function IngredientDetailClient({
   recipes,
   viaRecipes = [],
   otherBases,
+  productChoice,
 }: {
   base: {
     id: number;
@@ -36,6 +39,8 @@ export function IngredientDetailClient({
   /** Recettes qui l'utilisent à travers une sous-recette. */
   viaRecipes?: { id: number; name: string; via: string }[];
   otherBases: { id: number; name: string; count?: number }[];
+  /** Produits fournisseurs reliés (absent sans la permission de voir les prix). */
+  productChoice?: ProductChoice | null;
 }) {
   const router = useRouter();
   const can = useCan();
@@ -77,6 +82,8 @@ export function IngredientDetailClient({
         <AllergensField id={base.id} initial={base.allergens} />
         <PieceWeightField id={base.id} initial={base.pieceG} />
       </section>
+
+      {productChoice !== undefined && <IngredientProducts choice={productChoice} />}
 
       <div className="sect-title" style={{ marginTop: 8 }}>
         <h2>Recettes</h2>

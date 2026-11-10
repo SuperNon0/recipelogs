@@ -32,6 +32,7 @@ import { MOLD_PRESETS, moldCoef, moldLabel, moldsFilled, type Mold } from "@/lib
 import { MoldPicker } from "./MoldPicker";
 import { DEFAULT_SALE_COEF, costOf, formatEuro, type IngredientPrice } from "@/lib/cost";
 import { ModalOverlay } from "./ModalOverlay";
+import { CostDetail } from "./suppliers/CostDetail";
 import { Help } from "./ui/Help";
 import { useCan } from "./auth/Permissions";
 import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
@@ -678,8 +679,9 @@ function CostCard({
       <div className="fl-card cost-card cost-empty">
         <span className="kpi-l">Coût matière</span>
         <span>
-          Renseigne le prix d&apos;achat des ingrédients (Réglages → Ingrédients) pour voir le coût de revient et un prix de vente conseillé.
+          Renseigne le prix d&apos;achat des ingrédients (Réglages → Ingrédients) ou enregistre tes factures pour voir le coût de revient et un prix de vente conseillé.
         </span>
+        <CostDetail lines={lines} />
       </div>
     );
   }
@@ -738,6 +740,7 @@ function CostCard({
         <div className="cost-v num" style={{ color: "var(--accent)" }}>{formatEuro(cost.total * coef)}</div>
         {per && <div className="kpi-s">{formatEuro((cost.total * coef) / per.count)}{each}</div>}
       </div>
+      <CostDetail lines={lines} />
       {cost.missing.length > 0 && (
         <div className="cost-missing">
           {cost.missing.length} ingrédient{cost.missing.length > 1 ? "s" : ""} sans prix, non compté{cost.missing.length > 1 ? "s" : ""}

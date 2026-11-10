@@ -6,11 +6,13 @@ import { ORGANISATION_TOOLS } from "./organisation";
 import { RECIPE_TOOLS } from "./recipes";
 import { SHOPPING_TOOLS } from "./shopping";
 import { SITE_TOOLS } from "./site";
+import { SUPPLIER_TOOLS } from "./suppliers";
 import { VIDEO_TOOLS } from "./video";
 
 /** Groupes d'outils proposés à Claude, dans l'ordre affiché dans Réglages → Accès MCP. */
 export const MCP_TOOL_GROUPS: { title: string; tools: McpTool[] }[] = [
   { title: "Ingrédients", tools: INGREDIENT_TOOLS },
+  { title: "Fournisseurs, factures et prix", tools: SUPPLIER_TOOLS },
   { title: "Recettes", tools: RECIPE_TOOLS },
   { title: "Variantes, moules, production et recherche", tools: LABO_TOOLS },
   { title: "Vidéos et liens", tools: VIDEO_TOOLS },

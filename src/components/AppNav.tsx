@@ -15,6 +15,7 @@ import {
   Settings2,
   ShoppingBasket,
   Star,
+  Store,
   Wheat,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +56,13 @@ const NAV: NavItem[] = [
   { href: "/shopping", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
   { href: "/production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
   { href: "/settings/ingredients", needs: "organize.edit", label: "Ingrédients", icon: Wheat, match: (p) => p.startsWith("/settings/ingredients") },
+  {
+    href: "/fournisseurs",
+    needs: "costs.view",
+    label: "Prix fournisseurs",
+    icon: Store,
+    match: (p) => p.startsWith("/fournisseurs") || p.startsWith("/factures"),
+  },
 ];
 
 const TABS: NavItem[] = [
