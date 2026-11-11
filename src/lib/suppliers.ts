@@ -181,3 +181,56 @@ export function packLabel(packSize: number | null, unit: string): string | null 
 export function isPriceUnitLoose(u: unknown): u is PriceUnit {
   return PRICE_UNITS.includes(u as PriceUnit);
 }
+
+/** Contenance lue dans la désignation d'un produit (poids, volume, nombre par colis). */
+export type PackagingFound = {
+  /** Poids ou volume lu, ramené en kg ou L (le poids net égoutté « PNE » d'abord). */
+  amount: { value: number; unit: "kg" | "L"; drained: boolean } | null;
+  /** « x 50 », « x50 » : nombre d'unités dans le colis. */
+  count: number | null;
+};
+
+const frNum = (s: string) => Number(s.replace(",", "."));
+
+/**
+ * Lit la contenance écrite dans une désignation de facture : « boîte 4,2 kg
+ * PNE 2,4 kg » → 2,4 kg égoutté ; « 700 ml » → 0,7 L ; « 16 x 8 x 50 » → 50.
+ */
+export function readPackaging(name: string): PackagingFound {
+  const s = ` ${name.toLowerCase()} `;
+  const amounts: { value: number; unit: "kg" | "L"; drained: boolean; at: number }[] = [];
+  const re = /(pne|p\.n\.e\.?|égoutté|egoutte)?\s*:?\s*(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)(?![a-zà-ÿ])/g;
+  for (let m; (m = re.exec(s)); ) {
+    const v = frNum(m[2]);
+    if (!(v > 0)) continue;
+    const u = m[3];
+    const value = u === "kg" || u === "l" ? v : u === "g" || u === "ml" ? v / 1000 : v / 100;
+    amounts.push({ value: Math.round(value * 10000) / 10000, unit: u === "kg" || u === "g" ? "kg" : "L", drained: !!m[1], at: m.index });
+  }
+  const drained = amounts.find((a) => a.drained);
+  const first = drained ?? amounts[0];
+  const counts = [...s.matchAll(/(?:^|[\s\d])x\s*(\d{1,4})(?![\d.,]|\s*(?:cm|mm|m)\b)/g)].map((m) => Number(m[1]));
+  const count = counts.length ? counts[counts.length - 1] : null;
+  return {
+    amount: first ? { value: first.value, unit: first.unit, drained: first.drained } : null,
+    count: count && count > 1 ? count : null,
+  };
+}
+
+/**
+ * Ligne de facture à vérifier : prix « à la pièce » alors que la désignation
+ * donne un poids, un volume ou un nombre par colis, sans contenance indiquée.
+ * Renvoie une phrase pour Claude / l'utilisateur, ou null si tout va bien.
+ */
+export function packagingWarning(line: { product: string; unit: string; packSize?: number | null }): string | null {
+  if (line.unit !== "pièce" || (line.packSize != null && line.packSize > 1)) return null;
+  const p = readPackaging(line.product);
+  if (p.count) {
+    return `${line.product} : colis de ${p.count} ? Si le prix est celui du colis, mets contenance = ${p.count} (prix par pièce calculé).`;
+  }
+  if (p.amount && p.amount.value >= 1) {
+    const what = p.amount.drained ? "poids net égoutté" : p.amount.unit === "kg" ? "poids" : "volume";
+    return `${line.product} : ${what} ${p.amount.value.toLocaleString("fr-FR")} ${p.amount.unit} lu dans la désignation. Préfère unite_prix = ${p.amount.unit} avec contenance = ${p.amount.value} pour un prix au ${p.amount.unit} comparable.`;
+  }
+  return null;
+}

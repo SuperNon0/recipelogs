@@ -26,6 +26,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Coût d'une recette : le détail ingrédient par ingrédient, avec le produit dont vient le prix (« Guanaja 70 % · Choframa »). Touche un ingrédient pour choisir parmi tous ses produits, chez tous les fournisseurs, avec ce qu'ils coûtent dans la recette ; le choix vaut pour toutes les recettes et suit les prochaines factures",
       "Fiche d'un ingrédient : la liste de ses produits fournisseurs, le moins cher signalé, et celui qui est utilisé. Un prix tapé à la main remplace le produit choisi",
     ],
+    fixes: [
+      "Lecture des factures plus fine : les boîtes de conserve sont comptées au kg de poids net égoutté, les bouteilles au litre et les cartons « x 50 » à la pièce, au lieu d'un prix par boîte ou par carton. Claude signale les lignes à vérifier",
+      "Claude joint tout seul le PDF ou la photo de la facture qu'il enregistre, quand il peut envoyer le fichier ; sinon il te donne le lien de la facture pour toucher « Joindre un PDF »",
+      "Corriger une facture déjà enregistrée garde sa remarque, et retire les produits qui n'y sont plus",
+    ],
     migrations: ["Base de données : nouvelles tables des fournisseurs, de leurs produits et des factures, et le produit choisi pour chaque ingrédient"],
   },
   {
