@@ -139,7 +139,13 @@ export async function chooseProductForIngredient(baseId: number, productId: numb
       select: { id: true, baseId: true, price: true, priceUnit: true },
     });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId !== baseId) await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
+    if (product.baseId !== baseId) {
+      // Le produit change d'ingrédient : l'ancien ne le suit plus (il garde son dernier prix).
+      if (product.baseId != null) {
+        await tx.ingredientBase.updateMany({ where: { id: product.baseId, chosenProductId: productId }, data: { chosenProductId: null } });
+      }
+      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
+    }
     await tx.ingredientBase.update({ where: { id: baseId }, data: { chosenProductId: productId } });
     await applyProductPrice(tx, baseId, product, base.prices[0]);
   });
@@ -721,3 +727,39 @@ export async function productChoicesFor(names: string[]) {
 }
 
 export type ProductChoice = Awaited<ReturnType<typeof productChoicesFor>>[number];
+
+/**
+ * Tous les produits des fournisseurs qui ont un prix, pour en chercher un
+ * depuis le coût d'une recette et le relier à un ingrédient.
+ */
+export async function searchableProducts() {
+  const products = await prisma.supplierProduct.findMany({
+    where: { price: { not: null } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      article: true,
+      packSize: true,
+      price: true,
+      priceUnit: true,
+      priceDate: true,
+      supplier: { select: { id: true, name: true } },
+      base: { select: { id: true, name: true } },
+    },
+  });
+  return products.map((p) => ({
+    productId: p.id,
+    name: p.name,
+    article: p.article,
+    supplierId: p.supplier.id,
+    supplier: p.supplier.name,
+    packLabel: packLabel(num(p.packSize), p.priceUnit),
+    price: Number(p.price),
+    unit: (isPriceUnit(p.priceUnit) ? p.priceUnit : "kg") as PriceUnit,
+    date: p.priceDate ? isoDay(p.priceDate) : null,
+    base: p.base,
+  }));
+}
+
+export type SearchableProduct = Awaited<ReturnType<typeof searchableProducts>>[number];

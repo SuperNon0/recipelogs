@@ -9,7 +9,9 @@ import {
   deletePurchaseOrder,
   linkProductToIngredient,
   productChoicesFor,
+  searchableProducts,
   type ProductChoice,
+  type SearchableProduct,
 } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, invoiceExt, removeInvoiceFile, saveInvoiceFile } from "@/lib/invoiceFiles";
 
@@ -20,6 +22,12 @@ const fail = (e: unknown): ActionResult => ({ ok: false, error: e instanceof Err
 export async function getProductChoices(names: string[]): Promise<ProductChoice[]> {
   await requireAccess("costs.view");
   return productChoicesFor(names.slice(0, 300));
+}
+
+/** Tous les produits des fournisseurs avec un prix (recherche depuis le coût d'une recette). */
+export async function getSearchableProducts(): Promise<SearchableProduct[]> {
+  await requireAccess("costs.view");
+  return searchableProducts();
 }
 
 /** L'ingrédient utilise le prix de ce produit (null : plus de produit choisi). */

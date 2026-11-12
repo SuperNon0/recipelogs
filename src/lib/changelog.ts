@@ -13,14 +13,16 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "V2.10",
     date: "2026-11-12",
-    title: "Variantes d'un même article regroupées",
+    title: "Variantes regroupées et produit à choisir depuis la recette",
     summary:
-      "Chez un fournisseur, « Fraise France » et « Fraise Espagne » sont maintenant un seul article « Fraise » : une seule ligne, un seul historique de prix au kilo, et chaque prix rappelle ce qui était écrit sur la facture et ouvre la facture du jour.",
+      "Chez un fournisseur, « Fraise France » et « Fraise Espagne » sont maintenant un seul article « Fraise » : une seule ligne, un seul historique de prix au kilo, et chaque prix rappelle ce qui était écrit sur la facture et ouvre la facture du jour. Dans une recette, un ingrédient sans prix se relie en deux touchers à un produit de tes fournisseurs.",
     features: [
       "Fiche fournisseur : les produits rangés sous le même nom (« Comparer sous le nom ») tiennent sur une ligne, avec la liste des variantes, le dernier prix payé, l'évolution et la moyenne de l'article",
       "Touche l'article : tous les prix de toutes les variantes, du plus récent au plus ancien, avec la désignation de la facture (« Fraise Espagne cat I ») et le lien vers la facture. Le « ? » explique le regroupement, et chaque variante s'ouvre pour la relier à un ingrédient ou la ranger ailleurs",
       "Tableau « Comparer » : la case d'un fournisseur montre le dernier prix payé pour l'article, quelle que soit la variante, et son évolution par rapport à la variante achetée avant",
       "Coût des recettes : un ingrédient relié à une variante suit le dernier prix payé pour l'article. Si les fraises viennent d'Espagne cette fois, c'est leur prix qui compte",
+      "Coût d'une recette : un ingrédient sans prix (la farine, par exemple) reste toujours visible dans le détail. Touche-le pour chercher le bon produit chez tes fournisseurs, sans passer par la page Fournisseurs : tu choisis un fournisseur (ou « Tous »), tu tapes un mot, et tu vois chaque produit avec son prix au kg et ce qu'il coûte dans la recette. Un toucher relie le produit à l'ingrédient, pour toutes tes recettes. Le « ? » explique comment ça marche",
+      "Même pour un ingrédient qui a déjà un produit, « Chercher un autre produit chez les fournisseurs » permet d'en choisir un autre",
       "Claude range tout seul les nouvelles lignes de facture sous l'article existant (fraise, tomate, citron vert…) et sépare seulement quand la différence compte (chocolat par %, crème par matière grasse, farine par type). En cas de doute, il te demande",
     ],
   },
