@@ -6,7 +6,7 @@ Outil conçu pour le travail d'un pâtissier pro (et quelques recettes perso). I
 
 **Version actuelle : V2.8** (le numéro complet, par ex. V2.5.106, est affiché dans le menu et dans Réglages → Version et nouveautés) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
-> Ce fichier est **la documentation du projet**. Le journal des nouveautés affiché dans l'appli est `src/lib/changelog.ts` (règles dans `CLAUDE.md`). Les idées mises de côté pour plus tard sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md).
+> Ce fichier est **la documentation du projet**. Le journal des nouveautés affiché dans l'appli est `src/lib/changelog.ts` (règles dans `CLAUDE.md`). Les idées mises de côté pour plus tard sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md). Connexion par Cloudflare (Google + code par mail, demandes d'accès) : [`docs/connexion-cloudflare/`](docs/connexion-cloudflare/README.md).
 
 Choix de fond : pas de planning ni de calendrier, pas de photos, aucun service payant (API), une appli sobre avec peu de boutons visibles.
 
@@ -350,6 +350,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/sta
 ### Cloudflare Zero Trust
 - **Tunnel** (`cloudflared service install <TOKEN>` dans le container) → hostname `recipe.super-nono.cc` → `HTTP localhost:80`.
 - **Access** : application self-hosted sur le domaine, politique email + OTP.
+- **Ouvrir la connexion à tout le monde** (Google + code par mail, puis demande d'accès acceptée dans RecipeLog) : voir [`docs/connexion-cloudflare/`](docs/connexion-cloudflare/README.md).
 - Compte de maintenance : `RECIPELOG_ADMIN_EMAILS` dans `/opt/recipelog/.env` (voir `src/lib/auth/maintenance.ts`).
 
 ### Mise à jour
