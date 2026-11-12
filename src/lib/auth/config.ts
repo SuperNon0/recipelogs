@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeTeam } from "./cloudflare";
+import { isDemo } from "@/lib/demo";
 
 /**
  * Réglages des comptes, rangés dans la table settings (clé « auth »).
@@ -18,7 +19,7 @@ export async function getAuthSettings(): Promise<AuthSettings> {
   const row = await prisma.setting.findUnique({ where: { key: KEY } });
   const v = (row?.value ?? {}) as Partial<AuthSettings>;
   return {
-    enabled: v.enabled === true && process.env.RECIPELOG_AUTH_OFF !== "1",
+    enabled: v.enabled === true && process.env.RECIPELOG_AUTH_OFF !== "1" && !isDemo(),
     team: typeof v.team === "string" ? v.team : "",
     aud: typeof v.aud === "string" ? v.aud : "",
   };
