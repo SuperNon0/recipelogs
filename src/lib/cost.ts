@@ -68,3 +68,31 @@ export function formatEuro(v: number): string {
   const digits = Math.abs(v) < 1 && v !== 0 ? 3 : 2;
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: digits }) + " €";
 }
+
+/** TVA proposées pour le prix de vente, en % (0 = prix déjà HT). */
+export const SALE_VATS = [5.5, 10, 20, 0] as const;
+/** TVA par défaut : vente à emporter de pâtisserie. */
+export const DEFAULT_SALE_VAT = 5.5;
+
+/**
+ * Marge sur un prix de vente.
+ * - `price` : prix de vente tel qu'affiché au client, TVA `vat` % comprise (0 = HT) ;
+ * - `cost` : coût matière de ce qui est vendu (une pièce, ou la recette entière).
+ * La marge se calcule sur le prix HT : la TVA n'est pas gardée.
+ * `rate` = marge ÷ prix HT × 100 ; `coef` = prix de vente ÷ coût matière.
+ */
+export function saleMargin(price: number, vat: number, cost: number): { priceHT: number; margin: number; rate: number | null; coef: number | null } {
+  const priceHT = price / (1 + (vat > 0 ? vat : 0) / 100);
+  const margin = priceHT - cost;
+  return {
+    priceHT,
+    margin,
+    rate: priceHT > 0 ? (margin / priceHT) * 100 : null,
+    coef: cost > 0 ? price / cost : null,
+  };
+}
+
+/** « 5,5 % » ou « HT ». */
+export function formatVat(vat: number): string {
+  return vat > 0 ? `TTC ${vat.toLocaleString("fr-FR")} %` : "HT";
+}
