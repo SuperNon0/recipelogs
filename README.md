@@ -336,23 +336,21 @@ pnpm dev                      # http://localhost:3000
 ## 11. Production (Proxmox LXC)
 
 ### Installation initiale
-1. **Créer le container** sur l'hôte Proxmox :
-   ```bash
-   bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/debian.sh)"
-   ```
-   Debian 12 ou 13, unprivileged, **2 CPU, 4 Go RAM, 20 Go disque minimum** (le serveur actuel : Debian 13, 51 Go).
-2. **Activer Nesting** (obligatoire pour Chromium) : Options → Features → Nesting, ou `pct set <VMID> --features nesting=1 && pct reboot <VMID>`.
-3. **Installer l'appli** dans le container (`pct enter <VMID>`) :
-   ```bash
-   apt-get install -y curl git && \
-   curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/deploy/proxmox/setup.sh | bash
-   ```
-   `setup.sh` installe Node 22, pnpm, PostgreSQL, Chromium, nginx, clone dans `/opt/recipelog`, crée la base, le `.env`, le dossier photos `/var/lib/recipelog/uploads`, build, puis installe le service systemd `recipelog`, nginx, UFW et la règle sudoers du bouton de mise à jour.
+Un nouveau site (pour soi ou pour quelqu'un d'autre) s'installe **en une commande** dans le shell de l'hôte Proxmox, en root :
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/stable/deploy/proxmox/install.sh)"
+```
+`install.sh` crée un conteneur LXC Debian 12 (unprivileged, nesting, 2 CPU, 4 Go, 20 Go), puis y lance `setup.sh` : Node 22, pnpm, PostgreSQL, Chromium, nginx, code dans `/opt/recipelog` sur la branche choisie, base et `.env`, service `recipelog`, scripts protégés `recipelog-deploy` et `recipelog-backup` (sauvegarde chaque nuit à 3 h), puis le site lui-même par le même chemin qu'une mise à jour (paquet GitHub). Tuto pas à pas, Cloudflare et Claude compris : [`docs/installer-un-nouveau-site.md`](docs/installer-un-nouveau-site.md).
+
+### Bêta et stable
+- `main` = **bêta** : les PR y sont fusionnées, le site de Noë la suit.
+- `stable` = version validée : les autres sites la suivent. Pour la mettre à jour, avancer `stable` sur `main` (« passe la bêta en stable »).
+- Le bouton « Mettre à jour le site » suit la branche sur laquelle le serveur est installé (`git pull`), et GitHub construit un paquet pour les deux branches.
 
 ### Cloudflare Zero Trust
 - **Tunnel** (`cloudflared service install <TOKEN>` dans le container) → hostname `recipe.super-nono.cc` → `HTTP localhost:80`.
 - **Access** : application self-hosted sur le domaine, politique email + OTP.
-- `NEXTAUTH_URL` dans `/opt/recipelog/.env` doit correspondre au domaine.
+- Compte de maintenance : `RECIPELOG_ADMIN_EMAILS` dans `/opt/recipelog/.env` (voir `src/lib/auth/maintenance.ts`).
 
 ### Mise à jour
 Bouton **Réglages, Mettre à jour le site**, ou :
@@ -360,7 +358,7 @@ Bouton **Réglages, Mettre à jour le site**, ou :
 /usr/local/sbin/recipelog-deploy   # --force : refait la mise à jour même sans nouveauté
                                                # --local-build : construit sur le serveur, sans GitHub
 ```
-Le site n'est plus construit sur le serveur (15 à 20 min sur son disque dur) : à chaque mise à jour de `main`, GitHub Actions le construit (`.github/workflows/server-build.yml`, environ 2 min) et publie le paquet `recipelog-<commit>.tar.gz` dans la release **`server-builds`** du dépôt (10 derniers gardés, ne pas la supprimer).
+Le site n'est plus construit sur le serveur (15 à 20 min sur son disque dur) : à chaque mise à jour de `main` ou de `stable`, GitHub Actions le construit (`.github/workflows/server-build.yml`, environ 2 min) et publie le paquet `recipelog-<commit>.tar.gz` dans la release **`server-builds`** du dépôt (10 derniers gardés, ne pas la supprimer).
 
 #### Installations Proxmox existantes
 

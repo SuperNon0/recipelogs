@@ -1,214 +1,205 @@
 #!/usr/bin/env bash
 # ============================================================
-# setup.sh — Installation complète de RecipeLog dans le LXC
-# À exécuter UNE SEULE FOIS dans le container fraîchement créé
+# setup.sh — Installation complète de RecipeLog dans le conteneur
 #
-# Usage (dans le container, en root) :
-#   bash /tmp/setup.sh
+# Le plus simple : lancer install.sh sur l'hôte Proxmox, qui crée le conteneur
+# et lance ce script dedans (voir docs/installer-un-nouveau-site.md).
+#
+# À la main, dans un conteneur Debian 12 neuf, en root :
+#   RECIPELOG_BRANCH=stable RECIPELOG_ADMIN_EMAILS=moi@exemple.fr bash setup.sh
+#
+# Réglages (variables d'environnement, ou fichier /root/recipelog-install.env) :
+#   RECIPELOG_BRANCH       branche suivie par le site et par ses mises à jour
+#                          (main = bêta, stable = version validée). Défaut : main
+#   RECIPELOG_ADMIN_EMAILS adresse(s) du compte de maintenance (administrateur
+#                          caché, voir src/lib/auth/maintenance.ts). Facultatif
+#   CF_TUNNEL_TOKEN        jeton du tunnel Cloudflare. Facultatif : sans lui,
+#                          installer le tunnel plus tard
+#   RECIPELOG_REPO         dépôt GitHub. Défaut : SuperNon0/recipelogs
 # ============================================================
 set -euo pipefail
+
+CONF="/root/recipelog-install.env"
+if [ -f "${CONF}" ]; then
+  # shellcheck disable=SC1090
+  . "${CONF}"
+fi
+
+BRANCH="${RECIPELOG_BRANCH:-main}"
+ADMIN_EMAILS="${RECIPELOG_ADMIN_EMAILS:-}"
+TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}"
+REPO="${RECIPELOG_REPO:-https://github.com/SuperNon0/recipelogs.git}"
 
 APP_USER="recipelog"
 APP_DIR="/opt/recipelog"
 DB_NAME="recipelog"
 DB_USER="recipelog"
-DB_PASS="$(openssl rand -base64 24)"
 NODE_VERSION="22"
+export DEBIAN_FRONTEND=noninteractive
+
+if [ "${EUID}" -ne 0 ]; then
+  echo "À lancer en root." >&2
+  exit 1
+fi
 
 echo "======================================================"
-echo "  RecipeLog — Installation LXC"
+echo "  RecipeLog — installation (branche ${BRANCH})"
 echo "======================================================"
 
 # ── 1. Paquets système ────────────────────────────────────
-echo "==> Mise à jour et installation des paquets..."
+echo "==> Paquets système..."
 apt-get update -qq
 apt-get install -y -qq \
-  curl git build-essential ca-certificates \
-  postgresql postgresql-contrib \
-  nginx chromium ffmpeg \
-  openssl ufw
+  curl git sudo cron build-essential ca-certificates gnupg openssl \
+  postgresql postgresql-contrib nginx chromium ffmpeg
 
-# ── 2. Node.js ───────────────────────────────────────────
-echo "==> Installation de Node.js ${NODE_VERSION}..."
-curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash -
-apt-get install -y -qq nodejs
+# ── 2. Node.js et pnpm ───────────────────────────────────
+if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" != "${NODE_VERSION}" ]; then
+  echo "==> Node.js ${NODE_VERSION}..."
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash -
+  apt-get install -y -qq nodejs
+fi
 
-# ── 3. pnpm ──────────────────────────────────────────────
-echo "==> Installation de pnpm..."
-npm install -g pnpm@latest
-
-# ── 4. PostgreSQL ────────────────────────────────────────
-echo "==> Configuration de PostgreSQL..."
-service postgresql start
-
-sudo -u postgres psql <<SQL
-  CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';
-  CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};
-  GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
-  \c ${DB_NAME}
-  CREATE EXTENSION IF NOT EXISTS pg_trgm;
-SQL
-
-# Activer PostgreSQL au démarrage
-systemctl enable postgresql
-
-# ── 5. Utilisateur applicatif ────────────────────────────
-echo "==> Création de l'utilisateur ${APP_USER}..."
+# ── 3. Utilisateur et code ───────────────────────────────
 if ! id "${APP_USER}" &>/dev/null; then
-  # Pas de --create-home : on veut que git clone crée le dossier
+  echo "==> Utilisateur ${APP_USER}..."
   useradd --system --shell /bin/bash --home-dir "${APP_DIR}" "${APP_USER}"
 fi
-
-# ── 6. Clone du dépôt ────────────────────────────────────
-echo "==> Clone du dépôt..."
 if [ -d "${APP_DIR}/.git" ]; then
-  echo "    Dépôt déjà présent, skip."
+  echo "==> Code déjà présent : passage sur la branche ${BRANCH}..."
+  sudo -u "${APP_USER}" git -C "${APP_DIR}" fetch origin "${BRANCH}"
+  sudo -u "${APP_USER}" git -C "${APP_DIR}" checkout -B "${BRANCH}" "origin/${BRANCH}"
+  sudo -u "${APP_USER}" git -C "${APP_DIR}" branch --set-upstream-to="origin/${BRANCH}" "${BRANCH}"
 else
-  # Si le dossier existe mais n'est pas un repo git, on le vide
-  if [ -d "${APP_DIR}" ]; then
-    rm -rf "${APP_DIR}"
-  fi
-  git clone https://github.com/SuperNon0/recipelogs.git "${APP_DIR}"
+  echo "==> Téléchargement du code (branche ${BRANCH})..."
+  rm -rf "${APP_DIR}"
+  git clone --branch "${BRANCH}" "${REPO}" "${APP_DIR}"
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
+chmod 755 "${APP_DIR}"
 
-# ── 7. Fichier .env ──────────────────────────────────────
-echo "==> Création du fichier .env..."
-cat > "${APP_DIR}/.env" <<ENV
+PNPM_VERSION="$(node -p "(require('${APP_DIR}/package.json').packageManager || 'pnpm@10').split('@')[1]")"
+if [ "$(pnpm --version 2>/dev/null || true)" != "${PNPM_VERSION}" ]; then
+  echo "==> pnpm ${PNPM_VERSION}..."
+  npm install -g "pnpm@${PNPM_VERSION}" >/dev/null
+fi
+
+# ── 4. Base de données ───────────────────────────────────
+systemctl enable --now postgresql
+if [ -f "${APP_DIR}/.env" ] && grep -q '^DATABASE_URL=' "${APP_DIR}/.env"; then
+  echo "==> Base déjà configurée (.env présent) : on la garde."
+else
+  echo "==> Création de la base..."
+  DB_PASS="$(openssl rand -hex 24)"
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -q <<SQL
+DO \$\$ BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = '${DB_USER}') THEN
+    ALTER ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASS}';
+  ELSE
+    CREATE ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASS}';
+  END IF;
+END \$\$;
+SQL
+  if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+    sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+  fi
+  sudo -u postgres psql -q -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+  umask 077
+  cat > "${APP_DIR}/.env" <<ENV
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
 NODE_ENV=production
-NEXTAUTH_SECRET="$(openssl rand -base64 32)"
-NEXTAUTH_URL="https://recipe.super-nono.cc"
 UPLOAD_DIR="/var/lib/recipelog/uploads"
-ENV
-mkdir -p /var/lib/recipelog/uploads
-chown -R "${APP_USER}:${APP_USER}" /var/lib/recipelog
-
-chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
-chmod 600 "${APP_DIR}/.env"
-
-# ── 8. Build de l'application ────────────────────────────
-echo "==> Installation des dépendances et build..."
-sudo -u "${APP_USER}" bash -c "
-  cd ${APP_DIR}
-  pnpm install --frozen-lockfile
-  pnpm exec prisma generate
-  pnpm exec prisma migrate deploy
-  pnpm exec prisma db seed
-  pnpm build
-  # Mode standalone : copier static/ et public/ dans .next/standalone/
-  cp -r .next/static .next/standalone/.next/static
-  [ -d public ] && cp -r public .next/standalone/public || true
-"
-
-# Permissions pour que nginx (www-data) puisse servir les statiques
-chmod 755 "${APP_DIR}"
-chmod -R o+rX "${APP_DIR}/.next"
-
-# ── 9. Puppeteer Chromium ────────────────────────────────
-echo "==> Configuration Puppeteer pour Chromium système..."
-cat >> "${APP_DIR}/.env" <<ENV
-
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV
+  umask 022
+fi
+# Compte de maintenance (administrateur caché). Relancé sans adresse : on garde l'ancienne.
+if [ -n "${ADMIN_EMAILS}" ]; then
+  sed -i '/^RECIPELOG_ADMIN_EMAILS=/d' "${APP_DIR}/.env"
+  echo "RECIPELOG_ADMIN_EMAILS=\"${ADMIN_EMAILS}\"" >> "${APP_DIR}/.env"
+else
+  ADMIN_EMAILS="$(sed -nE 's/^RECIPELOG_ADMIN_EMAILS="?([^"]*)"?$/\1/p' "${APP_DIR}/.env")"
+fi
+chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
+chmod 600 "${APP_DIR}/.env"
+mkdir -p /var/lib/recipelog/uploads
+chown -R "${APP_USER}:${APP_USER}" /var/lib/recipelog
 
-# ── 10. Service systemd ──────────────────────────────────
-echo "==> Installation du service systemd..."
-cp "$(dirname "$0")/../recipelog.service" /etc/systemd/system/recipelog.service 2>/dev/null || \
-cat > /etc/systemd/system/recipelog.service <<SERVICE
-[Unit]
-Description=RecipeLog Next.js
-After=network.target postgresql.service
-Requires=postgresql.service
-
-[Service]
-Type=simple
-User=${APP_USER}
-WorkingDirectory=${APP_DIR}
-EnvironmentFile=${APP_DIR}/.env
-ExecStart=/usr/bin/node ${APP_DIR}/.next/standalone/server.js
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
+# ── 5. Service, nginx, scripts protégés ──────────────────
+echo "==> Service, nginx et scripts de mise à jour..."
+install -o root -g root -m 0644 "${APP_DIR}/deploy/recipelog.service" /etc/systemd/system/recipelog.service
 systemctl daemon-reload
 systemctl enable recipelog
-systemctl start recipelog
 
-# ── 10b. Sudoers (déclencher deploy.sh depuis l'app) ────
-echo "==> Sudoers : permettre à ${APP_USER} de lancer deploy.sh sans mot de passe..."
-SUDO_FILE="/etc/sudoers.d/recipelog-deploy"
 install -o root -g root -m 0755 "${APP_DIR}/deploy/proxmox/deploy.sh" /usr/local/sbin/recipelog-deploy
-cat > "${SUDO_FILE}" <<SUDOERS
-# Permet à l'app RecipeLog de déclencher sa propre mise à jour
-# depuis le bouton "Mise à jour" dans /settings.
+install -o root -g root -m 0755 "${APP_DIR}/deploy/proxmox/backup.sh" /usr/local/sbin/recipelog-backup
+cat > /etc/sudoers.d/recipelog-deploy <<SUDOERS
+# Bouton « Mettre à jour le site » (Réglages).
 ${APP_USER} ALL=(root) NOPASSWD: /usr/local/sbin/recipelog-deploy ""
 SUDOERS
-chmod 0440 "${SUDO_FILE}"
-visudo -c -f "${SUDO_FILE}" >/dev/null && echo "    OK"
+chmod 0440 /etc/sudoers.d/recipelog-deploy
+visudo -c -f /etc/sudoers.d/recipelog-deploy >/dev/null
 
-# ── 11. Nginx ────────────────────────────────────────────
-echo "==> Configuration Nginx..."
-cp "$(dirname "$0")/../nginx.conf" /etc/nginx/sites-available/recipelog 2>/dev/null || \
-cat > /etc/nginx/sites-available/recipelog <<'NGINX'
-map $uri $recipelog_loggable {
-    default 1;
-    ~^/api/mcp/ 0;
-}
-server {
-    listen 127.0.0.1:80;
-    server_name recipe.super-nono.cc;
-    access_log /var/log/nginx/recipelog.access.log if=$recipelog_loggable;
+echo "0 3 * * * root /usr/local/sbin/recipelog-backup >/var/log/recipelog-backup.log 2>&1" > /etc/cron.d/recipelog-backup
+chmod 0644 /etc/cron.d/recipelog-backup
 
-    location /_next/static/ {
-        alias /opt/recipelog/.next/static/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 120s;
-    }
-}
-NGINX
-
+install -o root -g root -m 0644 "${APP_DIR}/deploy/nginx.conf" /etc/nginx/sites-available/recipelog
 ln -sf /etc/nginx/sites-available/recipelog /etc/nginx/sites-enabled/recipelog
 rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl enable nginx && systemctl restart nginx
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
 
-# ── 12. Firewall ─────────────────────────────────────────
-echo "==> Configuration UFW..."
-ufw --force enable
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
+# ── 6. Le site : version construite par GitHub ───────────
+# Même chemin qu'une mise à jour : dépendances, paquet GitHub (ou build ici
+# s'il manque), migrations de la base, démarrage et vérification.
+echo "==> Installation du site (comme une mise à jour, quelques minutes)..."
+/usr/local/sbin/recipelog-deploy --force
+
+echo "==> Catégories et modèles PDF de départ..."
+sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && set -a && . ./.env && set +a && pnpm exec prisma db seed" \
+  || echo "⚠ données de départ ignorées"
+
+# ── 7. Tunnel Cloudflare (facultatif) ────────────────────
+if [ -n "${TUNNEL_TOKEN}" ]; then
+  echo "==> Tunnel Cloudflare..."
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    mkdir -p --mode=0755 /usr/share/keyrings
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+      > /etc/apt/sources.list.d/cloudflared.list
+    apt-get update -qq
+    apt-get install -y -qq cloudflared
+  fi
+  cloudflared service uninstall >/dev/null 2>&1 || true
+  cloudflared service install "${TUNNEL_TOKEN}"
+fi
+
+# Le fichier de réglages contenait le jeton du tunnel : on l'efface.
+[ -f "${CONF}" ] && shred -u "${CONF}" 2>/dev/null || rm -f "${CONF}"
 
 # ── Résumé ───────────────────────────────────────────────
+health="❌ ne répond pas (journalctl -u recipelog)"
+curl -fsS -o /dev/null --max-time 10 "http://127.0.0.1:3000/api/health?db=1" && health="✅ en ligne"
 echo ""
 echo "======================================================"
-echo "  Installation terminée !"
+echo "  RecipeLog installé"
 echo "======================================================"
+echo "  Site           : ${health}"
+echo "  Branche suivie : ${BRANCH} (le bouton « Mettre à jour le site » suit cette branche)"
+if [ -n "${ADMIN_EMAILS}" ]; then
+  echo "  Administrateur : ${ADMIN_EMAILS} (caché sur le site)"
+else
+  echo "  Administrateur : aucun compte de maintenance (RECIPELOG_ADMIN_EMAILS vide)"
+fi
+if [ -n "${TUNNEL_TOKEN}" ]; then
+  echo "  Tunnel         : installé (systemctl status cloudflared)"
+else
+  echo "  Tunnel         : pas encore (voir le tuto, étape Cloudflare)"
+fi
 echo ""
-echo "  App    : http://$(hostname -I | awk '{print $1}')"
-echo "  DB     : ${DB_NAME} / ${DB_USER}"
-echo "  Secret : voir ${APP_DIR}/.env"
-echo ""
-echo "  Commandes utiles :"
-echo "    systemctl status recipelog"
-echo "    journalctl -u recipelog -f"
-echo "    /usr/local/sbin/recipelog-deploy"
-echo ""
-echo "  N'oubliez pas de configurer Cloudflare Zero Trust !"
+echo "  Il n'y a pas de mot de passe : on entre par l'adresse Cloudflare du site,"
+echo "  avec le code reçu par e-mail. Suite : docs/installer-un-nouveau-site.md"
+echo "======================================================"
