@@ -11,6 +11,18 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.11",
+    date: "2026-11-12",
+    title: "Un nouveau site RecipeLog en une commande",
+    summary:
+      "RecipeLog s'installe maintenant pour une autre personne avec une seule commande dans le shell Proxmox : un conteneur à part, sa propre base, ses propres recettes et sa propre clé pour Claude. Les nouveautés sont d'abord essayées en bêta, puis passées en version stable.",
+    features: [
+      "Installation en une ligne sur l'hôte Proxmox : la commande crée le conteneur, installe la base, le site, les mises à jour et la sauvegarde de chaque nuit, et peut aussi brancher le tunnel Cloudflare",
+      "Deux versions du site : la bêta (où arrivent les nouveautés) et la stable (les nouveautés déjà essayées). Chaque site suit la sienne, et le bouton « Mettre à jour le site » n'apporte que ce qui est passé dans sa version",
+      "Claude présente RecipeLog sans prénom, pour que chaque site ait son propre connecteur",
+    ],
+  },
+  {
     version: "V2.10",
     date: "2026-11-12",
     title: "Variantes regroupées et produit à choisir depuis la recette",

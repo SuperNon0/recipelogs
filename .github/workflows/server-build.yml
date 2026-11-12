@@ -1,4 +1,5 @@
-# Construit le site pour le serveur à chaque mise à jour de main.
+# Construit le site pour le serveur à chaque mise à jour de main (bêta) ou de
+# stable (les autres sites, voir docs/installer-un-nouveau-site.md).
 #
 # Le bouton « Mettre à jour le site » (deploy/proxmox/deploy.sh) télécharge ce
 # paquet au lieu de construire le site lui-même : environ 2 min ici, contre
@@ -10,7 +11,7 @@ name: Build pour le serveur
 
 on:
   push:
-    branches: [main]
+    branches: [main, stable]
   pull_request:
   workflow_dispatch:
 
@@ -70,7 +71,10 @@ jobs:
               --notes "Construits par .github/workflows/server-build.yml à chaque mise à jour de main, puis téléchargés par le bouton « Mettre à jour le site ». Ne pas supprimer."
           fi
           gh release upload "${TAG}" "${ASSET}" "${ASSET}.sha256" --clobber
-          # On garde les 10 derniers paquets (2 fichiers chacun).
+          # On garde les 10 derniers paquets (2 fichiers chacun), plus toujours
+          # celui de stable : une nouvelle installation le télécharge.
+          STABLE_SHA="$(gh api "repos/${GH_REPO}/commits/stable" --jq .sha 2>/dev/null || true)"
           gh api "repos/${GH_REPO}/releases/tags/${TAG}" \
-            --jq '.assets | sort_by(.created_at) | reverse | .[20:] | .[].id' |
+            --jq '.assets | sort_by(.created_at) | reverse | .[20:] | .[]
+              | select(("'"${STABLE_SHA:-none}"'" as $s | .name | contains($s)) | not) | .id' |
             while read -r id; do gh api -X DELETE "repos/${GH_REPO}/releases/assets/${id}"; done
