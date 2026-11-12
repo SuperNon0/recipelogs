@@ -18,6 +18,21 @@ mise-a-jour.sh          mise à jour de la vitrine (et de la démo avec --demo)
 scripts/                scripts copiés dans les conteneurs
 ```
 
+## Nom de domaine dédié (une seule fois, avant l'installation)
+
+Exemple avec `recipelog.fr` :
+
+1. Ajouter le domaine à Cloudflare : l'acheter chez Cloudflare (Domain Registration), ou l'ajouter
+   puis mettre les serveurs DNS de Cloudflare chez le vendeur.
+2. Zero Trust → Networks → Tunnels : créer deux tunnels, « vitrine » et « demo », et copier le
+   **jeton** de chacun (la suite de caractères après `--token`).
+3. Public Hostname :
+   - tunnel vitrine : `recipelog.fr` et `www.recipelog.fr` → `http://localhost:80`
+   - tunnel demo : `demo.recipelog.fr` → `http://localhost:80`
+4. Pas d'application Access sur ce domaine : les deux sites sont publics.
+5. Lancer la commande d'installation et coller l'adresse de la démo, l'e-mail de contact et les
+   deux jetons quand elle les demande.
+
 ## Créer le site vitrine
 
 Une seule ligne, à coller dans le shell de l'hôte Proxmox (en root) :
