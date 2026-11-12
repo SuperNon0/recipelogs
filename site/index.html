@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RecipeLog · le carnet de recettes du pâtissier</title>
+  <meta name="description" content="RecipeLog : recettes de pâtisserie, multiplicateur, sous-recettes, coût de revient, allergènes, fournisseurs, cahiers PDF, mode labo et Claude. Installé chez vous, sur votre serveur.">
+  <meta name="theme-color" content="#0b0f17">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Adresse de la démo : écrite par l'installateur dans /etc/recipelog-vitrine/config.js -->
+  <script src="config.js"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#">
+      <img src="favicon.svg" alt="" width="30" height="30">
+      <span>RecipeLog</span>
+    </a>
+    <nav class="top-nav" aria-label="Sections">
+      <a href="#fonctions">Fonctions</a>
+      <a href="#labo">Au labo</a>
+      <a href="#equipe">À plusieurs</a>
+      <a href="#claude">Claude</a>
+      <a href="#installer">Installer</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" data-demo href="#demo">Essayer la démo</a>
+  </div>
+</header>
+
+<main>
+
+<!-- ───────────── Accueil ───────────── -->
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <p class="eyebrow">Pâtisserie · labo · boutique</p>
+      <h1>Le carnet de recettes qui <em>fait les calculs</em> à votre place.</h1>
+      <p class="lead">
+        RecipeLog range toutes vos recettes au gramme près, les multiplie pour n'importe quel moule ou quantité,
+        calcule le coût de revient et les allergènes, compare vos fournisseurs et imprime de beaux cahiers.
+        Toute l'équipe y travaille, chacun avec ses droits, et Claude peut le remplir pour vous.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" data-demo href="#demo">Essayer la démo</a>
+        <a class="btn btn-ghost" href="#fonctions">Tout ce qu'il sait faire</a>
+      </div>
+      <ul class="hero-points">
+        <li>Sur téléphone, tablette et ordinateur</li>
+        <li>Installé chez vous, vos recettes restent à vous</li>
+        <li>En français, pensé par un pâtissier</li>
+      </ul>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="screen">
+          <div class="scr-head">
+            <span class="scr-tag">Petits gâteaux</span>
+            <h3>Financiers amande</h3>
+            <p class="scr-sub">80 pièces · 2 520 g · Moule à financier</p>
+          </div>
+          <div class="scr-mult">
+            <span class="chip on">×2</span><span class="chip">Masse</span><span class="chip">Pièces</span><span class="chip">Moule</span>
+          </div>
+          <ul class="scr-ing">
+            <li><span>Beurre noisette</span><b>500 g</b><i>19 %</i></li>
+            <li><span>Sucre glace</span><b>600 g</b><i>23 %</i></li>
+            <li><span>Poudre d'amande</span><b>240 g</b><i>9 %</i></li>
+            <li><span>Farine T55</span><b>200 g</b><i>8 %</i></li>
+            <li><span>Blancs d’œufs</span><b>16 pc</b><i>19 %</i></li>
+            <li class="sub"><span>Sous-recette · Pâte d'amande</span><b>500 g</b><i>20 %</i></li>
+          </ul>
+          <div class="scr-foot">
+            <div><small>Coût matière</small><b>9,84 €</b></div>
+            <div><small>Par pièce</small><b>0,12 €</b></div>
+            <div><small>Allergènes</small><b class="al">Gluten · Œuf · Lait · Fruits à coque</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="float f1"><span class="dot ok"></span>Mode labo · minuteur 18 min</div>
+      <div class="float f2"><span class="dot pk"></span>Cadre 40×60 → 8 cercles Ø 20</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Chiffres ───────────── -->
+<section class="stats">
+  <div class="wrap stats-in">
+    <div><b>5</b><span>façons de multiplier une recette</span></div>
+    <div><b>14</b><span>allergènes suivis tout seuls</span></div>
+    <div><b>7</b><span>thèmes PDF modifiables</span></div>
+    <div><b>70+</b><span>outils pour Claude</span></div>
+    <div><b>1 min</b><span>pour une mise à jour</span></div>
+  </div>
+</section>
+
+<!-- ───────────── Essai : le multiplicateur ───────────── -->
+<section class="section try" id="essai">
+  <div class="wrap try-in">
+    <div>
+      <p class="eyebrow">À essayer tout de suite</p>
+      <h2>Changez de quantité, tout suit.</h2>
+      <p>
+        Le cœur de RecipeLog : le multiplicateur. Visez une masse, un nombre de pièces ou un coefficient,
+        les pesées se recalculent, sous-recettes comprises. Essayez ici sur une pâte à choux.
+      </p>
+      <p class="muted small">Dans l'appli, on peut aussi fixer un ingrédient (« j'ai 340 g de jaunes ») ou passer d'un moule à un autre.</p>
+    </div>
+
+    <div class="card calc">
+      <div class="calc-head">
+        <h3>Pâte à choux</h3>
+        <button class="help-btn" type="button" data-help="help-mult" aria-label="Aide : le multiplicateur">?</button>
+      </div>
+      <div class="seg" role="tablist" aria-label="Mode du multiplicateur">
+        <button type="button" class="on" data-mode="coef">Coefficient</button>
+        <button type="button" data-mode="masse">Masse</button>
+        <button type="button" data-mode="pieces">Pièces</button>
+      </div>
+      <label class="calc-field">
+        <span id="calc-label">Coefficient</span>
+        <input id="calc-input" type="number" inputmode="decimal" step="0.1" min="0.1" value="1">
+        <em id="calc-unit">×</em>
+      </label>
+      <ul class="calc-list" id="calc-list"></ul>
+      <div class="calc-total"><span>Masse totale</span><b id="calc-total">–</b></div>
+      <div class="calc-total"><span>Rendement</span><b id="calc-yield">–</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Fonctions ───────────── -->
+<section class="section" id="fonctions">
+  <div class="wrap">
+    <p class="eyebrow center">Tout ce qu'il sait faire</p>
+    <h2 class="center">Une appli pour toute la vie d'une recette.</h2>
+    <p class="center lead narrow">De la première pesée à la fiche de production, en passant par le prix d'achat et l'impression.</p>
+
+    <div class="tabs" role="tablist" aria-label="Familles de fonctions">
+      <button type="button" class="on" data-tab="t-recettes">Recettes</button>
+      <button type="button" data-tab="t-couts">Coûts &amp; fournisseurs</button>
+      <button type="button" data-tab="t-rangement">Rangement &amp; recherche</button>
+      <button type="button" data-tab="t-pdf">Cahiers &amp; PDF</button>
+      <button type="button" data-tab="t-site">Le site</button>
+    </div>
+
+    <div class="tab-panel on" id="t-recettes">
+      <div class="grid">
+        <article class="feat"><div class="ic">⚖</div><h3>Multiplicateur complet</h3><p>Coefficient, masse cible, ingrédient pivot, nombre de pièces ou changement de moule. Option « Entiers » pour arrondir au gramme, à la pièce ou à la demi-cuillère, et « masse exacte » pour tomber pile.</p></article>
+        <article class="feat"><div class="ic">◫</div><h3>Sous-recettes imbriquées</h3><p>Un entremets qui contient un biscuit, qui contient une pâte d'amande : tout est compté dans la masse, les PDF, les listes de courses. Une sous-recette peut être verrouillée pour ne pas bouger.</p></article>
+        <article class="feat"><div class="ic">%</div><h3>Pourcentages et masses</h3><p>Chaque ingrédient affiche sa part de la masse totale. Les œufs, jaunes et autres pièces ont un poids (un œuf = 50 g) et comptent dans le total.</p></article>
+        <article class="feat"><div class="ic">◎</div><h3>Rendement</h3><p>« 40 financiers » : la recette sait ce qu'elle donne, et le mode Pièces calcule pour 60 ou 200.</p></article>
+        <article class="feat"><div class="ic">⇄</div><h3>Variantes et comparaison</h3><p>Gardez vos essais (« moins sucré », « chocolat 64 % ») sous la recette d'origine. Comparez-en deux côte à côte : écart en grammes et en %, étapes changées en couleur.</p></article>
+        <article class="feat"><div class="ic">¶</div><h3>Étapes intelligentes</h3><p>Intertitres « Pâte », « Crème », « Montage ». Quantités liées dans le texte : « verser {167 g} de lait » devient 334 g à ×2. Unités g, L, cc, cs, pièce et QS.</p></article>
+        <article class="feat"><div class="ic">⚠</div><h3>Allergènes automatiques</h3><p>Les 14 allergènes se cochent une fois sur l'ingrédient. Chaque recette les cumule, sous-recettes comprises, et dit quel ingrédient les apporte.</p></article>
+        <article class="feat"><div class="ic">↺</div><h3>Historique et favoris</h3><p>Les 30 dernières recettes ouvertes, les favoris, les notes et les commentaires d'essai.</p></article>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="t-couts">
+      <div class="grid">
+        <article class="feat"><div class="ic">€</div><h3>Coût de revient</h3><p>Prix d'achat au kg, au litre ou à la pièce sur chaque ingrédient. La recette affiche son coût matière, son coût par pièce et un prix de vente conseillé avec votre coefficient.</p></article>
+        <article class="feat"><div class="ic">▤</div><h3>Factures enregistrées</h3><p>Envoyez la photo ou le PDF d'une facture à Claude : chaque ligne devient un produit du fournisseur, avec son prix ramené au kg et la date. Rien n'est jamais écrasé.</p></article>
+        <article class="feat"><div class="ic">⊞</div><h3>Comparer 3 fournisseurs</h3><p>Un tableau par famille (chocolat, crèmerie, épicerie, emballages…) : le moins cher en vert, l'évolution depuis le dernier achat, l'historique complet avec filtre de dates.</p></article>
+        <article class="feat"><div class="ic">≋</div><h3>Variantes d'article</h3><p>« Fraise France » et « Fraise Espagne » sont un seul article « Fraise » avec un seul historique de prix. Le chocolat reste séparé par pourcentage.</p></article>
+        <article class="feat"><div class="ic">⇢</div><h3>Le bon produit dans la recette</h3><p>Touchez un ingrédient dans le coût d'une recette pour choisir le produit d'un fournisseur. Le choix vaut pour toutes les recettes.</p></article>
+        <article class="feat"><div class="ic">✎</div><h3>Prix sur une page</h3><p>Tous les prix des ingrédients modifiables sur place, avec l'écart avec le prix précédent et un filtre « Sans prix ».</p></article>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="t-rangement">
+      <div class="grid">
+        <article class="feat"><div class="ic">▣</div><h3>Dossiers et catégories</h3><p>Rangez par dossier coloré, catégorie et étiquette. Les recettes importées arrivent dans leur dossier avec l'étiquette « à vérifier ».</p></article>
+        <article class="feat"><div class="ic">⌕</div><h3>Recherche complète</h3><p>Ctrl K ou la loupe : par nom, par ce qui est écrit dans les étapes et les notes, par ingrédient. « jaunes + crème » trouve les recettes qui ont les deux. Sans souci d'accents.</p></article>
+        <article class="feat"><div class="ic">◉</div><h3>Fiches ingrédients</h3><p>Chaque ingrédient sait dans quelles recettes il sert, avec quelle quantité, même à travers une sous-recette. Fusion des doublons en un clic.</p></article>
+        <article class="feat"><div class="ic">⇩</div><h3>Import et export</h3><p>Import d'une sauvegarde Recipe Keeper ou d'un fichier JSON, export JSON complet de vos recettes.</p></article>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="t-pdf">
+      <div class="grid">
+        <article class="feat"><div class="ic">❏</div><h3>Cahiers de recettes</h3><p>Plusieurs recettes en un cahier PDF, avec chapitres, sommaire aux numéros de page exacts et couverture. Une recette peut y être liée, figée ou à une masse donnée.</p></article>
+        <article class="feat"><div class="ic">✦</div><h3>7 thèmes, et les vôtres</h3><p>Classique, Fiche technique, Moderne, Magazine… Un éditeur avec aperçu en direct : papier, polices, marges, en-tête, ingrédients sur 2 colonnes.</p></article>
+        <article class="feat"><div class="ic">☑</div><h3>Listes de courses</h3><p>Ajoutez des recettes à une liste : les quantités s'additionnent, sous-recettes comprises, et on coche au fur et à mesure.</p></article>
+        <article class="feat"><div class="ic">↗</div><h3>Partage public</h3><p>Un lien en lecture seule pour envoyer une recette à quelqu'un qui n'a pas de compte.</p></article>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="t-site">
+      <div class="grid">
+        <article class="feat"><div class="ic">▯</div><h3>Comme une appli</h3><p>Ajoutez RecipeLog à l'écran d'accueil de l'iPhone : icône toque, plein écran, pas de zoom intempestif dans les champs.</p></article>
+        <article class="feat"><div class="ic">◐</div><h3>Design « Encre et ambre »</h3><p>Sombre et lisible au labo. Menu latéral sur ordinateur, onglets et feuilles d'actions sur téléphone, appui long pour le menu.</p></article>
+        <article class="feat"><div class="ic">?</div><h3>Un « ? » partout</h3><p>Chaque chiffre a sa bulle d'aide : ce que c'est, comment c'est calculé et un exemple.</p></article>
+        <article class="feat"><div class="ic">⟳</div><h3>Mises à jour en une minute</h3><p>Un bouton dans les réglages. La version est préparée à l'avance, le site revient tout seul à l'ancienne en cas de souci. La page « Version et nouveautés » dit ce qui a changé.</p></article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Au labo ───────────── -->
+<section class="section alt" id="labo">
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Au labo</p>
+      <h2>Pensé pour les mains pleines de farine.</h2>
+      <ul class="checks">
+        <li><b>Mode labo.</b> La recette en grand, l'écran reste allumé, on coche les pesées, l'étape en cours est mise en avant. « Cuire 18 min » devient un minuteur qui sonne même appli fermée.</li>
+        <li><b>Fiche de production.</b> « 60 éclairs » : toutes les pesées à l'échelle, une préparation par encadré dans l'ordre où on les fait, prête à imprimer.</li>
+        <li><b>Page Production.</b> Plusieurs recettes en même temps : les préparations communes s'additionnent (une seule pâte à choux pour éclairs et religieuses).</li>
+        <li><b>Conversion de moule.</b> Cercle Ø 18 vers Ø 24, cadre 40×60 vers cercles, ou plusieurs moules. La recette dit combien de moules elle remplit.</li>
+      </ul>
+    </div>
+    <div class="lab-card card" aria-hidden="true">
+      <div class="lab-top"><span class="pill">Mode labo · ×1,5</span><span class="timer">17:42</span></div>
+      <h3>Éclairs chocolat</h3>
+      <ol class="lab-steps">
+        <li class="done">Pâte à choux · 1 065 g</li>
+        <li class="done">Crémeux chocolat 64 % · 900 g</li>
+        <li class="now">Cuire 18 min à 165 °C, sans ouvrir le four</li>
+        <li>Glaçage miroir · 450 g</li>
+        <li>Garnir et glacer</li>
+      </ol>
+      <div class="lab-bar"><span style="width:52%"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── À plusieurs ───────────── -->
+<section class="section" id="equipe">
+  <div class="wrap split rev">
+    <div class="roles card" aria-hidden="true">
+      <div class="role"><span class="av" style="--c:#f0a64a">N</span><div><b>Chef pâtissier</b><small>Administrateur · tous les droits</small></div></div>
+      <div class="role"><span class="av" style="--c:#4fc0ad">C</span><div><b>Patronne</b><small>Voit les prix et les marges · imprime</small></div></div>
+      <div class="role"><span class="av" style="--c:#8f9cf0">L</span><div><b>Apprenti</b><small>Lit les recettes « Boutique » · sans les prix</small></div></div>
+      <div class="role pending"><span class="av" style="--c:#6f7a90">?</span><div><b>Nouvelle demande d'accès</b><small>En attente · choisir un rôle</small></div></div>
+    </div>
+    <div>
+      <p class="eyebrow">À plusieurs</p>
+      <h2>Toute l'équipe, chacun ses droits.</h2>
+      <p>Chaque personne a son compte. Elle demande un accès, l'administrateur l'accepte et lui donne un rôle qu'il a créé lui-même en cochant des cases.</p>
+      <ul class="checks">
+        <li><b>Rôles sur mesure.</b> Apprenti, Chef, Patronne : modifier ou supprimer des recettes, voir les prix, gérer les cahiers, la production, les PDF… chaque permission avec son « ? ».</li>
+        <li><b>Recettes visibles par rôle.</b> Un apprenti peut ne voir que certaines catégories, et les sous-recettes qu'elles utilisent. Sans le droit aux prix, aucun chiffre n'arrive sur son téléphone.</li>
+        <li><b>« Voir comme ».</b> L'administrateur vérifie ce que voit un apprenti, et un journal garde qui a fait quoi.</li>
+        <li><b>Connexion sûre.</b> L'entrée passe par Cloudflare Access : un code par e-mail, pas de mot de passe à retenir.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Claude ───────────── -->
+<section class="section alt" id="claude">
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Avec Claude</p>
+      <h2>Un assistant qui travaille dans vos recettes.</h2>
+      <p>RecipeLog se branche sur Claude (et tout assistant compatible MCP) avec une clé secrète. Vous lui parlez normalement, il lit et range vos recettes avec plus de 70 outils. Plusieurs assistants peuvent y travailler en même temps, chacun voit les mêmes recettes.</p>
+      <ul class="checks">
+        <li><b>Recettes depuis TikTok, Instagram, YouTube.</b> Envoyez le lien, il lit la vidéo (texte, sous-titres) et crée la recette « à vérifier ».</li>
+        <li><b>Factures.</b> Une photo de facture et il enregistre chaque prix chez le bon fournisseur, en regroupant les mêmes articles.</li>
+        <li><b>Sans doublons.</b> Il reprend vos ingrédients existants (« œuf entier » devient « Oeufs ») et demande quand il hésite.</li>
+        <li><b>Tout le reste.</b> Adapter au moule, comparer des variantes, remplir la production, faire une liste de courses, ranger les dossiers.</li>
+      </ul>
+    </div>
+    <div class="chat card" aria-hidden="true">
+      <div class="msg me">Ajoute cette recette de flan, c'est pour 2 cercles de 22 : tiktok.com/@…</div>
+      <div class="msg ai">J'ai lu la vidéo et créé « Flan pâtissier vanille » dans le dossier TikTok, avec l'étiquette « à vérifier ». J'ai repris tes ingrédients <b>Lait entier</b>, <b>Jaunes</b> et <b>Sucre semoule</b>. Moule noté : 2 cercles Ø 22.</div>
+      <div class="msg me">Et combien il me coûte ?</div>
+      <div class="msg ai">8,62 € de matière, soit 0,72 € la part sur 12 parts. La vanille fait 41 % du coût.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Démo ───────────── -->
+<section class="section demo" id="demo">
+  <div class="wrap demo-in card">
+    <div>
+      <p class="eyebrow">Démo</p>
+      <h2>Essayez avec de vraies recettes.</h2>
+      <p>Un RecipeLog complet, ouvert à tous, avec quelques recettes de démonstration. Multipliez, changez de moule, passez en mode labo, imprimez un PDF : tout marche. Chaque nuit, la démo revient comme au départ, alors cassez tout.</p>
+      <p class="muted small">Dans la démo, les comptes, l'accès Claude et la mise à jour du site sont coupés.</p>
+    </div>
+    <div class="demo-cta">
+      <a class="btn btn-primary btn-lg" data-demo href="#demo">Ouvrir la démo</a>
+      <p class="muted small" id="demo-missing" hidden>L'adresse de la démo n'est pas encore réglée sur ce serveur.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Installer ───────────── -->
+<section class="section" id="installer">
+  <div class="wrap">
+    <p class="eyebrow center">Installer chez vous</p>
+    <h2 class="center">Votre serveur, vos recettes.</h2>
+    <p class="center lead narrow">RecipeLog s'installe dans un conteneur LXC Proxmox, avec une seule ligne à coller dans le shell. Vos données ne quittent jamais votre serveur.</p>
+    <div class="steps">
+      <div class="step card"><span>1</span><h3>Une ligne dans Proxmox</h3><p>Le conteneur, la base de données, le site et les sauvegardes s'installent tout seuls.</p></div>
+      <div class="step card"><span>2</span><h3>Une adresse Cloudflare</h3><p>Un tunnel Cloudflare donne une adresse https sans ouvrir de port, et Cloudflare Access filtre l'entrée.</p></div>
+      <div class="step card"><span>3</span><h3>Les comptes et Claude</h3><p>Dans les réglages : activer les comptes, inviter l'équipe, créer la clé pour Claude.</p></div>
+    </div>
+    <div class="code card">
+      <code id="install-cmd">bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/stable/deploy/proxmox/install.sh)"</code>
+      <button class="btn btn-ghost btn-sm" type="button" data-copy="install-cmd">Copier</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="brand"><img src="favicon.svg" alt="" width="24" height="24"><span>RecipeLog</span></div>
+    <p class="muted small">Le carnet de recettes du pâtissier. Fait avec soin, pour le labo.</p>
+    <a class="muted small" href="https://github.com/SuperNon0/recipelogs">Code source</a>
+  </div>
+</footer>
+
+<!-- Aide du multiplicateur : se ferme seulement avec la croix -->
+<div class="pop" id="help-mult" role="dialog" aria-modal="true" aria-labelledby="help-mult-t" hidden>
+  <div class="pop-box card">
+    <button class="pop-x" type="button" data-close aria-label="Fermer">×</button>
+    <h3 id="help-mult-t">Le multiplicateur</h3>
+    <p><b>Coefficient</b> : toutes les quantités sont multipliées (×2 = deux fois plus).</p>
+    <p><b>Masse</b> : vous donnez la masse voulue, le coefficient est calculé.</p>
+    <pre>coefficient = masse voulue ÷ masse de la recette</pre>
+    <p><b>Pièces</b> : vous donnez le nombre de choux, d'après le rendement de la recette.</p>
+    <p class="muted small">Exemple : 1 000 g de pâte pour une recette de 710 g, c'est ×1,41.</p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
