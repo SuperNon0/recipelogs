@@ -69,7 +69,9 @@ Pas de bouton : la démo a le bouton « Mettre à jour le site » coupé.
 - **Vitrine** : un tunnel vers `http://localhost:80` (jeton donné à l'installation, ou plus tard
   `cloudflared service install <jeton>` dans le conteneur). Pas d'Access : le site est public.
 - **Démo** : un tunnel vers `http://localhost:80` dans le conteneur de la démo. Ne mets **pas**
-  d'application Cloudflare Access dessus, sinon les visiteurs ne pourront pas l'ouvrir.
+  d'application Cloudflare Access dessus, sinon les visiteurs ne pourront pas l'ouvrir. Si une
+  application Access couvre `*.ton-domaine`, ajoute-lui une règle « Bypass → Everyone » pour les
+  adresses de la démo et de la vitrine. Le site RecipeLog principal garde sa propre protection.
 - Liens de la vitrine (gardés aux mises à jour, dans `/etc/recipelog-vitrine/`) :
   `pct exec <numéro de la vitrine> -- vitrine-reglage demo https://demo.mon-site.fr`
   `pct exec <numéro de la vitrine> -- vitrine-reglage contact contact@mon-site.fr`
