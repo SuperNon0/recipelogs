@@ -9,6 +9,7 @@ import { getAuthSettings, saveAuthSettings } from "@/lib/auth/config";
 import { normalizeTeam, verifyCloudflareJwt, tokenFromRequest } from "@/lib/auth/cloudflare";
 import { requireAccess } from "@/lib/auth/guard";
 import { cleanPermissions } from "@/lib/auth/permissions";
+import { isMaintenanceEmail, maintenanceEmails } from "@/lib/auth/maintenance";
 import {
   getViewer,
   realAccountOf,
@@ -39,12 +40,16 @@ async function actingAdmin() {
 
 /** Autres comptes actifs au rôle Administrateur : il en faut toujours au moins un. */
 async function otherAdminsCount(exceptId: number): Promise<number> {
-  return prisma.account.count({ where: { role: { isAdmin: true }, status: "active", id: { not: exceptId } } });
+  // Le compte de maintenance ne compte pas : le site doit garder son propre administrateur.
+  return prisma.account.count({
+    where: { role: { isAdmin: true }, status: "active", id: { not: exceptId }, email: { notIn: maintenanceEmails() } },
+  });
 }
 
 async function target(id: number) {
   const acc = await prisma.account.findUnique({ where: { id }, include: { role: true } });
-  if (!acc) throw new Error("Compte introuvable.");
+  // Le compte de maintenance ne se gère pas depuis le site.
+  if (!acc || isMaintenanceEmail(acc.email)) throw new Error("Compte introuvable.");
   return acc;
 }
 
