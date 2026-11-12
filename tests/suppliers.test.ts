@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { articleKey, bestPrice, buildComparison, packLabel, packagingWarning, priceStats, readPackaging, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
+import { articleKey, bestPrice, buildComparison, groupByArticle, packLabel, packagingWarning, priceStats, readPackaging, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
 
 describe("unitPriceOf", () => {
   it("garde le prix unitaire donné", () => {
@@ -71,13 +71,46 @@ describe("buildComparison", () => {
     expect(rows.map((r) => r.family)).toEqual(["Chocolat", "Crèmerie et œufs", "Autres"]);
   });
 
-  it("chez un même fournisseur, garde le moins cher", () => {
+  it("chez un même fournisseur, à date égale, garde le moins cher", () => {
     const rows = buildComparison([p(1, 1, "Sucre", 1.2), p(2, 1, "Sucre", 1.1)]);
     expect(rows[0].cells[1].productId).toBe(2);
   });
 
   it("ne compare pas deux unités différentes", () => {
     expect(buildComparison([p(1, 1, "Oeufs", 0.3, null, "pièce"), p(2, 2, "Œufs", 4, null, "kg")])).toHaveLength(2);
+  });
+});
+
+describe("variantes d'un même article", () => {
+  const v = (id: number, name: string, article: string | null, prices: [string, number, number][], unit = "kg"): ComparisonProduct => {
+    const history = prices.map(([date, price, orderId]) => ({ date, price, unit, orderId }));
+    return { id, supplierId: 2, name, article, family: "Fruits et légumes", packLabel: null, unit, stats: priceStats(history.slice().reverse()), history };
+  };
+  const france = v(1, "Fraise France", "Fraise", [["2026-11-09", 12.75, 2]]);
+  const espagne = v(2, "Fraise Espagne cat I", "fraise", [["2026-11-12", 17.9, 6]]);
+  const tomate = v(3, "Tomate 57/67", "Tomate", [["2026-11-12", 2.95, 6]]);
+
+  it("réunit les variantes sous un seul article avec un historique commun", () => {
+    const groups = groupByArticle([france, espagne, tomate]);
+    expect(groups.map((g) => g.article)).toEqual(["Fraise", "Tomate"]);
+    const fraise = groups[0];
+    expect(fraise.products.map((p) => p.id)).toEqual([2, 1]);
+    expect(fraise.history.map((h) => [h.productName, h.price, h.orderId])).toEqual([
+      ["Fraise Espagne cat I", 17.9, 6],
+      ["Fraise France", 12.75, 2],
+    ]);
+    expect(fraise.stats).toMatchObject({ current: 17.9, previous: 12.75, changePct: 40, count: 2 });
+  });
+
+  it("ne mélange pas un prix au kg et un prix à la pièce", () => {
+    expect(groupByArticle([france, v(4, "Fraise barquette", "Fraise", [["2026-11-10", 4, 3]], "pièce")])).toHaveLength(2);
+  });
+
+  it("dans le tableau, la case montre le dernier prix payé de l'article", () => {
+    const rows = buildComparison([france, espagne]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].cells[2]).toMatchObject({ productId: 2, productIds: [2, 1], price: 17.9, changePct: 40 });
+    expect(rows[0].orders).toBe(2);
   });
 });
 
