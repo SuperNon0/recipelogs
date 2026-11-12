@@ -24,6 +24,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Coût d'une recette : un ingrédient sans prix (la farine, par exemple) reste toujours visible dans le détail. Touche-le pour chercher le bon produit chez tes fournisseurs, sans passer par la page Fournisseurs : tu choisis un fournisseur (ou « Tous »), tu tapes un mot, et tu vois chaque produit avec son prix au kg et ce qu'il coûte dans la recette. Un toucher relie le produit à l'ingrédient, pour toutes tes recettes. Le « ? » explique comment ça marche",
       "Même pour un ingrédient qui a déjà un produit, « Chercher un autre produit chez les fournisseurs » permet d'en choisir un autre",
       "Claude range tout seul les nouvelles lignes de facture sous l'article existant (fraise, tomate, citron vert…) et sépare seulement quand la différence compte (chocolat par %, crème par matière grasse, farine par type). En cas de doute, il te demande",
+      "Quand Claude ajoute une recette, il reprend tes ingrédients existants au lieu d'en créer de nouveaux (« œuf entier » devient « Oeufs », « huile » devient « Huile de tournesol »). S'il hésite, il te demande",
     ],
   },
   {
