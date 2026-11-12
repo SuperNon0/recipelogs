@@ -81,7 +81,10 @@
   var tabs = document.querySelectorAll("[data-tab]");
   tabs.forEach(function (btn) {
     btn.addEventListener("click", function () {
-      tabs.forEach(function (b) { b.classList.toggle("on", b === btn); });
+      tabs.forEach(function (b) {
+        b.classList.toggle("on", b === btn);
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
       document.querySelectorAll(".tab-panel").forEach(function (p) {
         p.classList.toggle("on", p.id === btn.dataset.tab);
       });
@@ -103,7 +106,7 @@
     return isFinite(v) ? v : 0;
   }
   function eur(n, d) {
-    return n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }) + " €";
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }) + " €";
   }
   function setOut(id, txt, cls) {
     var el = document.getElementById(id);
@@ -130,7 +133,7 @@
     setOut("o-piece", eur(parPiece, 3));
     setOut("o-ht", eur(ht, 2));
     setOut("o-coef", parPiece > 0 ? "× " + (prix / parPiece).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "–");
-    setOut("o-marge", eur(marge, 2) + " · " + taux + " %", marge < 0 ? "neg" : "");
+    setOut("o-marge", eur(marge, 2) + " · " + taux + " %", marge < 0 ? "neg" : "");
     setOut("o-total", eur(marge * pieces, 2), marge < 0 ? "neg" : "");
     if (gauge) {
       var part = ht > 0 ? Math.max(0, Math.min(1, marge / ht)) : 0;
@@ -157,28 +160,37 @@
   if (document.getElementById("m-prix")) calcMarge();
 
   // ── Aide « ? » : ne se ferme qu'avec la croix (ou Échap) ──
-  var openPop = null;
+  var openPop = null, opener = null;
+  function closePop() {
+    if (openPop) openPop.hidden = true;
+    openPop = null;
+    if (opener) opener.focus();
+    opener = null;
+  }
   document.querySelectorAll("[data-help]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var pop = document.getElementById(btn.dataset.help);
       if (!pop) return;
       pop.hidden = false;
       openPop = pop;
+      opener = btn;
       var x = pop.querySelector("[data-close]");
       if (x) x.focus();
     });
   });
   document.querySelectorAll("[data-close]").forEach(function (x) {
     x.addEventListener("click", function () {
-      var pop = x.closest(".pop");
-      if (pop) pop.hidden = true;
-      openPop = null;
+      openPop = x.closest(".pop");
+      closePop();
     });
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && openPop) {
-      openPop.hidden = true;
-      openPop = null;
+    if (e.key === "Escape" && openPop) closePop();
+    // La croix est le seul élément de la fenêtre : la touche Tab y reste.
+    if (e.key === "Tab" && openPop) {
+      e.preventDefault();
+      var x = openPop.querySelector("[data-close]");
+      if (x) x.focus();
     }
   });
 

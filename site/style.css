@@ -8,7 +8,7 @@
   --border2: #2b3549;
   --text: #e7ebf3;
   --soft: #aab3c5;
-  --muted: #6f7a90;
+  --muted: #808ba1;
   --accent: #f0a64a;
   --accent-ink: #1a1206;
   --accent-dim: rgba(240, 166, 74, 0.12);
@@ -33,6 +33,7 @@ body {
 }
 img { max-width: 100%; display: block; }
 a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 h1, h2, h3 { margin: 0; line-height: 1.15; }
 h1, h2 { font-family: var(--serif); font-weight: 400; letter-spacing: -0.01em; }
 h1 { font-size: clamp(36px, 6vw, 62px); }
@@ -202,6 +203,7 @@ b { color: var(--text); font-weight: 600; }
 @media (max-width: 959px) { .split.rev > :first-child { order: 2; } }
 
 .checks { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 14px; }
+.checks + p { margin-top: 18px; }
 .checks li { position: relative; padding-left: 30px; color: var(--soft); }
 .checks li::before {
   content: "";
@@ -242,7 +244,7 @@ b { color: var(--text); font-weight: 600; }
 .calc-total b { font-family: var(--mono); font-weight: 500; color: var(--accent); }
 
 /* Onglets des fonctions */
-.tabs { display: flex; gap: 8px; overflow-x: auto; margin: 36px -16px 28px; padding: 0 16px 4px; scrollbar-width: none; }
+.tabs { display: flex; gap: 8px; overflow-x: auto; margin: 32px -16px 28px; padding: 4px 16px; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 @media (min-width: 820px) { .tabs { justify-content: center; margin: 44px 0 32px; padding: 0; flex-wrap: wrap; } }
 .tabs button {
@@ -251,8 +253,11 @@ b { color: var(--text); font-weight: 600; }
   color: var(--soft); font: 500 14.5px var(--sans); cursor: pointer;
 }
 .tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
-.tab-panel { display: none; }
-.tab-panel.on { display: block; animation: fade .35s ease; }
+/* Sans JavaScript, les onglets ne marchent pas : toutes les fonctions s'affichent à la suite. */
+html:not(.js) .tabs { display: none; }
+html:not(.js) .tab-panel + .tab-panel { margin-top: 14px; }
+.js .tab-panel { display: none; }
+.js .tab-panel.on { display: block; animation: fade .35s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
 .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
 @media (min-width: 640px) { .grid { grid-template-columns: repeat(2, 1fr); } }
@@ -270,7 +275,7 @@ b { color: var(--text); font-weight: 600; }
 
 /* Labo */
 .lab-card { padding: 24px; }
-.lab-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.lab-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
 .pill { font: 500 12px var(--mono); padding: 5px 10px; border-radius: 99px; background: var(--accent-dim); color: var(--accent); }
 .timer { font: 500 30px var(--mono); color: var(--accent-2); }
 .lab-card h3 { font: 400 26px var(--serif); margin-bottom: 14px; }
@@ -626,6 +631,8 @@ b { color: var(--text); font-weight: 600; }
   opacity: 0; transition: opacity .25s; pointer-events: none;
 }
 .typing.on { opacity: 1; }
+.chat.done .typing { display: none; }
+.typing:not(.on) i { animation: none; }
 .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--soft); animation: blink 1.1s infinite ease-in-out; }
 .typing i:nth-child(2) { animation-delay: .16s; }
 .typing i:nth-child(3) { animation-delay: .32s; }
