@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# recipelog-demo-reset — remet la démo dans l'état figé par recipelog-demo-figer.
+set -euo pipefail
+ENV_FILE=/opt/recipelog/.env
+APP_DIR=/opt/recipelog
+SNAP=/var/lib/recipelog-demo
+[ -f "$SNAP/base.dump" ] || { echo "Pas encore de démo figée : rien à faire."; exit 0; }
+
+url="$(grep -m1 '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+url="${url%%\?*}"
+db="${url##*/}"
+dbuser="$(printf '%s' "$url" | sed -E 's#^[a-z]+://([^:@/]+).*#\1#')"
+uploads="$(grep -m1 '^UPLOAD_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+uploads="${uploads:-/var/lib/recipelog/uploads}"
+
+echo "$(date '+%F %T') Remise à zéro de la démo (figée le $(cat "$SNAP/fige-le" 2>/dev/null || echo '?'))"
+systemctl stop recipelog
+trap 'systemctl start recipelog' EXIT
+
+cd /tmp
+sudo -u postgres dropdb --if-exists --force "$db"
+sudo -u postgres createdb -O "$dbuser" "$db"
+sudo -u postgres psql -q -d "$db" -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;'
+# Les avertissements sur les extensions déjà là ne sont pas des erreurs.
+pg_restore --no-owner --no-acl -d "$url" "$SNAP/base.dump" || echo "    (avertissements de pg_restore ignorés)"
+
+# Le site a pu être mis à jour depuis : on applique les nouvelles migrations.
+sudo -u recipelog bash -c "cd '$APP_DIR' && set -a && . ./.env && set +a && pnpm exec prisma migrate deploy" >/dev/null
+
+if [ -f "$SNAP/uploads.tar.gz" ]; then
+  mkdir -p "$uploads"
+  find "$uploads" -mindepth 1 -delete
+  tar -xzf "$SNAP/uploads.tar.gz" -C "$uploads"
+  chown -R recipelog:recipelog "$uploads"
+fi
+echo "$(date '+%F %T') Démo remise à zéro."

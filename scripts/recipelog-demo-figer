@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# recipelog-demo-figer — garde l'état actuel de la démo (recettes, réglages, fichiers)
+# comme référence : chaque nuit, recipelog-demo-reset y revient.
+set -euo pipefail
+ENV_FILE=/opt/recipelog/.env
+SNAP=/var/lib/recipelog-demo
+url="$(grep -m1 '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+url="${url%%\?*}"
+uploads="$(grep -m1 '^UPLOAD_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+uploads="${uploads:-/var/lib/recipelog/uploads}"
+
+mkdir -p "$SNAP"
+chmod 700 "$SNAP"
+pg_dump -Fc --no-owner --no-acl --no-comments -d "$url" -f "$SNAP/base.dump.new"
+mv "$SNAP/base.dump.new" "$SNAP/base.dump"
+if [ -d "$uploads" ]; then
+  tar -czf "$SNAP/uploads.tar.gz.new" -C "$uploads" .
+  mv "$SNAP/uploads.tar.gz.new" "$SNAP/uploads.tar.gz"
+fi
+date '+%d/%m/%Y %H:%M' > "$SNAP/fige-le"
+echo "Démo figée le $(cat "$SNAP/fige-le") : elle reviendra à cet état chaque nuit."
