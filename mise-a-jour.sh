@@ -6,12 +6,20 @@
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)"
 # Pour mettre aussi à jour le RecipeLog de la démo (branche stable) :
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)" _ --demo
+# Pour mettre à jour SEULEMENT la démo (la vitrine ne bouge pas) :
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)" _ --demo-seulement
 #
 # Dans le conteneur de la vitrine, la même chose : vitrine-maj
 # ============================================================
 set -euo pipefail
 AVEC_DEMO=0
-for a in "$@"; do [ "$a" = "--demo" ] && AVEC_DEMO=1; done
+AVEC_VITRINE=1
+for a in "$@"; do
+  case "$a" in
+    --demo) AVEC_DEMO=1 ;;
+    --demo-seulement) AVEC_DEMO=1; AVEC_VITRINE=0 ;;
+  esac
+done
 RAW_DEFAULT="https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine"
 
 # ── Sur l'hôte Proxmox : on retrouve les conteneurs et on lance la mise à jour dedans ──
@@ -20,16 +28,20 @@ if command -v pct >/dev/null 2>&1; then
   find_ct() { pct list | awk -v h="$1" 'NR>1 && $NF==h {print $1; exit}'; }
   VID="${VITRINE_VMID:-$(find_ct recipelog-vitrine)}"
   [ -n "$VID" ] || { echo "Conteneur recipelog-vitrine introuvable (règle VITRINE_VMID=…)." >&2; exit 1; }
-  echo "==> Vitrine (conteneur ${VID})…"
-  # La version la plus récente de ce script fait la mise à jour dans le conteneur.
-  TMP="$(mktemp)"
-  curl -fsSL "${VITRINE_RAW_BASE:-$RAW_DEFAULT}/mise-a-jour.sh" -o "$TMP"
-  pct push "$VID" "$TMP" /root/vitrine-maj.sh && rm -f "$TMP"
-  pct exec "$VID" -- bash /root/vitrine-maj.sh
+  if [ "$AVEC_VITRINE" = 1 ]; then
+    echo "==> Vitrine (conteneur ${VID})…"
+    # La version la plus récente de ce script fait la mise à jour dans le conteneur.
+    TMP="$(mktemp)"
+    curl -fsSL "${VITRINE_RAW_BASE:-$RAW_DEFAULT}/mise-a-jour.sh" -o "$TMP"
+    pct push "$VID" "$TMP" /root/vitrine-maj.sh && rm -f "$TMP"
+    pct exec "$VID" -- bash /root/vitrine-maj.sh
+  fi
   if [ "$AVEC_DEMO" = 1 ]; then
+    # Démo dans le même conteneur que la vitrine (ou, anciennes installations, dans recipelog-demo).
     DID="${DEMO_VMID:-$(find_ct recipelog-demo)}"
-    if [ -z "$DID" ]; then
-      echo "Conteneur recipelog-demo introuvable : démo non mise à jour." >&2
+    DID="${DID:-$VID}"
+    if ! pct exec "$DID" -- test -x /usr/local/sbin/recipelog-deploy; then
+      echo "RecipeLog introuvable dans le conteneur ${DID} : démo non mise à jour." >&2
     else
       echo "==> Démo : RecipeLog (conteneur ${DID})…"
       pct exec "$DID" -- /usr/local/sbin/recipelog-deploy
