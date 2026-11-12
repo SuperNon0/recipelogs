@@ -23,11 +23,11 @@ echo "$BRANCH" > "$DIR/.branche"
 
 echo "==> Réglages (${CONF})…"
 mkdir -p "$CONF"
-install -m 0755 "$DIR/scripts/vitrine-adresse-demo" /usr/local/sbin/vitrine-adresse-demo
+install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
-if [ ! -f "$CONF/config.js" ] || [ -n "${VITRINE_DEMO_URL:-}" ]; then
-  /usr/local/sbin/vitrine-adresse-demo "${VITRINE_DEMO_URL:-}" >/dev/null
-fi
+if [ -n "${VITRINE_DEMO_URL:-}" ]; then vitrine-reglage demo "$VITRINE_DEMO_URL" >/dev/null; fi
+if [ -n "${VITRINE_CONTACT:-}" ]; then vitrine-reglage contact "$VITRINE_CONTACT" >/dev/null; fi
+vitrine-reglage >/dev/null
 
 echo "==> nginx…"
 cat > /etc/nginx/sites-available/vitrine <<'NGINX'

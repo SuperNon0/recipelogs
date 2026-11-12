@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# vitrine-reglage — règle les liens du site vitrine (gardés aux mises à jour).
+#   vitrine-reglage demo https://demo.mon-site.fr     adresse de la démo en ligne
+#   vitrine-reglage contact contact@mon-site.fr       e-mail des demandes de démo et de devis
+#   vitrine-reglage                                   affiche les réglages
+set -euo pipefail
+CONF=/etc/recipelog-vitrine
+mkdir -p "$CONF"
+demo="$(cat "$CONF/demo" 2>/dev/null || true)"
+contact="$(cat "$CONF/contact" 2>/dev/null || true)"
+cle="${1:-}"; val="${2:-}"
+case "$val" in *'"'*|*'\'*|*'<'*|*' '*) echo "Valeur invalide." >&2; exit 1 ;; esac
+case "$cle" in
+  demo)
+    case "$val" in ""|http://*|https://*) ;; *) echo "L'adresse doit commencer par https://" >&2; exit 1 ;; esac
+    demo="$val"; printf '%s' "$demo" > "$CONF/demo" ;;
+  contact)
+    case "$val" in ""|*@*.*) ;; *) echo "Adresse e-mail invalide." >&2; exit 1 ;; esac
+    contact="$val"; printf '%s' "$contact" > "$CONF/contact" ;;
+  "") ;;
+  *) echo "Usage : vitrine-reglage demo <https://…> | contact <e-mail>" >&2; exit 1 ;;
+esac
+cat > "$CONF/config.js" <<JS
+// Réglages de ce serveur (écrit par vitrine-reglage, gardé aux mises à jour).
+window.VITRINE = { demoUrl: "${demo}", contactEmail: "${contact}" };
+JS
+echo "Démo    : ${demo:-(pas réglée)}"
+echo "Contact : ${contact:-(pas réglé)}"
