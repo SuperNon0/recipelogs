@@ -11,6 +11,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.13",
+    date: "2026-11-12",
+    title: "Mode démonstration",
+    summary:
+      "Un RecipeLog peut maintenant servir de site de démonstration ouvert à tous, relié au site vitrine : chacun essaie les recettes, et tout revient comme avant chaque nuit.",
+    features: [
+      "Mode démo (RECIPELOG_DEMO=1 dans le .env du serveur) : un bandeau « Site de démonstration » en haut de chaque page, avec un « ? » qui explique que les changements sont effacés chaque nuit",
+      "En démo, les comptes, la clé Claude (MCP) et le bouton « Mettre à jour le site » sont coupés pour tout le monde : les pages et les boutons disparaissent, et le serveur refuse ces actions",
+    ],
+  },
+  {
     version: "V2.12",
     date: "2026-11-12",
     title: "Prix de vente et marge",
@@ -30,13 +41,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-11-12",
     title: "Un nouveau site RecipeLog en une commande",
     summary:
-      "RecipeLog s'installe maintenant pour une autre personne avec une seule commande dans le shell Proxmox : un conteneur à part, sa propre base, ses propres recettes et sa propre clé pour Claude. Les nouveautés sont d'abord essayées en bêta, puis passées en version stable. Un site peut aussi servir de démonstration ouverte à tous, remise à zéro chaque nuit.",
+      "RecipeLog s'installe maintenant pour une autre personne avec une seule commande dans le shell Proxmox : un conteneur à part, sa propre base, ses propres recettes et sa propre clé pour Claude. Les nouveautés sont d'abord essayées en bêta, puis passées en version stable.",
     features: [
       "Installation en une ligne sur l'hôte Proxmox : la commande crée le conteneur, installe la base, le site, les mises à jour et la sauvegarde de chaque nuit, et peut aussi brancher le tunnel Cloudflare",
       "Deux versions du site : la bêta (où arrivent les nouveautés) et la stable (les nouveautés déjà essayées). Chaque site suit la sienne, et le bouton « Mettre à jour le site » n'apporte que ce qui est passé dans sa version",
       "Claude présente RecipeLog sans prénom, pour que chaque site ait son propre connecteur",
-      "Mode démo (RECIPELOG_DEMO=1 dans le .env du serveur) : un bandeau « Site de démonstration » en haut de chaque page, avec un « ? » qui explique que les changements sont effacés chaque nuit",
-      "En démo, les comptes, la clé Claude (MCP) et le bouton « Mettre à jour le site » sont coupés pour tout le monde : les pages et les boutons disparaissent, et le serveur refuse ces actions",
     ],
   },
   {
