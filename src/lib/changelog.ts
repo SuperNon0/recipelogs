@@ -11,6 +11,21 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.12",
+    date: "2026-11-12",
+    title: "Prix de vente et marge",
+    summary:
+      "Tape le prix auquel tu vends une recette : RecipeLog retire la TVA, enlève le coût des ingrédients et te donne ta marge en euros et en pourcentage.",
+    features: [
+      "Carte Coût d'une recette : nouveau champ « Prix de vente ». Il se règle à la pièce quand la recette a un rendement (« / financier »), sinon pour la recette entière. Laisse vide une recette qui ne se vend pas",
+      "Choisis la TVA comprise dans ton prix (5,5 % à emporter, 10 % sur place, 20 %) ou « HT » : le prix hors TVA s'affiche juste en dessous, et la marge se calcule toujours hors TVA",
+      "La marge brute se calcule même si un ingrédient n'a pas encore de prix : il est compté à 0 € et signalé (« calculée sans Miel »)",
+      "Marge brute en euros par pièce et pour toute la fournée, taux de marge en % et coefficient réel (prix ÷ coût matière). La marge passe en rouge si le prix ne couvre pas les ingrédients. Chaque case a son « ? » avec le calcul détaillé",
+      "Claude peut lire et régler le prix de vente d'une recette (lire_recette, modifier_recette)",
+    ],
+    migrations: ["Base de données : prix de vente et TVA ajoutés aux recettes"],
+  },
+  {
     version: "V2.11",
     date: "2026-11-12",
     title: "Un nouveau site RecipeLog en une commande",

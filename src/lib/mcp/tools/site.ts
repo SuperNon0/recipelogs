@@ -26,6 +26,8 @@ const jsonRecipe = z.object({
   yield_count: z.number().nullable().optional(),
   yield_label: z.string().nullable().optional(),
   sale_coef: z.number().nullable().optional(),
+  sale_price: z.number().nullable().optional(),
+  sale_vat: z.number().nullable().optional(),
   mold: z.unknown().optional(),
   folder: z.string().nullable().optional(),
   categories: z.array(z.string()).optional(),
@@ -141,6 +143,8 @@ export const SITE_TOOLS: McpTool[] = [
           yield_count: r.yieldCount,
           yield_label: r.yieldLabel,
           sale_coef: r.saleCoef != null ? Number(r.saleCoef) : null,
+          sale_price: r.salePrice != null ? Number(r.salePrice) : null,
+          sale_vat: r.saleVat != null ? Number(r.saleVat) : null,
           mold: r.mold ?? null,
         })),
       );
