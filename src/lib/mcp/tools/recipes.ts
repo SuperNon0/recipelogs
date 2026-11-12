@@ -306,7 +306,7 @@ export const RECIPE_TOOLS: McpTool[] = [
   {
     name: "creer_recette",
     title: "Créer une recette",
-    description: `Crée une nouvelle recette. Les nouveaux ingrédients sont ajoutés à la base automatiquement. ${UNIT_HELP}`,
+    description: `Crée une nouvelle recette. Les nouveaux ingrédients sont ajoutés à la base automatiquement : AVANT, compare chaque ingrédient à ceux qui existent (lister_ingredients) et reprends le nom existant exact au lieu d'en créer un nouveau (« œuf entier » → « Oeufs » s'il existe, « huile » → « Huile de tournesol » si c'est la seule huile). Ne crée un ingrédient que s'il n'existe vraiment pas ; en cas de doute entre deux ingrédients existants, demande à l'utilisateur. ${UNIT_HELP}`,
     inputSchema: { type: "object", properties: recipeFieldsJs, required: ["nom", "ingredients"] },
     annotations: WRITE,
     run: async (args) => {

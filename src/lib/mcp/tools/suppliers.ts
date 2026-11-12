@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRICE_UNITS } from "@/lib/cost";
-import { SUPPLIER_FAMILIES } from "@/lib/suppliers";
+import { SUPPLIER_FAMILIES, groupByArticle } from "@/lib/suppliers";
 import {
   chooseProductForIngredient,
   deletePurchaseOrder,
@@ -61,10 +61,10 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       "Enregistre une facture (ou un bon de commande / bon de livraison) d'un fournisseur en une fois : le fournisseur est créé s'il n'existe pas, chaque ligne devient un produit de ce fournisseur (même ceux qui ne servent pas en recette : emballages, boissons, matériel…) et son prix est gardé dans l'historique à la DATE DE LA FACTURE. Rien n'est jamais écrasé. " +
       "LIS BIEN LE CONDITIONNEMENT de chaque ligne : dès qu'un poids ou un volume est connu, préfère un prix au kg ou au L (comparable entre fournisseurs) plutôt qu'à la pièce. Boîte de conserve (« 5/1 4,2 kg PNE 2,4 kg ») : unite_prix kg, contenance = poids net égoutté (PNE) s'il est écrit, sinon le poids net, et prix_colis = prix de la boîte. Bouteille, bidon, brique (« 700 ml », « 10 L ») : unite_prix L. Carton « x 50 », « x 250 » vendu au colis : unite_prix pièce, contenance = 50 ou 250, prix_colis = prix du carton. Garde « pièce » pour ce qui se compte (fougasse, canette, matériel). Si la réponse contient a_verifier, relis ces lignes et corrige avec remplacer=true. " +
       "Pour chaque ligne, donne le prix ramené à l'unité de prix (prix_unitaire, en € HT par kg, L ou pièce) OU le prix d'un colis (prix_colis) avec sa contenance (contenance = 25 pour un sac de 25 kg, 50 pour un carton de 50 pièces) OU le montant de la ligne avec la quantité : le serveur calcule le prix au kg / L / pièce. " +
-      "article = nom commun court pour comparer le même produit entre fournisseurs (« Chocolat noir 64 % », « Crème 35 % », « Boîte pâtissière 20 × 8 ») : réutilise les articles existants (voir comparer_prix_fournisseurs). " +
+      "produit = la désignation exacte écrite sur la facture (garde l'origine : « Fraise Espagne cat I »). article = nom commun court qui REGROUPE les variantes d'un même produit et sert à comparer entre fournisseurs : sans origine, calibre, catégorie ni taille de barquette (« Fraise », « Tomate », « Citron vert »), mais en gardant ce qui change la recette (« Chocolat noir 64 % », « Crème 35 % », « Farine T45 », « Boîte pâtissière 20 × 8 »). Réutilise TOUJOURS l'article existant, même orthographe (voir voir_fournisseur et comparer_prix_fournisseurs) : les variantes d'un article ont un seul historique de prix, et l'ingrédient des recettes relié suit le dernier prix payé pour l'article. En cas de doute entre deux articles, demande à l'utilisateur avant d'enregistrer. " +
       `${FAMILIES_HELP} ` +
       "ingredient = nom exact (ou id) d'un ingrédient des recettes auquel ce produit correspond (voir lister_ingredients) : il prend alors ce prix s'il n'avait pas encore de produit choisi. Ne crée JAMAIS d'ingrédient pour un produit qui ne sert pas en recette, et ne mets jamais les prix avec regler_fiches_ingredients. " +
-      "Réponse : nouveaux produits, prix qui ont changé (avant → après), ingrédients mis à jour, lignes à vérifier. À montrer à l'utilisateur. Ensuite, joins le PDF ou la photo de la facture avec joindre_fichier_facture.",
+      "Réponse : nouveaux produits, prix qui ont changé (avant → après), variantes_regroupees (nouvelle variante d'un article déjà acheté, avec l'évolution), ingrédients mis à jour, lignes à vérifier. À montrer à l'utilisateur. Ensuite, joins le PDF ou la photo de la facture avec joindre_fichier_facture.",
     inputSchema: {
       type: "object",
       properties: {
@@ -245,6 +245,15 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           moyenne: p.stats?.average,
           ingredient: p.base?.name ?? null,
         })),
+        articles_regroupes: groupByArticle(s.products)
+          .filter((g) => g.products.length > 1)
+          .map((g) => ({
+            article: g.article,
+            variantes: g.products.map((x) => x.name),
+            dernier_prix: g.stats ? `${g.stats.current} €/${g.stats.unit}` : null,
+            evolution: g.stats?.changePct,
+            moyenne: g.stats?.average,
+          })),
         factures: s.orders,
       });
     },
@@ -287,29 +296,45 @@ export const SUPPLIER_TOOLS: McpTool[] = [
 
   {
     name: "historique_prix",
-    title: "Historique des prix d'un produit",
-    description: "Tous les prix payés pour un produit, du plus récent au plus ancien, avec la facture de chacun. Filtre de période possible.",
+    title: "Historique des prix d'un article",
+    description:
+      "Tous les prix payés pour un produit ET les autres variantes du même article chez ce fournisseur (« Fraise France », « Fraise Espagne » rangées sous « Fraise »), du plus récent au plus ancien, avec la désignation et la facture de chacun. Filtre de période possible. seul_produit=true pour ne voir que ce produit.",
     inputSchema: {
       type: "object",
       properties: {
         produit_id: js.int("Id du produit (voir comparer_prix_fournisseurs)"),
         du: js.str("Depuis, AAAA-MM-JJ"),
         au: js.str("Jusqu'à, AAAA-MM-JJ"),
+        seul_produit: js.bool("true = sans les autres variantes de l'article"),
       },
       required: ["produit_id"],
     },
     annotations: READ,
     run: async (args) => {
-      const a = parseArgs(z.object({ produit_id: id, du: day.optional(), au: day.optional() }), args);
+      const a = parseArgs(
+        z.object({ produit_id: id, du: day.optional(), au: day.optional(), seul_produit: z.boolean().optional() }),
+        args,
+      );
       const { products, suppliers } = await loadAllProducts();
       const p = products.find((x) => x.id === a.produit_id);
       if (!p) throw new Error("produit introuvable");
-      const history = p.history.filter((h) => (!a.du || h.date >= a.du) && (!a.au || h.date <= a.au));
+      const groups = groupByArticle(products.filter((x) => x.supplierId === p.supplierId));
+      const group = a.seul_produit ? groupByArticle([p])[0] : groups.find((g) => g.products.some((x) => x.id === p.id))!;
+      const history = group.history.filter((h) => (!a.du || h.date >= a.du) && (!a.au || h.date <= a.au));
       return text({
-        produit: p.name,
+        article: group.article,
+        variantes: group.products.map((x) => ({ produit_id: x.id, produit: x.name })),
         fournisseur: suppliers.find((s) => s.id === p.supplierId)?.name,
-        moyenne: p.stats?.average,
-        prix: history.map((h) => ({ date: h.date, prix: `${h.price} €/${h.unit}`, facture_id: h.orderId, numero: h.number })),
+        dernier_prix: group.stats ? `${group.stats.current} €/${group.stats.unit}` : null,
+        evolution: group.stats?.changePct != null ? `${group.stats.changePct > 0 ? "+" : ""}${group.stats.changePct} %` : null,
+        moyenne: group.stats?.average,
+        prix: history.map((h) => ({
+          date: h.date,
+          produit: h.productName,
+          prix: `${h.price} €/${h.unit}`,
+          facture_id: h.orderId,
+          numero: h.number,
+        })),
       });
     },
   },

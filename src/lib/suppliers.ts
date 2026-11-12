@@ -95,10 +95,78 @@ export type ComparisonProduct = {
   packLabel: string | null;
   unit: string;
   stats: PriceStats | null;
+  /** Tous les prix payés (pour regrouper les variantes d'un même article). */
+  history?: (PricePoint & { orderId?: number })[];
 };
 
+/** Nom sous lequel un produit est rangé : son article, sinon son nom. */
+export const articleOf = (p: { name: string; article: string | null }) => (p.article?.trim() || p.name).trim();
+
+/** Un prix payé, avec le produit (la désignation écrite sur la facture) d'où il vient. */
+export type ArticleHistoryEntry<H> = H & { productId: number; productName: string };
+
+/**
+ * Article d'un fournisseur : toutes ses variantes (« Fraise France »,
+ * « Fraise Espagne ») réunies, avec un seul historique de prix.
+ */
+export type ArticleGroup<P extends ComparisonProduct> = {
+  key: string;
+  article: string;
+  family: string;
+  unit: string;
+  /** Les variantes, de la plus récemment achetée à la plus ancienne. */
+  products: P[];
+  /** Tous les prix, du plus récent au plus ancien. */
+  history: ArticleHistoryEntry<NonNullable<P["history"]>[number]>[];
+  stats: PriceStats | null;
+};
+
+const groupKey = (p: Pick<ComparisonProduct, "name" | "article" | "unit" | "stats">) =>
+  `${articleKey(articleOf(p))}|${p.stats?.unit ?? p.unit}`;
+
+/**
+ * Regroupe les produits d'UN fournisseur par article (même nom d'article,
+ * même unité de prix). Les prix de toutes les variantes forment un seul
+ * historique : dernier prix, évolution et moyenne valent pour l'article.
+ */
+export function groupByArticle<P extends ComparisonProduct>(products: P[]): ArticleGroup<P>[] {
+  const groups = new Map<string, ArticleGroup<P>>();
+  for (const p of products) {
+    const key = groupKey(p);
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, article: articleOf(p), family: p.family?.trim() || OTHER_FAMILY, unit: p.stats?.unit ?? p.unit, products: [], history: [], stats: null };
+      groups.set(key, g);
+    } else if (g.family === OTHER_FAMILY && p.family?.trim()) {
+      g.family = p.family.trim();
+    }
+    g.products.push(p);
+    for (const h of (p.history ?? []) as NonNullable<P["history"]>) g.history.push({ ...h, productId: p.id, productName: p.name });
+  }
+  for (const g of groups.values()) {
+    g.history.sort((a, b) => iso(b.date).localeCompare(iso(a.date)) || (b.orderId ?? 0) - (a.orderId ?? 0));
+    const anyHistory = g.products.some((p) => p.history);
+    if (anyHistory) {
+      g.stats = priceStats(g.history.slice().reverse());
+    } else {
+      // Sans historique détaillé : le prix le plus récent, puis le moins cher.
+      const best = g.products
+        .map((p) => p.stats)
+        .filter((s): s is PriceStats => s != null)
+        .sort((a, b) => b.date.localeCompare(a.date) || a.current - b.current)[0];
+      g.stats = best ?? null;
+    }
+    const lastDate = (p: P) => p.stats?.date ?? "";
+    g.products.sort((a, b) => lastDate(b).localeCompare(lastDate(a)) || (a.stats?.current ?? 0) - (b.stats?.current ?? 0));
+  }
+  return [...groups.values()].sort((a, b) => a.article.localeCompare(b.article, "fr", { sensitivity: "base" }));
+}
+
 export type ComparisonCell = {
+  /** La variante achetée le plus récemment. */
   productId: number;
+  /** Toutes les variantes de cet article chez ce fournisseur. */
+  productIds: number[];
   name: string;
   packLabel: string | null;
   price: number;
@@ -122,36 +190,41 @@ export type ComparisonRow = {
 /**
  * Lignes du tableau comparatif : un article par ligne (même nom d'article
  * chez plusieurs fournisseurs), rangées par famille puis par nom. Chez un même
- * fournisseur, si deux produits portent le même article, le moins cher compte.
+ * fournisseur, les variantes de l'article sont réunies : la case montre le
+ * dernier prix payé (à date égale, le moins cher).
  */
 export function buildComparison(products: ComparisonProduct[]): ComparisonRow[] {
-  const rows = new Map<string, ComparisonRow>();
+  const bySupplier = new Map<number, ComparisonProduct[]>();
   for (const p of products) {
     if (!p.stats) continue;
-    const article = (p.article?.trim() || p.name).trim();
-    const unit = p.stats.unit;
-    // Deux unités différentes ne se comparent pas : une ligne par unité.
-    const key = `${articleKey(article)}|${unit}`;
-    let row = rows.get(key);
-    if (!row) {
-      row = { key, article, family: p.family?.trim() || OTHER_FAMILY, unit, cells: {}, orders: 0 };
-      rows.set(key, row);
-    } else if (row.family === OTHER_FAMILY && p.family?.trim()) {
-      row.family = p.family.trim();
+    bySupplier.set(p.supplierId, [...(bySupplier.get(p.supplierId) ?? []), p]);
+  }
+  const rows = new Map<string, ComparisonRow>();
+  for (const [supplierId, list] of bySupplier) {
+    for (const g of groupByArticle(list)) {
+      if (!g.stats) continue;
+      let row = rows.get(g.key);
+      if (!row) {
+        row = { key: g.key, article: g.article, family: g.family, unit: g.unit, cells: {}, orders: 0 };
+        rows.set(g.key, row);
+      } else if (row.family === OTHER_FAMILY && g.family !== OTHER_FAMILY) {
+        row.family = g.family;
+      }
+      row.orders += g.stats.count;
+      const latest =
+        g.products.find((p) => g.history[0] && p.id === g.history[0].productId) ?? g.products[0];
+      row.cells[supplierId] = {
+        productId: latest.id,
+        productIds: g.products.map((p) => p.id),
+        name: latest.name,
+        packLabel: latest.packLabel,
+        price: g.stats.current,
+        unit: g.unit,
+        date: g.stats.date,
+        changePct: g.stats.changePct,
+        average: g.stats.average,
+      };
     }
-    row.orders += p.stats.count;
-    const cell: ComparisonCell = {
-      productId: p.id,
-      name: p.name,
-      packLabel: p.packLabel,
-      price: p.stats.current,
-      unit,
-      date: p.stats.date,
-      changePct: p.stats.changePct,
-      average: p.stats.average,
-    };
-    const prev = row.cells[p.supplierId];
-    if (!prev || cell.price < prev.price) row.cells[p.supplierId] = cell;
   }
   const familyRank = (f: string) => {
     const i = (SUPPLIER_FAMILIES as readonly string[]).indexOf(f);
