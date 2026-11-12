@@ -3,7 +3,13 @@
 Cette branche (`site-vitrine`) ne contient que le site vitrine de RecipeLog et ses scripts.
 Le site s'adresse aux professionnels (B2B) : RecipeLog y est présenté en location mensuelle,
 sans parler de l'hébergement technique.
-L'appli elle-même est sur `main` (bêta) et `stable`.
+L'appli elle-même est sur `main` (bêta) et `stable` : les trois ne se mélangent jamais.
+
+| Branche | Rôle |
+|---|---|
+| `main` | bêta de RecipeLog (le site de Noë) |
+| `stable` | RecipeLog validé (les autres sites, et la démo) |
+| `site-vitrine` | le site vitrine seul : ses commandes d'installation et de mise à jour ne lisent que cette branche |
 
 ```
 site/                   le site (HTML, CSS, JS, sans build)
@@ -12,7 +18,9 @@ mise-a-jour.sh          mise à jour de la vitrine (et de la démo avec --demo)
 scripts/                scripts copiés dans les conteneurs
 ```
 
-## Installer (une ligne, dans le shell de l'hôte Proxmox)
+## Créer le site vitrine
+
+Une seule ligne, à coller dans le shell de l'hôte Proxmox (en root) :
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/install.sh)"
@@ -29,7 +37,7 @@ Quatre questions, toutes facultatives (Entrée pour passer) : installer la démo
 de la démo, l'e-mail de contact, et les jetons des tunnels Cloudflare. À la fin, un résumé est gardé dans
 `/root/recipelog-vitrine.txt` sur l'hôte.
 
-## Mettre à jour la vitrine
+## Mettre à jour le site vitrine
 
 Modifie le site sur cette branche (`site-vitrine`), puis dans le shell Proxmox :
 
