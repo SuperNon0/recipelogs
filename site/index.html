@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RecipeLog · Logiciel de fiches techniques et de coût de revient pour la pâtisserie</title>
-  <meta name="description" content="RecipeLog, le logiciel des laboratoires de pâtisserie : fiches techniques, coût de revient, prix de vente et marge, suivi des prix fournisseurs, allergènes, fiches de production et gestion d'équipe. En location, sans installation.">
+  <meta name="description" content="RecipeLog, le logiciel des laboratoires de pâtisserie : fiches techniques, coût de revient, prix de vente et marge brute, suivi des prix fournisseurs, 14 allergènes réglementaires, fiches de production et droits d'équipe. En location mensuelle, hébergé pour vous, sans installation.">
   <meta name="theme-color" content="#0b0f17">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,8 +43,8 @@
       <h1>Chaque recette, <em>chiffrée au centime.</em></h1>
       <p class="lead">
         RecipeLog réunit vos fiches techniques, votre coût de revient, vos prix de vente et vos achats
-        fournisseurs dans un seul outil. Vous savez ce que rapporte chaque produit, vous produisez
-        à la bonne quantité et toute votre équipe travaille sur les mêmes recettes.
+        fournisseurs dans un seul outil. Vous savez ce que rapporte chaque produit, vous voyez l'effet
+        de chaque hausse fournisseur sur vos marges et toute votre équipe produit à partir des mêmes fiches.
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary" data-contact href="#contact">Demander une démonstration</a>
@@ -109,17 +109,19 @@
   <div class="wrap try-in">
     <div>
       <p class="eyebrow">Rentabilité</p>
-      <h2>Connaissez votre marge sur chaque produit.</h2>
+      <h2>Sachez ce que rapporte chaque produit.</h2>
       <p>
-        Le coût de revient est calculé tout seul à partir des prix d'achat, sous-recettes comprises.
-        Fixez un prix de vente : RecipeLog vous donne le prix HT selon la TVA, la marge brute et le
-        coefficient. Quand un fournisseur augmente un prix, toutes les recettes concernées sont recalculées.
+        Le coût de revient se calcule à partir des prix d'achat réels de vos ingrédients, sous-recettes
+        comprises. Indiquez votre prix de vente : RecipeLog en déduit le prix HT selon la TVA, la marge brute,
+        le taux de marge et le coefficient. Quand un fournisseur augmente un tarif, toutes les recettes qui
+        utilisent ce produit sont recalculées : vous voyez aussitôt l'effet sur votre coût et sur votre marge.
       </p>
       <ul class="checks">
-        <li><b>Coût matière et coût par pièce</b>, à toutes les quantités, avec le détail ingrédient par ingrédient et le produit fournisseur d'où vient chaque prix.</li>
+        <li><b>Coût matière et coût par pièce</b>, à toutes les quantités, avec le détail ingrédient par ingrédient et le produit fournisseur dont vient chaque prix.</li>
         <li><b>Prix de vente, marge brute et taux de marge</b>, en TTC ou HT, avec une TVA à 5,5 %, 10 % ou 20 %.</li>
         <li><b>Prix de vente conseillé</b> à partir de votre coefficient, recette par recette.</li>
-        <li><b>Aucun chiffre faux sans le savoir</b> : un ingrédient sans prix est signalé, et on lui choisit un produit en un geste.</li>
+        <li><b>Vos prix de vente réunis sur une seule page</b>, pour revoir votre carte en un coup d'œil.</li>
+        <li><b>Pas de coût faussé à votre insu</b> : un ingrédient sans prix est signalé, et vous lui associez un produit fournisseur en un clic.</li>
       </ul>
     </div>
 
@@ -127,7 +129,7 @@
       <div class="calc-head">
         <div>
           <h3>Financiers amande</h3>
-          <p class="muted small" style="margin:0">Calculez votre marge</p>
+          <p class="muted small" style="margin:0">Simulez votre marge</p>
         </div>
         <button class="help-btn" type="button" data-help="help-marge" aria-label="Aide : le calcul de la marge">?</button>
       </div>
@@ -181,11 +183,12 @@
     <div>
       <p class="eyebrow">Achats et fournisseurs</p>
       <h2>Vos factures deviennent un historique de prix.</h2>
-      <p>Photographiez une facture ou un bon de livraison : chaque ligne est rangée chez le bon fournisseur, avec son prix ramené au kilo, au litre ou à la pièce, à la date de la facture.</p>
+      <p>Envoyez une facture ou un bon de livraison, en photo ou en PDF, à l'assistant IA : chaque ligne est rangée chez le bon fournisseur, avec son prix ramené au kilo, au litre ou à la pièce, à la date de la facture.</p>
       <ul class="checks">
-        <li><b>Comparaison de trois fournisseurs</b> côte à côte, par famille de produits, avec le moins cher mis en évidence.</li>
+        <li><b>Jusqu'à trois fournisseurs comparés</b> côte à côte, par famille de produits, avec le moins cher mis en évidence et l'évolution de chaque prix.</li>
         <li><b>Historique complet</b> de chaque article : dernier prix, moyenne, plus bas, plus haut, sur la période de votre choix.</li>
         <li><b>Rien n'est écrasé</b> : chaque prix renvoie à sa facture d'origine, PDF ou photo jointe.</li>
+        <li><b>Un choix qui s'applique partout</b> : le produit fournisseur retenu pour un ingrédient sert à toutes les recettes qui l'utilisent.</li>
         <li><b>Les variantes regroupées</b> : la fraise d'Espagne et la fraise de France forment un seul article, le chocolat reste séparé par pourcentage.</li>
       </ul>
     </div>
@@ -208,12 +211,12 @@
   <div class="wrap split">
     <div>
       <p class="eyebrow">Production</p>
-      <h2>Du carnet de commandes aux pesées.</h2>
+      <h2>Du nombre de pièces aux pesées.</h2>
       <ul class="checks">
-        <li><b>Fiche de production.</b> « 60 éclairs » : toutes les pesées à l'échelle, sous-recettes comprises, une préparation par encadré dans l'ordre de fabrication, prête à imprimer.</li>
+        <li><b>Fiche de production.</b> Indiquez « 60 éclairs » : toutes les pesées sont calculées, sous-recettes comprises, une préparation par encadré dans l'ordre de fabrication, prête à imprimer en PDF.</li>
         <li><b>Plusieurs produits à la fois.</b> Les préparations communes s'additionnent : une seule pâte à choux pour les éclairs et les religieuses.</li>
-        <li><b>Adaptation des quantités.</b> Par coefficient, masse visée, ingrédient disponible, nombre de pièces ou changement de moule (cercle Ø 18 vers Ø 24, cadre 40×60 vers cercles).</li>
-        <li><b>Mode labo.</b> La recette en grand sur tablette ou téléphone, l'écran reste allumé, les pesées se cochent et les temps de cuisson deviennent des minuteurs.</li>
+        <li><b>Adaptation des quantités.</b> Par coefficient, masse visée, ingrédient disponible, nombre de pièces ou changement de moule (cercle de 18 cm vers 24 cm, cadre 40 × 60 vers cercles).</li>
+        <li><b>Mode labo.</b> La recette en grand sur tablette ou téléphone, l'écran reste allumé, les pesées se cochent et les durées indiquées dans les étapes deviennent des minuteurs.</li>
       </ul>
     </div>
     <div class="lab-card card" aria-hidden="true">
@@ -247,18 +250,18 @@
 
     <div class="tab-panel on" id="t-fiches">
       <div class="grid">
-        <article class="feat"><div class="ic">◫</div><h3>Sous-recettes</h3><p>Un entremets qui contient un biscuit, lui-même fait d'une pâte d'amande : les masses, les coûts et les allergènes suivent à tous les niveaux. Une sous-recette peut être verrouillée.</p></article>
-        <article class="feat"><div class="ic">%</div><h3>Masses et pourcentages</h3><p>Chaque ingrédient affiche sa part de la masse totale. Les pièces (œufs, jaunes) ont un poids et comptent dans le total.</p></article>
-        <article class="feat"><div class="ic">◎</div><h3>Rendement</h3><p>Chaque recette connaît son rendement (40 financiers) et calcule le coût par pièce.</p></article>
+        <article class="feat"><div class="ic">◫</div><h3>Sous-recettes</h3><p>Un entremets qui contient un biscuit, lui-même fait d'une pâte d'amande : les masses, les coûts et les allergènes suivent à tous les niveaux.</p></article>
+        <article class="feat"><div class="ic">%</div><h3>Masses et pourcentages</h3><p>Chaque ingrédient affiche sa part de la masse totale. Les ingrédients comptés à la pièce (œufs, jaunes) ont un poids et entrent dans le total.</p></article>
+        <article class="feat"><div class="ic">◎</div><h3>Rendement</h3><p>Chaque recette connaît son rendement (40 financiers, 1 040 g) et en déduit le coût par pièce.</p></article>
         <article class="feat"><div class="ic">⇄</div><h3>Essais et variantes</h3><p>Gardez vos essais sous la recette d'origine et comparez deux versions : écart de chaque ingrédient en grammes et en pourcentage, étapes modifiées en couleur.</p></article>
-        <article class="feat"><div class="ic">¶</div><h3>Étapes précises</h3><p>Intertitres (pâte, crème, montage) et quantités liées dans le texte, qui suivent la multiplication. Unités g, L, cuillères, pièces et QS.</p></article>
+        <article class="feat"><div class="ic">¶</div><h3>Étapes précises</h3><p>Intertitres (pâte, crème, montage) et quantités liées dans le texte, qui suivent chaque adaptation de la recette. Unités g, L, cuillères, pièces et QS.</p></article>
         <article class="feat"><div class="ic">↺</div><h3>Historique</h3><p>Les dernières recettes ouvertes par chaque personne, les favoris et les notes d'essai.</p></article>
       </div>
     </div>
 
     <div class="tab-panel" id="t-qualite">
       <div class="grid">
-        <article class="feat"><div class="ic">⚠</div><h3>Allergènes automatiques</h3><p>Les 14 allergènes réglementaires se renseignent une fois sur l'ingrédient. Chaque recette les cumule, sous-recettes comprises, et indique l'ingrédient qui les apporte.</p></article>
+        <article class="feat"><div class="ic">⚠</div><h3>Allergènes automatiques</h3><p>Les 14 allergènes réglementaires (règlement INCO) se renseignent une seule fois, sur l'ingrédient. Chaque recette les cumule, sous-recettes comprises, et indique l'ingrédient qui les apporte.</p></article>
         <article class="feat"><div class="ic">✓</div><h3>Une seule version de la recette</h3><p>Toute l'équipe travaille sur la même fiche : fini les photocopies annotées et les cahiers différents d'un poste à l'autre.</p></article>
         <article class="feat"><div class="ic">◉</div><h3>Ingrédients propres</h3><p>Chaque ingrédient sait dans quelles recettes il sert et en quelle quantité. Les doublons se fusionnent en un clic.</p></article>
         <article class="feat"><div class="ic">≡</div><h3>Journal des actions</h3><p>Qui a demandé un accès, qui l'a accepté, qui a changé un rôle, et quand.</p></article>
@@ -276,9 +279,9 @@
 
     <div class="tab-panel" id="t-rangement">
       <div class="grid">
-        <article class="feat"><div class="ic">▣</div><h3>Dossiers et catégories</h3><p>Rangez par gamme, boutique, saison ou client, avec des dossiers de couleur, des catégories et des étiquettes.</p></article>
-        <article class="feat"><div class="ic">⌕</div><h3>Recherche complète</h3><p>Par nom, par ingrédient ou par ce qui est écrit dans les étapes. « jaunes + crème » trouve les recettes qui contiennent les deux.</p></article>
-        <article class="feat"><div class="ic">⇩</div><h3>Reprise de l'existant</h3><p>Import depuis Recipe Keeper ou un fichier JSON, et export complet de vos recettes à tout moment.</p></article>
+        <article class="feat"><div class="ic">▣</div><h3>Dossiers et catégories</h3><p>Rangez par gamme, boutique, saison ou client, avec des dossiers de couleur, des catégories, des mots-clés et des favoris.</p></article>
+        <article class="feat"><div class="ic">⌕</div><h3>Recherche complète</h3><p>Par nom, par ingrédient ou dans le texte des étapes et des notes. « jaunes + crème » trouve les recettes qui contiennent les deux.</p></article>
+        <article class="feat"><div class="ic">⇩</div><h3>Reprise de l'existant</h3><p>Import depuis Recipe Keeper ou un fichier JSON, et export complet de vos recettes au format JSON, à tout moment.</p></article>
         <article class="feat"><div class="ic">▯</div><h3>Comme une application</h3><p>RecipeLog s'ajoute à l'écran d'accueil du téléphone ou de la tablette et s'ouvre en plein écran.</p></article>
       </div>
     </div>
@@ -297,7 +300,7 @@
     <div>
       <p class="eyebrow">Équipe</p>
       <h2>Chacun voit ce dont il a besoin.</h2>
-      <p>Chaque collaborateur a son propre accès. Vous créez les rôles et vous cochez ce que chacun peut faire.</p>
+      <p>Chaque collaborateur a son propre accès : les recettes se transmettent sans photocopies, et vous décidez qui voit quoi. Vous créez les rôles et cochez ce que chacun peut faire.</p>
       <ul class="checks">
         <li><b>Rôles sur mesure.</b> Modifier ou supprimer des recettes, voir ou modifier les prix, gérer la production, imprimer : chaque droit s'accorde séparément.</li>
         <li><b>Prix confidentiels.</b> Sans le droit de voir les prix, aucun coût ni aucune marge n'arrive sur l'appareil du collaborateur.</li>
@@ -314,19 +317,19 @@
     <div>
       <p class="eyebrow">Assistant IA</p>
       <h2>La saisie, déléguée.</h2>
-      <p>RecipeLog se connecte à Claude, l'assistant IA d'Anthropic. Vous lui écrivez comme à un collègue, il travaille directement dans vos fiches avec plus de 70 actions.</p>
+      <p>RecipeLog se connecte à Claude, l'assistant IA d'Anthropic. Vous lui écrivez comme à un collègue, et il travaille directement dans votre RecipeLog grâce à plus de 70 actions.</p>
       <ul class="checks">
         <li><b>Factures.</b> Une photo de facture, et chaque prix est enregistré chez le bon fournisseur, regroupé avec les mêmes articles.</li>
         <li><b>Nouvelles recettes.</b> À partir d'un texte, d'une photo, d'une page web ou d'une vidéo, en reprenant vos ingrédients existants plutôt que d'en créer de nouveaux.</li>
-        <li><b>Questions de gestion.</b> « Combien me coûte cette tarte ? », « Adapte-la pour 3 cercles de 22 », « Prépare la production de samedi ».</li>
+        <li><b>Questions de gestion.</b> « Combien me coûte cette tarte ? », « Adaptez-la pour 3 cercles de 22 cm », « Préparez la production de samedi ».</li>
       </ul>
-      <p class="muted small">Option qui nécessite un abonnement Claude. Chaque accès a sa propre clé secrète, que vous pouvez couper à tout moment.</p>
+      <p class="muted small">Option qui nécessite un abonnement Claude. Chaque accès a sa propre clé secrète, que vous pouvez révoquer à tout moment.</p>
     </div>
     <div class="chat card" aria-hidden="true">
-      <div class="msg me">Enregistre cette facture.<span class="att">facture-crèmerie.pdf</span></div>
+      <div class="msg me">Enregistrez cette facture.<span class="att">facture-crèmerie.pdf</span></div>
       <div class="msg ai">Facture du 10/11 enregistrée chez votre fournisseur crèmerie : 14 lignes. Le <b>beurre doux 82 %</b> passe de 9,40 € à 9,80 € le kg (+4,2 %). Il entre dans 23 recettes.</div>
       <div class="msg me">Quel est l'impact sur les financiers ?</div>
-      <div class="msg ai">Coût par pièce : 0,148 € au lieu de 0,145 €. À 1,80 € TTC, la marge brute reste à 1,56 € par pièce (91 %).</div>
+      <div class="msg ai">Coût par pièce : 0,150 € au lieu de 0,148 €. À 1,80 € TTC, la marge brute reste à 1,56 € par pièce (91 %).</div>
     </div>
   </div>
 </section>
@@ -335,12 +338,12 @@
 <section class="section" id="service">
   <div class="wrap">
     <p class="eyebrow center">Un service clé en main</p>
-    <h2 class="center">Vous travaillez, on s'occupe du reste.</h2>
+    <h2 class="center">Vous produisez, nous nous occupons du reste.</h2>
     <div class="steps four">
       <div class="step card"><span>✓</span><h3>Rien à installer</h3><p>Votre RecipeLog est hébergé et maintenu pour vous. Un navigateur suffit, au bureau comme au labo.</p></div>
-      <div class="step card"><span>✓</span><h3>Données protégées</h3><p>Chaque client a son propre espace, séparé des autres. Connexion sécurisée et sauvegardes régulières.</p></div>
-      <div class="step card"><span>✓</span><h3>Toujours à jour</h3><p>Les nouvelles fonctions arrivent sans interruption de service, et une page présente chaque nouveauté.</p></div>
-      <div class="step card"><span>✓</span><h3>Vos recettes restent à vous</h3><p>Export complet de vos recettes à tout moment, et pendant toute la durée de votre abonnement.</p></div>
+      <div class="step card"><span>✓</span><h3>Données protégées</h3><p>Chaque client a son propre espace, séparé des autres. Connexion sécurisée par code envoyé par e-mail, et sauvegardes régulières.</p></div>
+      <div class="step card"><span>✓</span><h3>Toujours à jour</h3><p>De nouvelles fonctions chaque mois, installées pour vous. La page « Version et nouveautés » présente chaque ajout.</p></div>
+      <div class="step card"><span>✓</span><h3>Vos recettes restent à vous</h3><p>Vous pouvez exporter l'ensemble de vos recettes à tout moment, pendant toute la durée de votre abonnement.</p></div>
     </div>
   </div>
 </section>
@@ -351,7 +354,7 @@
     <div>
       <p class="eyebrow">Offre</p>
       <h2>Une location mensuelle, tout compris.</h2>
-      <p>Pas de logiciel à acheter ni de matériel à prévoir. Un abonnement mensuel qui couvre la mise en service, l'hébergement, les mises à jour et l'assistance.</p>
+      <p>Pas de logiciel à acheter ni de matériel à prévoir. Un abonnement mensuel couvre la mise en service, l'hébergement, les mises à jour et l'assistance.</p>
       <p class="muted small">Tarif selon la taille de votre structure et le nombre de collaborateurs. Démonstration sans engagement.</p>
     </div>
     <div class="card offer">
@@ -377,11 +380,12 @@
     <h2 class="center">Bon à savoir</h2>
     <div class="faq">
       <details><summary>Faut-il installer quelque chose ?</summary><p>Non. RecipeLog s'ouvre dans le navigateur, sur ordinateur, tablette ou téléphone. Il peut aussi s'ajouter à l'écran d'accueil comme une application.</p></details>
-      <details><summary>Comment reprendre mes recettes actuelles ?</summary><p>La reprise est comprise dans la mise en service. Les recettes peuvent être importées depuis Recipe Keeper ou un fichier, ou saisies à partir de vos fiches, photos et documents.</p></details>
+      <details><summary>Comment reprendre mes recettes actuelles ?</summary><p>La reprise est comprise dans la mise en service. Les recettes peuvent être importées depuis Recipe Keeper ou un fichier JSON, ou saisies à partir de vos fiches, photos et documents.</p></details>
       <details><summary>Combien de personnes peuvent l'utiliser ?</summary><p>Toute votre équipe. Chaque personne a son accès et un rôle qui définit ce qu'elle peut voir et modifier, prix compris.</p></details>
-      <details><summary>Le coût de revient est-il fiable si un prix manque ?</summary><p>Un ingrédient sans prix est signalé dans le détail du coût. Il suffit de le toucher pour lui associer un produit de vos fournisseurs.</p></details>
+      <details><summary>Le coût de revient est-il fiable si un prix manque ?</summary><p>Un ingrédient sans prix est signalé dans le détail du coût. Un clic suffit pour lui associer un produit de vos fournisseurs.</p></details>
+      <details><summary>Que se passe-t-il quand un fournisseur augmente ses prix ?</summary><p>Dès que la facture est enregistrée, le nouveau prix s'applique aux recettes qui utilisent ce produit : coût de revient et marge sont recalculés. L'historique garde les anciens prix, pour suivre l'évolution et comparer avec vos autres fournisseurs.</p></details>
       <details><summary>Que deviennent mes données si j'arrête ?</summary><p>Elles vous appartiennent. Vous pouvez exporter toutes vos recettes à tout moment, y compris avant la fin de l'abonnement.</p></details>
-      <details><summary>L'assistant IA est-il obligatoire ?</summary><p>Non, toutes les fonctions s'utilisent sans lui. Il fait gagner du temps sur la saisie des factures et des recettes, avec un abonnement Claude.</p></details>
+      <details><summary>L'assistant IA est-il obligatoire ?</summary><p>Non, toutes les fonctions s'utilisent sans lui. Il fait gagner du temps sur la saisie des factures et des recettes, et nécessite un abonnement Claude.</p></details>
     </div>
   </div>
 </section>
@@ -392,7 +396,7 @@
     <div>
       <p class="eyebrow">Démo en ligne</p>
       <h2>Essayez RecipeLog dès maintenant.</h2>
-      <p>Une version de démonstration complète, avec quelques recettes, est ouverte à tous. Adaptez une recette, consultez son coût, lancez le mode labo ou imprimez une fiche. Elle revient à son état d'origine chaque nuit.</p>
+      <p>Une version de démonstration complète, avec quelques recettes, est ouverte à tous. Adaptez une recette, consultez son coût de revient, lancez le mode labo ou imprimez une fiche. Elle revient à son état d'origine chaque nuit.</p>
     </div>
     <div class="demo-cta">
       <a class="btn btn-primary btn-lg" data-demo href="#demo">Ouvrir la démo</a>
@@ -429,7 +433,7 @@
   <div class="pop-box card">
     <button class="pop-x" type="button" data-close aria-label="Fermer">×</button>
     <h3 id="help-marge-t">Le calcul de la marge</h3>
-    <p><b>Coût de revient</b> : la somme des ingrédients, chacun à son prix d'achat HT.</p>
+    <p><b>Coût de revient</b> : la somme des ingrédients, chacun à son prix d'achat HT. <b>Coût par pièce</b> : le coût de revient divisé par le nombre de pièces.</p>
     <p><b>Prix HT</b> : le prix TTC sans la TVA. <b>Marge brute</b> : ce qui reste du prix HT une fois les matières payées.</p>
     <pre>prix HT     = prix TTC ÷ (1 + TVA)
 marge brute = prix HT − coût par pièce
