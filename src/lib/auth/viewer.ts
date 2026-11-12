@@ -7,6 +7,7 @@ import { getAuthSettings } from "./config";
 import { currentService } from "./service";
 import { tokenFromRequest, verifyCloudflareJwt } from "./cloudflare";
 import { rolePermissions, type Access, type Permission } from "./permissions";
+import { demoBlocks } from "@/lib/demo";
 
 /**
  * Qui fait la requête.
@@ -110,6 +111,8 @@ export function canBeViewedAs(target: AccountWithRole): boolean {
 
 /** Le visiteur peut-il faire ça ? (compte actif avec la permission, ou comptes désactivés) */
 export function viewerCan(viewer: Viewer, access: Access): boolean {
+  // Mode démo : comptes, clé MCP et mise à jour du site fermés à tout le monde.
+  if (demoBlocks(access)) return false;
   if (viewer.kind === "open") return true;
   if (viewer.kind !== "account" || viewer.account.status !== "active" || !viewer.account.role) return false;
   return access === "read" || viewer.perms.includes(access);
@@ -117,8 +120,13 @@ export function viewerCan(viewer: Viewer, access: Access): boolean {
 
 /** Permissions du visiteur (toutes quand les comptes sont désactivés). */
 export function viewerPermissions(viewer: Viewer): Permission[] {
-  if (viewer.kind === "open") return rolePermissions({ isAdmin: true, permissions: [] });
-  return viewer.kind === "account" && viewerCan(viewer, "read") ? viewer.perms : [];
+  const all =
+    viewer.kind === "open"
+      ? rolePermissions({ isAdmin: true, permissions: [] })
+      : viewer.kind === "account" && viewerCan(viewer, "read")
+        ? viewer.perms
+        : [];
+  return all.filter((p) => !demoBlocks(p));
 }
 
 /** Le vrai compte derrière la requête (l'administrateur pendant « Voir comme »). */

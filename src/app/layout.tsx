@@ -13,6 +13,8 @@ import { ALL_PERMISSIONS } from "@/lib/auth/permissions";
 import { PermissionsProvider } from "@/components/auth/Permissions";
 import { AccessGate } from "@/components/auth/AccessGate";
 import { ViewAsBanner } from "@/components/auth/AccessButtons";
+import { DemoBanner } from "@/components/DemoBanner";
+import { isDemo } from "@/lib/demo";
 import { hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
@@ -104,6 +106,7 @@ export default async function RootLayout({
     <html lang="fr">
       {fonts}
       <body data-no={missing.length ? missing.join(" ") : undefined}>
+        {isDemo() && <DemoBanner />}
         {viewingAs && <ViewAsBanner email={viewingAs.email} role={viewingAs.role?.name ?? "sans rôle"} />}
         <PermissionsProvider permissions={perms}>
         <div className="app">

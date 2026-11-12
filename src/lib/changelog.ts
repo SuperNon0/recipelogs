@@ -11,6 +11,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.11",
+    date: "2026-11-12",
+    title: "Mode démonstration",
+    summary:
+      "Un RecipeLog peut maintenant servir de site de démonstration ouvert à tous, relié au site vitrine : chacun essaie les recettes, et tout revient comme avant chaque nuit.",
+    features: [
+      "Mode démo (RECIPELOG_DEMO=1 dans le .env du serveur) : un bandeau « Site de démonstration » en haut de chaque page, avec un « ? » qui explique que les changements sont effacés chaque nuit",
+      "En démo, les comptes, la clé Claude (MCP) et le bouton « Mettre à jour le site » sont coupés pour tout le monde : les pages et les boutons disparaissent, et le serveur refuse ces actions",
+    ],
+  },
+  {
     version: "V2.10",
     date: "2026-11-12",
     title: "Variantes regroupées et produit à choisir depuis la recette",
