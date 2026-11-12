@@ -21,7 +21,15 @@ export async function mcpResponse(req: Request): Promise<Response> {
   }
   const body = await req.text();
   // Clé valide : les outils ont tous les droits, même quand les comptes sont activés.
-  const out = await runAsService("mcp", () => handleMcpBody(body, MCP_TOOLS));
+  const out = await runAsService("mcp", () => handleMcpBody(body, MCP_TOOLS), publicOrigin(req));
   if (out === null) return new Response(null, { status: 202 });
   return Response.json(out, { headers: { "Cache-Control": "no-store" } });
+}
+
+/** https://<site> d'après les en-têtes du proxy (Cloudflare → nginx → Next). */
+export function publicOrigin(req: Request): string {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  if (!host) return new URL(req.url).origin;
+  return `${host.startsWith("localhost") || host.startsWith("127.") ? "http" : proto}://${host}`;
 }

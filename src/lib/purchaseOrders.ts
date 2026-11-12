@@ -9,7 +9,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { isPriceUnit, type PriceUnit } from "./cost";
-import { packLabel, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
+import { articleKey, articleOf, packLabel, packagingWarning, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
 
 type Tx = Prisma.TransactionClient;
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
@@ -77,6 +77,48 @@ async function applyProductPrice(
 }
 
 /**
+ * Variantes d'un même article chez un fournisseur (« Fraise France »,
+ * « Fraise Espagne » rangées sous « Fraise ») : une nouvelle variante est
+ * reliée au même ingrédient des recettes, et l'ingrédient qui suivait une
+ * variante suit celle achetée le plus récemment. Le coût des recettes prend
+ * donc le dernier prix payé pour l'article, quelle que soit la provenance.
+ */
+async function followArticles(tx: Tx, supplierId: number, productIds: number[]) {
+  if (productIds.length === 0) return;
+  const all = await tx.supplierProduct.findMany({
+    where: { supplierId },
+    select: { id: true, name: true, article: true, priceUnit: true, priceDate: true, baseId: true },
+  });
+  const keyOf = (p: (typeof all)[number]) => `${articleKey(articleOf(p))}|${p.priceUnit}`;
+  const touchedKeys = new Set(all.filter((p) => productIds.includes(p.id)).map(keyOf));
+  for (const key of touchedKeys) {
+    const group = all.filter((p) => keyOf(p) === key);
+    if (group.length < 2) continue;
+    const newest = group
+      .slice()
+      .sort((a, b) => (b.priceDate?.getTime() ?? 0) - (a.priceDate?.getTime() ?? 0) || b.id - a.id)[0];
+    const linkedBases = [...new Set(group.map((p) => p.baseId).filter((b): b is number => b != null))];
+    // Une seule correspondance possible : les variantes sans ingrédient prennent celui de l'article.
+    if (linkedBases.length === 1) {
+      const unlinked = group.filter((p) => p.baseId == null && productIds.includes(p.id)).map((p) => p.id);
+      if (unlinked.length) {
+        await tx.supplierProduct.updateMany({ where: { id: { in: unlinked } }, data: { baseId: linkedBases[0] } });
+      }
+    }
+    const followers = await tx.ingredientBase.findMany({
+      where: { chosenProductId: { in: group.map((p) => p.id), not: newest.id } },
+      select: { id: true },
+    });
+    if (followers.length === 0) continue;
+    await tx.ingredientBase.updateMany({ where: { id: { in: followers.map((f) => f.id) } }, data: { chosenProductId: newest.id } });
+    if (newest.baseId == null && linkedBases.length <= 1) {
+      await tx.supplierProduct.update({ where: { id: newest.id }, data: { baseId: linkedBases[0] ?? followers[0].id } });
+    }
+    await syncChosenIngredients(tx, [newest.id]);
+  }
+}
+
+/**
  * L'ingrédient utilise le prix de ce produit (null : plus de produit choisi,
  * le dernier prix reste comme prix saisi à la main). Le produit est relié à
  * l'ingrédient au passage.
@@ -97,7 +139,13 @@ export async function chooseProductForIngredient(baseId: number, productId: numb
       select: { id: true, baseId: true, price: true, priceUnit: true },
     });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId !== baseId) await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
+    if (product.baseId !== baseId) {
+      // Le produit change d'ingrédient : l'ancien ne le suit plus (il garde son dernier prix).
+      if (product.baseId != null) {
+        await tx.ingredientBase.updateMany({ where: { id: product.baseId, chosenProductId: productId }, data: { chosenProductId: null } });
+      }
+      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
+    }
     await tx.ingredientBase.update({ where: { id: baseId }, data: { chosenProductId: productId } });
     await applyProductPrice(tx, baseId, product, base.prices[0]);
   });
@@ -173,6 +221,8 @@ export type PurchaseOrderSummary = {
   nouveaux_produits: string[];
   prix_changes: { produit: string; avant: string; apres: string; evolution: string }[];
   ingredients_mis_a_jour: { ingredient: string; produit: string; prix: string }[];
+  /** Nouvelle variante rangée sous un article déjà acheté, avec l'évolution de l'article. */
+  variantes_regroupees?: { article: string; variante: string; avant: string; apres: string; evolution: string }[];
   ingredients_introuvables?: string[];
   lignes_ignorees?: string[];
   remplace?: boolean;
@@ -192,12 +242,13 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         (await tx.supplier.findFirst({ where: { name: { equals: supplierName, mode: "insensitive" } } })) ??
         (await tx.supplier.create({ data: { name: supplierName } }));
 
-      let replaced = false;
+      let replacedId: number | null = null;
+      let keptNote: string | null = null;
       const touched: number[] = [];
       if (number) {
         const dup = await tx.purchaseOrder.findFirst({
           where: { supplierId: supplier.id, number: { equals: number, mode: "insensitive" } },
-          select: { id: true, lines: { select: { productId: true } } },
+          select: { id: true, note: true, lines: { select: { productId: true } } },
         });
         if (dup) {
           if (!input.replace) {
@@ -206,16 +257,19 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             );
           }
           touched.push(...dup.lines.map((l) => l.productId));
-          await tx.purchaseOrder.delete({ where: { id: dup.id } });
-          replaced = true;
+          replacedId = dup.id;
+          // Sans nouvelle remarque, celle de la facture remplacée est gardée (le fichier joint aussi : même facture).
+          keptNote = dup.note;
         }
       }
 
-      const order = await tx.purchaseOrder.create({
-        data: { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || null },
-      });
+      const data = { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || keptNote };
+      const order = replacedId === null
+        ? await tx.purchaseOrder.create({ data })
+        : await tx.purchaseOrder.update({ where: { id: replacedId }, data: { ...data, lines: { deleteMany: {} } } });
 
       const created: string[] = [];
+      const warnings: string[] = [];
       const ignored: string[] = [];
       const notFound: string[] = [];
       const before = new Map<number, { name: string; price: number | null; unit: string }>();
@@ -269,6 +323,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         });
         lineCount++;
         touched.push(product.id);
+        const warn = packagingWarning({ product: name, unit: l.unit, packSize: l.packSize });
+        if (warn) warnings.push(warn);
         const lt = l.lineTotal ?? (l.quantity != null ? (l.packPrice ?? unitPrice * (l.packSize ?? 1)) * l.quantity : null);
         if (lt != null) computedTotal += lt;
 
@@ -301,8 +357,46 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           })
         ).map((b) => [b.id, num(b.price)]),
       );
+      if (replacedId !== null) {
+        // Produits de l'ancienne version qui ne sont plus sur aucune facture (nom corrigé…) : retirés.
+        const orphans = (
+          await tx.supplierProduct.findMany({ where: { id: { in: touched }, lines: { none: {} } }, select: { id: true } })
+        ).map((p) => p.id);
+        if (orphans.length) {
+          await tx.ingredientBase.updateMany({ where: { chosenProductId: { in: orphans } }, data: { chosenProductId: null } });
+          await tx.supplierProduct.deleteMany({ where: { id: { in: orphans } } });
+          for (const o of orphans) before.delete(o);
+          touched.splice(0, touched.length, ...touched.filter((t) => !orphans.includes(t)));
+        }
+      }
       await refreshProducts(tx, touched);
       for (const { baseId, productId } of linked) await autoChoose(tx, baseId, productId);
+      // Nouvelles variantes d'un article déjà acheté (« Fraise Espagne » après « Fraise France ») : évolution de l'article.
+      const variants: { article: string; variante: string; avant: string; apres: string; evolution: string }[] = [];
+      if (created.length) {
+        const all = await tx.supplierProduct.findMany({
+          where: { supplierId: supplier.id },
+          select: { id: true, name: true, article: true, price: true, priceUnit: true, priceDate: true },
+        });
+        const keyOf = (p: (typeof all)[number]) => `${articleKey(articleOf(p))}|${p.priceUnit}`;
+        for (const p of all.filter((x) => created.includes(x.name))) {
+          const prev = all
+            .filter((x) => x.id !== p.id && !created.includes(x.name) && keyOf(x) === keyOf(p) && x.price != null)
+            .sort((a, b) => (b.priceDate?.getTime() ?? 0) - (a.priceDate?.getTime() ?? 0))[0];
+          const now = num(p.price);
+          if (!prev || now == null) continue;
+          const was = Number(prev.price);
+          const pct = was > 0 ? Math.round(((now - was) / was) * 100) : null;
+          variants.push({
+            article: articleOf(p),
+            variante: `${p.name} (avant : ${prev.name})`,
+            avant: fmtPrice(was, prev.priceUnit),
+            apres: fmtPrice(now, p.priceUnit),
+            evolution: pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct} %`,
+          });
+        }
+      }
+      await followArticles(tx, supplier.id, touched);
 
       const after = await tx.supplierProduct.findMany({
         where: { id: { in: [...before.keys()] } },
@@ -340,9 +434,11 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         nouveaux_produits: created,
         prix_changes: changes,
         ingredients_mis_a_jour: updated,
+        ...(variants.length ? { variantes_regroupees: variants } : {}),
         ...(notFound.length ? { ingredients_introuvables: notFound } : {}),
         ...(ignored.length ? { lignes_ignorees: ignored } : {}),
-        ...(replaced ? { remplace: true } : {}),
+        ...(warnings.length ? { a_verifier: warnings } : {}),
+        ...(replacedId !== null ? { remplace: true } : {}),
       };
     },
     { timeout: 30_000 },
@@ -631,3 +727,39 @@ export async function productChoicesFor(names: string[]) {
 }
 
 export type ProductChoice = Awaited<ReturnType<typeof productChoicesFor>>[number];
+
+/**
+ * Tous les produits des fournisseurs qui ont un prix, pour en chercher un
+ * depuis le coût d'une recette et le relier à un ingrédient.
+ */
+export async function searchableProducts() {
+  const products = await prisma.supplierProduct.findMany({
+    where: { price: { not: null } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      article: true,
+      packSize: true,
+      price: true,
+      priceUnit: true,
+      priceDate: true,
+      supplier: { select: { id: true, name: true } },
+      base: { select: { id: true, name: true } },
+    },
+  });
+  return products.map((p) => ({
+    productId: p.id,
+    name: p.name,
+    article: p.article,
+    supplierId: p.supplier.id,
+    supplier: p.supplier.name,
+    packLabel: packLabel(num(p.packSize), p.priceUnit),
+    price: Number(p.price),
+    unit: (isPriceUnit(p.priceUnit) ? p.priceUnit : "kg") as PriceUnit,
+    date: p.priceDate ? isoDay(p.priceDate) : null,
+    base: p.base,
+  }));
+}
+
+export type SearchableProduct = Awaited<ReturnType<typeof searchableProducts>>[number];

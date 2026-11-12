@@ -11,8 +11,8 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "V2.10",
-    date: "2026-11-10",
+    version: "V2.12",
+    date: "2026-11-12",
     title: "Prix de vente et marge",
     summary:
       "Tape le prix auquel tu vends une recette : RecipeLog retire la TVA, enlève le coût des ingrédients et te donne ta marge en euros et en pourcentage.",
@@ -24,6 +24,35 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Claude peut lire et régler le prix de vente d'une recette (lire_recette, modifier_recette)",
     ],
     migrations: ["Base de données : prix de vente et TVA ajoutés aux recettes"],
+  },
+  {
+    version: "V2.11",
+    date: "2026-11-12",
+    title: "Un nouveau site RecipeLog en une commande",
+    summary:
+      "RecipeLog s'installe maintenant pour une autre personne avec une seule commande dans le shell Proxmox : un conteneur à part, sa propre base, ses propres recettes et sa propre clé pour Claude. Les nouveautés sont d'abord essayées en bêta, puis passées en version stable.",
+    features: [
+      "Installation en une ligne sur l'hôte Proxmox : la commande crée le conteneur, installe la base, le site, les mises à jour et la sauvegarde de chaque nuit, et peut aussi brancher le tunnel Cloudflare",
+      "Deux versions du site : la bêta (où arrivent les nouveautés) et la stable (les nouveautés déjà essayées). Chaque site suit la sienne, et le bouton « Mettre à jour le site » n'apporte que ce qui est passé dans sa version",
+      "Claude présente RecipeLog sans prénom, pour que chaque site ait son propre connecteur",
+    ],
+  },
+  {
+    version: "V2.10",
+    date: "2026-11-12",
+    title: "Variantes regroupées et produit à choisir depuis la recette",
+    summary:
+      "Chez un fournisseur, « Fraise France » et « Fraise Espagne » sont maintenant un seul article « Fraise » : une seule ligne, un seul historique de prix au kilo, et chaque prix rappelle ce qui était écrit sur la facture et ouvre la facture du jour. Dans une recette, un ingrédient sans prix se relie en deux touchers à un produit de tes fournisseurs.",
+    features: [
+      "Fiche fournisseur : les produits rangés sous le même nom (« Comparer sous le nom ») tiennent sur une ligne, avec la liste des variantes, le dernier prix payé, l'évolution et la moyenne de l'article",
+      "Touche l'article : tous les prix de toutes les variantes, du plus récent au plus ancien, avec la désignation de la facture (« Fraise Espagne cat I ») et le lien vers la facture. Le « ? » explique le regroupement, et chaque variante s'ouvre pour la relier à un ingrédient ou la ranger ailleurs",
+      "Tableau « Comparer » : la case d'un fournisseur montre le dernier prix payé pour l'article, quelle que soit la variante, et son évolution par rapport à la variante achetée avant",
+      "Coût des recettes : un ingrédient relié à une variante suit le dernier prix payé pour l'article. Si les fraises viennent d'Espagne cette fois, c'est leur prix qui compte",
+      "Coût d'une recette : un ingrédient sans prix (la farine, par exemple) reste toujours visible dans le détail. Touche-le pour chercher le bon produit chez tes fournisseurs, sans passer par la page Fournisseurs : tu choisis un fournisseur (ou « Tous »), tu tapes un mot, et tu vois chaque produit avec son prix au kg et ce qu'il coûte dans la recette. Un toucher relie le produit à l'ingrédient, pour toutes tes recettes. Le « ? » explique comment ça marche",
+      "Même pour un ingrédient qui a déjà un produit, « Chercher un autre produit chez les fournisseurs » permet d'en choisir un autre",
+      "Claude range tout seul les nouvelles lignes de facture sous l'article existant (fraise, tomate, citron vert…) et sépare seulement quand la différence compte (chocolat par %, crème par matière grasse, farine par type). En cas de doute, il te demande",
+      "Quand Claude ajoute une recette, il reprend tes ingrédients existants au lieu d'en créer de nouveaux (« œuf entier » devient « Oeufs », « huile » devient « Huile de tournesol »). S'il hésite, il te demande",
+    ],
   },
   {
     version: "V2.9",
@@ -40,6 +69,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fiche fournisseur : ses produits avec le dernier prix, l'évolution et la moyenne, et toutes ses factures",
       "Coût d'une recette : le détail ingrédient par ingrédient, avec le produit dont vient le prix (« Guanaja 70 % · Choframa »). Touche un ingrédient pour choisir parmi tous ses produits, chez tous les fournisseurs, avec ce qu'ils coûtent dans la recette ; le choix vaut pour toutes les recettes et suit les prochaines factures",
       "Fiche d'un ingrédient : la liste de ses produits fournisseurs, le moins cher signalé, et celui qui est utilisé. Un prix tapé à la main remplace le produit choisi",
+    ],
+    fixes: [
+      "Lecture des factures plus fine : les boîtes de conserve sont comptées au kg de poids net égoutté, les bouteilles au litre et les cartons « x 50 » à la pièce, au lieu d'un prix par boîte ou par carton. Claude signale les lignes à vérifier",
+      "Claude joint tout seul le PDF ou la photo de la facture qu'il enregistre, quand il peut envoyer le fichier ; sinon il te donne le lien de la facture pour toucher « Joindre un PDF »",
+      "Corriger une facture déjà enregistrée garde sa remarque, et retire les produits qui n'y sont plus",
     ],
     migrations: ["Base de données : nouvelles tables des fournisseurs, de leurs produits et des factures, et le produit choisi pour chaque ingrédient"],
   },

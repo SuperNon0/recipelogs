@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { articleKey, bestPrice, buildComparison, packLabel, priceStats, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
+import { articleKey, bestPrice, buildComparison, groupByArticle, packLabel, packagingWarning, priceStats, readPackaging, unitPriceOf, type ComparisonProduct } from "@/lib/suppliers";
 
 describe("unitPriceOf", () => {
   it("garde le prix unitaire donné", () => {
@@ -71,13 +71,46 @@ describe("buildComparison", () => {
     expect(rows.map((r) => r.family)).toEqual(["Chocolat", "Crèmerie et œufs", "Autres"]);
   });
 
-  it("chez un même fournisseur, garde le moins cher", () => {
+  it("chez un même fournisseur, à date égale, garde le moins cher", () => {
     const rows = buildComparison([p(1, 1, "Sucre", 1.2), p(2, 1, "Sucre", 1.1)]);
     expect(rows[0].cells[1].productId).toBe(2);
   });
 
   it("ne compare pas deux unités différentes", () => {
     expect(buildComparison([p(1, 1, "Oeufs", 0.3, null, "pièce"), p(2, 2, "Œufs", 4, null, "kg")])).toHaveLength(2);
+  });
+});
+
+describe("variantes d'un même article", () => {
+  const v = (id: number, name: string, article: string | null, prices: [string, number, number][], unit = "kg"): ComparisonProduct => {
+    const history = prices.map(([date, price, orderId]) => ({ date, price, unit, orderId }));
+    return { id, supplierId: 2, name, article, family: "Fruits et légumes", packLabel: null, unit, stats: priceStats(history.slice().reverse()), history };
+  };
+  const france = v(1, "Fraise France", "Fraise", [["2026-11-09", 12.75, 2]]);
+  const espagne = v(2, "Fraise Espagne cat I", "fraise", [["2026-11-12", 17.9, 6]]);
+  const tomate = v(3, "Tomate 57/67", "Tomate", [["2026-11-12", 2.95, 6]]);
+
+  it("réunit les variantes sous un seul article avec un historique commun", () => {
+    const groups = groupByArticle([france, espagne, tomate]);
+    expect(groups.map((g) => g.article)).toEqual(["Fraise", "Tomate"]);
+    const fraise = groups[0];
+    expect(fraise.products.map((p) => p.id)).toEqual([2, 1]);
+    expect(fraise.history.map((h) => [h.productName, h.price, h.orderId])).toEqual([
+      ["Fraise Espagne cat I", 17.9, 6],
+      ["Fraise France", 12.75, 2],
+    ]);
+    expect(fraise.stats).toMatchObject({ current: 17.9, previous: 12.75, changePct: 40, count: 2 });
+  });
+
+  it("ne mélange pas un prix au kg et un prix à la pièce", () => {
+    expect(groupByArticle([france, v(4, "Fraise barquette", "Fraise", [["2026-11-10", 4, 3]], "pièce")])).toHaveLength(2);
+  });
+
+  it("dans le tableau, la case montre le dernier prix payé de l'article", () => {
+    const rows = buildComparison([france, espagne]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].cells[2]).toMatchObject({ productId: 2, productIds: [2, 1], price: 17.9, changePct: 40 });
+    expect(rows[0].orders).toBe(2);
   });
 });
 
@@ -90,5 +123,27 @@ describe("petits utilitaires", () => {
     expect(packLabel(25, "kg")).toBe("colis de 25 kg");
     expect(packLabel(50, "pièce")).toBe("colis de 50");
     expect(packLabel(1, "kg")).toBeNull();
+  });
+});
+
+describe("readPackaging / packagingWarning", () => {
+  it("prend le poids net égoutté d'une boîte de conserve", () => {
+    expect(readPackaging("Abricot oreillon sirop 5/1 boîte 4,2 kg PNE 2,4 kg Brover").amount).toEqual({ value: 2.4, unit: "kg", drained: true });
+  });
+  it("lit ml, g, x N", () => {
+    expect(readPackaging("Crème sucrée 32% MG 700 ml UHT").amount).toEqual({ value: 0.7, unit: "L", drained: false });
+    expect(readPackaging("Levure pressée 500 g x 5").amount?.value).toBe(0.5);
+    expect(readPackaging("Boîte pâtissière Rendez-Vous 16 x 8 x 50").count).toBe(50);
+    expect(readPackaging("Carré raine 17 cm x 250").count).toBe(250);
+    expect(readPackaging("Poche pâtissière 30 x 54 cm x 100").count).toBe(100);
+    expect(readPackaging("Minuteur 20 heures")).toEqual({ amount: null, count: null });
+  });
+  it("prévient pour une boîte à la pièce, pas pour un prix au kg ou un colis donné", () => {
+    expect(packagingWarning({ product: "Demi poire Williams sirop boîte 5/1 4,25 kg PNE 2,3 kg", unit: "pièce" })).toMatch(/2,3 kg/);
+    expect(packagingWarning({ product: "Carré raine 17 cm x 250", unit: "pièce" })).toMatch(/contenance = 250/);
+    expect(packagingWarning({ product: "Carré raine 17 cm x 250", unit: "pièce", packSize: 250 })).toBeNull();
+    expect(packagingWarning({ product: "Chocolat noir 5 kg", unit: "kg" })).toBeNull();
+    expect(packagingWarning({ product: "Minuteur 20 heures", unit: "pièce" })).toBeNull();
+    expect(packagingWarning({ product: "Fuze Tea pêche 33 cl canette", unit: "pièce" })).toBeNull();
   });
 });

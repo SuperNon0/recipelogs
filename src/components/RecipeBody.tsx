@@ -776,7 +776,8 @@ function CostCard({
           {cost.missing.length} ingrédient{cost.missing.length > 1 ? "s" : ""} sans prix, non compté{cost.missing.length > 1 ? "s" : ""}
           <Help title="Ingrédients sans prix" calc={cost.missing.join("\n")}>
             Ces ingrédients n&apos;ont pas de prix d&apos;achat (ou sont à la pièce sans poids connu) : le coût
-            affiché est donc un peu sous-estimé. Règle-les dans Réglages → Ingrédients.
+            affiché est donc un peu sous-estimé. Touche l&apos;ingrédient dans la liste au-dessus pour lui
+            choisir un produit de tes fournisseurs, ou règle son prix dans Réglages → Ingrédients.
           </Help>
         </div>
       )}

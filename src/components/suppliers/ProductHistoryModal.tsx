@@ -6,22 +6,28 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronRight, Receipt } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { chooseIngredientProduct, linkProduct, updateProductInfo } from "@/app/actions/suppliers";
-import { SUPPLIER_FAMILIES } from "@/lib/suppliers";
+import { SUPPLIER_FAMILIES, groupByArticle } from "@/lib/suppliers";
 import { ModalOverlay } from "@/components/ModalOverlay";
+import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
 import type { ProductDetail } from "@/lib/purchaseOrders";
 import { Change } from "./PriceComparison";
 
 const fr = (d: string) => new Date(d).toLocaleDateString("fr-FR");
 
-/** Tous les prix payés pour un produit, chacun relié à sa facture, avec un filtre du… au… */
+/**
+ * Tous les prix payés pour un article chez un fournisseur, chacun relié à sa
+ * facture, avec un filtre du… au…. Les variantes de l'article (« Fraise
+ * France », « Fraise Espagne ») sont réunies : chaque prix dit laquelle.
+ */
 export function ProductHistoryModal({
-  product,
+  products,
   supplier,
   bases,
   onClose,
 }: {
-  product: ProductDetail;
+  /** Les variantes de l'article (une seule s'il n'y en a pas d'autre). */
+  products: ProductDetail[];
   supplier: string;
   /** Ingrédients des recettes, pour relier le produit (si on peut modifier les prix). */
   bases?: { id: number; name: string }[];
@@ -30,28 +36,34 @@ export function ProductHistoryModal({
   const can = useCan();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const group = useMemo(() => groupByArticle(products)[0], [products]);
+  const several = products.length > 1;
   const list = useMemo(
-    () => product.history.filter((h) => (!from || h.date >= from) && (!to || h.date <= to)),
-    [product.history, from, to],
+    () => (group?.history ?? []).filter((h) => (!from || h.date >= from) && (!to || h.date <= to)),
+    [group, from, to],
   );
-  const unit = product.stats?.unit ?? product.unit;
+  if (!group) return null;
+  const single = products[0];
+  const stats = group.stats;
+  const unit = stats?.unit ?? group.unit;
   const same = list.filter((h) => h.unit === unit);
   const avg = same.length ? same.reduce((s, h) => s + h.price, 0) / same.length : null;
   const min = same.length ? Math.min(...same.map((h) => h.price)) : null;
   const max = same.length ? Math.max(...same.map((h) => h.price)) : null;
+  const linked = [...new Set(products.map((p) => p.base?.name).filter(Boolean))];
 
   return (
-    <ModalOverlay onClose={onClose} title={product.name}>
+    <ModalOverlay onClose={onClose} title={several ? group.article : single.name}>
       <p className="sub" style={{ color: "var(--muted)", marginTop: -6, marginBottom: 12, fontSize: 13 }}>
         {supplier}
-        {product.packLabel ? ` · ${product.packLabel}` : ""}
-        {product.base ? ` · ingrédient « ${product.base.name} »` : ""}
+        {several ? ` · ${products.length} variantes` : single.packLabel ? ` · ${single.packLabel}` : ""}
+        {linked.length ? ` · ingrédient « ${linked.join(" », « ")} »` : ""}
       </p>
-      {product.stats && (
+      {stats && (
         <div className="sup-hist-stats">
           <div>
             <small>Dernier prix</small>
-            <b>{formatEuro(product.stats.current)}</b> <Change pct={product.stats.changePct} />
+            <b>{formatEuro(stats.current)}</b> <Change pct={stats.changePct} />
           </div>
           <div>
             <small>Moyenne{from || to ? " (période)" : ""}</small>
@@ -63,7 +75,7 @@ export function ProductHistoryModal({
           </div>
         </div>
       )}
-      {bases && can("costs.edit") && <ProductSettings product={product} bases={bases} />}
+      {bases && can("costs.edit") && !several && <ProductSettings product={single} bases={bases} />}
       <div className="sup-range">
         <span className="sup-dates">
         <span>Du</span>
@@ -80,7 +92,7 @@ export function ProductHistoryModal({
       <div className="fl-list">
         {list.length === 0 && <div className="fl-row" style={{ color: "var(--muted)" }}>Aucun prix sur cette période.</div>}
         {list.map((h, i) => (
-          <Link key={`${h.orderId}-${i}`} href={`/factures/${h.orderId}`} className="fl-row">
+          <Link key={`${h.orderId}-${h.productId}-${i}`} href={`/factures/${h.orderId}`} className="fl-row">
             <span className="ic">
               <Receipt size={16} />
             </span>
@@ -89,6 +101,7 @@ export function ProductHistoryModal({
                 <span>{fr(h.date)}</span>
               </b>
               <small>
+                {several ? `${h.productName} · ` : ""}
                 Facture{h.number ? ` n° ${h.number}` : ""}
                 {h.quantity != null ? ` · ${h.quantity.toLocaleString("fr-FR")} acheté${h.quantity > 1 ? "s" : ""}` : ""}
               </small>
@@ -101,6 +114,31 @@ export function ProductHistoryModal({
           </Link>
         ))}
       </div>
+      {several && (
+        <p className="sub" style={{ color: "var(--muted)", fontSize: 13, margin: "16px 0 10px", display: "flex", gap: 6, alignItems: "center" }}>
+          Variantes regroupées sous « {group.article} »
+          <Help title="Variantes regroupées">
+            Les produits qui ont le même nom dans « Comparer sous le nom » sont un seul article : par exemple « Fraise France » et
+            « Fraise Espagne » sont rangées sous « Fraise ». Leurs prix forment un seul historique, et chaque prix rappelle ce qui
+            était écrit sur la facture. Pour séparer une variante, ouvre-la plus bas et change son nom pour comparer.
+          </Help>
+        </p>
+      )}
+      {several && bases && can("costs.edit") && (
+          <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+            {products.map((p) => (
+              <details key={p.id} className="fl-card" style={{ padding: "8px 12px" }}>
+                <summary style={{ cursor: "pointer", fontSize: 14 }}>
+                  {p.name}
+                  {p.stats ? ` · ${formatEuro(p.stats.current)} /${p.stats.unit}` : ""}
+                </summary>
+                <div style={{ marginTop: 10 }}>
+                  <ProductSettings product={p} bases={bases} />
+                </div>
+              </details>
+            ))}
+          </div>
+      )}
     </ModalOverlay>
   );
 }
