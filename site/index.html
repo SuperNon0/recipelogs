@@ -31,7 +31,7 @@
       <a href="#equipe">Équipe</a>
       <a href="#offre">Offre</a>
     </nav>
-    <a class="btn btn-primary btn-sm" data-contact href="#contact">Demander une démo</a>
+    <a class="btn btn-primary btn-sm" data-contact="demo" href="#contact">Demander une démo</a>
   </div>
 </header>
 
@@ -49,7 +49,7 @@
         de chaque hausse fournisseur sur vos marges et toute votre équipe produit à partir des mêmes fiches.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary" data-contact href="#contact">Demander une démonstration</a>
+        <a class="btn btn-primary" data-contact="demo" href="#contact">Demander une démonstration</a>
         <a class="btn btn-ghost" data-demo href="#demo">Essayer la démo en ligne</a>
       </div>
       <ul class="hero-points">
@@ -370,7 +370,7 @@
         <li>Assistance par e-mail</li>
         <li>Assistant IA en option (abonnement Claude)</li>
       </ul>
-      <a class="btn btn-primary btn-full" data-contact href="#contact">Demander un devis</a>
+      <a class="btn btn-primary btn-full" data-contact="devis" href="#contact">Demander un devis</a>
     </div>
   </div>
 </section>
@@ -413,7 +413,7 @@
         <p>Une démonstration de 30 minutes sur vos propres recettes, sans engagement.</p>
       </div>
       <div class="contact-cta">
-        <a class="btn btn-primary btn-lg" id="contact-btn" data-contact href="#contact">Nous écrire</a>
+        <a class="btn btn-primary btn-lg" id="contact-btn" data-contact="question" href="#contact">Nous écrire</a>
         <p class="muted small" id="contact-mail"></p>
       </div>
     </div>
@@ -442,6 +442,39 @@ marge brute = prix HT − coût par pièce
 taux        = marge brute ÷ prix HT
 coefficient = prix TTC ÷ coût par pièce</pre>
     <p class="muted small">Exemple : 1,80 € TTC à 5,5 % font 1,71 € HT. Avec un coût de 0,15 €, la marge brute est de 1,56 €, soit 91 %.</p>
+  </div>
+</div>
+
+<div class="pop" id="contact-pop" role="dialog" aria-modal="true" aria-labelledby="contact-pop-t" hidden>
+  <div class="pop-box pop-wide card">
+    <button class="pop-x" type="button" data-close aria-label="Fermer">×</button>
+    <h3 id="contact-pop-t">Nous écrire</h3>
+    <form id="contact-form" class="cform" novalidate>
+      <label class="cf-full"><span>Votre demande
+        </span><select name="type">
+          <option value="demo">Une démonstration de 30 minutes</option>
+          <option value="devis">Un devis</option>
+          <option value="question">Une question</option>
+        </select>
+      </label>
+      <label><span>Nom <b>*</b></span><input name="nom" autocomplete="name" required></label>
+      <label><span>Établissement</span><input name="etab" autocomplete="organization" placeholder="Pâtisserie, restaurant…"></label>
+      <label><span>E-mail <b>*</b></span><input name="email" type="email" autocomplete="email" required></label>
+      <label><span>Téléphone</span><input name="tel" type="tel" autocomplete="tel"></label>
+      <label class="cf-hp" aria-hidden="true">Site web<input name="site" tabindex="-1" autocomplete="off"></label>
+      <label class="cf-full"><span>Message</span><textarea name="msg" rows="4" placeholder="Votre activité, le nombre de recettes, vos questions…"></textarea></label>
+      <p class="cf-err cf-full" id="cf-err" role="alert" hidden></p>
+      <div class="cf-actions cf-full">
+        <button class="btn btn-primary" type="submit" id="cf-send">Envoyer</button>
+        <span class="muted small" id="cf-note">Réponse sous 24 h ouvrées.</span>
+      </div>
+    </form>
+    <p class="cf-direct" id="cf-direct">Ou écrivez-nous directement : <b id="cf-mail"></b>
+      <button class="btn btn-ghost btn-sm" type="button" id="cf-copy">Copier l'adresse</button></p>
+    <div class="cf-ok" id="cf-ok" role="status" hidden>
+      <p class="cf-ok-t">Merci, votre message est bien parti.</p>
+      <p class="muted small">Nous vous répondons très vite, à l'adresse que vous avez indiquée.</p>
+    </div>
   </div>
 </div>
 

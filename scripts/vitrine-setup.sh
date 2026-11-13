@@ -12,7 +12,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "==> Paquets (nginx, git)…"
 apt-get update -qq
-apt-get install -y -qq nginx git curl ca-certificates >/dev/null
+apt-get install -y -qq nginx git curl ca-certificates python3 >/dev/null
 
 echo "==> Code du site (branche ${BRANCH})…"
 if [ -d "$DIR/.git" ]; then
@@ -29,6 +29,32 @@ mkdir -p "$CONF"
 echo "$PORT" > "$CONF/port"
 install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
+install -m 0755 "$DIR/scripts/vitrine-contact.py" /usr/local/sbin/vitrine-contact
+install -d -o www-data -g www-data -m 0750 /var/lib/recipelog-vitrine
+[ -f "$CONF/smtp" ] && chown root:www-data "$CONF/smtp" && chmod 640 "$CONF/smtp"
+cat > /etc/systemd/system/vitrine-contact.service <<'UNIT'
+[Unit]
+Description=Formulaire « Nous écrire » du site vitrine RecipeLog
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/sbin/vitrine-contact
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/recipelog-vitrine
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable -q vitrine-contact
+systemctl restart vitrine-contact
 if [ -n "${VITRINE_DEMO_URL:-}" ]; then /usr/local/sbin/vitrine-reglage demo "$VITRINE_DEMO_URL" >/dev/null; fi
 if [ -n "${VITRINE_CONTACT:-}" ]; then /usr/local/sbin/vitrine-reglage contact "$VITRINE_CONTACT" >/dev/null; fi
 /usr/local/sbin/vitrine-reglage >/dev/null
@@ -54,6 +80,15 @@ cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
         alias /etc/recipelog-vitrine/config.js;
         default_type application/javascript;
         add_header Cache-Control "no-cache";
+    }
+    # Formulaire « Nous écrire » : envoyé par vitrine-contact (e-mail)
+    location = /api/contact {
+        limit_except POST { deny all; }
+        client_max_body_size 32k;
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+        proxy_read_timeout 40s;
     }
     location ~* \.(css|js|svg|png|jpg|webp|woff2)$ {
         add_header Cache-Control "public, max-age=3600";

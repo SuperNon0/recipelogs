@@ -141,8 +141,27 @@ pct exec 120 -- vitrine-reglage            # affiche les réglages actuels
 ```
 
 - **demo** : tous les boutons « Essayer la démo » et « Ouvrir la démo » ouvrent cette adresse.
-- **contact** : le bouton « Nous écrire » ouvre un e-mail vers cette adresse, qui s'affiche aussi
-  en bas de la page. Sans e-mail réglé, les boutons « Demander une démo » mènent au bas de la page.
+- **contact** : l'adresse affichée en bas de la page et dans la fenêtre « Nous écrire ».
+
+**Le formulaire « Nous écrire »** : les boutons « Nous écrire », « Demander une démo » et
+« Demander un devis » ouvrent une fenêtre où le visiteur laisse son nom, son établissement, son
+e-mail, son téléphone et un message. Tu reçois le message **par e-mail** : il suffit de répondre
+à cet e-mail pour écrire au visiteur. Pour que l'envoi marche, règle une fois le compte qui envoie :
+
+1. Sur ton compte Google : Sécurité → validation en deux étapes activée, puis
+   « Mots de passe des applications » ([myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)).
+   Crée-en un nommé « Vitrine RecipeLog » et copie les 16 lettres.
+2. Dans le shell de l'hôte Proxmox :
+   ```bash
+   pct exec 120 -- /usr/local/sbin/vitrine-reglage email
+   ```
+   Réponds aux questions (Entrée garde smtp.gmail.com et le port 587) : ton adresse Gmail, les
+   16 lettres, puis l'adresse où recevoir les messages. Un e-mail de test part tout de suite.
+
+Autres commandes : `vitrine-reglage test-mail` (renvoie un test), `vitrine-reglage messages`
+(les 20 derniers messages). Chaque message est aussi gardé dans le conteneur
+(`/var/lib/recipelog-vitrine/messages.jsonl`), même si l'envoi échoue. Un même visiteur ne peut
+pas envoyer plus de 5 messages en 10 minutes, et un champ caché écarte les robots.
 
 Ces réglages sont gardés dans le conteneur (`/etc/recipelog-vitrine/`) : les mises à jour ne les
 effacent pas. Le changement se voit tout de suite, sans redémarrer quoi que ce soit.

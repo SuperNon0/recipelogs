@@ -2,6 +2,9 @@
 # vitrine-reglage — règle les liens du site vitrine (gardés aux mises à jour).
 #   vitrine-reglage demo https://demo.mon-site.fr     adresse de la démo en ligne
 #   vitrine-reglage contact contact@mon-site.fr       e-mail des demandes de démo et de devis
+#   vitrine-reglage email                             compte qui envoie le formulaire « Nous écrire » (questions)
+#   vitrine-reglage test-mail                         envoie un e-mail de test
+#   vitrine-reglage messages                          affiche les derniers messages reçus
 #   vitrine-reglage                                   affiche les réglages
 set -euo pipefail
 CONF=/etc/recipelog-vitrine
@@ -17,8 +20,33 @@ case "$cle" in
   contact)
     case "$val" in ""|*@*.*) ;; *) echo "Adresse e-mail invalide." >&2; exit 1 ;; esac
     contact="$val"; printf '%s' "$contact" > "$CONF/contact" ;;
+  email)
+    echo "Compte e-mail qui envoie les messages du formulaire (Gmail : un « mot de passe d'application »)."
+    read -r -p "  Serveur SMTP [smtp.gmail.com] : " h </dev/tty; h="${h:-smtp.gmail.com}"
+    read -r -p "  Port [587] : " p </dev/tty; p="${p:-587}"
+    read -r -p "  Adresse du compte (ex. moi@gmail.com) : " u </dev/tty
+    read -r -s -p "  Mot de passe d'application (rien ne s'affiche) : " pw </dev/tty; echo
+    read -r -p "  Recevoir les messages sur [${contact:-$u}] : " to </dev/tty; to="${to:-${contact:-$u}}"
+    pw="${pw// /}"
+    case "$u" in *@*.*) ;; *) echo "Adresse invalide." >&2; exit 1 ;; esac
+    case "$to" in *@*.*) ;; *) echo "Adresse invalide." >&2; exit 1 ;; esac
+    [ -n "$pw" ] || { echo "Mot de passe vide." >&2; exit 1; }
+    umask 077
+    printf 'SMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_USER=%s\nSMTP_PASS=%s\nMAIL_TO=%s\n' "$h" "$p" "$u" "$pw" "$to" > "$CONF/smtp"
+    chown root:www-data "$CONF/smtp" 2>/dev/null || true; chmod 640 "$CONF/smtp"
+    if [ -z "$contact" ]; then contact="$to"; printf '%s' "$contact" > "$CONF/contact"; fi
+    echo "Enregistré. Envoi d'un e-mail de test…"
+    python3 /usr/local/sbin/vitrine-contact test || echo "Le test a échoué : vérifie l'adresse et le mot de passe d'application, puis relance « vitrine-reglage email »." ;;
+  test-mail) exec python3 /usr/local/sbin/vitrine-contact test ;;
+  messages)
+    f=/var/lib/recipelog-vitrine/messages.jsonl
+    [ -s "$f" ] || { echo "Aucun message reçu pour l'instant."; exit 0; }
+    tail -n 20 "$f" | python3 -c 'import json,sys
+for l in sys.stdin:
+    m=json.loads(l); print("%s  %s  %s <%s>  %s\n    %s\n" % (m["date"], m["type"], m["nom"], m["email"], m.get("tel",""), m.get("msg","").replace("\n"," ")[:300]))'
+    exit 0 ;;
   "") ;;
-  *) echo "Usage : vitrine-reglage demo <https://…> | contact <e-mail>" >&2; exit 1 ;;
+  *) echo "Usage : vitrine-reglage demo <https://…> | contact <e-mail> | email | test-mail | messages" >&2; exit 1 ;;
 esac
 cat > "$CONF/config.js" <<JS
 // Réglages de ce serveur (écrit par vitrine-reglage, gardé aux mises à jour).
@@ -26,3 +54,5 @@ window.VITRINE = { demoUrl: "${demo}", contactEmail: "${contact}" };
 JS
 echo "Démo    : ${demo:-(pas réglée)}"
 echo "Contact : ${contact:-(pas réglé)}"
+if [ -s "$CONF/smtp" ]; then echo "Formulaire : envoi par $(sed -n 's/^SMTP_USER=//p' "$CONF/smtp") vers $(sed -n 's/^MAIL_TO=//p' "$CONF/smtp")"
+else echo "Formulaire : envoi pas encore réglé (vitrine-reglage email)"; fi
