@@ -11,6 +11,7 @@ import re
 import smtplib
 import ssl
 import sys
+import threading
 import time
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
@@ -24,6 +25,28 @@ EMAIL_RE = re.compile(r"^[^\s@<>\"]+@[^\s@<>\"]+\.[^\s@<>\"]+$")
 LIMITS = {"nom": 120, "etab": 160, "email": 200, "tel": 40, "msg": 5000}
 RATE = {}  # ip -> [horodatages]
 RATE_MAX, RATE_WINDOW = 5, 600  # 5 messages par 10 minutes et par visiteur
+STORE_LOCK = threading.Lock()
+STORE_MAX_BYTES = 10 * 1024 * 1024  # journal courant + une archive, 20 Mio au maximum
+
+
+def store_message(record):
+    raw = json.dumps(record, ensure_ascii=False) + "\n"
+    with STORE_LOCK:
+        STORE.parent.mkdir(parents=True, exist_ok=True)
+        if STORE.exists() and STORE.stat().st_size + len(raw.encode("utf-8")) > STORE_MAX_BYTES:
+            previous = STORE.with_suffix(".previous.jsonl")
+            if STORE.stat().st_size > STORE_MAX_BYTES:
+                # Premier passage après une ancienne version sans plafond : garde
+                # seulement les dernières lignes complètes, sans charger tout le journal.
+                with STORE.open("rb") as fh:
+                    fh.seek(-STORE_MAX_BYTES, 2)
+                    fh.readline()
+                    previous.write_bytes(fh.read())
+                STORE.unlink()
+            else:
+                STORE.replace(previous)
+        with STORE.open("a", encoding="utf-8") as fh:
+            fh.write(raw)
 
 
 def read_smtp():
@@ -103,14 +126,18 @@ class Handler(BaseHTTPRequestHandler):
         if clean(data.get("site"), 200):
             return self.reply(200, {"ok": True})
 
+        if any(not isinstance(data.get(k, ""), str) or len(data.get(k, "")) > n for k, n in LIMITS.items()):
+            return self.reply(400, {"ok": False, "error": "Un champ dépasse la longueur autorisée (message : 5 000 caractères)."})
         f = {k: clean(data.get(k), n) for k, n in LIMITS.items()}
         for k in ("nom", "etab", "email", "tel"):  # une seule ligne (en-têtes de l'e-mail)
             f[k] = " ".join(f[k].split())
-        kind = data.get("type") if data.get("type") in TYPES else "question"
+        kind = data.get("type")
+        kind = kind if isinstance(kind, str) and kind in TYPES else "question"
         if not f["nom"] or not EMAIL_RE.match(f["email"]):
             return self.reply(400, {"ok": False, "error": "Merci d'indiquer votre nom et une adresse e-mail valide."})
 
-        ip = self.headers.get("CF-Connecting-IP") or self.headers.get("X-Real-IP") or self.client_address[0]
+        # nginx a déjà validé le proxy via real_ip ; ne jamais relire l'en-tête client.
+        ip = self.headers.get("X-Real-IP") or self.client_address[0]
         now = time.time()
         hits = [t for t in RATE.get(ip, []) if now - t < RATE_WINDOW]
         if len(hits) >= RATE_MAX:
@@ -122,9 +149,7 @@ class Handler(BaseHTTPRequestHandler):
 
         record = {"date": time.strftime("%Y-%m-%d %H:%M:%S"), "type": kind, **f}
         try:
-            STORE.parent.mkdir(parents=True, exist_ok=True)
-            with STORE.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+            store_message(record)
         except OSError as e:
             sys.stderr.write("stockage impossible : %s\n" % e)
 

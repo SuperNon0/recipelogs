@@ -30,6 +30,7 @@ sed -i -E "s#(href=\"style\.css|src=\"app\.js)(\?v=[0-9a-f]+)?\"#\1?v=${V}\"#g" 
 
 echo "==> Réglages (${CONF})…"
 mkdir -p "$CONF"
+[ -f "$CONF/trusted-proxy.conf" ] || printf 'set_real_ip_from 127.0.0.1;\nset_real_ip_from ::1;\n' > "$CONF/trusted-proxy.conf"
 echo "$PORT" > "$CONF/port"
 install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
@@ -70,6 +71,9 @@ server {
 NGINX_HEAD
 cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
     server_name _;
+    # Seul le tunnel configuré peut fournir l'adresse du visiteur.
+    include /etc/recipelog-vitrine/trusted-proxy.conf;
+    real_ip_header CF-Connecting-IP;
     root /opt/vitrine/site;
     index index.html;
 
@@ -91,7 +95,9 @@ cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
         client_max_body_size 32k;
         proxy_pass http://127.0.0.1:8090;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+        # Les accès directs ne peuvent pas choisir leur identité. Pour le tunnel,
+        # configurer real_ip uniquement avec les proxys Cloudflare de confiance.
+        proxy_set_header CF-Connecting-IP "";
         proxy_read_timeout 40s;
     }
     location ~* \.(css|js|svg|png|jpg|webp|woff2)$ {

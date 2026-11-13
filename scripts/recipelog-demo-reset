@@ -1,37 +1,95 @@
 #!/usr/bin/env bash
-# recipelog-demo-reset — remet la démo dans l'état figé par recipelog-demo-figer.
+# Restaure et migre une base provisoire avant de remplacer la démo.
 set -euo pipefail
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV_FILE=/opt/recipelog/.env
 APP_DIR=/opt/recipelog
 SNAP=/var/lib/recipelog-demo
 [ -f "$SNAP/base.dump" ] || { echo "Pas encore de démo figée : rien à faire."; exit 0; }
-
-url="$(grep -m1 '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+# Évite deux remises à zéro simultanées (minuteur et lancement manuel).
+exec 9>"$SNAP/reset.lock"
+flock -n 9 || { echo "Une remise à zéro est déjà en cours." >&2; exit 1; }
+url="$(grep -m1 '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | tr -d "\"'")"
 url="${url%%\?*}"
 db="${url##*/}"
 dbuser="$(printf '%s' "$url" | sed -E 's#^[a-z]+://([^:@/]+).*#\1#')"
-uploads="$(grep -m1 '^UPLOAD_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d '"'"'")"
+# Les identifiants ci-dessous sont utilisés dans ALTER DATABASE : validation stricte.
+[[ "$db" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || { echo "Nom de base non pris en charge." >&2; exit 1; }
+uploads="$(grep -m1 '^UPLOAD_DIR=' "$ENV_FILE" | cut -d= -f2- | tr -d "\"'" || true)"
 uploads="${uploads:-/var/lib/recipelog/uploads}"
-
-echo "$(date '+%F %T') Remise à zéro de la démo (figée le $(cat "$SNAP/fige-le" 2>/dev/null || echo '?'))"
-systemctl stop recipelog
-trap 'systemctl start recipelog' EXIT
-
-cd /tmp
-sudo -u postgres dropdb --if-exists --force "$db"
-sudo -u postgres createdb -O "$dbuser" "$db"
-sudo -u postgres psql -q -d "$db" -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;'
-# Les avertissements sur les extensions déjà là ne sont pas des erreurs.
-pg_restore --no-owner --no-acl -d "$url" "$SNAP/base.dump" || echo "    (avertissements de pg_restore ignorés)"
-
-# Le site a pu être mis à jour depuis : on applique les nouvelles migrations.
-sudo -u recipelog bash -c "cd '$APP_DIR' && set -a && . ./.env && set +a && pnpm exec prisma migrate deploy" >/dev/null
-
+[[ "$uploads" = /* && "$uploads" != / ]] || { echo "Dossier uploads invalide." >&2; exit 1; }
+uploads="$(realpath -m -- "$uploads")"
+case "$uploads" in
+  /|/var|/var/lib|/var/lib/recipelog|/var/log|/var/cache|/var/backups|/opt|/opt/recipelog|/tmp|/home|/root|/mnt|/media|/srv|/etc|/etc/*|/usr|/usr/*|/bin|/bin/*|/sbin|/sbin/*|/lib|/lib/*|/lib64|/lib64/*|/dev|/dev/*|/proc|/proc/*|/sys|/sys/*|/run|/run/*|/boot|/boot/*)
+    echo "Dossier uploads protégé : $uploads" >&2; exit 1 ;;
+esac
+stage="${db:0:35}_restore_$$"
+backup="${db:0:35}_previous_$$"
+stage_url="${url%/*}/$stage"
+stage_uploads=""
+old_uploads="${uploads}.previous.$$"
+stopped=0
+renamed=0
+switched=0
+files_switched=0
+success=0
+remove_sibling() {
+  local target="$1"
+  [[ "$(realpath -m -- "$target")" = "$target" && "${target%/*}" = "${uploads%/*}" ]] || return 1
+  case "$target" in "$uploads".restore.*|"$old_uploads") rm -rf -- "$target" ;; *) return 1 ;; esac
+}
+cleanup() {
+  local code=$?
+  trap - EXIT
+  if [ "$success" != 1 ]; then
+    # L'ancienne base et ses fichiers existent encore : retour à l'état initial.
+    if [ "$switched" = 1 ]; then
+      sudo -u postgres dropdb --if-exists --force "$db" || exit 1
+    fi
+    if [ "$renamed" = 1 ]; then
+      sudo -u postgres psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER DATABASE \"$backup\" RENAME TO \"$db\"" || exit 1
+    fi
+    if [ "$files_switched" = 1 ]; then
+      rm -rf -- "$uploads"
+      [ ! -d "$old_uploads" ] || mv -- "$old_uploads" "$uploads"
+    elif [ -d "$old_uploads" ]; then
+      mv -- "$old_uploads" "$uploads"
+    fi
+  fi
+  sudo -u postgres dropdb --if-exists --force "$stage" || true
+  [ -z "$stage_uploads" ] || remove_sibling "$stage_uploads"
+  if [ "$stopped" = 1 ]; then systemctl start recipelog || code=1; fi
+  exit "$code"
+}
+trap cleanup EXIT
+sudo -u postgres createdb -O "$dbuser" "$stage"
+# Pas d'extensions précréées : le dump les restaure lui-même. Toute erreur est fatale.
+pg_restore --exit-on-error --no-owner --no-acl -d "$stage_url" "$SNAP/base.dump"
+sudo -u recipelog bash -c 'cd "$1" && set -a && . ./.env && set +a && export DATABASE_URL="$2" && pnpm exec prisma migrate deploy' _ "$APP_DIR" "$stage_url"
 if [ -f "$SNAP/uploads.tar.gz" ]; then
-  mkdir -p "$uploads"
-  find "$uploads" -mindepth 1 -delete
-  tar -xzf "$SNAP/uploads.tar.gz" -C "$uploads"
-  chown -R recipelog:recipelog "$uploads"
+  mkdir -p -- "$(dirname "$uploads")"
+  stage_uploads="$(mktemp -d "${uploads}.restore.XXXXXX")"
+  tar -xzf "$SNAP/uploads.tar.gz" -C "$stage_uploads"
+  chown -R recipelog:recipelog "$stage_uploads"
 fi
+systemctl stop recipelog
+stopped=1
+# Coupe les connexions résiduelles avant le renommage atomique des noms de bases.
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db' AND pid <> pg_backend_pid()" >/dev/null
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER DATABASE \"$db\" RENAME TO \"$backup\""
+renamed=1
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER DATABASE \"$stage\" RENAME TO \"$db\""
+switched=1
+if [ -n "$stage_uploads" ]; then
+  [ ! -d "$uploads" ] || mv -- "$uploads" "$old_uploads"
+  mv -- "$stage_uploads" "$uploads"
+  stage_uploads=""
+  files_switched=1
+fi
+# En cas d'échec du démarrage, cleanup remet aussi l'ancienne base en place.
+systemctl start recipelog
+success=1
+stopped=0
+sudo -u postgres dropdb --if-exists --force "$backup"
+[ ! -d "$old_uploads" ] || remove_sibling "$old_uploads"
 echo "$(date '+%F %T') Démo remise à zéro."

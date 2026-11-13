@@ -153,7 +153,7 @@ e-mail, son téléphone et un message. Tu reçois le message **par e-mail** : il
    Crée-en un nommé « Vitrine RecipeLog » et copie les 16 lettres.
 2. Dans le shell de l'hôte Proxmox :
    ```bash
-   pct exec 120 -- /usr/local/sbin/vitrine-reglage email
+   pct exec 120 --tty 1 --interactive 1 -- /usr/local/sbin/vitrine-reglage email
    ```
    Réponds aux questions (Entrée garde smtp.gmail.com et le port 587) : ton adresse Gmail, les
    16 lettres, puis l'adresse où recevoir les messages. Un e-mail de test part tout de suite.
@@ -162,6 +162,17 @@ Autres commandes : `vitrine-reglage test-mail` (renvoie un test), `vitrine-regla
 (les 20 derniers messages). Chaque message est aussi gardé dans le conteneur
 (`/var/lib/recipelog-vitrine/messages.jsonl`), même si l'envoi échoue. Un même visiteur ne peut
 pas envoyer plus de 5 messages en 10 minutes, et un champ caché écarte les robots.
+
+Le journal est limité à 10 Mio et conserve une seule archive de 10 Mio
+(`messages.previous.jsonl`) : les messages les plus anciens sont supprimés à la rotation.
+Les messages dépassant 5 000 caractères sont refusés, jamais tronqués.
+
+Si le tunnel Cloudflare tourne dans **un autre conteneur**, déclare son IP locale fixe :
+`pct exec 120 -- /usr/local/sbin/vitrine-reglage proxy 192.168.1.51`.
+Seul ce proxy (et le tunnel local) peut fournir l'adresse du visiteur. Sans ce réglage,
+les visiteurs du tunnel séparé partagent sa limite d'envoi. Ne déclare pas un réseau
+entier : seulement l'adresse du conteneur du tunnel. Les accès directs conservent
+leur vraie adresse et ne peuvent pas contourner la limite avec un faux en-tête.
 
 Ces réglages sont gardés dans le conteneur (`/etc/recipelog-vitrine/`) : les mises à jour ne les
 effacent pas. Le changement se voit tout de suite, sans redémarrer quoi que ce soit.
@@ -273,3 +284,9 @@ cd site && python3 -m http.server 8000   # puis ouvrir http://localhost:8000
 
 Règles du site : vouvoiement, ton professionnel, ne présenter que des fonctions qui existent, et
 les fenêtres d'aide ne se ferment qu'avec leur croix.
+
+## Vérifier les correctifs localement
+
+`python3 -m unittest discover -s tests -v` (Bash disponible ; `BASH_TEST` permet de choisir son chemin)
+et `node tests/clipboard.cjs`. Les tests remplacent PostgreSQL, systemd, SMTP et le
+déploiement par des simulacres ; ils ne modifient aucune installation réelle.

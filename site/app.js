@@ -260,8 +260,9 @@
     document.getElementById("cf-copy").addEventListener("click", function () {
       var b = this;
       var done = function () { b.textContent = "Adresse copiée ✓"; setTimeout(function () { b.textContent = "Copier l'adresse"; }, 2000); };
-      if (navigator.clipboard) navigator.clipboard.writeText(mail).then(done, done);
-      else done();
+      function failed() { b.textContent = "Sélectionnez et copiez l'adresse ci-dessus"; }
+      if (navigator.clipboard) navigator.clipboard.writeText(mail).then(done, failed);
+      else failed();
     });
   }
 
