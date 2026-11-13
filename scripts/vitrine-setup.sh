@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # vitrine-setup.sh — installe le site vitrine DANS son conteneur (lancé par install.sh).
 set -euo pipefail
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 REPO_URL="https://github.com/SuperNon0/recipelogs.git"
 BRANCH="${VITRINE_BRANCH:-site-vitrine}"
 DIR="/opt/vitrine"
@@ -28,9 +29,9 @@ mkdir -p "$CONF"
 echo "$PORT" > "$CONF/port"
 install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
-if [ -n "${VITRINE_DEMO_URL:-}" ]; then vitrine-reglage demo "$VITRINE_DEMO_URL" >/dev/null; fi
-if [ -n "${VITRINE_CONTACT:-}" ]; then vitrine-reglage contact "$VITRINE_CONTACT" >/dev/null; fi
-vitrine-reglage >/dev/null
+if [ -n "${VITRINE_DEMO_URL:-}" ]; then /usr/local/sbin/vitrine-reglage demo "$VITRINE_DEMO_URL" >/dev/null; fi
+if [ -n "${VITRINE_CONTACT:-}" ]; then /usr/local/sbin/vitrine-reglage contact "$VITRINE_CONTACT" >/dev/null; fi
+/usr/local/sbin/vitrine-reglage >/dev/null
 
 echo "==> nginx…"
 cat > /etc/nginx/sites-available/vitrine <<NGINX_HEAD
