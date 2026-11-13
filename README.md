@@ -4,7 +4,7 @@
 
 Outil conçu pour le travail d'un pâtissier pro (et quelques recettes perso). Il comble les manques de Recipe Keeper : précision au gramme, multiplicateur (coefficient, masse, pivot, pièces, moule), sous-recettes à tous les niveaux, fiches de production, allergènes, coût de revient, cahiers PDF et accès par Claude (MCP).
 
-**Version actuelle : V2.8** (le numéro complet, par ex. V2.5.106, est affiché dans le menu et dans Réglages → Version et nouveautés) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
+**Version du code : V2.15** (le numéro complet est affiché dans le menu et dans Réglages → Version et nouveautés ; la version en ligne dépend du dernier déploiement) · Production : [`recipe.super-nono.cc`](https://recipe.super-nono.cc) (Proxmox LXC + Cloudflare Zero Trust)
 
 > Ce fichier est **la documentation du projet**. Le journal des nouveautés affiché dans l'appli est `src/lib/changelog.ts` (règles dans `CLAUDE.md`). Les idées mises de côté pour plus tard sont dans [`docs/futures-mises-a-jour.md`](docs/futures-mises-a-jour.md). Connexion par Cloudflare (Google + code par mail, demandes d'accès) : [`docs/connexion-cloudflare/`](docs/connexion-cloudflare/README.md).
 
@@ -315,12 +315,27 @@ Prérequis : Node.js ≥ 20, pnpm ≥ 10, PostgreSQL ≥ 15 (ou Docker).
 git clone https://github.com/SuperNon0/recipelogs
 cd recipelogs
 pnpm install
-cp .env.example .env          # adapter DATABASE_URL
+cp .env.example .env          # renseigner POSTGRES_PASSWORD et adapter DATABASE_URL
 docker compose up -d          # PostgreSQL local (optionnel)
 pnpm db:migrate               # applique les migrations
 pnpm db:seed                  # catégories, dossiers, templates PDF
 pnpm dev                      # http://localhost:3000
 ```
+
+Le PostgreSQL Docker n'écoute que sur `127.0.0.1:5432`. Renseigner un mot de passe
+non vide dans `POSTGRES_PASSWORD` et utiliser le même dans `DATABASE_URL`
+(encoder les caractères réservés de l'URL, par exemple `@` en `%40`). Sur un volume
+PostgreSQL déjà initialisé, changer `.env` ne change pas le mot de passe existant :
+conserver son mot de passe actuel ou le modifier dans PostgreSQL avant d'adapter `.env`.
+
+Les fichiers envoyés sont conservés dans `data/uploads`, hors du répertoire public,
+afin que les routes de l'application vérifient les droits. Pour un environnement de
+développement existant utilisant `public/uploads`, arrêter le serveur, sauvegarder
+ce dossier, déplacer son contenu dans `data/uploads` en conservant les sous-dossiers,
+puis régler `UPLOAD_DIR="./data/uploads"` dans `.env`. Retirer ensuite l'ancien
+`public/uploads` et reconstruire le site si nécessaire : toute copie laissée dans
+`public/` peut être servie directement par Next.js, sans les contrôles de la route.
+Le dossier de production `/var/lib/recipelog/uploads` reste inchangé.
 
 | Commande | Effet |
 |---|---|

@@ -190,10 +190,40 @@ export function resolveLink(
   link: LinkInput,
   parentCoef: number,
   memo: MassMemo = new Map(),
-): { effectiveCoef: number; ingredients: AdjIngredient[]; min: number; max: number } {
-  const { effectiveCoef, ingredients } = resolveParts(link, parentCoef, memo);
+): { effectiveCoef: number; ingredients: AdjIngredient[]; fixed: boolean[]; min: number; max: number } {
+  const { effectiveCoef, ingredients, fixed } = resolveParts(link, parentCoef, memo);
   const { min, max } = recipeMass(ingredients);
-  return { effectiveCoef, ingredients, min, max };
+  return { effectiveCoef, ingredients, fixed, min, max };
+}
+
+/** Masse avant arrondis, en respectant les verrouillages à chaque niveau. */
+export function treeScaledMass(node: TreeNode, coef: number, memo: MassMemo = new Map()): number {
+  let mass = recipeMass(node.ingredients).avg * coef;
+  for (const link of node.subLinks) {
+    const scale = link.isLocked ? 1 : coef;
+    const childCoef = linkLocalCoef(link, link.child, treeBaseMass(link.child, memo), scale);
+    mass += treeScaledMass(link.child, childCoef, memo);
+  }
+  return mass;
+}
+
+/** Recherche monotone : les masses cibles imbriquées peuvent avoir des paliers. */
+export function treeCoefficientForMass(node: TreeNode, target: number): number {
+  if (!Number.isFinite(target) || target <= 0) throw new Error("Masse cible invalide.");
+  const memo: MassMemo = new Map();
+  const mass = (k: number) => treeScaledMass(node, k, memo);
+  if (Math.abs(mass(1) - target) < 1e-9) return 1;
+  if (target <= mass(0)) return 0;
+  let high = 1;
+  while (mass(high) < target && high < 1e9) high *= 2;
+  if (mass(high) < target) throw new Error("Cette recette ne contient aucune masse ajustable suffisante.");
+  let low = 0;
+  for (let i = 0; i < 64; i++) {
+    const mid = (low + high) / 2;
+    if (mass(mid) < target) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
 }
 
 /** Retire les prix d'achat de tout l'arbre (rôle sans la permission « Voir les prix et les coûts »). */

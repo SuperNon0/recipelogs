@@ -8,6 +8,7 @@ import type { ActionResult } from "@/lib/actionResult";
 import { aggregateIngredients, shoppingKey, visibleShoppingListWhere } from "@/lib/shopping";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
 import { requireVisibleCookbook, visibleRecipeWhere } from "@/lib/auth/visibility";
+import { checkedAfterRegeneration } from "@/lib/shoppingChecked";
 
 async function requireShoppingList(id: number) {
   if (!(await prisma.shoppingList.findFirst({ where: { id, ...(await visibleShoppingListWhere()) }, select: { id: true } }))) {
@@ -219,10 +220,10 @@ async function regenerateItems(listId: number) {
     where: { shoppingListId: listId },
     orderBy: { position: "asc" },
   });
-  // Les cases déjà cochées le restent après régénération.
-  const checkedKeys = new Set(
-    previous.filter((i) => i.recipeId !== null && i.checked).map((i) => shoppingKey(i.name, i.unit)),
-  );
+  // Garde les achats acquis seulement si leur quantité couvre encore le besoin.
+  const checkedKeys = checkedAfterRegeneration(previous.map((item) => ({
+    ...item, quantityG: item.quantityG === null ? null : Number(item.quantityG),
+  })), aggregated);
   const manualItems = previous.filter((i) => i.recipeId === null);
 
   await prisma.$transaction([

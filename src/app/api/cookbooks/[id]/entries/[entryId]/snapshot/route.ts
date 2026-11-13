@@ -1,3 +1,5 @@
+import { snapshotMassInfo, type MassSnapshot } from "@/lib/snapshotMass";
+import { ingMass } from "@/lib/massAdjust";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiDenied } from "@/lib/auth/guard";
@@ -32,13 +34,9 @@ export async function GET(
     return new NextResponse("Not snapshot", { status: 409 });
   }
 
-  const snap = entry.snapshotData as unknown as {
-    ingredients?: { name: string; quantityG: number }[];
-    totalMassG?: number;
-  };
-
+  const snap = entry.snapshotData as unknown as MassSnapshot;
   return NextResponse.json({
-    ingredients: (snap.ingredients ?? []).map(({ name, quantityG }) => ({ name, quantityG })),
-    totalMassG: snap.totalMassG ?? 0,
+    ingredients: (snap.ingredients ?? []).map((i) => ({ name: i.name, quantityG: ingMass(i.quantityG, i.unit ?? "g", i.pieceG) })),
+    ...snapshotMassInfo(snap),
   });
 }

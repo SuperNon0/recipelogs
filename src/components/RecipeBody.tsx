@@ -19,7 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { formatCoef, formatG, formatGDecimal, formatYield } from "@/lib/format";
-import { resolveLink, type TreeNode } from "@/lib/recipeTree";
+import { resolveLink, treeCoefficientForMass, treeScaledMass, type TreeNode } from "@/lib/recipeTree";
 import { adjustToTarget, ingMass, recipeMass, roundScaled, scaledUnit, type AdjIngredient } from "@/lib/massAdjust";
 import {
   moveSubRecipe,
@@ -148,24 +148,15 @@ export function RecipeBody({
   const [locks, setLocks] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(subRecipes.map((s) => [s.id, s.isLocked])),
   );
-  // Masse de toute la recette à ×1 (sous-recettes comprises) et la part qui ne
-  // suit pas le multiplicateur (sous-recettes verrouillées) : le mode Masse vise
-  // la masse totale affichée.
-  const massParts = useMemo(() => {
-    let fixed = 0;
-    let total = baseTotalG;
-    for (const sr of subRecipes) {
-      const locked = locks[sr.id] ?? sr.isLocked;
-      const m1 = resolveLink({ ...linkOf(sr), isLocked: locked }, 1);
-      const m2 = resolveLink({ ...linkOf(sr), isLocked: locked }, 2);
-      const a1 = (m1.min + m1.max) / 2;
-      const a2 = (m2.min + m2.max) / 2;
-      total += a1;
-      // Part fixe = ce qui ne double pas quand le multiplicateur double.
-      fixed += Math.max(0, 2 * a1 - a2);
-    }
-    return { total, fixed };
-  }, [baseTotalG, subRecipes, locks]);
+  // Même arbre et même calcul que les cahiers, y compris les paliers des
+  // masses cibles imbriquées et les inserts verrouillés.
+  const massTree = useMemo<TreeNode>(() => ({
+    id: recipeId, name: "", steps: null,
+    ingredients: ingredients.map((i) => ({ ...i, quantityGMax: i.quantityGMax ?? null, unit: i.unit ?? "g" })),
+    subLinks: subRecipes.map((sr) => ({ ...linkOf(sr), id: sr.id, childId: sr.childId,
+      childName: sr.childName, label: sr.label, isLocked: locks[sr.id] ?? sr.isLocked })),
+  }), [recipeId, ingredients, subRecipes, locks]);
+  const massParts = useMemo(() => ({ total: treeScaledMass(massTree, 1) }), [massTree]);
 
   const [mode, setMode] = useState<MultMode>("coefficient");
   const [coefInput, setCoefInput] = useState("1");
@@ -189,11 +180,12 @@ export function RecipeBody({
     }
     if (mode === "mass_target") {
       const target = num(massInput);
-      const { total, fixed } = massParts;
-      if (!Number.isFinite(target) || target <= 0 || total - fixed <= 0) return 1;
+      const { total } = massParts;
+      if (!Number.isFinite(target) || target <= 0) return 1;
       // Valeur pré-remplie (arrondie au gramme) : on reste à ×1 exact.
       if (Math.abs(target - total) < 0.5) return 1;
-      return Math.max(target - fixed, 0.01) / (total - fixed);
+      try { return treeCoefficientForMass(massTree, target); }
+      catch { return 1; }
     }
     if (mode === "pieces") {
       const wanted = num(piecesInput);
@@ -212,7 +204,7 @@ export function RecipeBody({
     const pivotBaseG = pivot ? ingMass(pivot.quantityG, pivot.unit ?? "g", pivot.pieceG) : 0;
     if (!pivot || !Number.isFinite(target) || target <= 0 || pivotBaseG <= 0) return 1;
     return target / pivotBaseG;
-  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, massParts, moldFrom, moldTo, moldCount]);
+  }, [mode, coefInput, massInput, piecesInput, yieldInfo, pivotId, pivotInput, ingredients, massParts, massTree, moldFrom, moldTo, moldCount]);
 
   const reset = () => {
     setMode("coefficient");

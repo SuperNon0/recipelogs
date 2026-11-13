@@ -5,10 +5,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: recipelog
-      POSTGRES_PASSWORD: recipelog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Renseigner POSTGRES_PASSWORD dans .env}
       POSTGRES_DB: recipelog
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./data/pgdata:/var/lib/postgresql/data
     healthcheck:
