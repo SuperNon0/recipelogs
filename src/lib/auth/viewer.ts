@@ -7,6 +7,8 @@ import { getAuthSettings } from "./config";
 import { currentService } from "./service";
 import { tokenFromRequest, verifyCloudflareJwt } from "./cloudflare";
 import { rolePermissions, type Access, type Permission } from "./permissions";
+import { demoBlocks } from "@/lib/demo";
+import { isMaintenanceEmail } from "./maintenance";
 
 /**
  * Qui fait la requête.
@@ -83,7 +85,11 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   const who = await verifiedEmail();
   if ("error" in who) return { kind: "anonymous", error: who.error };
 
-  const account = await prisma.account.findUnique({ where: { email: who.email }, include: { role: true } });
+  let account = await prisma.account.findUnique({ where: { email: who.email }, include: { role: true } });
+  // Compte de maintenance (.env du serveur) : toujours administrateur actif.
+  if (isMaintenanceEmail(who.email) && (!account || account.status !== "active" || !account.role?.isAdmin)) {
+    account = await ensureMaintenanceAccount(who.email);
+  }
   if (!account) return { kind: "unknown", email: who.email };
 
   if (!account.lastSeenAt || Date.now() - account.lastSeenAt.getTime() > SEEN_EVERY_MS) {
@@ -103,6 +109,19 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   return { kind: "account", account, perms, realAccount: null };
 });
 
+/** Crée ou répare le compte de maintenance, sans rien écrire au journal. */
+async function ensureMaintenanceAccount(email: string): Promise<AccountWithRole> {
+  const role =
+    (await prisma.role.findFirst({ where: { isAdmin: true }, orderBy: { id: "asc" } })) ??
+    (await prisma.role.create({ data: { name: "Administrateur", isAdmin: true } }));
+  return prisma.account.upsert({
+    where: { email },
+    update: { roleId: role.id, status: "active" },
+    create: { email, roleId: role.id, status: "active", approvedAt: new Date() },
+    include: { role: true },
+  });
+}
+
 /** « Voir comme » : seulement un compte actif, avec un rôle, qui n'est pas administrateur. */
 export function canBeViewedAs(target: AccountWithRole): boolean {
   return target.status === "active" && !!target.role && !target.role.isAdmin;
@@ -110,6 +129,8 @@ export function canBeViewedAs(target: AccountWithRole): boolean {
 
 /** Le visiteur peut-il faire ça ? (compte actif avec la permission, ou comptes désactivés) */
 export function viewerCan(viewer: Viewer, access: Access): boolean {
+  // Mode démo : comptes, clé MCP et mise à jour du site fermés à tout le monde.
+  if (demoBlocks(access)) return false;
   if (viewer.kind === "open") return true;
   if (viewer.kind !== "account" || viewer.account.status !== "active" || !viewer.account.role) return false;
   return access === "read" || viewer.perms.includes(access);
@@ -117,8 +138,13 @@ export function viewerCan(viewer: Viewer, access: Access): boolean {
 
 /** Permissions du visiteur (toutes quand les comptes sont désactivés). */
 export function viewerPermissions(viewer: Viewer): Permission[] {
-  if (viewer.kind === "open") return rolePermissions({ isAdmin: true, permissions: [] });
-  return viewer.kind === "account" && viewerCan(viewer, "read") ? viewer.perms : [];
+  const all =
+    viewer.kind === "open"
+      ? rolePermissions({ isAdmin: true, permissions: [] })
+      : viewer.kind === "account" && viewerCan(viewer, "read")
+        ? viewer.perms
+        : [];
+  return all.filter((p) => !demoBlocks(p));
 }
 
 /** Le vrai compte derrière la requête (l'administrateur pendant « Voir comme »). */

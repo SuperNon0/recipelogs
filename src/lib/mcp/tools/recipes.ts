@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
-import { DEFAULT_SALE_COEF, costOf } from "@/lib/cost";
+import { DEFAULT_SALE_COEF, DEFAULT_SALE_VAT, costOf, saleMargin } from "@/lib/cost";
 import { ingMass } from "@/lib/massAdjust";
 import { getRecipeDetail, listRecipes, loadRecipeTree } from "@/lib/recipes";
 import { treeBaseMass } from "@/lib/recipeTree";
@@ -18,6 +18,7 @@ import {
   deleteRecipes,
   duplicateRecipe,
   setRecipeSaleCoef,
+  setRecipeSalePrice,
   updateRecipe,
 } from "@/app/actions/recipes";
 import { addSubRecipe, removeSubRecipe } from "@/app/actions/subRecipes";
@@ -63,6 +64,8 @@ const recipeFields = {
   rendement_nombre: z.number().int().positive().max(100_000).nullable().optional(),
   rendement_libelle: z.string().trim().max(60).optional(),
   coef_vente: z.number().positive().max(100).optional(),
+  prix_vente: z.number().min(0.01).max(100_000).nullable().optional(),
+  tva_vente: z.number().min(0).max(50).optional(),
   moule: z
     .object({ forme: z.enum(["cercle", "cadre", "carre"]), a: z.number().min(1).max(1000), b: z.number().min(1).max(1000).optional(), h: z.number().min(1).max(1000).optional() })
     // Sans largeur, le cadre serait effacé en silence.
@@ -85,6 +88,8 @@ const recipeFieldsJs = {
   rendement_nombre: js.int("Rendement : nombre de pièces ou de portions que donne la recette (ex. 60), null pour aucun"),
   rendement_libelle: js.str("Ce que compte le rendement (« financiers », « parts »… ; « pièces » par défaut)"),
   coef_vente: js.num(`Coefficient de vente : prix conseillé = coût matière × coef (${DEFAULT_SALE_COEF} par défaut)`),
+  prix_vente: js.num("Prix de vente réel du produit fini en € : par pièce si la recette a un rendement, sinon la recette entière. null pour l'enlever. Sert à calculer la marge"),
+  tva_vente: js.num(`TVA comprise dans prix_vente, en % (${DEFAULT_SALE_VAT} par défaut, 10 sur place, 0 si le prix est HT)`),
   moule: {
     type: ["object", "null"],
     description: "Moule d'origine de la recette, en cm : cercle (a = diamètre), carre (a = côté) ou cadre (a × b), hauteur h facultative. null pour aucun.",
@@ -112,6 +117,8 @@ type RecipeValues = {
   rendement_nombre?: number | null;
   rendement_libelle?: string;
   coef_vente?: number;
+  prix_vente?: number | null;
+  tva_vente?: number;
   moule?: { forme: "cercle" | "cadre" | "carre"; a: number; b?: number; h?: number } | null;
 };
 
@@ -240,6 +247,26 @@ export const RECIPE_TOOLS: McpTool[] = [
       const cost = snap ? costOf([...snap.ingredients, ...snap.subRecipes.flatMap((s) => s.ingredients)]) : null;
       const coef = r.saleCoef != null ? Number(r.saleCoef) : DEFAULT_SALE_COEF;
       const round2 = (v: number) => Math.round(v * 100) / 100;
+      // Prix de vente réel et marge : par pièce avec un rendement, sinon la recette entière.
+      const saleInfo = () => {
+        if (r.salePrice == null) return null;
+        const price = Number(r.salePrice);
+        const vat = r.saleVat != null ? Number(r.saleVat) : DEFAULT_SALE_VAT;
+        const unit = snap?.yield ? snap.yield.count : a.multiplicateur;
+        const out: Record<string, unknown> = { prix_vente_eur: price, tva_pourcent: vat, par: snap?.yield ? "pièce" : "recette entière" };
+        if (cost && unit > 0) {
+          const m = saleMargin(price, vat, cost.total / unit);
+          Object.assign(out, {
+            prix_ht_eur: round2(m.priceHT),
+            cout_matiere_eur: round2(cost.total / unit),
+            marge_eur: round2(m.margin),
+            taux_marge_pourcent: m.rate != null ? Math.round(m.rate * 10) / 10 : null,
+            coefficient_reel: m.coef != null ? round2(m.coef) : null,
+            ...(cost.missing.length ? { calculee_sans_ingredients_sans_prix: cost.missing } : {}),
+          });
+        }
+        return out;
+      };
       // Part de chaque ligne dans la masse totale (sous-recettes comprises), comme la colonne % de l'appli.
       const grand = snap ? snap.totalMassG + snap.subRecipes.reduce((t, x) => t + x.totalMassG, 0) : 0;
       const pct = (i: { quantityG: number; quantityGMax?: number | null; unit: string | null; pieceG?: number | null }, total: number) => {
@@ -274,6 +301,7 @@ export const RECIPE_TOOLS: McpTool[] = [
                 ...(cost.missing.length ? { ingredients_sans_prix: cost.missing } : {}),
               }
             : null,
+        vente: saleInfo(),
         ingredients: (snap?.ingredients ?? []).map((i, idx) => ({
           id: r.ingredients[idx]?.id,
           nom: i.name,
@@ -306,7 +334,7 @@ export const RECIPE_TOOLS: McpTool[] = [
   {
     name: "creer_recette",
     title: "Créer une recette",
-    description: `Crée une nouvelle recette. Les nouveaux ingrédients sont ajoutés à la base automatiquement. ${UNIT_HELP}`,
+    description: `Crée une nouvelle recette. Les nouveaux ingrédients sont ajoutés à la base automatiquement : AVANT, compare chaque ingrédient à ceux qui existent (lister_ingredients) et reprends le nom existant exact au lieu d'en créer un nouveau (« œuf entier » → « Oeufs » s'il existe, « huile » → « Huile de tournesol » si c'est la seule huile). Ne crée un ingrédient que s'il n'existe vraiment pas ; en cas de doute entre deux ingrédients existants, demande à l'utilisateur. ${UNIT_HELP}`,
     inputSchema: { type: "object", properties: recipeFieldsJs, required: ["nom", "ingredients"] },
     annotations: WRITE,
     run: async (args) => {
@@ -314,6 +342,8 @@ export const RECIPE_TOOLS: McpTool[] = [
       const { redirectTo } = await runAction(() => createRecipe(recipeForm(a)));
       const newId = idFromPath(redirectTo);
       if (a.coef_vente !== undefined && newId) await runAction(() => setRecipeSaleCoef(newId, a.coef_vente!));
+      if ((a.prix_vente !== undefined || a.tva_vente !== undefined) && newId)
+        await runAction(() => setRecipeSalePrice(newId, a.prix_vente ?? null, a.tva_vente ?? DEFAULT_SALE_VAT));
       return text({ creee: a.nom, id: newId });
     },
   },
@@ -351,6 +381,11 @@ export const RECIPE_TOOLS: McpTool[] = [
       for (const [k, v] of Object.entries(a)) if (k !== "id" && v !== undefined) Object.assign(next, { [k]: v });
       await runAction(() => updateRecipe(a.id, recipeForm(next)));
       if (a.coef_vente !== undefined) await runAction(() => setRecipeSaleCoef(a.id, a.coef_vente!));
+      if (a.prix_vente !== undefined || a.tva_vente !== undefined) {
+        const price = a.prix_vente !== undefined ? a.prix_vente : r.salePrice != null ? Number(r.salePrice) : null;
+        const vat = a.tva_vente ?? (r.saleVat != null ? Number(r.saleVat) : DEFAULT_SALE_VAT);
+        await runAction(() => setRecipeSalePrice(a.id, price, vat));
+      }
       return text({ modifiee: next.nom, id: a.id, champs: Object.keys(a).filter((k) => k !== "id") });
     },
   },

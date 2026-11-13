@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { costOf, formatEuro, lineCost } from "@/lib/cost";
+import { costOf, formatEuro, lineCost, saleMargin } from "@/lib/cost";
 
 describe("coût de revient", () => {
   it("prix au kg sur des grammes, des litres et des cuillères", () => {
@@ -32,5 +32,26 @@ describe("coût de revient", () => {
   it("formatEuro", () => {
     expect(formatEuro(12.4)).toBe("12,40 €");
     expect(formatEuro(0.315)).toBe("0,315 €");
+  });
+});
+
+describe("saleMargin", () => {
+  it("retire la TVA avant de calculer la marge", () => {
+    const m = saleMargin(2.11, 5.5, 0.5);
+    expect(m.priceHT).toBeCloseTo(2, 2);
+    expect(m.margin).toBeCloseTo(1.5, 2);
+    expect(m.rate).toBeCloseTo(75, 0);
+    expect(m.coef).toBeCloseTo(4.22, 2);
+  });
+  it("prix HT : rien n'est retiré", () => {
+    const m = saleMargin(10, 0, 4);
+    expect(m.margin).toBe(6);
+    expect(m.rate).toBe(60);
+  });
+  it("marge négative quand le coût dépasse le prix", () => {
+    expect(saleMargin(1, 0, 1.5).margin).toBe(-0.5);
+  });
+  it("sans coût, pas de coefficient", () => {
+    expect(saleMargin(5, 5.5, 0).coef).toBeNull();
   });
 });

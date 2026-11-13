@@ -339,3 +339,25 @@ body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
   height: 8px;
   border-radius: 50%;
 }
+/* Bandeau du site de démonstration (RECIPELOG_DEMO=1) */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+.demo-banner > svg {
+  color: var(--accent);
+  flex: none;
+}
+.demo-banner b {
+  color: var(--accent);
+  font-weight: 600;
+}

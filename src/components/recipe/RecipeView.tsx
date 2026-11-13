@@ -36,6 +36,8 @@ type Props = {
     updatedAt: string;
     totalMassG: number;
     saleCoef: number | null;
+    salePrice: number | null;
+    saleVat: number | null;
   };
   ingredients: IngredientRow[];
   subRecipes: SubRecipeRow[];
@@ -177,7 +179,7 @@ export function RecipeView({ recipe, ingredients, subRecipes, yieldInfo, mold, v
 
       {/* Toujours monté (caché hors de l'onglet) : le multiplicateur est gardé d'un onglet à l'autre. */}
       <div hidden={tab !== "recipe"}>
-        <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} mold={mold} saleCoef={recipe.saleCoef} onScaleChange={onScaleChange} />
+        <RecipeBody recipeId={recipe.id} ingredients={ingredients} subRecipes={subRecipes} yieldInfo={yieldInfo} mold={mold} saleCoef={recipe.saleCoef} salePrice={recipe.salePrice} saleVat={recipe.saleVat} onScaleChange={onScaleChange} />
         <AllergensCard allergens={allergens} />
         {usedIn.length > 0 && (
           <div className="fl-card" style={{ marginTop: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

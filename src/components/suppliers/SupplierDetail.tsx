@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, Pencil } from "lucide-react";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { useCan } from "@/components/auth/Permissions";
 import { renameSupplier } from "@/app/actions/suppliers";
 import { formatEuro } from "@/lib/cost";
+import { groupByArticle } from "@/lib/suppliers";
 import type { loadSupplier } from "@/lib/purchaseOrders";
 import { Change } from "./PriceComparison";
 import { ProductHistoryModal } from "./ProductHistoryModal";
@@ -18,9 +19,11 @@ type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases: { id: number; name: string }[] }) {
   const can = useCan();
   const router = useRouter();
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
-  const open = supplier.products.find((p) => p.id === openId);
+  // Les variantes d'un même article (« Fraise France », « Fraise Espagne ») tiennent sur une ligne.
+  const groups = useMemo(() => groupByArticle(supplier.products), [supplier.products]);
+  const open = groups.find((g) => g.key === openKey);
   const total = supplier.orders.reduce((s, o) => s + (o.total ?? 0), 0);
 
   return (
@@ -33,7 +36,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
           </button>
         )}
         <p className="sub">
-          {supplier.products.length} produit{supplier.products.length > 1 ? "s" : ""} · {supplier.orders.length} facture
+          {groups.length} article{groups.length > 1 ? "s" : ""} · {supplier.orders.length} facture
           {supplier.orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} au total` : ""}
         </p>
@@ -43,31 +46,40 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         <h2>Produits</h2>
       </div>
       <div className="fl-list">
-        {supplier.products.map((p) => (
-          <button key={p.id} type="button" className="fl-row" style={{ width: "100%", textAlign: "left" }} onClick={() => setOpenId(p.id)}>
-            <span className="ic">
-              <Package size={16} />
-            </span>
-            <span className="set-tx">
-              <b>
-                <span>{p.name}</span>
-              </b>
-              <small>
-                {[p.packLabel, p.base ? `ingrédient « ${p.base.name} »${p.base.chosen ? " ✓" : ""}` : null, p.stats ? `moyenne ${formatEuro(p.stats.average)}` : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </small>
-            </span>
-            {p.stats && (
-              <span className="sup-num strong" style={{ textAlign: "right" }}>
-                {formatEuro(p.stats.current)}
-                <span className="sup-unit"> /{p.stats.unit}</span>
-                <br />
-                <Change pct={p.stats.changePct} />
+        {groups.map((g) => {
+          const p = g.products[0];
+          const several = g.products.length > 1;
+          const base = g.products.find((x) => x.base?.chosen)?.base ?? g.products.find((x) => x.base)?.base;
+          return (
+            <button key={g.key} type="button" className="fl-row" style={{ width: "100%", textAlign: "left" }} onClick={() => setOpenKey(g.key)}>
+              <span className="ic">
+                <Package size={16} />
               </span>
-            )}
-          </button>
-        ))}
+              <span className="set-tx">
+                <b>
+                  <span>{several ? g.article : p.name}</span>
+                </b>
+                <small>
+                  {[
+                    several ? `${g.products.length} variantes : ${g.products.map((x) => x.name).join(", ")}` : p.packLabel,
+                    base ? `ingrédient « ${base.name} »${base.chosen ? " ✓" : ""}` : null,
+                    g.stats ? `moyenne ${formatEuro(g.stats.average)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+              </span>
+              {g.stats && (
+                <span className="sup-num strong" style={{ textAlign: "right" }}>
+                  {formatEuro(g.stats.current)}
+                  <span className="sup-unit"> /{g.stats.unit}</span>
+                  <br />
+                  <Change pct={g.stats.changePct} />
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="sect-title" style={{ marginTop: 20 }}>
@@ -75,7 +87,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
       </div>
       <InvoiceList orders={supplier.orders} showSupplier={false} />
 
-      {open && <ProductHistoryModal product={open} supplier={supplier.name} bases={bases} onClose={() => setOpenId(null)} />}
+      {open && <ProductHistoryModal products={open.products} supplier={supplier.name} bases={bases} onClose={() => setOpenKey(null)} />}
       {renaming && (
         <RenameModal
           name={supplier.name}

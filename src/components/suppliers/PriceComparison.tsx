@@ -43,7 +43,7 @@ export function PriceComparison({
   const [selected, setSelected] = useState<number[]>(defaults);
   const [often, setOften] = useState(false);
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<{ productId: number; supplier: string } | null>(null);
+  const [open, setOpen] = useState<{ productIds: number[]; supplier: string } | null>(null);
 
   // Le choix des fournisseurs est retenu sur cet appareil.
   useEffect(() => {
@@ -67,6 +67,7 @@ export function PriceComparison({
   };
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const openProducts = (open?.productIds ?? []).map((id) => byId.get(id)).filter((p): p is ProductDetail => !!p);
   const names = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers]);
   const allRows = useMemo(() => buildComparison(products), [products]);
   const hasOften = allRows.some((r) => r.orders >= 2);
@@ -79,9 +80,9 @@ export function PriceComparison({
         (!often || r.orders >= 2) &&
         (!q ||
           r.article.toLowerCase().includes(q) ||
-          Object.values(r.cells).some((c) => c.name.toLowerCase().includes(q))),
+          Object.values(r.cells).some((c) => c.productIds.some((id) => byId.get(id)?.name.toLowerCase().includes(q)))),
     );
-  }, [allRows, selected, often, query]);
+  }, [allRows, selected, often, query, byId]);
 
   const groups = useMemo(() => {
     const out: { family: string; rows: ComparisonRow[] }[] = [];
@@ -161,10 +162,7 @@ export function PriceComparison({
                   family={g.family}
                   rows={g.rows}
                   cols={cols.map((c) => c.id)}
-                  onOpen={(productId, supplierId) => {
-                    const product = byId.get(productId);
-                    if (product) setOpen({ productId, supplier: names.get(supplierId) ?? "" });
-                  }}
+                  onOpen={(productIds, supplierId) => setOpen({ productIds, supplier: names.get(supplierId) ?? "" })}
                 />
               ))}
             </tbody>
@@ -183,7 +181,9 @@ export function PriceComparison({
         <span>Touche un prix pour voir tout son historique</span>
       </div>
 
-      {open && byId.get(open.productId) && <ProductHistoryModal product={byId.get(open.productId)!} supplier={open.supplier} bases={bases} onClose={() => setOpen(null)} />}
+      {openProducts.length > 0 && (
+        <ProductHistoryModal products={openProducts} supplier={open?.supplier ?? ""} bases={bases} onClose={() => setOpen(null)} />
+      )}
     </>
   );
 }
@@ -197,7 +197,7 @@ function FamilyRows({
   family: string;
   rows: ComparisonRow[];
   cols: number[];
-  onOpen: (productId: number, supplierId: number) => void;
+  onOpen: (productIds: number[], supplierId: number) => void;
 }) {
   return (
     <>
@@ -229,8 +229,8 @@ function FamilyRows({
                   <button
                     type="button"
                     className={`sup-cell${best != null && c.price === best ? " best" : ""}`}
-                    onClick={() => onOpen(c.productId, id)}
-                    title={`${c.name} · facture du ${new Date(c.date).toLocaleDateString("fr-FR")}`}
+                    onClick={() => onOpen(c.productIds, id)}
+                    title={`${c.productIds.length > 1 ? `${c.productIds.length} variantes, dernière : ` : ""}${c.name} · facture du ${new Date(c.date).toLocaleDateString("fr-FR")}`}
                   >
                     <span>
                       {formatEuro(c.price)}

@@ -7,6 +7,7 @@ import { realAccountOf } from "@/lib/auth/viewer";
 import { AUDIT_LABEL } from "@/lib/auth/audit";
 import { AccountsManager, type AccountInfo, type AuditInfo, type RoleInfo } from "@/components/settings/AccountsManager";
 import { cleanPermissions } from "@/lib/auth/permissions";
+import { isMaintenanceEmail } from "@/lib/auth/maintenance";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +15,16 @@ export default async function AccountsSettingsPage() {
   const viewer = await requirePage("accounts.manage");
   const [settings, roles, accounts, log, categories] = await Promise.all([
     getAuthSettings(),
-    prisma.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }], include: { _count: { select: { accounts: true } } } }),
+    prisma.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }] }),
     prisma.account.findMany({ orderBy: [{ createdAt: "asc" }] }),
     prisma.auditLog.findMany({ orderBy: { at: "desc" }, take: 40 }),
     prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
   ]);
   const me = realAccountOf(viewer);
 
-  const rows: AccountInfo[] = accounts.map((a) => ({
+  // Le compte de maintenance (.env du serveur) n'est jamais affiché.
+  const visible = accounts.filter((a) => !isMaintenanceEmail(a.email));
+  const rows: AccountInfo[] = visible.map((a) => ({
     id: a.id,
     email: a.email,
     roleId: a.roleId,
@@ -36,9 +39,11 @@ export default async function AccountsSettingsPage() {
     isAdmin: r.isAdmin,
     permissions: cleanPermissions(r.permissions),
     categoryIds: r.categoryIds,
-    accounts: r._count.accounts,
+    accounts: visible.filter((a) => a.roleId === r.id).length,
   }));
-  const entries: AuditInfo[] = log.map((l) => ({
+  const entries: AuditInfo[] = log
+    .filter((l) => !isMaintenanceEmail(l.actorEmail) && !isMaintenanceEmail(l.targetEmail))
+    .map((l) => ({
     id: l.id,
     at: l.at.toISOString(),
     text: [l.actorEmail ?? "Quelqu'un", AUDIT_LABEL[l.action] ?? l.action, l.targetEmail].filter(Boolean).join(" "),

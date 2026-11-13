@@ -527,6 +527,28 @@ export async function setRecipeSaleCoef(
   return { ok: true };
 }
 
+/**
+ * Prix de vente d'une recette (produit fini) pour calculer la marge.
+ * `price` null = plus de prix de vente ; `vat` = TVA comprise en % (0 = prix HT).
+ */
+export async function setRecipeSalePrice(
+  id: number,
+  price: number | null,
+  vat: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAccess("costs.edit");
+  await requireVisibleRecipe(id);
+  if (price != null && (!Number.isFinite(price) || price < 0.01 || price > 100_000)) return { ok: false, error: "Prix de vente invalide." };
+  if (!Number.isFinite(vat) || vat < 0 || vat > 50) return { ok: false, error: "TVA invalide." };
+  const { count } = await prisma.recipe.updateMany({
+    where: { id },
+    data: { salePrice: price == null ? null : Math.round(price * 100) / 100, saleVat: Math.round(vat * 100) / 100 },
+  });
+  if (!count) return { ok: false, error: "Recette introuvable." };
+  revalidatePath(`/recipes/${id}`);
+  return { ok: true };
+}
+
 export async function toggleFavorite(id: number) {
   await requireAccess("recipes.edit");
   await requireVisibleRecipe(id);

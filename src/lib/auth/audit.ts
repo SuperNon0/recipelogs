@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isMaintenanceEmail } from "./maintenance";
 
 /** Une ligne dans le journal des comptes. Ne fait jamais échouer l'action journalisée. */
 export async function audit(
@@ -7,6 +8,8 @@ export async function audit(
   targetEmail: string | null = null,
   detail: string | null = null,
 ): Promise<void> {
+  // Le compte de maintenance ne laisse aucune trace visible sur le site.
+  if (isMaintenanceEmail(actorEmail) || isMaintenanceEmail(targetEmail)) return;
   await prisma.auditLog
     .create({ data: { actorEmail, action, targetEmail, detail } })
     .catch(() => {});

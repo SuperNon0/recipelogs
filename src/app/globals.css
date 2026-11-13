@@ -2438,6 +2438,86 @@ button.fl-row:hover {
   background: var(--bg);
 }
 
+/* Prix de vente (produit fini) et marge */
+.cost-sale {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.cost-sale-in {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.cost-sale-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cost-price input {
+  width: 76px;
+  height: 32px;
+  font-size: 16px; /* 16 px : pas de zoom auto sur iPhone */
+  text-align: right;
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.cost-sale-unit {
+  font-size: 13px;
+  color: var(--soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.cost-vat {
+  height: 32px;
+  font-size: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.cost-sale-ht,
+.cost-sale-warn {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.cost-sale-ht b {
+  color: var(--text);
+}
+
+.cost-sale-tva {
+  color: var(--muted);
+}
+
+.cost-sale-warn {
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
+.cost-sale-err {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
 .cost-missing {
   grid-column: 1 / -1;
   display: flex;
