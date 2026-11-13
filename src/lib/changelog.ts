@@ -11,6 +11,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.16",
+    date: "2026-11-13",
+    title: "Démo remplie d'exemples",
+    summary:
+      "Le site de démonstration n'est plus vide : il arrive avec une pâtisserie d'exemple complète (recettes, sous-recettes, fournisseurs, factures, prix de vente et marges) pour essayer chaque fonction tout de suite.",
+    features: [
+      "26 recettes d'exemple : bases de l'atelier (pâte sucrée, choux, crème pâtissière…) et produits de vitrine faits de sous-recettes (tartelette citron, éclair, Paris-Brest, entremets), avec rendement, moule, étapes, notes, commentaires et allergènes",
+      "Variantes (crème pâtissière chocolat, financiers pistache et framboise, pains au chocolat), dossiers, catégories et étiquettes",
+      "4 fournisseurs inventés et 10 factures sur trois mois : le beurre augmente, les fraises passent de France à Espagne, deux fournisseurs à comparer sur la crèmerie. Chaque recette a son coût matière, son prix de vente et sa marge",
+      "2 cahiers (carte boutique avec chapitres, fiches apprentis), 2 listes de courses et une fiche de production prête",
+      "Les exemples se chargent tout seuls sur une démo vide. Ce que les visiteurs changent est effacé chaque nuit ; ce qui est figé avec recipelog-demo-figer reste la référence",
+    ],
+  },
+  {
     version: "V2.15",
     date: "2026-11-13",
     title: "Nouveau look « encre » : clair, sombre et couleur au choix",
