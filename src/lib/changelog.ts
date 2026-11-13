@@ -20,6 +20,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Mode démo (RECIPELOG_DEMO=1 dans le .env du serveur) : un bandeau « Site de démonstration » en haut de chaque page, avec un « ? » qui explique que les changements sont effacés chaque nuit",
       "En démo, les comptes, la clé Claude (MCP) et le bouton « Mettre à jour le site » sont coupés pour tout le monde : les pages et les boutons disparaissent, et le serveur refuse ces actions",
     ],
+    fixes: [
+      "L'installation d'un nouveau serveur ne s'arrête plus sur une erreur nginx (« unknown log format »)",
+    ],
   },
   {
     version: "V2.12",
