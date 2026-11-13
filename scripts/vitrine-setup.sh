@@ -23,6 +23,10 @@ else
   git clone -q --depth 1 --branch "$BRANCH" --single-branch "$REPO_URL" "$DIR"
 fi
 echo "$BRANCH" > "$DIR/.branche"
+# Version dans les liens du style et du script : chaque mise à jour force les navigateurs
+# et Cloudflare à reprendre les nouveaux fichiers.
+V="$(git -C "$DIR" rev-parse --short HEAD)"
+sed -i -E "s#(href=\"style\.css|src=\"app\.js)(\?v=[0-9a-f]+)?\"#\1?v=${V}\"#g" "$DIR/site/index.html"
 
 echo "==> Réglages (${CONF})…"
 mkdir -p "$CONF"
