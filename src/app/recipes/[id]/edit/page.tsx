@@ -69,6 +69,12 @@ export default async function EditRecipePage({
             quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
             unit: i.unit ?? "g",
           })),
+          subRecipes: recipe.parentLinks.map((l) => ({
+            label: l.label,
+            childName: l.child.name,
+            calcMode: l.calcMode,
+            calcValue: Number(l.calcValue),
+          })),
         }}
       />
     </div>

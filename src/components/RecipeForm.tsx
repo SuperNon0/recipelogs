@@ -11,6 +11,7 @@ import {
   CircleAlert,
   FileText,
   Heading,
+  Layers,
   ListPlus,
   MoveHorizontal,
   Plus,
@@ -29,6 +30,18 @@ import { MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 import { htmlToPlainText } from "@/lib/stepsText";
+import { AddSubRecipeDialog, type PickedSubRecipe } from "./AddSubRecipeModal";
+
+/** Une sous-recette déjà liée (modification d'une recette), affichée pour mémoire. */
+type ExistingSubRecipe = { label: string; childName: string; calcMode: string; calcValue: number };
+
+/** « 500 g », « × 0,5 » ou « pivot 200 g » selon le mode de calcul. */
+function subQtyText(mode: string, value: number, pivotName?: string) {
+  const v = value.toLocaleString("fr-FR");
+  if (mode === "coefficient") return `× ${v}`;
+  if (mode === "pivot_ingredient") return `${pivotName ?? "pivot"} : ${v} g`;
+  return `${v} g`;
+}
 
 type IngredientUnit = "g" | "L" | "cc" | "cs" | "pièce" | "QS" | "titre";
 /** Unités proposées dans la liste ; « titre » = intertitre, ajouté par son propre bouton. */
@@ -63,6 +76,7 @@ export type RecipeFormInitial = {
   yieldLabel?: string | null;
   mold?: Mold | null;
   ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
+  subRecipes?: ExistingSubRecipe[];
 };
 
 let nextKey = 1;
@@ -127,6 +141,21 @@ export function RecipeForm({
 
   const markDirty = useCallback(() => setDirty(true), []);
   const [mold, setMold] = useState<Mold | null>(initial?.mold ?? null);
+  const existingSubs = initial?.subRecipes ?? [];
+  const [pendingSubs, setPendingSubs] = useState<(PickedSubRecipe & { key: number })[]>([]);
+  const [subDialog, setSubDialog] = useState<null | "pick" | "new">(null);
+  const [subDefaults, setSubDefaults] = useState<{ folderId?: number | null; categoryIds?: number[] }>({});
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const openSubDialog = (mode: "pick" | "new") => {
+    // Une recette créée ici va dans le même dossier et les mêmes catégories.
+    const fd = formRef.current ? new FormData(formRef.current) : null;
+    setSubDefaults({
+      folderId: folderId === "" ? null : folderId,
+      categoryIds: fd ? fd.getAll("categoryIds").map(Number).filter((n) => n > 0) : [],
+    });
+    setSubDialog(mode);
+  };
 
   // Prévient avant de quitter la page avec des modifications non enregistrées.
   useEffect(() => {
@@ -237,8 +266,8 @@ export function RecipeForm({
     const hasValidIngredient = ingredients.some(
       (r) => r.name.trim() && (r.unit === "QS" || Number(r.quantity) > 0),
     );
-    if (!hasValidIngredient) {
-      setError("Ajoute au moins un ingrédient avec une quantité (ou QS).");
+    if (!hasValidIngredient && pendingSubs.length === 0 && existingSubs.length === 0) {
+      setError("Ajoute au moins un ingrédient avec une quantité (ou QS), ou une sous-recette.");
       return;
     }
     const badRange = ingredients.findIndex(
@@ -287,7 +316,7 @@ export function RecipeForm({
   const cancelHref = initial?.id ? `/recipes/${initial.id}` : "/";
 
   return (
-    <form action={onSubmit} onInput={markDirty} className="rf-form">
+    <form ref={formRef} action={onSubmit} onInput={markDirty} className="rf-form">
       {/* ─── Informations ─────────────────────────────────────────── */}
       <Section icon={FileText} title="Informations">
         <Field label="Nom de la recette">
@@ -672,6 +701,86 @@ export function RecipeForm({
               </span>
             </div>
           </>
+        )}
+
+        {/* ─── Sous-recettes, sous les ingrédients ─── */}
+        <div className="rf-subs">
+          <div className="rf-subs-head">
+            <Layers size={15} /> Sous-recettes
+            <Help title="Sous-recettes" example="Entremets : Biscuit (× 1) + Mousse chocolat (600 g) + Glaçage (300 g).">
+              Ajoute ici les éléments de la recette qui sont eux-mêmes des recettes (biscuit,
+              mousse, glaçage…), avec la quantité voulue, comme depuis la fiche. « Existante »
+              prend une recette déjà enregistrée ; « Nouvelle » te laisse l&apos;écrire tout de suite
+              dans une fenêtre, sans quitter cette page. Elles sont ajoutées quand tu enregistres
+              la recette. Une recette faite seulement de sous-recettes n&apos;a pas besoin
+              d&apos;ingrédient.
+            </Help>
+          </div>
+          {existingSubs.length + pendingSubs.length > 0 && (
+            <ul className="rf-subs-list">
+              {existingSubs.map((sr, i) => (
+                <li key={`e${i}`} className="rf-sub">
+                  <span className="rf-sub-name">
+                    <b>{sr.label}</b>
+                    {sr.childName !== sr.label && <span className="rf-hint"> · {sr.childName}</span>}
+                  </span>
+                  <span className="rf-sub-qty num">{subQtyText(sr.calcMode, sr.calcValue)}</span>
+                  <span className="rf-hint rf-sub-tag">déjà liée</span>
+                </li>
+              ))}
+              {pendingSubs.map((sr) => (
+                <li key={sr.key} className="rf-sub" data-new>
+                  <span className="rf-sub-name">
+                    <b>{sr.label}</b>
+                    {sr.childName !== sr.label && <span className="rf-hint"> · {sr.childName}</span>}
+                  </span>
+                  <span className="rf-sub-qty num">{subQtyText(sr.calcMode, sr.calcValue, sr.pivotName)}</span>
+                  <button
+                    type="button"
+                    className="fl-btn fl-btn-ghost fl-btn-icon"
+                    aria-label={`Retirer la sous-recette ${sr.label}`}
+                    title="Retirer"
+                    onClick={() => {
+                      setPendingSubs((l) => l.filter((x) => x.key !== sr.key));
+                      setDirty(true);
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {existingSubs.length > 0 && (
+            <p className="rf-hint">Les sous-recettes déjà liées se règlent ou se retirent depuis la fiche de la recette.</p>
+          )}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" className="fl-btn fl-btn-secondary" onClick={() => openSubDialog("pick")}>
+              <Layers size={16} /> Sous-recette existante
+            </button>
+            <button type="button" className="fl-btn fl-btn-ghost" onClick={() => openSubDialog("new")}>
+              <Plus size={16} /> Nouvelle sous-recette
+            </button>
+          </div>
+          <input
+            type="hidden"
+            name="subRecipes"
+            value={JSON.stringify(
+              pendingSubs.map(({ childId, label, calcMode, calcValue, pivotIngredientId }) => ({ childId, label, calcMode, calcValue, pivotIngredientId })),
+            )}
+          />
+        </div>
+        {subDialog && (
+          <AddSubRecipeDialog
+            parentId={initial?.id}
+            startWithNew={subDialog === "new"}
+            newDefaults={subDefaults}
+            onClose={() => setSubDialog(null)}
+            onPicked={(p) => {
+              setPendingSubs((l) => [...l, { ...p, key: nextKey++ }]);
+              setDirty(true);
+            }}
+          />
         )}
 
         {/* Champs envoyés avec le formulaire (une entrée par ligne, dans l'ordre) */}

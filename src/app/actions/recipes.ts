@@ -17,6 +17,7 @@ import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { rescaleStepText } from "@/lib/stepQty";
 import { parseMold } from "@/lib/mold";
 import { copyRecipe } from "@/lib/recipeCopy";
+import { hasCycle } from "@/lib/subRecipes";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -103,11 +104,74 @@ function parseFormOrThrow(formData: FormData): ReturnType<typeof parseForm> {
   }
 }
 
-export async function createRecipe(formData: FormData) {
-  await requireAccess("recipes.edit");
-  const data = parseFormOrThrow(formData);
+const NO_INGREDIENT = "Ajoute au moins un ingrédient avec une quantité (ou une sous-recette).";
 
-  const recipe = await prisma.recipe.create({
+/** Une sous-recette choisie dans le formulaire, ajoutée à l'enregistrement. */
+export type PendingSubRecipe = {
+  childId: number;
+  label: string;
+  calcMode: "coefficient" | "mass_target" | "pivot_ingredient";
+  calcValue: number;
+  pivotIngredientId: number | null;
+};
+
+/** Lit et vérifie les sous-recettes envoyées par le formulaire (champ « subRecipes », JSON). */
+async function parsePendingSubRecipes(formData: FormData, parentId: number | null): Promise<PendingSubRecipe[]> {
+  const raw = String(formData.get("subRecipes") ?? "").trim();
+  if (!raw) return [];
+  let list: unknown;
+  try {
+    list = JSON.parse(raw);
+  } catch {
+    throw new Error("Sous-recettes illisibles : recharge la page et réessaie.");
+  }
+  if (!Array.isArray(list)) return [];
+  const out: PendingSubRecipe[] = [];
+  for (const item of list.slice(0, 50)) {
+    const it = item as Record<string, unknown>;
+    const childId = Number(it.childId);
+    const label = String(it.label ?? "").trim().slice(0, 200);
+    const calcMode = String(it.calcMode) as PendingSubRecipe["calcMode"];
+    const calcValue = Number(it.calcValue);
+    const pivot = it.pivotIngredientId != null ? Number(it.pivotIngredientId) : null;
+    if (!Number.isInteger(childId) || childId <= 0) throw new Error("Sous-recette invalide.");
+    if (!label) throw new Error("Chaque sous-recette doit avoir un nom.");
+    if (!["coefficient", "mass_target", "pivot_ingredient"].includes(calcMode)) throw new Error("Mode de calcul invalide.");
+    if (!Number.isFinite(calcValue) || calcValue <= 0) throw new Error(`« ${label} » : la quantité doit être un nombre positif.`);
+    if (calcMode === "pivot_ingredient" && !(pivot && Number.isInteger(pivot))) throw new Error(`« ${label} » : choisis l'ingrédient pivot.`);
+    await requireVisibleRecipe(childId);
+    if (parentId != null && (childId === parentId || (await hasCycle(parentId, childId)))) {
+      throw new Error(`« ${label} » : cette recette contient déjà celle-ci, impossible de l'ajouter.`);
+    }
+    out.push({ childId, label, calcMode, calcValue, pivotIngredientId: calcMode === "pivot_ingredient" ? pivot : null });
+  }
+  return out;
+}
+
+/** Ajoute les sous-recettes en attente à la suite de celles déjà présentes. */
+async function attachSubRecipes(tx: Prisma.TransactionClient, parentId: number, list: PendingSubRecipe[]) {
+  if (list.length === 0) return;
+  const maxPos = await tx.subRecipe.aggregate({ where: { parentId }, _max: { position: true } });
+  let pos = (maxPos._max.position ?? -1) + 1;
+  for (const sr of list) {
+    await tx.subRecipe.create({
+      data: {
+        parentId,
+        childId: sr.childId,
+        label: sr.label,
+        calcMode: sr.calcMode,
+        calcValue: sr.calcValue,
+        pivotIngredientId: sr.pivotIngredientId,
+        position: pos++,
+      },
+    });
+  }
+}
+
+type RecipeData = ReturnType<typeof parseForm>;
+
+function insertRecipe(tx: Prisma.TransactionClient, data: RecipeData) {
+  return tx.recipe.create({
     data: {
       name: data.name,
       nameNormalized: normalizeForSearch(data.name),
@@ -141,6 +205,19 @@ export async function createRecipe(formData: FormData) {
         : undefined,
     },
   });
+}
+
+export async function createRecipe(formData: FormData) {
+  await requireAccess("recipes.edit");
+  const data = parseFormOrThrow(formData);
+  const subs = await parsePendingSubRecipes(formData, null);
+  if (data.ingredients.length === 0 && subs.length === 0) throw new Error(NO_INGREDIENT);
+
+  const recipe = await prisma.$transaction(async (tx) => {
+    const created = await insertRecipe(tx, data);
+    await attachSubRecipes(tx, created.id, subs);
+    return created;
+  });
 
   await ensureIngredientBases(ingredientNames(data.ingredients));
 
@@ -149,10 +226,38 @@ export async function createRecipe(formData: FormData) {
   redirect(`/recipes/${recipe.id}`);
 }
 
+/**
+ * Crée une recette depuis la fenêtre « Nouvelle sous-recette » (pendant
+ * l'écriture d'une autre recette) et renvoie son id, sans changer de page.
+ */
+export async function createRecipeInline(
+  formData: FormData,
+): Promise<{ ok: true; id: number; name: string } | { ok: false; error: string }> {
+  await requireAccess("recipes.edit");
+  let data: RecipeData;
+  try {
+    data = parseFormOrThrow(formData);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Formulaire invalide." };
+  }
+  if (!data.ingredients.some((i) => !isSectionTitle(i.unit))) {
+    return { ok: false, error: "Ajoute au moins un ingrédient." };
+  }
+  const recipe = await prisma.$transaction((tx) => insertRecipe(tx, data));
+  await ensureIngredientBases(ingredientNames(data.ingredients));
+  revalidatePath("/");
+  return { ok: true, id: recipe.id, name: recipe.name };
+}
+
 export async function updateRecipe(id: number, formData: FormData) {
   await requireAccess("recipes.edit");
   await requireVisibleRecipe(id);
   const data = parseFormOrThrow(formData);
+  const subs = await parsePendingSubRecipes(formData, id);
+  if (data.ingredients.length === 0 && subs.length === 0) {
+    const existing = await prisma.subRecipe.count({ where: { parentId: id } });
+    if (existing === 0) throw new Error(NO_INGREDIENT);
+  }
 
   await prisma.$transaction(async (tx) => {
     // Les ingrédients sont recréés (nouveaux id). On mémorise les anciens pour
@@ -218,6 +323,8 @@ export async function updateRecipe(id: number, formData: FormData) {
     } else {
       await tx.stepsBlock.deleteMany({ where: { recipeId: id } });
     }
+
+    await attachSubRecipes(tx, id, subs);
   });
 
   await ensureIngredientBases(ingredientNames(data.ingredients));

@@ -30,7 +30,9 @@ export const recipeFormSchema = z.object({
   folderId: z.coerce.number().int().positive().nullable().optional(),
   yieldCount: z.coerce.number().int().positive().max(100_000).nullable().optional(),
   yieldLabel: z.string().trim().max(80).optional().or(z.literal("")),
-  ingredients: z.array(ingredientInputSchema).min(1).max(100),
+  // Au moins un ingrédient, sauf si la recette n'est faite que de sous-recettes
+  // (vérifié dans les actions, qui connaissent les sous-recettes).
+  ingredients: z.array(ingredientInputSchema).max(100),
 });
 
 export type RecipeFormInput = z.infer<typeof recipeFormSchema>;
