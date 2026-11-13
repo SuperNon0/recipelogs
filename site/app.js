@@ -1,5 +1,4 @@
 // RecipeLog — site vitrine : onglets, calcul de marge, aide, liens de la démo et du contact.
-// Chargé après encre/encre.js (les deux en defer) : l'objet Encre est déjà là.
 (function () {
   "use strict";
 
@@ -55,11 +54,7 @@
 
   // ── Lien de la démo (config.js écrit par l'installateur) ──
   var demoUrl = (window.VITRINE && window.VITRINE.demoUrl) || "";
-  var demoLinks = Array.prototype.slice.call(document.querySelectorAll("[data-demo]"));
-  document.querySelectorAll("template").forEach(function (t) {
-    demoLinks = demoLinks.concat(Array.prototype.slice.call(t.content.querySelectorAll("[data-demo]")));
-  });
-  demoLinks.forEach(function (a) {
+  document.querySelectorAll("[data-demo]").forEach(function (a) {
     if (demoUrl) {
       a.href = demoUrl;
       a.target = "_blank";
@@ -164,54 +159,40 @@
   });
   if (document.getElementById("m-prix")) calcMarge();
 
-  // ── Fenêtres du design « encre » (feuille du bas sur téléphone, fenêtre au centre sur ordinateur) ──
-  // Règle du site : une fenêtre ne se ferme qu'avec sa croix (ou Échap, ou le bouton retour du
-  // téléphone), jamais en touchant à côté ni en la faisant glisser.
-  document.addEventListener("click", function (e) {
-    if (e.target.classList && e.target.classList.contains("voile")) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  }, true);
-  document.addEventListener("pointerdown", function (e) {
-    var t = e.target.closest && e.target.closest(".feuille .grab, .feuille .feuille-t");
-    if (t && !e.target.closest("button")) e.stopImmediatePropagation();
-  }, true);
-
-  function ouvrirModele(id, titre) {
-    var tpl = document.getElementById(id);
-    if (!tpl || !window.Encre) return null;
-    var f = window.Encre.feuille({ titre: titre, html: tpl.innerHTML });
-    if (window.Encre.apparence) window.Encre.apparence.marquer(f.el);
-    return f;
+  // ── Aide « ? » : ne se ferme qu'avec la croix (ou Échap) ──
+  var openPop = null, opener = null;
+  function closePop() {
+    if (openPop) openPop.hidden = true;
+    openPop = null;
+    if (opener) opener.focus();
+    opener = null;
   }
-  function ouvrirApparence() {
-    // Depuis la feuille « Plus » : on la referme d'abord.
-    window.Encre.Couches.fermerTout().then(function () { ouvrirModele("apparence", "Apparence"); });
-  }
-  document.addEventListener("click", function (e) {
-    var help = e.target.closest("[data-help]");
-    if (help) { e.preventDefault(); ouvrirModele(help.dataset.help, "Le calcul de la marge"); return; }
-    if (e.target.closest("[data-apparence]")) { e.preventDefault(); ouvrirApparence(); }
+  document.querySelectorAll("[data-help]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pop = document.getElementById(btn.dataset.help);
+      if (!pop) return;
+      pop.hidden = false;
+      openPop = pop;
+      opener = btn;
+      var x = pop.querySelector("[data-close]");
+      if (x) x.focus();
+    });
   });
-
-  // Recherche rapide (Ctrl K, ⌘ K, « / » ou la loupe) : les sections du site.
-  if (window.Encre && window.Encre.recherche) {
-    window.Encre.recherche.placeholder = "Une section, une question…";
-    var rac = [];
-    document.querySelectorAll(".side nav .side-it").forEach(function (a) {
-      rac.push({ titre: a.textContent.trim(), icone: (a.querySelector("use").getAttribute("href").split("#i-")[1] || "dot"), href: a.getAttribute("href") });
+  document.querySelectorAll("[data-close]").forEach(function (x) {
+    x.addEventListener("click", function () {
+      openPop = x.closest(".pop");
+      closePop();
     });
-    document.querySelectorAll(".faq summary").forEach(function (s) {
-      rac.push({ groupe: "Questions", titre: s.textContent.trim(), icone: "help", action: function () {
-        var d = s.parentNode; d.open = true;
-        d.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-      } });
-    });
-    rac.push({ titre: "Demander une démonstration", icone: "mail", mots: "contact devis prix tarif", href: "#contact" });
-    rac.push({ titre: "Apparence", sous: "Couleur d'accent, thème clair ou sombre", icone: "palette", mots: "couleur theme sombre clair", action: ouvrirApparence });
-    window.Encre.recherche.raccourcis = rac;
-  }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && openPop) closePop();
+    // La croix est le seul élément de la fenêtre : la touche Tab y reste.
+    if (e.key === "Tab" && openPop) {
+      e.preventDefault();
+      var x = openPop.querySelector("[data-close]");
+      if (x) x.focus();
+    }
+  });
 
   // ── Copier la commande ──
   document.querySelectorAll("[data-copy]").forEach(function (btn) {
@@ -239,7 +220,7 @@
   }
 
   // Apparition au défilement, les éléments frères l'un après l'autre.
-  var REVEAL = ".feat, .step, .duo > *, .try-in > *, .offer-in > *, .demo-in, .contact, .stats-in > div," +
+  var REVEAL = ".feat, .step, .split > *, .try-in > *, .offer-in > *, .demo-in, .contact, .stats-in > div," +
     " .checks li, .who-list li, .faq details, .section > .wrap > .eyebrow, .section > .wrap > h2, .section > .wrap > .lead";
   if (hasIO && !reduce) {
     var io = new IntersectionObserver(function (entries) {
@@ -260,27 +241,31 @@
     });
   }
 
-  // Section visible → onglet allumé dans la barre flottante et dans le menu de gauche.
-  var navSecs = Array.prototype.map.call(document.querySelectorAll(".side nav .side-it[data-page]"), function (a) {
-    return document.getElementById(a.dataset.page);
-  }).filter(Boolean);
-  var ticking = false, courante = null;
+  // En-tête : plus opaque au défilement, barre de lecture, lien de la section visible.
+  var top = document.querySelector(".top");
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll(".top-nav a[href^='#']"));
+  var navSecs = navLinks.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  var ticking = false;
   function onScroll() {
     ticking = false;
-    var line = window.innerHeight * 0.35, cur = navSecs.length ? navSecs[0].id : null;
-    navSecs.forEach(function (s) {
-      if (s.getBoundingClientRect().top <= line) cur = s.id;
-    });
-    if (cur !== courante && window.Encre && window.Encre.nav) {
-      courante = cur;
-      window.Encre.nav.marquer(cur);
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    if (top) {
+      top.classList.toggle("scrolled", y > 12);
+      top.style.setProperty("--p", max > 0 ? Math.min(1, y / max).toFixed(4) : "0");
     }
+    var line = window.innerHeight * 0.35, cur = -1;
+    navSecs.forEach(function (s, i) {
+      if (!s) return;
+      var r = s.getBoundingClientRect();
+      if (r.top <= line && r.bottom > line) cur = i;
+    });
+    navLinks.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
   }
   window.addEventListener("scroll", function () {
     if (!ticking) { ticking = true; raf(onScroll); }
   }, { passive: true });
   window.addEventListener("resize", onScroll);
-  window.addEventListener("hashchange", function () { courante = null; setTimeout(onScroll, 0); });
   onScroll();
 
   // Accueil : lignes de la recette (CSS), puis coûts qui montent.
