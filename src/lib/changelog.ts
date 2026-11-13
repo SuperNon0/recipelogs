@@ -21,7 +21,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       "En démo, les comptes, la clé Claude (MCP) et le bouton « Mettre à jour le site » sont coupés pour tout le monde : les pages et les boutons disparaissent, et le serveur refuse ces actions",
     ],
     fixes: [
+      "Les photos de factures restent réservées aux personnes autorisées à voir les coûts, y compris quand leur lien est connu",
+      "Un ingrédient servant de pivot ne peut plus être supprimé ou remplacé silencieusement : un message demande d'abord de changer le pivot dans les recettes parentes",
+      "Les masses cibles des cahiers comptent toutes les sous-recettes, les litres et le poids des pièces ; les ingrédients verrouillés sont conservés et une masse exacte impossible est signalée",
+      "Le conditionnement d'une ligne de facture est conservé : modifier un produit ne change plus les montants de ses anciennes factures",
+      "L'import Recipe Keeper conserve les rendements simples ; un rendement ambigu reste dans les notes",
+      "Une ligne de courses se décoche si la quantité nécessaire augmente",
+      "Les fichiers joints fonctionnent aussi sous Windows ; en développement, leur stockage par défaut reste hors du dossier public",
       "L'installation d'un nouveau serveur ne s'arrête plus sur une erreur nginx (« unknown log format »)",
+    ],
+    migrations: [
+      "Les lignes de facture conservent leur conditionnement. Pour les anciennes factures, seuls les conditionnements déductibles des montants enregistrés sont repris ; les autres sont signalés comme inconnus",
     ],
   },
   {

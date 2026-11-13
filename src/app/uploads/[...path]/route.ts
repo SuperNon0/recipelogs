@@ -15,6 +15,9 @@ export async function GET(
   const denied = await apiDenied("read");
   if (denied) return denied;
   const { path } = await params;
+  // Les pièces jointes financières passent uniquement par /api/factures/:id/fichier,
+  // qui vérifie costs.view. Aucun lien connu ne doit contourner ce contrôle.
+  if (path[0]?.toLowerCase() === "factures") return new Response("Not found", { status: 404 });
   const visible = await visibleRecipeIds();
   if (visible && !(await prisma.recipe.findFirst({
     where: { id: { in: [...visible] }, photoPath: uploadUrl(...path) },
