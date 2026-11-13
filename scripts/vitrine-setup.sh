@@ -4,6 +4,8 @@ set -euo pipefail
 REPO_URL="https://github.com/SuperNon0/recipelogs.git"
 BRANCH="${VITRINE_BRANCH:-site-vitrine}"
 DIR="/opt/vitrine"
+# 8080 quand RecipeLog (la démo) est dans le même conteneur ; gardé pour les relances.
+PORT="${VITRINE_PORT:-$(cat /etc/recipelog-vitrine/port 2>/dev/null || echo 80)}"
 CONF="/etc/recipelog-vitrine"
 export DEBIAN_FRONTEND=noninteractive
 
@@ -23,6 +25,7 @@ echo "$BRANCH" > "$DIR/.branche"
 
 echo "==> Réglages (${CONF})…"
 mkdir -p "$CONF"
+echo "$PORT" > "$CONF/port"
 install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
 if [ -n "${VITRINE_DEMO_URL:-}" ]; then vitrine-reglage demo "$VITRINE_DEMO_URL" >/dev/null; fi
@@ -30,10 +33,12 @@ if [ -n "${VITRINE_CONTACT:-}" ]; then vitrine-reglage contact "$VITRINE_CONTACT
 vitrine-reglage >/dev/null
 
 echo "==> nginx…"
-cat > /etc/nginx/sites-available/vitrine <<'NGINX'
+cat > /etc/nginx/sites-available/vitrine <<NGINX_HEAD
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen ${PORT};
+    listen [::]:${PORT};
+NGINX_HEAD
+cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
     server_name _;
     root /opt/vitrine/site;
     index index.html;
@@ -79,4 +84,5 @@ if [ -n "${VITRINE_TUNNEL_TOKEN:-}" ]; then
   cloudflared service install "$VITRINE_TUNNEL_TOKEN" >/dev/null 2>&1 || echo "    (tunnel déjà installé)"
 fi
 
-echo "==> Site vitrine prêt : http://$(hostname -I | awk '{print $1}')"
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow "${PORT}/tcp" >/dev/null || true; fi
+echo "==> Site vitrine prêt : http://$(hostname -I | awk '{print $1}'):${PORT}"

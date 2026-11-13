@@ -35,18 +35,23 @@ ne lisent que cette branche.
 ```
 site/                   le site (HTML, CSS, JS, sans compilation)
 install.sh              création de la vitrine et de la démo, en une ligne
-mise-a-jour.sh          mise à jour de la vitrine (et de la démo avec --demo)
+mise-a-jour.sh          mise à jour de la vitrine, de la démo, ou des deux
 scripts/                scripts copiés dans les conteneurs
 ```
 
 ## 2. Ce qui est installé
 
-La commande crée **deux conteneurs LXC** sur Proxmox (pas de machine virtuelle) :
+La commande crée **un seul conteneur LXC** sur Proxmox (pas de machine virtuelle),
+`recipelog-vitrine`, qui contient tout :
 
-| Conteneur | Contenu | Ressources |
+| Dans le conteneur | Adresse interne | Adresse publique |
 |---|---|---|
-| `recipelog-vitrine` | le site vitrine, servi par nginx | 512 Mo de mémoire, 4 Go de disque |
-| `recipelog-demo` | un RecipeLog classique (branche `stable`) en **mode démo** | ceux de l'installateur RecipeLog |
+| le site vitrine (branche `site-vitrine`), servi par nginx | `localhost:8080` | `recipelog.fr` |
+| la démo : un RecipeLog classique (branche `stable`) en **mode démo** | `localhost:80` | `demo.recipelog.fr` |
+| un tunnel Cloudflare pour les deux adresses | | |
+
+La vitrine est **reliée toute seule** à la démo : avec le domaine `recipelog.fr`, les boutons
+« Essayer la démo » ouvrent `https://demo.recipelog.fr`.
 
 Ton site RecipeLog actuel n'est pas touché : il reste dans son conteneur, sur `main`, avec sa
 protection Cloudflare.
@@ -61,23 +66,20 @@ protection Cloudflare.
 - S'il est acheté ailleurs : dans Cloudflare, « Add a domain », puis chez le vendeur, remplacer
   les serveurs DNS par les deux que Cloudflare indique. Attendre que Cloudflare affiche « Active ».
 
-**b. Créer deux tunnels**
+**b. Créer un tunnel**
 
-Dans Cloudflare Zero Trust → Networks → Tunnels → « Create a tunnel » (type Cloudflared) :
-- un tunnel nommé `vitrine` ;
-- un tunnel nommé `demo`.
+Dans Cloudflare Zero Trust → Networks → Tunnels → « Create a tunnel » (type Cloudflared), nommé
+par exemple `vitrine`. Cloudflare affiche une commande d'installation : copie seulement le
+**jeton**, la longue suite de caractères après `--token`. La commande d'installation le demandera.
+Pas besoin de lancer la commande de Cloudflare, l'installation s'en charge.
 
-Pour chacun, Cloudflare affiche une commande d'installation. Copie seulement le **jeton** : la longue
-suite de caractères après `--token`. Garde les deux jetons de côté, la commande d'installation
-les demandera. Pas besoin de lancer la commande de Cloudflare, l'installation s'en charge.
+**c. Donner les adresses au tunnel** (onglet « Public Hostname », trois lignes) :
 
-**c. Donner une adresse à chaque tunnel** (onglet « Public Hostname ») :
-
-| Tunnel | Adresse | Service |
-|---|---|---|
-| `vitrine` | `recipelog.fr` | `HTTP` → `localhost:80` |
-| `vitrine` | `www.recipelog.fr` | `HTTP` → `localhost:80` |
-| `demo` | `demo.recipelog.fr` | `HTTP` → `localhost:80` |
+| Adresse | Service |
+|---|---|
+| `recipelog.fr` | `HTTP` → `localhost:8080` (vitrine) |
+| `www.recipelog.fr` | `HTTP` → `localhost:8080` (vitrine) |
+| `demo.recipelog.fr` | `HTTP` → `localhost:80` (démo) |
 
 **d. Ne pas créer d'application Access pour ce domaine.** La vitrine et la démo sont publiques
 (voir la [partie 9](#9-cloudflare-access--ce-qui-est-public-ce-qui-est-protégé)).
@@ -90,33 +92,25 @@ Dans Proxmox, ouvre le **shell de l'hôte** (le nœud, pas un conteneur), et col
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/install.sh)"
 ```
 
-La commande pose quatre questions. Pour en passer une, appuie sur Entrée : tout se règle aussi plus tard.
+La commande pose trois questions. Pour en passer une, appuie sur Entrée : tout se règle aussi plus tard.
 
 | Question | Exemple de réponse |
 |---|---|
-| Installer aussi la démo ? | Entrée (= oui) |
-| Adresse publique de la démo | `https://demo.recipelog.fr` |
+| Domaine du site vitrine | `recipelog.fr` |
 | E-mail de contact affiché sur la vitrine | `contact@recipelog.fr` |
-| Jeton du tunnel Cloudflare pour la VITRINE | le jeton du tunnel `vitrine` |
-| Jeton du tunnel Cloudflare pour la DÉMO | le jeton du tunnel `demo` |
+| Jeton du tunnel Cloudflare | le jeton du tunnel |
 
-À la fin, un **résumé** s'affiche avec les numéros des deux conteneurs. Il est aussi gardé sur
-l'hôte, dans `/root/recipelog-vitrine.txt`. Pour le relire : `cat /root/recipelog-vitrine.txt`.
+L'installation de RecipeLog prend plusieurs minutes. À la fin, un **résumé** s'affiche avec le
+numéro du conteneur et les adresses à mettre dans Cloudflare. Il est aussi gardé sur l'hôte, dans
+`/root/recipelog-vitrine.txt`. Pour le relire : `cat /root/recipelog-vitrine.txt`.
 
 Après quelques minutes, `https://recipelog.fr` affiche la vitrine et `https://demo.recipelog.fr`
 affiche la démo.
 
-> Si la démo n'a pas pu s'installer (par exemple parce que l'installateur RecipeLog n'est pas
-> encore sur `stable`), la vitrine est quand même installée. Pour ajouter la démo plus tard :
-> ```bash
-> VITRINE_SEULEMENT_DEMO=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/install.sh)"
-> ```
+## 5. Changer l'adresse de la démo ou l'e-mail de contact
 
-## 5. Relier la vitrine à la démo et au contact
-
-Ce n'est pas automatique, puisque c'est toi qui choisis les adresses dans Cloudflare. Si tu as
-répondu aux questions de l'installation, c'est déjà fait. Sinon, ou pour changer plus tard, tape
-dans le shell de l'hôte Proxmox (remplace `120` par le numéro du conteneur `recipelog-vitrine`) :
+Avec un domaine donné à l'installation, c'est déjà fait. Pour changer plus tard, tape dans le
+shell de l'hôte Proxmox (remplace `120` par le numéro du conteneur `recipelog-vitrine`) :
 
 ```bash
 pct exec 120 -- vitrine-reglage demo https://demo.recipelog.fr
@@ -138,15 +132,15 @@ La démo est remise à zéro **chaque nuit à 4 h 30**. Elle revient alors à l'
 1. Ouvre la démo (`https://demo.recipelog.fr`) et ajoute tes 2-3 recettes de démonstration,
    avec leurs ingrédients, leurs prix et leurs allergènes, pour que les visiteurs voient le coût
    de revient et la marge.
-2. Fige-les, dans le shell de l'hôte Proxmox (remplace `121` par le numéro du conteneur
-   `recipelog-demo`) :
+2. Fige-les, dans le shell de l'hôte Proxmox (remplace `120` par le numéro du conteneur
+   `recipelog-vitrine`) :
    ```bash
-   pct exec 121 -- recipelog-demo-figer
+   pct exec 120 -- recipelog-demo-figer
    ```
 3. C'est tout. Chaque nuit, les changements des visiteurs disparaissent et tes recettes reviennent.
 
 Pour changer les recettes de démo, recommence les étapes 1 et 2. Pour remettre la démo à zéro
-tout de suite : `pct exec 121 -- recipelog-demo-reset`.
+tout de suite : `pct exec 120 -- recipelog-demo-reset`.
 
 **Ce que le mode démo coupe** (`RECIPELOG_DEMO=1` dans `/opt/recipelog/.env` du conteneur) : un
 bandeau « Site de démonstration » s'affiche, et personne ne peut activer les comptes, créer une
@@ -167,15 +161,18 @@ nouveau. Il n'y a pas de bouton de mise à jour sur la vitrine.
 
 ## 8. Mettre à jour la démo
 
-La démo suit la branche `stable` de RecipeLog. Quand `stable` a changé :
+La démo suit la branche `stable` de RecipeLog. Quand tu as passé des nouveautés sur `stable`, tu
+choisis ce que tu mets à jour :
 
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)" _ --demo
-```
+| Mettre à jour | Commande (shell de l'hôte Proxmox) |
+|---|---|
+| la vitrine seule | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)"` |
+| la démo seule | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)" _ --demo-seulement` |
+| les deux | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/mise-a-jour.sh)" _ --demo` |
 
-Cela met à jour la vitrine, puis le RecipeLog de la démo et ses scripts de remise à zéro. Les
-recettes figées restent valables : après chaque remise à zéro, les changements de la base de
-données apportés par la mise à jour sont appliqués.
+La mise à jour de la démo installe la dernière version de `stable` et ses scripts de remise à
+zéro. Les recettes figées restent valables : après chaque remise à zéro, les changements de la
+base de données apportés par la mise à jour sont appliqués.
 
 ## 9. Cloudflare Access : ce qui est public, ce qui est protégé
 
@@ -192,25 +189,26 @@ Cloudflare Access protège **par adresse**, pas par compte entier.
   adresses de ce domaine. Dans ce cas, ajoute-lui une règle **Bypass → Everyone** pour les
   adresses de la vitrine et de la démo.
 - Même publiques, les deux adresses restent protégées par Cloudflare contre les attaques. La démo
-  tourne dans son propre conteneur, avec sa propre base : un visiteur ne peut jamais atteindre tes
-  recettes.
+  tourne dans un conteneur séparé du tien, avec sa propre base : un visiteur ne peut jamais
+  atteindre tes recettes.
 
 ## 10. Commandes utiles et dépannage
 
-Toutes ces commandes se tapent dans le shell de l'hôte Proxmox. `120` = vitrine, `121` = démo :
-remplace-les par tes numéros (voir `pct list` ou `/root/recipelog-vitrine.txt`).
+Toutes ces commandes se tapent dans le shell de l'hôte Proxmox. Remplace `120` par le numéro du
+conteneur `recipelog-vitrine` (voir `pct list` ou `/root/recipelog-vitrine.txt`).
 
 | Besoin | Commande |
 |---|---|
 | Voir les conteneurs | `pct list` |
 | Relire le résumé de l'installation | `cat /root/recipelog-vitrine.txt` |
 | Réglages de la vitrine | `pct exec 120 -- vitrine-reglage` |
-| La vitrine répond-elle ? | `pct exec 120 -- curl -sI http://localhost` |
-| État du tunnel de la vitrine | `pct exec 120 -- systemctl status cloudflared` |
+| La vitrine répond-elle ? | `pct exec 120 -- curl -sI http://localhost:8080` |
+| La démo répond-elle ? | `pct exec 120 -- curl -sI http://localhost` |
+| État du tunnel | `pct exec 120 -- systemctl status cloudflared` |
 | Ajouter le tunnel plus tard | `pct exec 120 -- env VITRINE_TUNNEL_TOKEN=<jeton> bash /opt/vitrine/scripts/vitrine-setup.sh` |
-| État du site de la démo | `pct exec 121 -- systemctl status recipelog` |
-| Prochaine remise à zéro | `pct exec 121 -- systemctl list-timers recipelog-demo-reset.timer` |
-| Journal des remises à zéro | `pct exec 121 -- journalctl -u recipelog-demo-reset -n 30` |
+| État du site de la démo | `pct exec 120 -- systemctl status recipelog` |
+| Prochaine remise à zéro | `pct exec 120 -- systemctl list-timers recipelog-demo-reset.timer` |
+| Journal des remises à zéro | `pct exec 120 -- journalctl -u recipelog-demo-reset -n 30` |
 
 **La vitrine s'affiche, mais « Essayer la démo » ne fait rien** : l'adresse de la démo n'est pas
 réglée (partie 5).
@@ -219,6 +217,9 @@ réglée (partie 5).
 
 **« Erreur 1033 » de Cloudflare** : le tunnel ne tourne pas dans le conteneur. Vérifie son état
 ou installe-le avec son jeton (tableau ci-dessus).
+
+**« Erreur 502 » sur la vitrine** : dans Cloudflare, l'adresse de la vitrine doit pointer vers
+`localhost:8080` (et celle de la démo vers `localhost:80`).
 
 ## 11. Modifier le site vitrine
 

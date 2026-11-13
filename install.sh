@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
 # ============================================================
-# install.sh — Site vitrine RecipeLog + démo, en une ligne.
+# install.sh — Site vitrine RecipeLog + démo, en une ligne, dans UN conteneur.
 # À lancer dans le shell de l'hôte Proxmox (en root) :
 #
 #   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/install.sh)"
 #
-# Crée deux conteneurs LXC (pas de machine virtuelle) :
-#   1. recipelog-vitrine : le site vitrine (nginx, très léger) ;
-#   2. recipelog-demo    : un RecipeLog classique (branche stable) en mode démo,
-#                          remis à zéro chaque nuit.
+# Crée un seul conteneur LXC (pas de machine virtuelle), « recipelog-vitrine », avec :
+#   - la démo : un RecipeLog classique (branche stable) en mode démo, remis à zéro
+#     chaque nuit, sur http://localhost:80 dans le conteneur ;
+#   - le site vitrine (branche site-vitrine), sur http://localhost:8080 ;
+#   - un seul tunnel Cloudflare pour les deux adresses.
+# La vitrine est reliée toute seule à la démo : https://<domaine> et https://demo.<domaine>.
 #
 # Réglages facultatifs (variables d'environnement, sinon questions) :
-#   VITRINE_DEMO_URL        adresse publique de la démo (https://demo.mon-site.fr)
+#   VITRINE_DOMAINE         domaine du site vitrine (ex. recipelog.fr)
 #   VITRINE_CONTACT         e-mail des demandes de démo et de devis
-#   VITRINE_TUNNEL_TOKEN    jeton du tunnel Cloudflare de la vitrine
-#   DEMO_TUNNEL_TOKEN       jeton du tunnel Cloudflare de la démo
-#   VITRINE_AVEC_DEMO       1 (défaut) ou 0 pour ne pas installer la démo
+#   VITRINE_TUNNEL_TOKEN    jeton du tunnel Cloudflare
 #   VITRINE_NONINTERACTIVE  1 = aucune question
-#   VITRINE_VMID / DEMO_VMID, VITRINE_STORAGE, VITRINE_BRIDGE (vmbr0)
+#   VITRINE_VMID, VITRINE_STORAGE, VITRINE_BRIDGE (vmbr0)
 #   DEMO_BRANCH             branche de RecipeLog pour la démo (stable)
-#   VITRINE_SEULEMENT_DEMO  1 = n'installe que la démo (vitrine déjà en place)
 # ============================================================
 set -euo pipefail
 
@@ -27,9 +26,7 @@ REPO="SuperNon0/recipelogs"
 VITRINE_BRANCH="${VITRINE_BRANCH:-site-vitrine}"
 RAW="${VITRINE_RAW_BASE:-https://raw.githubusercontent.com/${REPO}/${VITRINE_BRANCH}}"
 DEMO_BRANCH="${DEMO_BRANCH:-stable}"
-BRIDGE="${VITRINE_BRIDGE:-vmbr0}"
-HOST_VITRINE="recipelog-vitrine"
-HOST_DEMO="recipelog-demo"
+CT_NAME="recipelog-vitrine"
 
 say()  { printf '\n\033[1;33m==>\033[0m %s\n' "$*"; }
 ok()   { printf '    \033[1;32m✓\033[0m %s\n' "$*"; }
@@ -48,134 +45,86 @@ ask() { # ask VAR "question" "défaut"
 }
 
 echo "======================================================"
-echo "  RecipeLog — site vitrine + démo (conteneurs LXC)"
+echo "  RecipeLog — site vitrine + démo (un conteneur LXC)"
 echo "======================================================"
 echo "  Appuie sur Entrée pour passer une question : tout se règle aussi plus tard."
-ask VITRINE_AVEC_DEMO "Installer aussi la démo (un 2e conteneur RecipeLog) ? [O/n]" "o"
-case "${VITRINE_AVEC_DEMO,,}" in n|non|0) AVEC_DEMO=0 ;; *) AVEC_DEMO=1 ;; esac
-ask VITRINE_DEMO_URL "Adresse publique de la démo (ex. https://demo.mon-site.fr) :" ""
+ask VITRINE_DOMAINE "Domaine du site vitrine, sans https (ex. recipelog.fr) :" ""
+VITRINE_DOMAINE="${VITRINE_DOMAINE#http://}"; VITRINE_DOMAINE="${VITRINE_DOMAINE#https://}"
+VITRINE_DOMAINE="${VITRINE_DOMAINE#www.}"; VITRINE_DOMAINE="${VITRINE_DOMAINE%%/*}"
 ask VITRINE_CONTACT "E-mail de contact affiché sur la vitrine (demandes de démo et de devis) :" ""
-ask VITRINE_TUNNEL_TOKEN "Jeton du tunnel Cloudflare pour la VITRINE (vide = plus tard) :" ""
-if [ "$AVEC_DEMO" = 1 ]; then
-  ask DEMO_TUNNEL_TOKEN "Jeton du tunnel Cloudflare pour la DÉMO (vide = plus tard) :" ""
-fi
+ask VITRINE_TUNNEL_TOKEN "Jeton du tunnel Cloudflare (vide = plus tard) :" ""
 
-# ── Stockages et modèle Debian 12 ─────────────────────────
-STORAGE="${VITRINE_STORAGE:-$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 && $3=="active"{print $1; exit}')}"
-[ -n "$STORAGE" ] || die "aucun stockage pour conteneurs trouvé (règle VITRINE_STORAGE=local-lvm)."
-TSTORE="$(pvesm status -content vztmpl 2>/dev/null | awk 'NR>1 && $3=="active"{print $1; exit}')"
-[ -n "$TSTORE" ] || die "aucun stockage pour modèles de conteneurs (vztmpl) trouvé."
+DEMO_URL=""
+[ -n "$VITRINE_DOMAINE" ] && DEMO_URL="https://demo.${VITRINE_DOMAINE}"
 
-say "Modèle Debian 12…"
-pveam update >/dev/null 2>&1 || true
-TEMPLATE="$(pveam available --section system 2>/dev/null | awk '/debian-12-standard/{print $2}' | sort -V | tail -1)"
-[ -n "$TEMPLATE" ] || die "modèle debian-12-standard introuvable (pveam available)."
-if ! pveam list "$TSTORE" | grep -q "$TEMPLATE"; then pveam download "$TSTORE" "$TEMPLATE"; fi
-ok "$TEMPLATE"
-
-wait_net() { # attend que le conteneur ait Internet
-  local id="$1" i
-  for i in $(seq 1 60); do
-    if pct exec "$id" -- getent hosts github.com >/dev/null 2>&1; then return 0; fi
-    sleep 2
-  done
-  die "le conteneur $id n'a pas accès à Internet (DHCP sur ${BRIDGE} ?)."
-}
-
-# ── 1. Conteneur de la vitrine ────────────────────────────
-if [ "${VITRINE_SEULEMENT_DEMO:-0}" = 1 ]; then
-  AVEC_DEMO=1
-  VMID="${VITRINE_VMID:-$(pct list | awk 'NR>1 && $NF=="'"$HOST_VITRINE"'" {print $1; exit}')}"
-  [ -n "$VMID" ] || die "conteneur ${HOST_VITRINE} introuvable (règle VITRINE_VMID)."
-  IP_VITRINE="$(pct exec "$VMID" -- hostname -I | awk '{print $1}')"
-  if [ -n "${VITRINE_DEMO_URL:-}" ]; then pct exec "$VMID" -- vitrine-reglage demo "$VITRINE_DEMO_URL"; fi
-else
 VMID="${VITRINE_VMID:-$(pvesh get /cluster/nextid)}"
 pct status "$VMID" >/dev/null 2>&1 && die "le numéro $VMID est déjà pris (règle VITRINE_VMID)."
-say "Création du conteneur ${VMID} (${HOST_VITRINE})…"
-pct create "$VMID" "${TSTORE}:vztmpl/${TEMPLATE}" \
-  --hostname "$HOST_VITRINE" \
-  --rootfs "${STORAGE}:4" \
-  --memory 512 --swap 256 --cores 1 \
-  --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp" \
-  --ostype debian --unprivileged 1 --features nesting=1 \
-  --onboot 1 --start 1 >/dev/null
-wait_net "$VMID"
-ok "conteneur démarré"
 
-say "Installation du site vitrine…"
-TMP="$(mktemp)"
-curl -fsSL "${RAW}/scripts/vitrine-setup.sh" -o "$TMP"
-pct push "$VMID" "$TMP" /root/vitrine-setup.sh
-rm -f "$TMP"
-pct exec "$VMID" -- env \
+# ── 1. RecipeLog (la démo), avec l'installateur officiel de la branche stable ──
+say "Installation de RecipeLog (branche ${DEMO_BRANCH}) dans le conteneur ${VMID}…"
+RL_INSTALL="$(mktemp)"
+curl -fsSL "https://raw.githubusercontent.com/${REPO}/${DEMO_BRANCH}/deploy/proxmox/install.sh" -o "$RL_INSTALL" \
+  || die "installateur RecipeLog introuvable sur la branche ${DEMO_BRANCH}."
+RECIPELOG_NONINTERACTIVE=1 \
+RECIPELOG_VMID="$VMID" \
+RECIPELOG_HOSTNAME="$CT_NAME" \
+RECIPELOG_BRANCH="$DEMO_BRANCH" \
+RECIPELOG_STORAGE="${VITRINE_STORAGE:-}" \
+RECIPELOG_BRIDGE="${VITRINE_BRIDGE:-vmbr0}" \
+CF_TUNNEL_TOKEN="${VITRINE_TUNNEL_TOKEN:-}" \
+  bash "$RL_INSTALL"
+rm -f "$RL_INSTALL"
+
+push_run() { # push_run script.sh VAR=valeur…
+  local script="$1"; shift
+  local tmp; tmp="$(mktemp)"
+  curl -fsSL "${RAW}/scripts/${script}" -o "$tmp"
+  pct push "$VMID" "$tmp" "/root/${script}"
+  rm -f "$tmp"
+  pct exec "$VMID" -- env "$@" bash "/root/${script}"
+}
+
+# ── 2. Mode démo et remise à zéro chaque nuit ──
+say "Mode démonstration et remise à zéro chaque nuit…"
+push_run demo-setup.sh VITRINE_RAW_BASE="$RAW"
+
+# ── 3. Site vitrine, relié à la démo ──
+say "Site vitrine…"
+push_run vitrine-setup.sh \
   VITRINE_BRANCH="$VITRINE_BRANCH" \
-  VITRINE_DEMO_URL="${VITRINE_DEMO_URL:-}" \
-  VITRINE_CONTACT="${VITRINE_CONTACT:-}" \
-  VITRINE_TUNNEL_TOKEN="${VITRINE_TUNNEL_TOKEN:-}" \
-  bash /root/vitrine-setup.sh
-IP_VITRINE="$(pct exec "$VMID" -- hostname -I | awk '{print $1}')"
-ok "vitrine en ligne : http://${IP_VITRINE}"
-fi
+  VITRINE_PORT=8080 \
+  VITRINE_DEMO_URL="$DEMO_URL" \
+  VITRINE_CONTACT="${VITRINE_CONTACT:-}"
 
-# ── 2. Conteneur de la démo (RecipeLog classique) ─────────
-DEMO_ID="" ; DEMO_STATE="non installée"
-if [ "$AVEC_DEMO" = 1 ]; then
-  DEMO_ID="${DEMO_VMID:-$(pvesh get /cluster/nextid)}"
-  say "Démo : installation de RecipeLog (branche ${DEMO_BRANCH}) dans le conteneur ${DEMO_ID}…"
-  RL_INSTALL="$(mktemp)"
-  if curl -fsSL "https://raw.githubusercontent.com/${REPO}/${DEMO_BRANCH}/deploy/proxmox/install.sh" -o "$RL_INSTALL"; then
-    RECIPELOG_NONINTERACTIVE=1 \
-    RECIPELOG_VMID="$DEMO_ID" \
-    RECIPELOG_HOSTNAME="$HOST_DEMO" \
-    RECIPELOG_BRANCH="$DEMO_BRANCH" \
-    CF_TUNNEL_TOKEN="${DEMO_TUNNEL_TOKEN:-}" \
-      bash "$RL_INSTALL"
-    rm -f "$RL_INSTALL"
-
-    say "Démo : mode démonstration et remise à zéro chaque nuit…"
-    TMP="$(mktemp)"
-    curl -fsSL "${RAW}/scripts/demo-setup.sh" -o "$TMP"
-    pct push "$DEMO_ID" "$TMP" /root/demo-setup.sh
-    rm -f "$TMP"
-    pct exec "$DEMO_ID" -- env VITRINE_RAW_BASE="$RAW" bash /root/demo-setup.sh
-    DEMO_STATE="installée"
-  else
-    rm -f "$RL_INSTALL"
-    DEMO_ID=""
-    DEMO_STATE="pas encore possible (l'installateur RecipeLog n'est pas sur la branche ${DEMO_BRANCH})"
-    printf '    \033[1;33m!\033[0m %s\n' "La démo n'a pas été installée : ${DEMO_STATE}."
-    echo "      Relance plus tard avec : VITRINE_SEULEMENT_DEMO=1 (voir le README de la branche site-vitrine)."
-  fi
-fi
+IP="$(pct exec "$VMID" -- hostname -I | awk '{print $1}')"
 
 # ── Résumé ────────────────────────────────────────────────
 SUMMARY="/root/recipelog-vitrine.txt"
+D="${VITRINE_DOMAINE:-ton-domaine.fr}"
 {
   echo "RecipeLog — site vitrine + démo (installé le $(date '+%d/%m/%Y %H:%M'))"
   echo ""
-  echo "Vitrine : conteneur ${VMID} (${HOST_VITRINE}) — http://${IP_VITRINE}"
-  if [ -n "$DEMO_ID" ]; then
-    echo "Démo    : conteneur ${DEMO_ID} (${HOST_DEMO}) — voir /root/recipelog-${DEMO_ID}.txt"
-  else
-    echo "Démo    : ${DEMO_STATE}"
-  fi
-  echo "Adresse de la démo sur la vitrine : ${VITRINE_DEMO_URL:-(pas encore réglée)}"
+  echo "Conteneur ${VMID} (${CT_NAME}) — adresse locale ${IP}"
+  echo "  Vitrine : http://${IP}:8080"
+  echo "  Démo    : RecipeLog, sur localhost:80 dans le conteneur (passe par le tunnel)"
   echo ""
-  echo "Mettre à jour la vitrine (depuis le shell Proxmox) :"
-  echo "  bash -c \"\$(curl -fsSL ${RAW}/mise-a-jour.sh)\""
-  echo "Mettre à jour aussi le RecipeLog de la démo : ajoute  --demo  à la fin (bash -c \"…\" _ --demo)"
-  if [ -n "$DEMO_ID" ]; then
-    echo ""
-    echo "Après avoir mis tes recettes de démo sur le site, fige-les (elles reviendront chaque nuit) :"
-    echo "  pct exec ${DEMO_ID} -- recipelog-demo-figer"
-    echo "Remettre la démo à zéro tout de suite :"
-    echo "  pct exec ${DEMO_ID} -- recipelog-demo-reset"
-  fi
+  echo "Cloudflare, dans le tunnel (Public Hostname) :"
+  echo "  ${D}          → HTTP  localhost:8080   (vitrine)"
+  echo "  www.${D}      → HTTP  localhost:8080   (vitrine)"
+  echo "  demo.${D}     → HTTP  localhost:80     (démo)"
+  echo "  Pas d'application Access sur ce domaine : les deux sites sont publics."
   echo ""
-  echo "Changer l'adresse de la démo ou l'e-mail de contact affichés sur la vitrine :"
-  echo "  pct exec ${VMID} -- vitrine-reglage demo https://demo.mon-site.fr"
-  echo "  pct exec ${VMID} -- vitrine-reglage contact contact@mon-site.fr"
+  echo "Vitrine reliée à la démo : ${DEMO_URL:-(pas encore : pct exec ${VMID} -- vitrine-reglage demo https://demo.${D})}"
+  echo "E-mail de contact : ${VITRINE_CONTACT:-(pas encore : pct exec ${VMID} -- vitrine-reglage contact contact@${D})}"
+  echo ""
+  echo "Mettre tes recettes de démo, puis les figer (elles reviennent chaque nuit) :"
+  echo "  pct exec ${VMID} -- recipelog-demo-figer"
+  echo ""
+  echo "Mettre à jour (shell Proxmox) :"
+  echo "  la vitrine : bash -c \"\$(curl -fsSL ${RAW}/mise-a-jour.sh)\""
+  echo "  la démo    : bash -c \"\$(curl -fsSL ${RAW}/mise-a-jour.sh)\" _ --demo-seulement"
+  echo "  les deux   : bash -c \"\$(curl -fsSL ${RAW}/mise-a-jour.sh)\" _ --demo"
+  [ -f "/root/recipelog-${VMID}.txt" ] && echo "" && echo "Détails de RecipeLog : /root/recipelog-${VMID}.txt"
 } > "$SUMMARY"
 
 echo ""
