@@ -34,7 +34,7 @@ export function scaleQty(
   unit: string,
   coef: number,
 ): { quantityG: number; unit: string } {
-  const round = coef === 1 ? (x: number) => x : (x: number) => roundScaled(x, unit);
+  const round = coef === 0 ? () => 0 : coef === 1 ? (x: number) => x : (x: number) => roundScaled(x, unit);
   if (unit === "L") return { quantityG: round(qty * coef * 1000), unit: "g" };
   return { quantityG: round(qty * coef), unit };
 }

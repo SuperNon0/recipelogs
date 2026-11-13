@@ -8,7 +8,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
-import { adjustToTarget, ingMass, recipeMass, roundScaled } from "@/lib/massAdjust";
+import { resizeSnapshot, type MassSnapshot } from "@/lib/snapshotMass";
 import { parseTheme, cookbookThemeSchema } from "@/lib/pdf/theme";
 
 
@@ -201,33 +201,13 @@ export async function addMultipleRecipesWithMassTarget(
 
   let added = 0;
   for (let i = 0; i < toAdd.length; i++) {
-    const r = await prisma.recipe.findUnique({
-      where: { id: toAdd[i] },
-      select: { ingredients: { select: { quantityG: true, quantityGMax: true, unit: true } } },
-    });
-    if (!r) continue;
-
-    // Masse totale de base de la recette
-    const baseTotalG = recipeMass(r.ingredients).avg;
-
-    const multiplier = baseTotalG > 0 ? targetMassG / baseTotalG : 1;
-    let snap = await buildRecipeSnapshot(toAdd[i], multiplier);
-    if (!snap) continue;
-
-    // Si forceExact : ajuster les ingrédients pour atteindre exactement la cible
-    if (forceExact) {
-      const { ingredients, totalMassGMin, totalMassGMax } = adjustToTarget(
-        snap.ingredients,
-        targetMassG,
-      );
-      snap = {
-        ...snap,
-        ingredients,
-        totalMassGMin,
-        totalMassGMax,
-        totalMassG: (totalMassGMin + totalMassGMax) / 2,
-      };
+    let snap;
+    try {
+      snap = await buildRecipeSnapshot(toAdd[i], 1, { target: targetMassG, exact: forceExact });
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Masse cible impossible." , added, skipped };
     }
+    if (!snap) continue;
 
     await prisma.cookbookRecipe.create({
       data: {
@@ -253,6 +233,7 @@ export async function addRecipeToCookbook(
   linkMode: "linked" | "snapshot",
   subrecipeMode: "single" | "separate",
   multiplier = 1,
+  massTarget?: number,
 ): Promise<ActionResult> {
   await requireAccess("cookbooks.edit");
   await requireVisibleCookbook(cookbookId);
@@ -268,7 +249,12 @@ export async function addRecipeToCookbook(
   let snapshotData = null;
   let snapshotDate: Date | null = null;
   if (linkMode === "snapshot") {
-    const snap = await buildRecipeSnapshot(recipeId, multiplier);
+    let snap;
+    try {
+      snap = await buildRecipeSnapshot(recipeId, multiplier, massTarget == null ? undefined : { target: massTarget });
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Masse cible impossible." };
+    }
     if (!snap) return { ok: false, error: "Recette introuvable." };
     snapshotData = snap;
     snapshotDate = new Date();
@@ -466,36 +452,18 @@ export async function convertToLinked(entryId: number, cookbookId: number) {
 
 // ─── Modification de la masse d'une recette figée ────────────────────────────
 
-type SnapIngredient = { name: string; quantityG: number; unit?: string; quantityGMax?: number | null; pieceG?: number | null };
-type SnapData = {
-  ingredients: SnapIngredient[];
-  totalMassG: number;
-  totalMassGMin?: number;
-  totalMassGMax?: number;
-  subRecipes?: {
-    ingredients: SnapIngredient[];
-    totalMassG: number;
-    totalMassGMin?: number;
-    totalMassGMax?: number;
-    [k: string]: unknown;
-  }[];
-  multiplier?: number;
-  yield?: { count: number; label: string } | null;
-  [k: string]: unknown;
-};
-
 export type UpdateSnapshotMassPayload =
   | { mode: "coefficient"; coefficient: number }
   | { mode: "mass_target"; targetMassG: number; forceExact?: boolean }
   | { mode: "pivot_ingredient"; pivotIndex: number; targetMassG: number };
 
 /**
- * Recettes FIGÉES (📌 snapshot) uniquement : applique un coefficient à toutes
- * les quantités du snapshot pour atteindre la masse demandée.
+ * Recettes FIGÉES (📌 snapshot) uniquement : met les quantités libres à
+ * l'échelle en conservant les ingrédients des sous-recettes verrouillées.
  *
  * Trois modes (identiques à la fiche recette) :
  *  - `coefficient`     : multiplicateur direct (ex : 1.5)
- *  - `mass_target`     : on vise une masse totale (ratio = cible / total actuel)
+ *  - `mass_target`     : ratio = (cible − masse verrouillée) / masse libre
  *  - `pivot_ingredient`: on fixe la masse d'un ingrédient (ratio = cible / qté actuelle)
  */
 export async function updateSnapshotMass(
@@ -514,84 +482,12 @@ export async function updateSnapshotMass(
     return { ok: false, error: "Cette entrée n'est pas figée." };
   }
 
-  const snap = entry.snapshotData as unknown as SnapData;
-
-  let ratio: number;
-  if (payload.mode === "coefficient") {
-    if (!Number.isFinite(payload.coefficient) || payload.coefficient <= 0) {
-      return { ok: false, error: "Coefficient invalide (doit être > 0)." };
-    }
-    ratio = payload.coefficient;
-  } else if (payload.mode === "mass_target") {
-    if (!Number.isFinite(payload.targetMassG) || payload.targetMassG <= 0) {
-      return { ok: false, error: "Masse cible invalide." };
-    }
-    if (!snap.totalMassG || snap.totalMassG <= 0) {
-      return { ok: false, error: "Masse totale actuelle nulle, impossible de calculer." };
-    }
-    ratio = payload.targetMassG / snap.totalMassG;
-  } else {
-    if (!snap.ingredients || !snap.ingredients[payload.pivotIndex]) {
-      return { ok: false, error: "Ingrédient pivot introuvable." };
-    }
-    const pivot = snap.ingredients[payload.pivotIndex];
-    // Masse du pivot en grammes (L, cuillères, pièces avec leur poids).
-    const pivotG = ingMass(pivot.quantityG, pivot.unit ?? "g", pivot.pieceG);
-    if (!pivotG || pivotG <= 0) {
-      return { ok: false, error: "Quantité du pivot nulle, impossible de calculer." };
-    }
-    if (!Number.isFinite(payload.targetMassG) || payload.targetMassG <= 0) {
-      return { ok: false, error: "Masse cible du pivot invalide." };
-    }
-    ratio = payload.targetMassG / pivotG;
+  let newSnap: MassSnapshot;
+  try {
+    newSnap = resizeSnapshot(entry.snapshotData as unknown as MassSnapshot, payload);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Masse invalide." };
   }
-
-  const forceExact = payload.mode === "mass_target" && payload.forceExact === true;
-  const scaledIngredients = snap.ingredients.map((i) => ({
-    ...i,
-    quantityG: roundScaled(i.quantityG * ratio, i.unit),
-    quantityGMax: i.quantityGMax != null ? roundScaled(i.quantityGMax * ratio, i.unit) : null,
-    unit: i.unit ?? "g",
-  }));
-  const finalIngredients = forceExact
-    ? adjustToTarget(scaledIngredients, payload.targetMassG).ingredients
-    : scaledIngredients;
-  // On recalcule l'ENSEMBLE des totaux (min/max + valeur unique) à partir des
-  // quantités finales, sinon totalMassGMin/Max resteraient figés sur l'ancienne
-  // masse et le « Total » du PDF deviendrait incohérent avec les ingrédients.
-  // Les pièces comptent avec leur poids, comme dans la masse du snapshot.
-  const { min: newTotalMinG, max: newTotalMaxG } = recipeMass(finalIngredients);
-
-  const newSnap: SnapData = {
-    ...snap,
-    ingredients: finalIngredients,
-    totalMassGMin: round3(newTotalMinG),
-    totalMassGMax: round3(newTotalMaxG),
-    totalMassG: round3((newTotalMinG + newTotalMaxG) / 2),
-    subRecipes: (snap.subRecipes ?? []).map((sr) => {
-      // Sous-recette verrouillée 🔒 : sa masse ne suit pas la recette parente.
-      if (sr.isLocked) return sr;
-      // Même arrondi au supérieur que la recette principale.
-      const subIngredients = sr.ingredients.map((i) => ({
-        ...i,
-        quantityG: roundScaled(i.quantityG * ratio, i.unit),
-        quantityGMax: i.quantityGMax != null ? roundScaled(i.quantityGMax * ratio, i.unit) : null,
-      }));
-      const { min: subMinG, max: subMaxG } = recipeMass(subIngredients);
-      return {
-        ...sr,
-        ingredients: subIngredients,
-        // Quantités liées des étapes de la sous-recette : même mise à l'échelle.
-        ...(typeof sr.coef === "number" ? { coef: round3(sr.coef * ratio) } : {}),
-        totalMassGMin: round3(subMinG),
-        totalMassGMax: round3(subMaxG),
-        totalMassG: round3((subMinG + subMaxG) / 2),
-      };
-    }),
-    multiplier: round3((snap.multiplier ?? 1) * ratio),
-    // Le rendement suit (40 financiers ×2 → 80).
-    yield: snap.yield ? { ...snap.yield, count: Math.round(snap.yield.count * ratio * 10) / 10 } : snap.yield,
-  };
 
   await prisma.cookbookRecipe.update({
     where: { id: entryId, cookbookId },
@@ -603,8 +499,4 @@ export async function updateSnapshotMass(
 
   revalidatePath(`/cookbooks/${cookbookId}`);
   return { ok: true };
-}
-
-function round3(x: number): number {
-  return Math.round(x * 1000) / 1000;
 }

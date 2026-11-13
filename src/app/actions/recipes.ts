@@ -17,6 +17,7 @@ import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { rescaleStepText } from "@/lib/stepQty";
 import { parseMold } from "@/lib/mold";
 import { copyRecipe } from "@/lib/recipeCopy";
+import { matchPivotIngredient } from "@/lib/pivotIdentity";
 
 /**
  * Vrai si le contenu des étapes est exploitable (pas vide après strip HTML).
@@ -491,7 +492,8 @@ export async function deleteComment(id: number, recipeId: number) {
 /**
  * Après recréation des ingrédients d'une recette, re-pointe les sous-recettes
  * (dans les recettes parentes) dont le pivot visait un ancien ingrédient :
- * même nom (insensible à la casse) d'abord, sinon même position.
+ * même nom unique (insensible à la casse). Une suppression ou une ambiguïté
+ * annule la transaction plutôt que de changer le calcul des recettes parentes.
  */
 async function remapPivotIngredients(
   tx: Prisma.TransactionClient,
@@ -512,12 +514,10 @@ async function remapPivotIngredients(
   for (const link of links) {
     const old = oldIngredients.find((o) => o.id === link.pivotIngredientId);
     if (!old) continue;
-    const match =
-      fresh.find((f) => (f.name ?? "").toLowerCase() === (old.name ?? "").toLowerCase()) ??
-      fresh.find((f) => f.position === old.position);
+    const match = matchPivotIngredient(old, oldIngredients, fresh);
     await tx.subRecipe.update({
       where: { id: link.id },
-      data: { pivotIngredientId: match?.id ?? null },
+      data: { pivotIngredientId: match.id },
     });
   }
 }

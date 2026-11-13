@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
-import { scaleQty, recipeMass, type AdjIngredient } from "./massAdjust";
-import { resolveLink } from "./recipeTree";
+import { adjustToTarget, scaleQty, recipeMass, type AdjIngredient } from "./massAdjust";
+import { resolveLink, treeCoefficientForMass } from "./recipeTree";
 import { collectAllergens } from "./allergens";
 import { loadRecipeTree } from "./recipes";
 import { hiddenCookbookIds } from "./auth/visibility";
@@ -52,7 +52,7 @@ export async function getCookbookDetail(id: number) {
  * @param multiplier coefficient appliqué à toutes les quantités (1 = inchangé).
  *                   Permet de figer une version multipliée de la recette.
  */
-export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
+export async function buildRecipeSnapshot(recipeId: number, multiplier = 1, massTarget?: { target: number; exact?: boolean }) {
   const [r, tree] = await Promise.all([
     prisma.recipe.findUnique({
       where: { id: recipeId },
@@ -66,7 +66,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
   ]);
   if (!r || !tree) return null;
 
-  const k = multiplier > 0 ? multiplier : 1;
+  const k = massTarget ? treeCoefficientForMass(tree, massTarget.target) : multiplier > 0 && Number.isFinite(multiplier) ? multiplier : 1;
 
   const ingredients: AdjIngredient[] = tree.ingredients.map((i) => {
     const scaled = scaleQty(i.quantityG, i.unit, k);
@@ -80,13 +80,14 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       cost: i.cost ?? null,
     };
   });
-  const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);
 
   // Chaque sous-recette est résolue sur son arbre complet (sous-recettes
   // imbriquées comprises) : plus rien n'est oublié au-delà du 1er niveau.
   const memo = new Map();
+  const subFixed: boolean[][] = [];
   const subRecipes = tree.subLinks.map((link) => {
     const res = resolveLink(link, k, memo);
+    subFixed.push(res.fixed.map((fixed) => fixed || link.isLocked));
     return {
       label: link.label,
       childName: link.childName,
@@ -95,6 +96,7 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       isLocked: link.isLocked,
       isExact: link.isExact,
       ingredients: res.ingredients,
+      fixedIngredients: res.fixed.map((fixed) => fixed || link.isLocked),
       totalMassG: (res.min + res.max) / 2,
       totalMassGMin: res.min,
       totalMassGMax: res.max,
@@ -103,6 +105,37 @@ export async function buildRecipeSnapshot(recipeId: number, multiplier = 1) {
       coef: res.effectiveCoef,
     };
   });
+
+  if (massTarget?.exact) {
+    // Ajuste toutes les préparations ensemble, en épargnant même les éléments
+    // verrouillés au deuxième niveau. Les totaux stockés restent propres à chaque préparation.
+    const groups = [ingredients, ...subRecipes.map((sr) => sr.ingredients)];
+    const flags = [ingredients.map(() => false), ...subFixed];
+    const free: AdjIngredient[] = [];
+    let fixedMass = 0;
+    groups.forEach((group, g) => group.forEach((ing, i) => {
+      if (flags[g][i]) fixedMass += recipeMass([ing]).avg;
+      else free.push(ing);
+    }));
+    const target = Math.max(0, massTarget.target - fixedMass);
+    const adjusted = target === 0
+      ? free.map((i) => ({ ...i, quantityG: 0, quantityGMax: i.quantityGMax == null ? null : 0 }))
+      : adjustToTarget(free, target).ingredients;
+    let idx = 0;
+    groups.forEach((group, g) => group.forEach((_, i) => {
+      if (!flags[g][i]) group[i] = adjusted[idx++];
+    }));
+    for (const sr of subRecipes) {
+      const mass = recipeMass(sr.ingredients);
+      sr.totalMassG = mass.avg;
+      sr.totalMassGMin = mass.min;
+      sr.totalMassGMax = mass.max;
+    }
+  }
+  const { min: totalMassGMin, max: totalMassGMax, avg: totalMassG } = recipeMass(ingredients);
+  if (massTarget?.exact && Math.abs(totalMassG + subRecipes.reduce((sum, sr) => sum + sr.totalMassG, 0) - massTarget.target) > 0.5) {
+    throw new Error("Masse exacte impossible avec les unités et les ingrédients verrouillés actuels.");
+  }
 
   return {
     recipeId: r.id,

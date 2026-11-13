@@ -9,6 +9,7 @@ import { parseMold } from "@/lib/mold";
 import { normalizeForSearch } from "@/lib/recipes";
 import { ensureIngredientBases } from "@/lib/ingredientBases";
 import { parseRecipeKeeperCsv } from "@/lib/importRecipeKeeper";
+import { importYield } from "@/lib/importYield";
 import {
   parseRecipeKeeperHtml,
   type RKHtmlRecipe,
@@ -64,7 +65,7 @@ export async function importRecipeKeeperCsv(
           name: rk.name,
           nameNormalized: normalizeForSearch(rk.name),
           source: rk.source,
-          notesTips: rk.notesTips,
+          ...importYield(rk.portionSize, rk.notesTips),
           stepsBlock: rk.steps
             ? { create: { content: rk.steps } }
             : undefined,
@@ -220,7 +221,7 @@ export async function importRecipeKeeperHtmlOrZip(
           name: rk.name,
           nameNormalized: normalizeForSearch(rk.name),
           source: rk.source,
-          notesTips: rk.notesTips,
+          ...importYield(rk.portionSize, rk.notesTips),
           favorite: rk.favorite,
           rating: rk.rating,
           stepsBlock: rk.steps ? { create: { content: rk.steps } } : undefined,

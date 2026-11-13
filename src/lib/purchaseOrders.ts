@@ -11,6 +11,8 @@ import { prisma } from "./prisma";
 import { isPriceUnit, type PriceUnit } from "./cost";
 import { articleKey, articleOf, packLabel, packagingWarning, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
 
+import { purchaseLineAmounts } from "./purchaseLineSnapshot";
+
 type Tx = Prisma.TransactionClient;
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -315,6 +317,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             orderId: order.id,
             productId: product.id,
             quantity: l.quantity ?? null,
+            packSize: l.packSize != null && l.packSize > 0 ? l.packSize : 1,
             packPrice: l.packPrice ?? null,
             unitPrice,
             priceUnit: l.unit,
@@ -640,6 +643,7 @@ export async function loadPurchaseOrder(id: number) {
           id: true,
           quantity: true,
           packPrice: true,
+          packSize: true,
           unitPrice: true,
           priceUnit: true,
           lineTotal: true,
@@ -659,15 +663,17 @@ export async function loadPurchaseOrder(id: number) {
     supplier: o.supplier,
     lines: o.lines.map((l) => {
       // Prix d'un colis (ou d'une unité) et montant de la ligne, recalculés s'ils ne sont pas écrits.
-      const each = num(l.packPrice) ?? Number(l.unitPrice) * (num(l.product.packSize) ?? 1);
-      const amount = num(l.lineTotal) ?? (l.quantity != null ? Math.round(each * Number(l.quantity) * 100) / 100 : null);
+      const { each, amount } = purchaseLineAmounts({
+        quantity: num(l.quantity), packSize: num(l.packSize), packPrice: num(l.packPrice),
+        unitPrice: Number(l.unitPrice), lineTotal: num(l.lineTotal),
+      });
       return {
       id: l.id,
       each,
       amount,
       productId: l.product.id,
       product: l.product.name,
-      packLabel: packLabel(num(l.product.packSize), l.product.priceUnit),
+      packLabel: l.packSize == null ? "conditionnement historique inconnu" : packLabel(Number(l.packSize), l.priceUnit),
       ingredient: l.product.base,
       quantity: num(l.quantity),
       packPrice: num(l.packPrice),
