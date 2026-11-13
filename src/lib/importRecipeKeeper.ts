@@ -21,6 +21,7 @@ export type RKRecipe = {
   steps: string | null;
   ingredients: { name: string; quantityG: number; quantityGMax?: number; unit: string }[];
   tags: string[];
+  portionSize: string | null;
 };
 
 /** Parse le CSV exporté par Recipe Keeper. */
@@ -37,6 +38,7 @@ export function parseRecipeKeeperCsv(csvText: string): RKRecipe[] {
   const iSource = idx("source");
   const iDescription = idx("description");
   const iCategories = idx("categories");
+  const iServings = idx("servings");
 
   const recipes: RKRecipe[] = [];
 
@@ -68,6 +70,7 @@ export function parseRecipeKeeperCsv(csvText: string): RKRecipe[] {
       steps: directions || null,
       ingredients,
       tags,
+      portionSize: get(iServings) || null,
     });
   }
 

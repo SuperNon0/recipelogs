@@ -70,7 +70,7 @@ export function InvoiceDetail({ order }: { order: Order }) {
               <br />
               <small>
                 {[
-                  l.quantity != null ? `${qty(l.quantity)} × ${formatEuro(l.each)}` : null,
+                  l.quantity != null ? `${qty(l.quantity)} × ${l.each != null ? formatEuro(l.each) : "prix du colis inconnu"}` : null,
                   l.packLabel,
                   l.ingredient ? `ingrédient « ${l.ingredient.name} »` : null,
                 ]

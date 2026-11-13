@@ -8,6 +8,7 @@ import { ModalOverlay } from "./ModalOverlay";
 import { Help } from "./ui/Help";
 import { fetchCookbooksForModal, fetchRecipeMassInfo } from "@/app/actions/modals";
 import { formatCoef, formatG } from "@/lib/format";
+import { treeCoefficientForMass, treeScaledMass, type TreeNode } from "@/lib/recipeTree";
 
 type Cookbook = { id: number; name: string };
 type Ingredient = { name: string; quantityG: number };
@@ -20,25 +21,25 @@ type CalcMode = "coefficient" | "mass" | "pivot";
 export function AddToCookbookDialog({
   recipeId,
   recipeName,
-  totalMassG: massProp,
-  ingredients: ingProp,
   onClose,
 }: {
   recipeId: number;
   recipeName?: string;
-  totalMassG?: number;
-  ingredients?: Ingredient[];
   onClose: () => void;
 }) {
   const [cookbooks, setCookbooks] = useState<Cookbook[] | null>(null);
-  const [info, setInfo] = useState<{ totalMassG: number; ingredients: Ingredient[] } | null>(
-    massProp !== undefined && ingProp ? { totalMassG: massProp, ingredients: ingProp } : null,
-  );
+  const [info, setInfo] = useState<Awaited<ReturnType<typeof fetchRecipeMassInfo>>>(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    fetchCookbooksForModal().then(setCookbooks);
-    if (!info) fetchRecipeMassInfo(recipeId).then((r) => setInfo(r ?? { totalMassG: 0, ingredients: [] }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    Promise.all([fetchCookbooksForModal(), fetchRecipeMassInfo(recipeId)]).then(([books, r]) => {
+      if (!active) return;
+      setCookbooks(books);
+      setInfo(r);
+      setLoadError(!r);
+    }).catch(() => { if (active) setLoadError(true); });
+    return () => { active = false; };
   }, [recipeId]);
 
   const title = (
@@ -47,10 +48,10 @@ export function AddToCookbookDialog({
     </span>
   );
 
-  if (cookbooks === null || info === null) {
+  if (loadError || cookbooks === null || info === null) {
     return (
       <ModalOverlay onClose={onClose} title={title}>
-        <p style={{ color: "var(--muted)" }}>Chargement…</p>
+        <p style={{ color: "var(--muted)" }}>{loadError ? "Impossible de charger la recette. Ferme cette fenêtre et réessaie." : "Chargement…"}</p>
       </ModalOverlay>
     );
   }
@@ -73,6 +74,7 @@ export function AddToCookbookDialog({
         cookbooks={cookbooks}
         totalMassG={info.totalMassG}
         ingredients={info.ingredients}
+        tree={info.tree}
         onClose={onClose}
       />
     </ModalOverlay>
@@ -85,6 +87,7 @@ function CookbookForm({
   cookbooks,
   totalMassG,
   ingredients,
+  tree,
   onClose,
 }: {
   recipeId: number;
@@ -92,6 +95,7 @@ function CookbookForm({
   cookbooks: Cookbook[];
   totalMassG: number;
   ingredients: Ingredient[];
+  tree: TreeNode;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -107,27 +111,27 @@ function CookbookForm({
   const [pivotIdx, setPivotIdx] = useState(0);
   const [pivotValueStr, setPivotValueStr] = useState(String(ingredients[0]?.quantityG ?? 0));
 
-  const multiplier = useMemo(() => {
-    if (linkMode !== "snapshot") return 1;
-    if (calcMode === "coefficient") {
-      const k = parseFloat(coefStr.replace(",", "."));
-      return isFinite(k) && k > 0 ? k : 1;
-    }
-    if (calcMode === "mass") {
-      const target = parseFloat(targetMassStr.replace(",", "."));
-      if (!isFinite(target) || target <= 0 || totalMassG <= 0) return 1;
-      return target / totalMassG;
-    }
-    const ref = ingredients[pivotIdx]?.quantityG ?? 0;
-    const target = parseFloat(pivotValueStr.replace(",", "."));
-    if (!isFinite(target) || target <= 0 || ref <= 0) return 1;
-    return target / ref;
-  }, [linkMode, calcMode, coefStr, targetMassStr, pivotValueStr, pivotIdx, ingredients, totalMassG]);
+  const scale = useMemo(() => {
+    try {
+      if (linkMode !== "snapshot") return 1;
+      if (calcMode === "coefficient") {
+        const k = Number(coefStr.replace(",", "."));
+        return Number.isFinite(k) && k > 0 ? k : null;
+      }
+      if (calcMode === "mass") return treeCoefficientForMass(tree, Number(targetMassStr.replace(",", ".")));
+      const ref = ingredients[pivotIdx]?.quantityG ?? 0;
+      const target = Number(pivotValueStr.replace(",", "."));
+      if (!Number.isFinite(target) || target <= 0 || ref <= 0) return null;
+      return target / ref;
+    } catch { return null; }
+  }, [linkMode, calcMode, coefStr, targetMassStr, pivotValueStr, pivotIdx, ingredients, tree]);
+  const multiplier = scale ?? 1;
 
   function handleAdd() {
     setError(null);
     startTransition(async () => {
-      const result = await addRecipeToCookbook(cookbookId, recipeId, linkMode, "single", multiplier);
+      const result = await addRecipeToCookbook(cookbookId, recipeId, linkMode, "single", multiplier,
+        linkMode === "snapshot" && calcMode === "mass" ? Number(targetMassStr.replace(",", ".")) : undefined);
       if (result.ok) {
         setDone(true);
         setTimeout(onClose, 700);
@@ -191,7 +195,7 @@ function CookbookForm({
               ))}
             </div>
             <span className="num" style={{ color: "var(--accent)", fontSize: 13 }}>
-              {formatG(totalMassG * multiplier)} · {formatCoef(multiplier)}
+              {formatG(treeScaledMass(tree, multiplier))} · {formatCoef(multiplier)}
             </span>
           </div>
           {calcMode === "coefficient" && (
@@ -226,11 +230,11 @@ function CookbookForm({
         </div>
       )}
 
-      {error && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error}</p>}
+      {(error || scale === null) && <p style={{ color: "var(--danger)", fontSize: 13 }}>{error ?? "Cette masse ne peut pas être obtenue avec les quantités ajustables de cette recette."}</p>}
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onClose} className="fl-btn fl-btn-secondary">Annuler</button>
-        <button type="button" onClick={handleAdd} disabled={pending || done} className="fl-btn fl-btn-primary">
+        <button type="button" onClick={handleAdd} disabled={pending || done || scale === null} className="fl-btn fl-btn-primary">
           {done ? <><Check size={16} /> Ajoutée</> : pending ? "Ajout…" : "Ajouter"}
         </button>
       </div>

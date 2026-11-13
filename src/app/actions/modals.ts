@@ -3,7 +3,9 @@
 import { requireAccess } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import { visibleShoppingListWhere } from "@/lib/shopping";
-import { recipeMass } from "@/lib/massAdjust";
+import { ingMass } from "@/lib/massAdjust";
+import { loadRecipeTree } from "@/lib/recipes";
+import { stripTreeCosts, treeScaledMass, type TreeNode } from "@/lib/recipeTree";
 import { canSeeRecipe, hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 export async function fetchAvailableRecipes(excludeId: number): Promise<{ id: number; name: string }[]> {
@@ -36,27 +38,17 @@ export async function fetchShoppingListsForModal(): Promise<{ id: number; name: 
 /** Masse et ingrédients d'une recette (fenêtre « Ajouter au cahier » ouverte depuis une liste). */
 export async function fetchRecipeMassInfo(
   recipeId: number,
-): Promise<{ totalMassG: number; ingredients: { name: string; quantityG: number }[] } | null> {
+): Promise<{ totalMassG: number; tree: TreeNode; ingredients: { name: string; quantityG: number }[] } | null> {
   await requireAccess("read");
   if (!(await canSeeRecipe(recipeId))) return null;
-  const r = await prisma.recipe.findUnique({
-    where: { id: recipeId },
-    select: {
-      ingredients: {
-        orderBy: { position: "asc" },
-        select: { name: true, quantityG: true, quantityGMax: true, unit: true, ingredientBase: { select: { name: true } } },
-      },
-    },
-  });
-  if (!r) return null;
-  const ings = r.ingredients.map((i) => ({
-    quantityG: Number(i.quantityG),
-    quantityGMax: i.quantityGMax != null ? Number(i.quantityGMax) : null,
-    unit: i.unit,
-  }));
+  const tree = await loadRecipeTree(recipeId);
+  if (!tree) return null;
+  // La fenêtre a besoin de l'arbre pour la masse, jamais des prix d'achat.
+  stripTreeCosts(tree);
   return {
-    totalMassG: recipeMass(ings).avg,
-    ingredients: r.ingredients.map((i) => ({ name: i.name ?? i.ingredientBase?.name ?? "—", quantityG: Number(i.quantityG) })),
+    totalMassG: treeScaledMass(tree, 1),
+    tree,
+    ingredients: tree.ingredients.map((i) => ({ name: i.name, quantityG: ingMass(i.quantityG, i.unit, i.pieceG) })).filter((i) => i.quantityG > 0),
   };
 }
 

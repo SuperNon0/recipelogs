@@ -12,6 +12,7 @@ type Mode = "coefficient" | "mass_target" | "pivot_ingredient";
 type SnapInfo = {
   ingredients: { name: string; quantityG: number }[];
   totalMassG: number;
+  fixedMassG: number;
 };
 
 const num = (s: string) => parseFloat(s.replace(",", "."));
@@ -107,7 +108,11 @@ export function EditSnapshotMassModal({
       if (Number.isFinite(c) && c > 0) ratio = c;
     } else if (mode === "mass_target") {
       const m = num(targetMassG);
-      if (Number.isFinite(m) && m > 0 && snap.totalMassG > 0) ratio = m / snap.totalMassG;
+      const freeMassG = snap.totalMassG - snap.fixedMassG;
+      if (Number.isFinite(m) && m > 0 && m >= snap.fixedMassG) {
+        if (freeMassG > 0) ratio = (m - snap.fixedMassG) / freeMassG;
+        else if (m === snap.totalMassG) ratio = 1;
+      }
     } else if (snap.ingredients[pivotIndex]) {
       const t = num(pivotTargetG);
       const q = snap.ingredients[pivotIndex].quantityG;
@@ -128,7 +133,7 @@ export function EditSnapshotMassModal({
         <span style={{ color: "var(--text)" }}>{recipeName}</span>
         <Help title="Masse figée">
           Cette recette est figée dans le cahier : c&apos;est une copie. Changer sa masse multiplie
-          toutes les quantités de la copie, sans toucher à la recette d&apos;origine.
+          les quantités libres de la copie, sans toucher à la recette d&apos;origine.
         </Help>
       </p>
 
@@ -156,11 +161,11 @@ export function EditSnapshotMassModal({
             </div>
             <Help
               title="Trois façons de changer la masse"
-              calc={"Masse totale : coef = masse voulue ÷ masse actuelle\nCoefficient : coef saisi\nPivot : coef = quantité voulue ÷ quantité actuelle de l'ingrédient\nChaque quantité = quantité actuelle × coef"}
+              calc={"Masse totale : coef = (masse voulue − masse verrouillée) ÷ masse libre\nCoefficient : coef saisi\nPivot : coef = quantité voulue ÷ quantité actuelle de l'ingrédient\nChaque quantité = quantité actuelle × coef"}
               example="Recette de 800 g, masse voulue 1 200 g : coef 1,5 ; 200 g de beurre deviennent 300 g."
             >
               Choisis la masse totale voulue, un coefficient direct, ou la quantité d&apos;un ingrédient
-              (le pivot) : toutes les autres quantités suivent la même proportion.
+              (le pivot) : les autres quantités libres suivent la même proportion. Les sous-recettes verrouillées restent fixes.
             </Help>
           </div>
 
@@ -170,7 +175,7 @@ export function EditSnapshotMassModal({
 
           {mode === "coefficient" && (
             <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <span className="fl-label">Coefficient (multiplie tout)</span>
+              <span className="fl-label">Coefficient (hors sous-recettes verrouillées)</span>
               <input type="number" step="0.01" min="0.01" inputMode="decimal" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} className="fl-input" autoFocus />
             </label>
           )}
@@ -220,7 +225,7 @@ export function EditSnapshotMassModal({
                 × {ratio.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
               </span>
               , masse totale d&apos;environ{" "}
-              <span className="num" style={{ color: "var(--text)" }}>{formatG(snap.totalMassG * ratio)}</span>
+              <span className="num" style={{ color: "var(--text)" }}>{formatG(snap.fixedMassG + (snap.totalMassG - snap.fixedMassG) * ratio)}</span>
             </div>
           )}
 
