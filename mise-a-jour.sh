@@ -64,10 +64,9 @@ AVANT="$(git -C "$DIR" rev-parse --short HEAD)"
 git -C "$DIR" fetch -q --depth 1 origin "$BRANCH"
 git -C "$DIR" reset -q --hard FETCH_HEAD
 APRES="$(git -C "$DIR" rev-parse --short HEAD)"
-install -m 0755 "$DIR/mise-a-jour.sh" /usr/local/sbin/vitrine-maj
-install -m 0755 "$DIR/scripts/vitrine-reglage" /usr/local/sbin/vitrine-reglage
 rm -f /usr/local/sbin/vitrine-adresse-demo
-nginx -t -q && systemctl reload nginx
+# Réinstalle tout ce qui vient du code (nginx, formulaire, commandes) ; les réglages sont gardés.
+VITRINE_BRANCH="$BRANCH" bash "$DIR/scripts/vitrine-setup.sh" >/dev/null
 if [ "$AVANT" = "$APRES" ]; then
   echo "    Vitrine déjà à jour (${APRES})."
 else

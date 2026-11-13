@@ -684,3 +684,26 @@ html:not(.js) .tab-panel + .tab-panel { margin-top: 14px; }
   .lab-steps li.now::after { animation: none; opacity: .8; }
   .phone::after, .lab-bar span::after, .float .dot::after, .hero-cta .btn-primary::after { display: none; }
 }
+
+/* Fenêtre « Nous écrire » */
+.pop-wide { max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.cform { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .cform { grid-template-columns: 1fr 1fr; } }
+.cform .cf-full { grid-column: 1 / -1; }
+.cform label { display: grid; gap: 6px; font-size: 13.5px; color: var(--soft); }
+.cform label b { color: var(--accent); font-weight: 500; }
+.cform input, .cform select, .cform textarea {
+  width: 100%; padding: 10px 12px; min-height: 42px;
+  background: var(--surface); border: 1px solid var(--border2); border-radius: 10px;
+  color: var(--text); font: 16px var(--sans);
+}
+.cform textarea { resize: vertical; }
+.cform input:focus, .cform select:focus, .cform textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cf-err { margin: 0; color: var(--accent-3); font-size: 14px; }
+.cf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; }
+.cf-direct { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; color: var(--soft); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cf-direct b { color: var(--text); font-weight: 500; word-break: break-all; }
+.cf-hp { position: absolute !important; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.cf-ok { text-align: center; padding: 18px 0 6px; }
+.cf-ok-t { font: 400 22px var(--serif); color: var(--accent); margin: 0 0 6px; }
+.cform[hidden], .cf-direct[hidden], .cf-ok[hidden] { display: none; }

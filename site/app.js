@@ -64,16 +64,10 @@
   var missing = document.getElementById("demo-missing");
   if (missing && !demoUrl) missing.hidden = false;
 
-  // ── Contact (adresse e-mail réglée sur le serveur) ──
+  // ── Contact (adresse e-mail réglée sur le serveur) : fenêtre « Nous écrire » ──
   var mail = (window.VITRINE && window.VITRINE.contactEmail) || "";
-  if (mail) {
-    var subject = encodeURIComponent("Démonstration RecipeLog");
-    document.querySelectorAll("[data-contact]").forEach(function (a) {
-      if (a.id === "contact-btn") a.href = "mailto:" + mail + "?subject=" + subject;
-    });
-    var shown = document.getElementById("contact-mail");
-    if (shown) shown.textContent = mail;
-  }
+  var shown = document.getElementById("contact-mail");
+  if (shown && mail) shown.textContent = mail;
   var year = document.getElementById("year");
   if (year) year.textContent = String(new Date().getFullYear());
 
@@ -186,13 +180,90 @@
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && openPop) closePop();
-    // La croix est le seul élément de la fenêtre : la touche Tab y reste.
+    // La touche Tab reste dans la fenêtre ouverte.
     if (e.key === "Tab" && openPop) {
-      e.preventDefault();
-      var x = openPop.querySelector("[data-close]");
-      if (x) x.focus();
+      var f = Array.prototype.filter.call(
+        openPop.querySelectorAll("button, input, select, textarea, a[href]"),
+        function (el) { return !el.disabled && el.offsetParent !== null; });
+      if (!f.length) return;
+      var i = f.indexOf(document.activeElement);
+      if (e.shiftKey ? i <= 0 : i === f.length - 1 || i === -1) {
+        e.preventDefault();
+        f[e.shiftKey ? f.length - 1 : 0].focus();
+      }
     }
   });
+
+  // ── Fenêtre « Nous écrire » (ne se ferme qu'avec la croix ou Échap) ──
+  var cPop = document.getElementById("contact-pop");
+  var cForm = document.getElementById("contact-form");
+  if (cPop && cForm) {
+    var SUJETS = { demo: "Demande de démonstration", devis: "Demande de devis", question: "Question" };
+    document.getElementById("cf-mail").textContent = mail;
+    if (!mail) document.getElementById("cf-direct").hidden = true;
+    var cErr = document.getElementById("cf-err");
+    var cOk = document.getElementById("cf-ok");
+    var cSend = document.getElementById("cf-send");
+    function showErr(t) { cErr.textContent = t; cErr.hidden = !t; }
+    document.querySelectorAll("[data-contact]").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (SUJETS[a.dataset.contact]) cForm.elements.type.value = a.dataset.contact;
+        showErr("");
+        cForm.hidden = false;
+        cOk.hidden = true;
+        document.getElementById("cf-direct").hidden = !mail;
+        cPop.hidden = false;
+        openPop = cPop;
+        opener = a;
+        setTimeout(function () { cForm.elements.nom.focus(); }, 50);
+      });
+    });
+    function mailto(v) {
+      var sujet = SUJETS[v("type")] + " — RecipeLog" + (v("etab") ? " — " + v("etab") : "");
+      var corps = ["Nom : " + v("nom"), "Établissement : " + (v("etab") || "—"), "E-mail : " + v("email"),
+        "Téléphone : " + (v("tel") || "—"), "", v("msg") || SUJETS[v("type")] + "."].join("\n");
+      return "mailto:" + mail + "?subject=" + encodeURIComponent(sujet) + "&body=" + encodeURIComponent(corps);
+    }
+    cForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = function (n) { return (cForm.elements[n].value || "").trim(); };
+      if (!v("nom") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email"))) {
+        showErr("Merci d'indiquer votre nom et une adresse e-mail valide.");
+        return;
+      }
+      showErr("");
+      cSend.disabled = true;
+      cSend.textContent = "Envoi…";
+      var data = {};
+      ["type", "nom", "etab", "email", "tel", "msg", "site"].forEach(function (n) { data[n] = v(n); });
+      fetch("api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
+        .catch(function () { return { ok: false }; })
+        .then(function (res) {
+          cSend.disabled = false;
+          cSend.textContent = "Envoyer";
+          if (res && res.ok) {
+            cForm.reset();
+            cForm.hidden = true;
+            cOk.hidden = false;
+            document.getElementById("cf-direct").hidden = true;
+            cPop.querySelector("[data-close]").focus();
+          } else if (mail) {
+            showErr("L'envoi n'a pas abouti. Votre messagerie va s'ouvrir avec le message prêt : il ne reste qu'à l'envoyer.");
+            setTimeout(function () { window.location.href = mailto(v); }, 1200);
+          } else {
+            showErr((res && res.error) || "L'envoi n'a pas abouti. Réessayez dans quelques minutes.");
+          }
+        });
+    });
+    document.getElementById("cf-copy").addEventListener("click", function () {
+      var b = this;
+      var done = function () { b.textContent = "Adresse copiée ✓"; setTimeout(function () { b.textContent = "Copier l'adresse"; }, 2000); };
+      if (navigator.clipboard) navigator.clipboard.writeText(mail).then(done, done);
+      else done();
+    });
+  }
 
   // ── Copier la commande ──
   document.querySelectorAll("[data-copy]").forEach(function (btn) {
