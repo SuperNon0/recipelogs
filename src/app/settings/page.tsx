@@ -6,6 +6,7 @@ import { listPdfThemes } from "@/lib/pdfThemes";
 import { getSiteUrl } from "@/app/actions/settings";
 import { getMcpToken } from "@/lib/mcp/token";
 import { SiteSettings } from "@/components/settings/SiteSettings";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { requirePage } from "@/lib/auth/guard";
 import { viewerCan } from "@/lib/auth/viewer";
 import type { Permission } from "@/lib/auth/permissions";
@@ -36,8 +37,13 @@ export default async function SettingsPage() {
     <div className="set-page">
       <div className="page-head">
         <h1>Réglages</h1>
-        <p className="sub">Rangement des recettes, PDF, imports et site</p>
+        <p className="sub">Apparence, rangement des recettes, PDF, imports et site</p>
       </div>
+
+      <div className="sect-title">
+        <h2>Apparence</h2>
+      </div>
+      <AppearanceSettings />
 
       {can("accounts.manage") && auth && (
         <>

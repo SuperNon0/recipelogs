@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useEscape } from "./ui/useMedia";
 import { STOP } from "./ui/Menu";
+import { useOverlayOpen } from "./ui/overlay";
 
 /**
  * Fenêtre modale : centrée sur ordinateur, feuille qui remonte du bas sur
@@ -29,6 +30,7 @@ export function ModalOverlay({
   full?: boolean;
 }) {
   useEscape(true, onClose);
+  useOverlayOpen(true);
 
   // Bloque le défilement de la page derrière la fenêtre.
   useEffect(() => {

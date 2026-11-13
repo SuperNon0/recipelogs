@@ -386,7 +386,7 @@ export function RecipeBody({
         <div className="irow ihead">
           <span />
           <span>Ingrédient</span>
-          <span className="q">Quantité</span>
+          <span className="qte">Quantité</span>
           <span className="p">
             <span className="desk-only">% masse</span>
             <span className="mob-only">%</span>
@@ -434,7 +434,7 @@ export function RecipeBody({
         <div className="irow itotal">
           <span />
           <span>Total</span>
-          <span className="q num">
+          <span className="qte num">
             {own.min !== own.max && subs.length === 0 ? `${fmt(own.min)} à ${fmt(own.max)}` : fmt(grandTotal)}
           </span>
           <span className="p num">{grandTotal > 0 ? "100 %" : ""}</span>
@@ -482,7 +482,7 @@ function OwnRow({
     <div className="irow">
       <span />
       <span className="n">{ing.name}</span>
-      <span className="q num">
+      <span className="qte num">
         {ing.unit === "QS" ? (
           <b style={{ color: "var(--accent)" }}>QS</b>
         ) : (
@@ -594,7 +594,7 @@ function SubRows({
 
   const tag =
     locked ? (
-      <span className="fl-tag" style={{ color: "var(--lock)", borderColor: "rgba(143,156,240,.35)", background: "rgba(143,156,240,.08)" }}>
+      <span className="fl-tag" style={{ color: "var(--lock)", borderColor: "color-mix(in srgb, var(--prog) 35%, transparent)", background: "var(--prog-dim)" }}>
         <Lock size={11} /> fixe
       </span>
     ) : sr.calcMode === "pivot_ingredient" ? (
@@ -614,7 +614,7 @@ function SubRows({
           {sr.label !== sr.childName && <small className="desk-only">{sr.childName}</small>}
           {tag}
         </span>
-        <span className="q num">{mass}</span>
+        <span className="qte num">{mass}</span>
         <span className="p num">{pct(avg)}</span>
         <MoreButton spec={spec} label={`Actions pour la sous-recette ${sr.label}`} />
       </ContextArea>
@@ -626,7 +626,7 @@ function SubRows({
           <div className="irow ichild" key={i}>
             <span />
             <span className="n">{ing.name}</span>
-            <span className="q num">
+            <span className="qte num">
               {ing.unit === "QS" ? (
                 <b style={{ color: "var(--accent)" }}>QS</b>
               ) : (

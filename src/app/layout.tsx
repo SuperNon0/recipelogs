@@ -7,6 +7,7 @@ import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
 import { headers } from "next/headers";
+import Script from "next/script";
 import { getViewer, viewerCan, viewerPermissions } from "@/lib/auth/viewer";
 import { PATH_HEADER } from "@/lib/auth/path";
 import { ALL_PERMISSIONS } from "@/lib/auth/permissions";
@@ -32,8 +33,35 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0b0f17",
+  // Couleur de la barre du téléphone : posée par encre.js d'après le thème affiché.
 };
+
+/* Design « encre » : avant l'affichage, relit l'accent et le thème gardés sur
+   cet appareil (rien ne clignote). Ambre par défaut, thème automatique. */
+const APPARENCE_AVANT_AFFICHAGE = `try {
+  var p = JSON.parse(localStorage.getItem("encre-apparence") || "{}"), h = document.documentElement;
+  if (p.accent) h.dataset.accent = p.accent;
+  if (p.theme === "sombre") h.dataset.theme = "dark";
+  else if (p.theme === "clair") h.dataset.theme = "light";
+  else { h.dataset.theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; h.dataset.encreAuto = ""; }
+} catch (e) {}`;
+
+/** <html> du design « encre » : accent ambre par défaut, pas d'historique pour
+ *  les feuilles (Next.js a le sien), icônes lues dans /encre/icones.svg. */
+function EncreHtml({ children }: { children: React.ReactNode }) {
+  return (
+    <html
+      lang="fr"
+      data-accent="ambre"
+      data-accent-defaut="ambre"
+      data-encre-sans-retour=""
+      data-encre-sprite="/encre/icones.svg"
+      suppressHydrationWarning
+    >
+      {children}
+    </html>
+  );
+}
 
 async function loadNavCounts(): Promise<NavCounts> {
   // Rôle limité à certaines catégories : les compteurs ne comptent que ses recettes.
@@ -73,26 +101,27 @@ export default async function RootLayout({
   // Partage public : pas de compte demandé (le middleware le garde en lecture seule).
   const gated = !path.startsWith("/share") && !viewerCan(viewer, "read");
 
+  // Polices servies par le site lui-même (src/encre/polices.css, public/polices/).
   const fonts = (
     <head>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap"
-        rel="stylesheet"
-      />
+      <script dangerouslySetInnerHTML={{ __html: APPARENCE_AVANT_AFFICHAGE }} />
+      <meta name="color-scheme" content="dark light" />
+      <link rel="preload" href="/polices/archivo-latin.woff2" as="font" type="font/woff2" crossOrigin="" />
+      <link rel="preload" href="/polices/dm-serif-display-latin.woff2" as="font" type="font/woff2" crossOrigin="" />
     </head>
   );
+  const encreJs = <Script src="/encre/encre.js" strategy="afterInteractive" />;
 
   // Comptes activés et visiteur sans accès : page de demande, d'attente, de refus ou de blocage.
   if (gated) {
     return (
-      <html lang="fr">
+      <EncreHtml>
         {fonts}
         <body>
           <AccessGate viewer={viewer} />
+          {encreJs}
         </body>
-      </html>
+      </EncreHtml>
     );
   }
 
@@ -103,7 +132,7 @@ export default async function RootLayout({
   const missing = ALL_PERMISSIONS.filter((p) => !perms.includes(p));
 
   return (
-    <html lang="fr">
+    <EncreHtml>
       {fonts}
       <body data-no={missing.length ? missing.join(" ") : undefined}>
         {isDemo() && <DemoBanner />}
@@ -111,7 +140,7 @@ export default async function RootLayout({
         <PermissionsProvider permissions={perms}>
         <div className="app">
           <AppSidebar siteUrl={siteUrl} counts={counts} />
-          <div style={{ minWidth: 0 }}>
+          <div className="main">
             <AppTopBar />
             <main className="app-main">
               <div className="app-content">{children}</div>
@@ -122,7 +151,8 @@ export default async function RootLayout({
         <CommandPalette />
         </PermissionsProvider>
         <ZoomReset />
+        {encreJs}
       </body>
-    </html>
+    </EncreHtml>
   );
 }

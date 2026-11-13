@@ -16,7 +16,7 @@ export function FolderTiles({ folders, noFolderCount }: { folders: FolderTile[];
         <Tile key={f.id} f={f} />
       ))}
       {noFolderCount > 0 && (
-        <div className="ftile" style={{ "--c": "#6f7a90" } as React.CSSProperties}>
+        <div className="ftile" style={{ "--c": "var(--muted)" } as React.CSSProperties}>
           <Link href="/?folder=none">
             <span className="ico">
               <Inbox size={17} />

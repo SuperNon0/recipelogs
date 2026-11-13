@@ -1,0 +1,208 @@
+/* ─────────────────────────────────────────────
+   Design « encre » appliqué à RecipeLog
+   Les briques viennent de src/encre/encre.css (copie du kit design-encre/).
+   Ici : seulement ce qui les adapte à RecipeLog (menu de gauche dès 900 px,
+   marque, contenu des pages, icônes lucide au trait fin). Couleurs : jetons.
+   ───────────────────────────────────────────── */
+
+/* Icônes lucide : même trait que les icônes d'encre (1,8). */
+svg.lucide {
+  stroke-width: 1.8;
+}
+
+/* ─── Cadre ─── */
+.app-main {
+  min-width: 0;
+  flex: 1;
+  padding: 10px max(var(--pad), env(safe-area-inset-right, 0px))
+    calc(var(--tab-h) + 52px + env(safe-area-inset-bottom, 0px)) max(var(--pad), env(safe-area-inset-left, 0px));
+  animation: fondu 0.25s var(--ease);
+}
+
+.app-content {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* RecipeLog passe au menu de gauche dès 900 px (ses pages sont réglées sur
+   cette largeur) ; encre le fait à 1000 px : on avance le changement. */
+@media (min-width: 900px) {
+  .app {
+    display: grid;
+    grid-template-columns: var(--side-w) minmax(0, 1fr);
+  }
+  .side {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 18px 14px 14px;
+    scrollbar-width: thin;
+  }
+  .top,
+  .tabbar {
+    display: none !important;
+  }
+  .app-main {
+    padding: 26px 34px 64px;
+  }
+}
+
+/* ─── Marque : pastille au chef + « Recipe Log » ─── */
+.brand .mk {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.top .brand .wm {
+  font-size: calc(20px * var(--t-scale));
+}
+
+/* ─── Menu de gauche ─── */
+.side {
+  gap: 2px;
+}
+
+/* Beaucoup de dossiers : le menu défile au lieu d'écraser ses lignes. */
+.side > * {
+  flex-shrink: 0;
+}
+
+.side-search {
+  margin: 16px 0 10px;
+}
+
+.side-search span:first-of-type {
+  flex: 1;
+}
+
+.side-it svg.lucide {
+  color: var(--muted);
+}
+
+.side-it.on svg.lucide {
+  color: var(--accent);
+}
+
+.side-it .dot {
+  width: 9px;
+  height: 9px;
+}
+
+.side-lbl-a {
+  color: var(--muted);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.side-lbl-a:hover {
+  color: var(--accent);
+  background: var(--card);
+}
+
+.side-foot {
+  padding-top: 10px;
+  margin-top: auto;
+}
+
+/* Laisse un peu d'air entre la liste des dossiers et le pied du menu. */
+.side-listes {
+  margin-bottom: 16px;
+}
+
+/* ─── Barre du haut et barre d'onglets ─── */
+.top .ib {
+  border-color: transparent;
+  background: transparent;
+}
+
+.top .ib:hover {
+  background: var(--card);
+}
+
+.tab {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Les fenêtres de RecipeLog cachent la barre (body.overlay-ouvert) ; elle
+   reste au-dessus du contenu mais sous les fenêtres. */
+.tabbar {
+  z-index: 44;
+}
+
+/* Feuille « Plus » : les tuiles passent sur 3 colonnes sur petit téléphone. */
+@media (max-width: 379px) {
+  .plus-t {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.q-ext:hover {
+  text-decoration: none;
+}
+
+/* ─── Titres : DM Serif Display, comme encre ─── */
+.page-head h1 {
+  font: 400 calc(27px * var(--t-scale)) / 1.08 var(--f-title);
+  letter-spacing: 0;
+}
+
+@media (min-width: 900px) {
+  .page-head h1 {
+    font-size: calc(30px * var(--t-scale));
+  }
+}
+
+/* ─── Réglages → Apparence ─── */
+.encre-apparence .pastilles {
+  margin-top: 4px;
+}
+
+.encre-apparence .seg {
+  max-width: 420px;
+}
+
+.encre-apparence .past {
+  cursor: pointer;
+}
+
+.encre-apparence {
+  display: grid;
+  gap: 18px;
+  scroll-margin-top: 80px;
+}
+
+.encre-apparence .set-l {
+  display: grid;
+  gap: 10px;
+}
+
+.encre-apparence .set-l-t {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ─── Petits libellés en capitales : DM Mono, comme encre (lbl-mono) ─── */
+.sect-title h2,
+.fl-label {
+  font-family: var(--f-mono);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}

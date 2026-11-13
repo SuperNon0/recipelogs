@@ -19,7 +19,7 @@
 
 .sh-lrow:hover,
 .sh-lrow[data-menu-open="true"] {
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
 }
 
 .sh-lrow-link {
@@ -197,7 +197,7 @@
 }
 
 .sh-item[data-menu-open="true"] {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 
 .sh-item-btn {
@@ -347,7 +347,7 @@
   height: 26px;
   color: var(--accent);
   background: var(--accent-dim);
-  border-color: rgba(240, 166, 74, 0.3);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .sh-picker {

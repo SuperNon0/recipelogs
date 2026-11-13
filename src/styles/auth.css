@@ -83,7 +83,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 10px 16px;
-  background: rgba(143, 156, 240, 0.15);
+  background: color-mix(in srgb, var(--prog) 15%, transparent);
   border-bottom: 1px solid var(--pending);
   color: var(--text);
   font-size: 13px;

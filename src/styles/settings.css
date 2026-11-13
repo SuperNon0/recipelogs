@@ -70,7 +70,7 @@ button.set-row:first-child {
 }
 
 .set-item:hover {
-  background: rgba(255, 255, 255, 0.018);
+  background: color-mix(in srgb, var(--text) 1.8%, transparent);
 }
 
 .set-item[data-menu-open="true"] {
@@ -400,7 +400,7 @@ button.set-row:first-child {
 }
 
 .set-result[data-ok="false"] {
-  border-color: rgba(239, 125, 107, 0.4);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
 .set-result[data-ok="false"] > svg {
@@ -515,7 +515,7 @@ button.set-row:first-child {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(5, 7, 12, 0.94);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(6px);
 }
 
@@ -531,7 +531,7 @@ button.set-row:first-child {
   border-radius: 18px;
   background: var(--pop);
   border: 1px solid var(--border2);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow);
 }
 
 .set-progress {
@@ -601,8 +601,8 @@ button.set-row:first-child {
   align-items: flex-start;
   padding: 11px 13px;
   border-radius: 12px;
-  background: rgba(239, 125, 107, 0.08);
-  border: 1px solid rgba(239, 125, 107, 0.35);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
   color: var(--danger);
   font-size: 13px;
 }
@@ -725,12 +725,12 @@ button.set-row:first-child {
 
 .mcp-pill.on {
   color: var(--accent-2);
-  background: rgba(79, 192, 173, 0.14);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 
 .mcp-pill.off {
   color: var(--danger);
-  background: rgba(239, 125, 107, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .mcp-status-tx {
