@@ -1,44 +1,88 @@
 <!doctype html>
-<html lang="fr">
+<!-- Design « encre » (dossier design-encre/ à la racine du dépôt). Les fichiers servis sont dans site/encre/. -->
+<html lang="fr" data-accent-defaut="ambre" data-encre-sprite="encre/icones.svg">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Zoom autorisé (pas de maximum-scale) ; viewport-fit=cover pour l'encoche. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>RecipeLog · Logiciel de fiches techniques et de coût de revient pour la pâtisserie</title>
   <meta name="description" content="RecipeLog, le logiciel des laboratoires de pâtisserie : fiches techniques, coût de revient, prix de vente et marge brute, suivi des prix fournisseurs, 14 allergènes réglementaires, fiches de production et droits d'équipe. En location mensuelle, hébergé pour vous, sans installation.">
-  <meta name="theme-color" content="#0b0f17">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    /* Avant l'affichage : accent et thème gardés sur cet appareil (rien ne clignote). */
+    try {
+      var p = JSON.parse(localStorage.getItem("encre-apparence") || "{}"), h = document.documentElement;
+      if (p.accent) h.dataset.accent = p.accent;
+      if (p.theme === "sombre") h.dataset.theme = "dark";
+      else if (p.theme === "clair") h.dataset.theme = "light";
+      else { h.dataset.theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; h.dataset.encreAuto = ""; }
+    } catch (e) {}
+    /* Les animations ne cachent rien tant que ce script n'a pas tourné */
+    document.documentElement.classList.add("js");
+  </script>
+  <link rel="preload" href="encre/polices/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="encre/polices/dm-serif-display-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="encre/polices.css">
+  <link rel="stylesheet" href="encre/encre.css">
   <link rel="stylesheet" href="style.css">
   <!-- Réglages du serveur (adresse de la démo, contact) : /etc/recipelog-vitrine/config.js -->
   <script src="config.js"></script>
-  <!-- Les animations ne cachent rien tant que ce script n'a pas tourné -->
-  <script>document.documentElement.classList.add("js");</script>
+  <script defer src="encre/encre.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
 
-<header class="top">
-  <div class="wrap top-in">
-    <a class="brand" href="#">
-      <img src="favicon.svg" alt="" width="30" height="30">
-      <span>RecipeLog</span>
+<div class="app">
+  <!-- Menu de gauche : ordinateur (1000 px et plus). -->
+  <aside class="side" aria-label="Menu principal">
+    <a class="brand" href="#accueil">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect class="lg-a" width="64" height="64" rx="15"/><g class="lg-t" transform="translate(14 13) scale(1.5)"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></g></svg>
+      <span class="wm">Recipe<b>Log</b></span>
     </a>
-    <nav class="top-nav" aria-label="Sections">
-      <a href="#rentabilite">Rentabilité</a>
-      <a href="#achats">Achats</a>
-      <a href="#production">Production</a>
-      <a href="#equipe">Équipe</a>
-      <a href="#offre">Offre</a>
+    <!-- Recherche rapide : ce bouton, Ctrl K (⌘ K) ou « / ». -->
+    <button class="side-search" type="button" data-encre-recherche><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-search"/></svg>Rechercher…<span class="kbd">Ctrl K</span></button>
+    <nav aria-label="Sections">
+      <a class="side-it" href="#accueil" data-page="accueil"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-home"/></svg><span class="nom">Accueil</span></a>
+      <a class="side-it" href="#rentabilite" data-page="rentabilite"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-chart"/></svg><span class="nom">Rentabilité</span></a>
+      <a class="side-it" href="#achats" data-page="achats"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-ticket"/></svg><span class="nom">Achats</span></a>
+      <a class="side-it" href="#production" data-page="production"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-clock"/></svg><span class="nom">Production</span></a>
+      <a class="side-it" href="#fonctions" data-page="fonctions"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-grid"/></svg><span class="nom">Fonctions</span></a>
+      <a class="side-it" href="#equipe" data-page="equipe"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-users"/></svg><span class="nom">Équipe</span></a>
+      <a class="side-it" href="#assistant" data-page="assistant"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-sparkle"/></svg><span class="nom">Assistant IA</span></a>
+      <a class="side-it" href="#service" data-page="service"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-shield"/></svg><span class="nom">Service</span></a>
+      <a class="side-it" href="#offre" data-page="offre"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-star"/></svg><span class="nom">Offre</span></a>
+      <a class="side-it" href="#faq" data-page="faq"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-help"/></svg><span class="nom">Questions</span></a>
     </nav>
-    <a class="btn btn-primary btn-sm" data-contact href="#contact">Demander une démo</a>
-  </div>
-</header>
+    <div class="side-lbl">Essayer RecipeLog</div>
+    <div class="side-cta">
+      <a class="btn pri w" data-contact href="#contact"><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-mail"/></svg>Demander une démo</a>
+      <a class="btn w" data-demo href="#demo"><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-play"/></svg>Ouvrir la démo</a>
+    </div>
+    <div class="side-foot">
+      <button class="side-it" type="button" data-apparence><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-palette"/></svg><span class="nom">Apparence</span></button>
+    </div>
+  </aside>
 
-<main>
+  <div class="main">
+    <!-- Barre du haut : téléphone et tablette (en verre). -->
+    <header class="top">
+      <a class="brand" href="#accueil">
+        <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect class="lg-a" width="64" height="64" rx="15"/><g class="lg-t" transform="translate(14 13) scale(1.5)"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></g></svg>
+        <span class="wm">Recipe<b>Log</b></span>
+      </a>
+      <span class="esp"></span>
+      <button class="ib" type="button" data-apparence aria-label="Apparence"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-palette"/></svg></button>
+      <button class="ib" type="button" data-encre-recherche aria-label="Rechercher"><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-search"/></svg></button>
+      <a class="btn pri sm" data-contact href="#contact">Démo</a>
+    </header>
+
+    <main class="pages">
 
 <!-- ───────────── Accueil ───────────── -->
-<section class="hero">
+<section class="hero" id="accueil">
   <div class="wrap hero-in">
     <div class="hero-text">
       <p class="eyebrow">Logiciel pour laboratoires de pâtisserie</p>
@@ -49,8 +93,8 @@
         de chaque hausse fournisseur sur vos marges et toute votre équipe produit à partir des mêmes fiches.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary" data-contact href="#contact">Demander une démonstration</a>
-        <a class="btn btn-ghost" data-demo href="#demo">Essayer la démo en ligne</a>
+        <a class="btn pri lg" data-contact href="#contact">Demander une démonstration</a>
+        <a class="btn lg" data-demo href="#demo"><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-play"/></svg>Essayer la démo en ligne</a>
       </div>
       <ul class="hero-points">
         <li>Aucune installation, accessible partout</li>
@@ -66,28 +110,28 @@
           <div class="scr-head">
             <span class="scr-tag">Petits gâteaux · Boutique</span>
             <h3>Financiers amande</h3>
-            <p class="scr-sub">40 pièces · 1 040 g · Moule à financier</p>
+            <p class="scr-sub">40 pièces · 1 040 g · Moule à financier</p>
           </div>
           <div class="scr-mult">
             <span class="chip on">×1</span><span class="chip">Masse</span><span class="chip">Pièces</span><span class="chip">Moule</span>
           </div>
           <ul class="scr-ing">
-            <li><span>Beurre</span><b>250 g</b><i>24 %</i></li>
-            <li><span>Sucre glace</span><b>300 g</b><i>29 %</i></li>
-            <li><span>Poudre d'amande</span><b>120 g</b><i>12 %</i></li>
-            <li><span>Farine T55</span><b>100 g</b><i>10 %</i></li>
-            <li><span>Blancs d'œufs</span><b>8 pc</b><i>23 %</i></li>
-            <li><span>Miel</span><b>30 g</b><i>3 %</i></li>
+            <li><span>Beurre</span><b>250 g</b><i>24 %</i></li>
+            <li><span>Sucre glace</span><b>300 g</b><i>29 %</i></li>
+            <li><span>Poudre d'amande</span><b>120 g</b><i>12 %</i></li>
+            <li><span>Farine T55</span><b>100 g</b><i>10 %</i></li>
+            <li><span>Blancs d'œufs</span><b>8 pc</b><i>23 %</i></li>
+            <li><span>Miel</span><b>30 g</b><i>3 %</i></li>
           </ul>
           <div class="scr-foot">
-            <div><small>Coût de revient</small><b>6,01 €</b></div>
-            <div><small>Par pièce</small><b>0,15 €</b></div>
-            <div class="wide"><small>Vente 1,80 € TTC · TVA 5,5 %</small><b class="ok">Marge brute 1,56 € / pièce · 91 %</b></div>
+            <div><small>Coût de revient</small><b>6,01 €</b></div>
+            <div><small>Par pièce</small><b>0,15 €</b></div>
+            <div class="wide"><small>Vente 1,80 € TTC · TVA 5,5 %</small><b class="ok">Marge brute 1,56 € / pièce · 91 %</b></div>
           </div>
         </div>
       </div>
-      <div class="float f1"><span class="dot pk"></span>Beurre : +4,2 % chez votre fournisseur</div>
-      <div class="float f2"><span class="dot ok"></span>Allergènes : gluten, œuf, lait, fruits à coque</div>
+      <div class="float f1"><span class="dot pk"></span>Beurre : +4,2 % chez votre fournisseur</div>
+      <div class="float f2"><span class="dot ok"></span>Allergènes : gluten, œuf, lait, fruits à coque</div>
     </div>
   </div>
 </section>
@@ -97,11 +141,11 @@
   <div class="wrap">
     <p class="who-title">Conçu pour</p>
     <ul class="who-list">
-      <li>Pâtisseries et boulangeries</li>
-      <li>Laboratoires et traiteurs</li>
-      <li>Chocolatiers et glaciers</li>
-      <li>Restaurants et hôtels</li>
-      <li>Écoles et CFA</li>
+      <li class="chip">Pâtisseries et boulangeries</li>
+      <li class="chip">Laboratoires et traiteurs</li>
+      <li class="chip">Chocolatiers et glaciers</li>
+      <li class="chip">Restaurants et hôtels</li>
+      <li class="chip">Écoles et CFA</li>
     </ul>
   </div>
 </section>
@@ -114,49 +158,49 @@
       <h2>Sachez ce que rapporte chaque produit.</h2>
       <p>
         Le coût de revient se calcule à partir des prix d'achat réels de vos ingrédients, sous-recettes
-        comprises. Indiquez votre prix de vente : RecipeLog en déduit le prix HT selon la TVA, la marge brute,
+        comprises. Indiquez votre prix de vente : RecipeLog en déduit le prix HT selon la TVA, la marge brute,
         le taux de marge et le coefficient. Quand un fournisseur augmente un tarif, toutes les recettes qui
-        utilisent ce produit sont recalculées : vous voyez aussitôt l'effet sur votre coût et sur votre marge.
+        utilisent ce produit sont recalculées : vous voyez aussitôt l'effet sur votre coût et sur votre marge.
       </p>
       <ul class="checks">
         <li><b>Coût matière et coût par pièce</b>, à toutes les quantités, avec le détail ingrédient par ingrédient et le produit fournisseur dont vient chaque prix.</li>
-        <li><b>Prix de vente, marge brute et taux de marge</b>, en TTC ou HT, avec une TVA à 5,5 %, 10 % ou 20 %.</li>
+        <li><b>Prix de vente, marge brute et taux de marge</b>, en TTC ou HT, avec une TVA à 5,5 %, 10 % ou 20 %.</li>
         <li><b>Prix de vente conseillé</b> à partir de votre coefficient, recette par recette.</li>
         <li><b>Tous vos prix d'achat sur une seule page</b>, modifiables sur place, avec l'écart par rapport au prix précédent.</li>
-        <li><b>Pas de coût faussé à votre insu</b> : un ingrédient sans prix est signalé, et vous lui associez un produit fournisseur en un clic.</li>
+        <li><b>Pas de coût faussé à votre insu</b> : un ingrédient sans prix est signalé, et vous lui associez un produit fournisseur en un clic.</li>
       </ul>
     </div>
 
-    <div class="card calc">
+    <div class="carte calc">
       <div class="calc-head">
         <div>
           <h3>Financiers amande</h3>
-          <p class="muted small" style="margin:0">Simulez votre marge</p>
+          <p class="muted petit">Simulez votre marge</p>
         </div>
-        <button class="help-btn" type="button" data-help="help-marge" aria-label="Aide : le calcul de la marge">?</button>
+        <button class="aide-q" type="button" data-help="aide-marge" aria-label="Aide : le calcul de la marge">?</button>
       </div>
       <label class="calc-field">
         <span>Prix de vente d'une pièce (TTC)</span>
-        <input id="m-prix" type="number" inputmode="decimal" step="0.05" min="0" value="1.80">
+        <input class="input" id="m-prix" type="number" inputmode="decimal" step="0.05" min="0" value="1.80">
         <em>€</em>
       </label>
       <label class="calc-field">
         <span>TVA</span>
-        <select id="m-tva">
-          <option value="5.5" selected>5,5 %</option>
-          <option value="10">10 %</option>
-          <option value="20">20 %</option>
+        <select class="select" id="m-tva">
+          <option value="5.5" selected>5,5 %</option>
+          <option value="10">10 %</option>
+          <option value="20">20 %</option>
         </select>
         <em></em>
       </label>
       <label class="calc-field">
         <span>Prix du beurre (le kg HT)</span>
-        <input id="m-beurre" type="number" inputmode="decimal" step="0.1" min="0" value="9.80">
+        <input class="input" id="m-beurre" type="number" inputmode="decimal" step="0.1" min="0" value="9.80">
         <em>€</em>
       </label>
       <label class="calc-field">
         <span>Pièces à produire</span>
-        <input id="m-pieces" type="number" inputmode="numeric" step="10" min="1" value="40">
+        <input class="input" id="m-pieces" type="number" inputmode="numeric" step="10" min="1" value="40">
         <em>pc</em>
       </label>
       <dl class="calc-out">
@@ -173,25 +217,25 @@
 
 <!-- ───────────── Achats ───────────── -->
 <section class="section alt" id="achats">
-  <div class="wrap split rev">
-    <div class="card table-card" aria-hidden="true">
-      <div class="tc-head"><b>Comparer les prix</b><span class="muted small">Crèmerie et œufs · le kg HT</span></div>
+  <div class="wrap duo rev">
+    <div class="carte table-card" aria-hidden="true">
+      <div class="tc-head"><b>Comparer les prix</b><span class="muted petit">Crèmerie et œufs · le kg HT</span></div>
       <div class="tc-row tc-th"><span>Article</span><span>Fournisseur A</span><span>Fournisseur B</span><span>Fournisseur C</span></div>
-      <div class="tc-row"><span>Beurre doux 82 %</span><span>9,80 € <i class="up">+4,2 %</i></span><span class="best">9,35 €</span><span>10,10 €</span></div>
-      <div class="tc-row"><span>Crème 35 %</span><span class="best">4,62 €</span><span>4,90 €</span><span>–</span></div>
-      <div class="tc-row"><span>Blancs liquides</span><span>4,20 €</span><span>–</span><span class="best">3,95 € <i class="down">−2 %</i></span></div>
-      <div class="tc-row"><span>Lait entier</span><span class="best">1,08 €</span><span>1,12 €</span><span>1,15 €</span></div>
+      <div class="tc-row"><span>Beurre doux 82 %</span><span>9,80 € <i class="up">+4,2 %</i></span><span class="best">9,35 €</span><span>10,10 €</span></div>
+      <div class="tc-row"><span>Crème 35 %</span><span class="best">4,62 €</span><span>4,90 €</span><span>–</span></div>
+      <div class="tc-row"><span>Blancs liquides</span><span>4,20 €</span><span>–</span><span class="best">3,95 € <i class="down">−2 %</i></span></div>
+      <div class="tc-row"><span>Lait entier</span><span class="best">1,08 €</span><span>1,12 €</span><span>1,15 €</span></div>
     </div>
     <div>
       <p class="eyebrow">Achats et fournisseurs</p>
       <h2>Vos factures deviennent un historique de prix.</h2>
-      <p>Envoyez une facture ou un bon de livraison, en photo ou en PDF, à l'assistant IA : chaque ligne est rangée chez le bon fournisseur, avec son prix ramené au kilo, au litre ou à la pièce, à la date de la facture.</p>
+      <p>Envoyez une facture ou un bon de livraison, en photo ou en PDF, à l'assistant IA : chaque ligne est rangée chez le bon fournisseur, avec son prix ramené au kilo, au litre ou à la pièce, à la date de la facture.</p>
       <ul class="checks">
         <li><b>Jusqu'à trois fournisseurs comparés</b> côte à côte, par famille de produits, avec le moins cher mis en évidence et l'évolution de chaque prix.</li>
-        <li><b>Historique complet</b> de chaque article : dernier prix, moyenne, plus bas, plus haut, sur la période de votre choix.</li>
-        <li><b>Rien n'est écrasé</b> : chaque prix renvoie à sa facture d'origine, PDF ou photo jointe.</li>
-        <li><b>Un choix qui s'applique partout</b> : le produit fournisseur retenu pour un ingrédient sert à toutes les recettes qui l'utilisent.</li>
-        <li><b>Les variantes regroupées</b> : la fraise d'Espagne et la fraise de France forment un seul article, le chocolat reste séparé par pourcentage.</li>
+        <li><b>Historique complet</b> de chaque article : dernier prix, moyenne, plus bas, plus haut, sur la période de votre choix.</li>
+        <li><b>Rien n'est écrasé</b> : chaque prix renvoie à sa facture d'origine, PDF ou photo jointe.</li>
+        <li><b>Un choix qui s'applique partout</b> : le produit fournisseur retenu pour un ingrédient sert à toutes les recettes qui l'utilisent.</li>
+        <li><b>Les variantes regroupées</b> : la fraise d'Espagne et la fraise de France forment un seul article, le chocolat reste séparé par pourcentage.</li>
       </ul>
     </div>
   </div>
@@ -200,35 +244,35 @@
 <!-- ───────────── Chiffres ───────────── -->
 <section class="stats">
   <div class="wrap stats-in">
-    <div><b>14</b><span>allergènes réglementaires suivis</span></div>
-    <div><b>3</b><span>fournisseurs comparés côte à côte</span></div>
-    <div><b>5</b><span>façons d'adapter une recette</span></div>
-    <div><b>7</b><span>modèles de fiches PDF</span></div>
-    <div><b>0</b><span>installation à faire</span></div>
+    <div class="tuile"><b class="v">14</b><span class="s">allergènes réglementaires suivis</span></div>
+    <div class="tuile"><b class="v">3</b><span class="s">fournisseurs comparés côte à côte</span></div>
+    <div class="tuile"><b class="v">5</b><span class="s">façons d'adapter une recette</span></div>
+    <div class="tuile"><b class="v">7</b><span class="s">modèles de fiches PDF</span></div>
+    <div class="tuile"><b class="v">0</b><span class="s">installation à faire</span></div>
   </div>
 </section>
 
 <!-- ───────────── Production ───────────── -->
 <section class="section" id="production">
-  <div class="wrap split">
+  <div class="wrap duo">
     <div>
       <p class="eyebrow">Production</p>
       <h2>Du nombre de pièces aux pesées.</h2>
       <ul class="checks">
-        <li><b>Fiche de production.</b> Indiquez « 60 éclairs » : toutes les pesées sont calculées, sous-recettes comprises, une préparation par encadré dans l'ordre de fabrication, prête à imprimer en PDF.</li>
-        <li><b>Plusieurs produits à la fois.</b> Les préparations communes s'additionnent : une seule pâte à choux pour les éclairs et les religieuses.</li>
-        <li><b>Adaptation des quantités.</b> Par coefficient, masse visée, ingrédient disponible, nombre de pièces ou changement de moule (cercle de 18 cm vers 24 cm, cadre 40 × 60 vers cercles).</li>
+        <li><b>Fiche de production.</b> Indiquez « 60 éclairs » : toutes les pesées sont calculées, sous-recettes comprises, une préparation par encadré dans l'ordre de fabrication, prête à imprimer en PDF.</li>
+        <li><b>Plusieurs produits à la fois.</b> Les préparations communes s'additionnent : une seule pâte à choux pour les éclairs et les religieuses.</li>
+        <li><b>Adaptation des quantités.</b> Par coefficient, masse visée, ingrédient disponible, nombre de pièces ou changement de moule (cercle de 18 cm vers 24 cm, cadre 40 × 60 vers cercles).</li>
         <li><b>Mode labo.</b> La recette en grand sur tablette ou téléphone, l'écran reste allumé, les pesées se cochent et les durées indiquées dans les étapes deviennent des minuteurs.</li>
       </ul>
     </div>
-    <div class="lab-card card" aria-hidden="true">
-      <div class="lab-top"><span class="pill">Fiche de production · 60 pièces</span><span class="timer">17:42</span></div>
+    <div class="lab-card carte" aria-hidden="true">
+      <div class="lab-top"><span class="pill">Fiche de production · 60 pièces</span><span class="timer">17:42</span></div>
       <h3>Éclairs chocolat</h3>
       <ol class="lab-steps">
-        <li class="done">Pâte à choux · 1 420 g</li>
-        <li class="done">Crémeux chocolat 64 % · 1 200 g</li>
-        <li class="now">Cuire 18 min à 165 °C, sans ouvrir le four</li>
-        <li>Glaçage miroir · 600 g</li>
+        <li class="done">Pâte à choux · 1 420 g</li>
+        <li class="done">Crémeux chocolat 64 % · 1 200 g</li>
+        <li class="now">Cuire 18 min à 165 °C, sans ouvrir le four</li>
+        <li>Glaçage miroir · 600 g</li>
         <li>Garnir et glacer</li>
       </ol>
       <div class="lab-bar"><span style="width:52%"></span></div>
@@ -243,48 +287,48 @@
     <h2 class="center">Tout ce dont un laboratoire a besoin.</h2>
     <p class="center lead narrow">Des fiches techniques fiables, partagées par toute l'équipe et toujours à jour.</p>
 
-    <div class="tabs" role="tablist" aria-label="Familles de fonctions">
-      <button type="button" role="tab" class="on" data-tab="t-fiches" aria-controls="t-fiches" aria-selected="true">Fiches techniques</button>
-      <button type="button" role="tab" data-tab="t-qualite" aria-controls="t-qualite" aria-selected="false">Allergènes et qualité</button>
-      <button type="button" role="tab" data-tab="t-impression" aria-controls="t-impression" aria-selected="false">Impression</button>
-      <button type="button" role="tab" data-tab="t-rangement" aria-controls="t-rangement" aria-selected="false">Organisation</button>
+    <div class="chips tabs" role="tablist" aria-label="Familles de fonctions">
+      <button type="button" role="tab" class="chip on" data-tab="t-fiches" aria-controls="t-fiches" aria-selected="true">Fiches techniques</button>
+      <button type="button" role="tab" class="chip" data-tab="t-qualite" aria-controls="t-qualite" aria-selected="false">Allergènes et qualité</button>
+      <button type="button" role="tab" class="chip" data-tab="t-impression" aria-controls="t-impression" aria-selected="false">Impression</button>
+      <button type="button" role="tab" class="chip" data-tab="t-rangement" aria-controls="t-rangement" aria-selected="false">Organisation</button>
     </div>
 
     <div class="tab-panel on" id="t-fiches" role="tabpanel">
       <div class="grid">
-        <article class="feat"><div class="ic">◫</div><h3>Sous-recettes</h3><p>Un entremets qui contient un biscuit, lui-même fait d'une pâte d'amande : les masses, les coûts et les allergènes suivent à tous les niveaux. Une sous-recette peut être verrouillée pour garder sa quantité.</p></article>
-        <article class="feat"><div class="ic">%</div><h3>Masses et pourcentages</h3><p>Chaque ingrédient affiche sa part de la masse totale. Les ingrédients comptés à la pièce (œufs, jaunes) ont un poids et entrent dans le total.</p></article>
-        <article class="feat"><div class="ic">◎</div><h3>Rendement</h3><p>Chaque recette connaît son rendement (40 financiers, 1 040 g) et en déduit le coût par pièce.</p></article>
-        <article class="feat"><div class="ic">⇄</div><h3>Essais et variantes</h3><p>Gardez vos essais sous la recette d'origine et comparez deux versions : écart de chaque ingrédient en grammes et en pourcentage, étapes modifiées en couleur.</p></article>
-        <article class="feat"><div class="ic">¶</div><h3>Étapes précises</h3><p>Intertitres (pâte, crème, montage) et quantités liées dans le texte, qui suivent chaque adaptation de la recette. Unités g, L, cuillères, pièces et QS.</p></article>
-        <article class="feat"><div class="ic">↺</div><h3>Historique</h3><p>Les dernières recettes ouvertes par chaque personne, les favoris et les notes d'essai.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-layers"/></svg></div><h3>Sous-recettes</h3><p>Un entremets qui contient un biscuit, lui-même fait d'une pâte d'amande : les masses, les coûts et les allergènes suivent à tous les niveaux. Une sous-recette peut être verrouillée pour garder sa quantité.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-hash"/></svg></div><h3>Masses et pourcentages</h3><p>Chaque ingrédient affiche sa part de la masse totale. Les ingrédients comptés à la pièce (œufs, jaunes) ont un poids et entrent dans le total.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-zap"/></svg></div><h3>Rendement</h3><p>Chaque recette connaît son rendement (40 financiers, 1 040 g) et en déduit le coût par pièce.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-refresh"/></svg></div><h3>Essais et variantes</h3><p>Gardez vos essais sous la recette d'origine et comparez deux versions : écart de chaque ingrédient en grammes et en pourcentage, étapes modifiées en couleur.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-list"/></svg></div><h3>Étapes précises</h3><p>Intertitres (pâte, crème, montage) et quantités liées dans le texte, qui suivent chaque adaptation de la recette. Unités g, L, cuillères, pièces et QS.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-clock"/></svg></div><h3>Historique</h3><p>Les dernières recettes ouvertes par chaque personne, les favoris et les notes d'essai.</p></article>
       </div>
     </div>
 
     <div class="tab-panel" id="t-qualite" role="tabpanel">
       <div class="grid">
-        <article class="feat"><div class="ic">⚠</div><h3>Allergènes automatiques</h3><p>Les 14 allergènes réglementaires (règlement INCO) se renseignent une seule fois, sur l'ingrédient. Chaque recette les cumule, sous-recettes comprises, et indique l'ingrédient qui les apporte.</p></article>
-        <article class="feat"><div class="ic">✓</div><h3>Une seule version de la recette</h3><p>Toute l'équipe travaille sur la même fiche : fini les photocopies annotées et les cahiers différents d'un poste à l'autre.</p></article>
-        <article class="feat"><div class="ic">◉</div><h3>Ingrédients propres</h3><p>Chaque ingrédient sait dans quelles recettes il sert et en quelle quantité. Les doublons se fusionnent en un clic.</p></article>
-        <article class="feat"><div class="ic">≡</div><h3>Journal des actions</h3><p>Qui a demandé un accès, qui l'a accepté, qui a changé un rôle, et quand.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-alert"/></svg></div><h3>Allergènes automatiques</h3><p>Les 14 allergènes réglementaires (règlement INCO) se renseignent une seule fois, sur l'ingrédient. Chaque recette les cumule, sous-recettes comprises, et indique l'ingrédient qui les apporte.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-check"/></svg></div><h3>Une seule version de la recette</h3><p>Toute l'équipe travaille sur la même fiche : fini les photocopies annotées et les cahiers différents d'un poste à l'autre.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-checks"/></svg></div><h3>Ingrédients propres</h3><p>Chaque ingrédient sait dans quelles recettes il sert et en quelle quantité. Les doublons se fusionnent en un clic.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-eye"/></svg></div><h3>Journal des actions</h3><p>Qui a demandé un accès, qui l'a accepté, qui a changé un rôle, et quand.</p></article>
       </div>
     </div>
 
     <div class="tab-panel" id="t-impression" role="tabpanel">
       <div class="grid">
-        <article class="feat"><div class="ic">❏</div><h3>Cahiers de recettes</h3><p>Plusieurs recettes réunies en un PDF avec chapitres, couverture et sommaire aux numéros de page exacts.</p></article>
-        <article class="feat"><div class="ic">✦</div><h3>Modèles à votre image</h3><p>Sept modèles fournis (fiche technique, classique, moderne…) et un éditeur avec aperçu : polices, marges, en-tête, ingrédients sur deux colonnes.</p></article>
-        <article class="feat"><div class="ic">☑</div><h3>Listes de courses</h3><p>Les quantités de plusieurs recettes s'additionnent, sous-recettes comprises, et se cochent au fil des achats.</p></article>
-        <article class="feat"><div class="ic">↗</div><h3>Partage en lecture seule</h3><p>Un lien pour transmettre une recette à un client ou un partenaire, sans lui ouvrir le logiciel.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-lib"/></svg></div><h3>Cahiers de recettes</h3><p>Plusieurs recettes réunies en un PDF avec chapitres, couverture et sommaire aux numéros de page exacts.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-type"/></svg></div><h3>Modèles à votre image</h3><p>Sept modèles fournis (fiche technique, classique, moderne…) et un éditeur avec aperçu : polices, marges, en-tête, ingrédients sur deux colonnes.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-listplus"/></svg></div><h3>Listes de courses</h3><p>Les quantités de plusieurs recettes s'additionnent, sous-recettes comprises, et se cochent au fil des achats.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-share"/></svg></div><h3>Partage en lecture seule</h3><p>Un lien pour transmettre une recette à un client ou un partenaire, sans lui ouvrir le logiciel.</p></article>
       </div>
     </div>
 
     <div class="tab-panel" id="t-rangement" role="tabpanel">
       <div class="grid">
-        <article class="feat"><div class="ic">▣</div><h3>Dossiers et catégories</h3><p>Rangez par gamme, boutique, saison ou client, avec des dossiers de couleur, des catégories, des mots-clés et des favoris.</p></article>
-        <article class="feat"><div class="ic">⌕</div><h3>Recherche complète</h3><p>Par nom, par ingrédient ou dans le texte des étapes et des notes. « jaunes + crème » trouve les recettes qui contiennent les deux.</p></article>
-        <article class="feat"><div class="ic">⇩</div><h3>Reprise de l'existant</h3><p>Import depuis Recipe Keeper ou un fichier JSON, et export complet de vos recettes au format JSON, à tout moment.</p></article>
-        <article class="feat"><div class="ic">▯</div><h3>Comme une application</h3><p>RecipeLog s'ajoute à l'écran d'accueil du téléphone ou de la tablette et s'ouvre en plein écran.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-bookmark"/></svg></div><h3>Dossiers et catégories</h3><p>Rangez par gamme, boutique, saison ou client, avec des dossiers de couleur, des catégories, des mots-clés et des favoris.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-search"/></svg></div><h3>Recherche complète</h3><p>Par nom, par ingrédient ou dans le texte des étapes et des notes. « jaunes + crème » trouve les recettes qui contiennent les deux.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-download"/></svg></div><h3>Reprise de l'existant</h3><p>Import depuis Recipe Keeper ou un fichier JSON, et export complet de vos recettes au format JSON, à tout moment.</p></article>
+        <article class="feat"><div class="ic"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-home"/></svg></div><h3>Comme une application</h3><p>RecipeLog s'ajoute à l'écran d'accueil du téléphone ou de la tablette et s'ouvre en plein écran.</p></article>
       </div>
     </div>
   </div>
@@ -292,19 +336,19 @@
 
 <!-- ───────────── Équipe ───────────── -->
 <section class="section" id="equipe">
-  <div class="wrap split rev">
-    <div class="roles card" aria-hidden="true">
-      <div class="role"><span class="av" style="--c:#f0a64a">A</span><div><b>Chef pâtissier</b><small>Administrateur · tous les droits</small></div></div>
-      <div class="role"><span class="av" style="--c:#4fc0ad">G</span><div><b>Gérance</b><small>Coûts, marges et achats · impression</small></div></div>
-      <div class="role"><span class="av" style="--c:#8f9cf0">P</span><div><b>Commis</b><small>Recettes de la gamme boutique · sans les prix</small></div></div>
-      <div class="role pending"><span class="av" style="--c:#6f7a90">?</span><div><b>Nouvelle demande d'accès</b><small>En attente · choisir un rôle</small></div></div>
+  <div class="wrap duo rev">
+    <div class="roles carte" aria-hidden="true">
+      <div class="role"><span class="av c-acc">A</span><div><b>Chef pâtissier</b><small>Administrateur · tous les droits</small></div></div>
+      <div class="role"><span class="av c-ok">G</span><div><b>Gérance</b><small>Coûts, marges et achats · impression</small></div></div>
+      <div class="role"><span class="av c-prog">P</span><div><b>Commis</b><small>Recettes de la gamme boutique · sans les prix</small></div></div>
+      <div class="role pending"><span class="av c-muted">?</span><div><b>Nouvelle demande d'accès</b><small>En attente · choisir un rôle</small></div></div>
     </div>
     <div>
       <p class="eyebrow">Équipe</p>
       <h2>Chacun voit ce dont il a besoin.</h2>
-      <p>Chaque collaborateur a son propre accès : les recettes se transmettent sans photocopies, et vous décidez qui voit quoi. Vous créez les rôles et cochez ce que chacun peut faire.</p>
+      <p>Chaque collaborateur a son propre accès : les recettes se transmettent sans photocopies, et vous décidez qui voit quoi. Vous créez les rôles et cochez ce que chacun peut faire.</p>
       <ul class="checks">
-        <li><b>Rôles sur mesure.</b> Modifier ou supprimer des recettes, voir ou modifier les prix, gérer la production, imprimer : chaque droit s'accorde séparément.</li>
+        <li><b>Rôles sur mesure.</b> Modifier ou supprimer des recettes, voir ou modifier les prix, gérer la production, imprimer : chaque droit s'accorde séparément.</li>
         <li><b>Prix confidentiels.</b> Sans le droit de voir les prix, aucun coût ni aucune marge n'arrive sur l'appareil du collaborateur.</li>
         <li><b>Recettes par gamme.</b> Un apprenti ou un commis peut ne voir que certaines catégories de recettes.</li>
         <li><b>Contrôle.</b> L'administrateur voit le logiciel comme le voit un collaborateur, et un journal garde la trace des accès.</li>
@@ -315,23 +359,23 @@
 
 <!-- ───────────── Assistant IA ───────────── -->
 <section class="section alt" id="assistant">
-  <div class="wrap split">
+  <div class="wrap duo">
     <div>
       <p class="eyebrow">Assistant IA</p>
       <h2>La saisie, déléguée.</h2>
-      <p>RecipeLog se connecte à Claude, l'assistant IA d'Anthropic. Vous lui écrivez comme à un collègue, et il travaille directement dans votre RecipeLog grâce à plus de 70 actions.</p>
+      <p>RecipeLog se connecte à Claude, l'assistant IA d'Anthropic. Vous lui écrivez comme à un collègue, et il travaille directement dans votre RecipeLog grâce à plus de 70 actions.</p>
       <ul class="checks">
         <li><b>Factures.</b> Une photo de facture, et chaque prix est enregistré chez le bon fournisseur, regroupé avec les mêmes articles.</li>
         <li><b>Nouvelles recettes.</b> À partir d'un texte, d'une photo, d'une page web ou d'une vidéo, en reprenant vos ingrédients existants plutôt que d'en créer de nouveaux.</li>
-        <li><b>Questions de gestion.</b> « Combien me coûte cette tarte ? », « Adaptez-la pour 3 cercles de 22 cm », « Préparez la production de samedi ».</li>
+        <li><b>Questions de gestion.</b> « Combien me coûte cette tarte ? », « Adaptez-la pour 3 cercles de 22 cm », « Préparez la production de samedi ».</li>
       </ul>
-      <p class="muted small">Option qui nécessite un abonnement Claude. Chaque accès a sa propre clé secrète, que vous pouvez révoquer à tout moment.</p>
+      <p class="muted petit">Option qui nécessite un abonnement Claude. Chaque accès a sa propre clé secrète, que vous pouvez révoquer à tout moment.</p>
     </div>
-    <div class="chat card" aria-hidden="true">
+    <div class="chat carte" aria-hidden="true">
       <div class="msg me">Enregistrez cette facture.<span class="att">facture-crèmerie.pdf</span></div>
-      <div class="msg ai">Facture du 10/11 enregistrée chez votre fournisseur crèmerie : 14 lignes. Le <b>beurre doux 82 %</b> passe de 9,40 € à 9,80 € le kg (+4,2 %). Il entre dans 23 recettes.</div>
-      <div class="msg me">Quel est l'impact sur les financiers ?</div>
-      <div class="msg ai">Coût par pièce : 0,150 € au lieu de 0,148 €. À 1,80 € TTC, la marge brute reste à 1,56 € par pièce (91 %).</div>
+      <div class="msg ai">Facture du 10/11 enregistrée chez votre fournisseur crèmerie : 14 lignes. Le <b>beurre doux 82 %</b> passe de 9,40 € à 9,80 € le kg (+4,2 %). Il entre dans 23 recettes.</div>
+      <div class="msg me">Quel est l'impact sur les financiers ?</div>
+      <div class="msg ai">Coût par pièce : 0,150 € au lieu de 0,148 €. À 1,80 € TTC, la marge brute reste à 1,56 € par pièce (91 %).</div>
     </div>
   </div>
 </section>
@@ -342,10 +386,10 @@
     <p class="eyebrow center">Un service clé en main</p>
     <h2 class="center">Vous produisez, nous nous occupons du reste.</h2>
     <div class="steps four">
-      <div class="step card"><span>✓</span><h3>Rien à installer</h3><p>Votre RecipeLog est hébergé et maintenu pour vous. Un navigateur suffit, au bureau comme au labo.</p></div>
-      <div class="step card"><span>✓</span><h3>Données protégées</h3><p>Chaque client a son propre espace, séparé des autres. Connexion sécurisée par code envoyé par e-mail, et sauvegardes régulières.</p></div>
-      <div class="step card"><span>✓</span><h3>Toujours à jour</h3><p>De nouvelles fonctions chaque mois, installées pour vous. La page « Version et nouveautés » présente chaque ajout.</p></div>
-      <div class="step card"><span>✓</span><h3>Vos recettes restent à vous</h3><p>Vous pouvez exporter l'ensemble de vos recettes à tout moment, pendant toute la durée de votre abonnement.</p></div>
+      <div class="step carte"><span><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-cloud"/></svg></span><h3>Rien à installer</h3><p>Votre RecipeLog est hébergé et maintenu pour vous. Un navigateur suffit, au bureau comme au labo.</p></div>
+      <div class="step carte"><span><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-shield"/></svg></span><h3>Données protégées</h3><p>Chaque client a son propre espace, séparé des autres. Connexion sécurisée par code envoyé par e-mail, et sauvegardes régulières.</p></div>
+      <div class="step carte"><span><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-refresh"/></svg></span><h3>Toujours à jour</h3><p>De nouvelles fonctions chaque mois, installées pour vous. La page « Version et nouveautés » présente chaque ajout.</p></div>
+      <div class="step carte"><span><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-download"/></svg></span><h3>Vos recettes restent à vous</h3><p>Vous pouvez exporter l'ensemble de vos recettes à tout moment, pendant toute la durée de votre abonnement.</p></div>
     </div>
   </div>
 </section>
@@ -357,20 +401,20 @@
       <p class="eyebrow">Offre</p>
       <h2>Une location mensuelle, tout compris.</h2>
       <p>Pas de logiciel à acheter ni de matériel à prévoir. Un abonnement mensuel couvre la mise en service, l'hébergement, les mises à jour et l'assistance.</p>
-      <p class="muted small">Tarif selon la taille de votre structure et le nombre de collaborateurs. Démonstration sans engagement.</p>
+      <p class="muted petit">Tarif selon la taille de votre structure et le nombre de collaborateurs. Démonstration sans engagement.</p>
     </div>
-    <div class="card offer">
+    <div class="carte offer">
       <p class="offer-name">RecipeLog Pro</p>
       <p class="offer-price">Sur devis</p>
       <ul class="checks">
         <li>Mise en service et reprise de vos recettes</li>
-        <li>Toutes les fonctions : coûts, achats, production, impression</li>
+        <li>Toutes les fonctions : coûts, achats, production, impression</li>
         <li>Accès pour toute votre équipe, avec rôles et droits</li>
         <li>Hébergement, sauvegardes et mises à jour</li>
         <li>Assistance par e-mail</li>
         <li>Assistant IA en option (abonnement Claude)</li>
       </ul>
-      <a class="btn btn-primary btn-full" data-contact href="#contact">Demander un devis</a>
+      <a class="btn pri w lg" data-contact href="#contact">Demander un devis</a>
     </div>
   </div>
 </section>
@@ -381,70 +425,116 @@
     <p class="eyebrow center">Questions fréquentes</p>
     <h2 class="center">Bon à savoir</h2>
     <div class="faq">
-      <details><summary>Faut-il installer quelque chose ?</summary><p>Non. RecipeLog s'ouvre dans le navigateur, sur ordinateur, tablette ou téléphone. Il peut aussi s'ajouter à l'écran d'accueil comme une application.</p></details>
-      <details><summary>Comment reprendre mes recettes actuelles ?</summary><p>La reprise est comprise dans la mise en service. Les recettes peuvent être importées depuis Recipe Keeper ou un fichier JSON, ou saisies à partir de vos fiches, photos et documents.</p></details>
-      <details><summary>Combien de personnes peuvent l'utiliser ?</summary><p>Toute votre équipe. Chaque personne a son accès et un rôle qui définit ce qu'elle peut voir et modifier, prix compris.</p></details>
-      <details><summary>Le coût de revient est-il fiable si un prix manque ?</summary><p>Un ingrédient sans prix est signalé dans le détail du coût. Un clic suffit pour lui associer un produit de vos fournisseurs.</p></details>
-      <details><summary>Que se passe-t-il quand un fournisseur augmente ses prix ?</summary><p>Dès que la facture est enregistrée, le nouveau prix s'applique aux recettes qui utilisent ce produit : coût de revient et marge sont recalculés. L'historique garde les anciens prix, pour suivre l'évolution et comparer avec vos autres fournisseurs.</p></details>
-      <details><summary>Que deviennent mes données si j'arrête ?</summary><p>Elles vous appartiennent. Vous pouvez exporter toutes vos recettes à tout moment, y compris avant la fin de l'abonnement.</p></details>
-      <details><summary>L'assistant IA est-il obligatoire ?</summary><p>Non, toutes les fonctions s'utilisent sans lui. Il fait gagner du temps sur la saisie des factures et des recettes, et nécessite un abonnement Claude.</p></details>
+      <details><summary>Faut-il installer quelque chose ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Non. RecipeLog s'ouvre dans le navigateur, sur ordinateur, tablette ou téléphone. Il peut aussi s'ajouter à l'écran d'accueil comme une application.</p></div></details>
+      <details><summary>Comment reprendre mes recettes actuelles ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>La reprise est comprise dans la mise en service. Les recettes peuvent être importées depuis Recipe Keeper ou un fichier JSON, ou saisies à partir de vos fiches, photos et documents.</p></div></details>
+      <details><summary>Combien de personnes peuvent l'utiliser ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Toute votre équipe. Chaque personne a son accès et un rôle qui définit ce qu'elle peut voir et modifier, prix compris.</p></div></details>
+      <details><summary>Le coût de revient est-il fiable si un prix manque ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Un ingrédient sans prix est signalé dans le détail du coût. Un clic suffit pour lui associer un produit de vos fournisseurs.</p></div></details>
+      <details><summary>Que se passe-t-il quand un fournisseur augmente ses prix ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Dès que la facture est enregistrée, le nouveau prix s'applique aux recettes qui utilisent ce produit : coût de revient et marge sont recalculés. L'historique garde les anciens prix, pour suivre l'évolution et comparer avec vos autres fournisseurs.</p></div></details>
+      <details><summary>Que deviennent mes données si j'arrête ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Elles vous appartiennent. Vous pouvez exporter toutes vos recettes à tout moment, y compris avant la fin de l'abonnement.</p></div></details>
+      <details><summary>L'assistant IA est-il obligatoire ?<svg class="i s18 chev" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></summary><div class="rep"><p>Non, toutes les fonctions s'utilisent sans lui. Il fait gagner du temps sur la saisie des factures et des recettes, et nécessite un abonnement Claude.</p></div></details>
     </div>
   </div>
 </section>
 
 <!-- ───────────── Démo et contact ───────────── -->
 <section class="section demo" id="demo">
-  <div class="wrap demo-in card">
-    <div>
-      <p class="eyebrow">Démo en ligne</p>
-      <h2>Essayez RecipeLog dès maintenant.</h2>
-      <p>Une version de démonstration complète, avec quelques recettes, est ouverte à tous. Adaptez une recette, consultez son coût de revient, lancez le mode labo ou imprimez une fiche. Elle revient à son état d'origine chaque nuit.</p>
-    </div>
-    <div class="demo-cta">
-      <a class="btn btn-primary btn-lg" data-demo href="#demo">Ouvrir la démo</a>
-      <p class="muted small" id="demo-missing" hidden>La démo en ligne sera bientôt disponible.</p>
+  <div class="wrap">
+    <div class="demo-in carte">
+      <div>
+        <p class="eyebrow">Démo en ligne</p>
+        <h2>Essayez RecipeLog dès maintenant.</h2>
+        <p>Une version de démonstration complète, avec quelques recettes, est ouverte à tous. Adaptez une recette, consultez son coût de revient, lancez le mode labo ou imprimez une fiche. Elle revient à son état d'origine chaque nuit.</p>
+      </div>
+      <div class="demo-cta">
+        <a class="btn pri lg" data-demo href="#demo"><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-play"/></svg>Ouvrir la démo</a>
+        <p class="muted petit" id="demo-missing" hidden>La démo en ligne sera bientôt disponible.</p>
+      </div>
     </div>
   </div>
 
   <div class="wrap" id="contact">
-    <div class="contact card">
+    <div class="contact carte">
       <div>
         <h2>Parlons de votre laboratoire.</h2>
-        <p>Une démonstration de 30 minutes sur vos propres recettes, sans engagement.</p>
+        <p>Une démonstration de 30 minutes sur vos propres recettes, sans engagement.</p>
       </div>
       <div class="contact-cta">
-        <a class="btn btn-primary btn-lg" id="contact-btn" data-contact href="#contact">Nous écrire</a>
-        <p class="muted small" id="contact-mail"></p>
+        <a class="btn pri lg" id="contact-btn" data-contact href="#contact"><svg class="i s18" aria-hidden="true"><use href="encre/icones.svg#i-mail"/></svg>Nous écrire</a>
+        <p class="muted petit" id="contact-mail"></p>
       </div>
     </div>
   </div>
 </section>
 
-</main>
-
 <footer class="foot">
   <div class="wrap foot-in">
-    <div class="brand"><img src="favicon.svg" alt="" width="24" height="24"><span>RecipeLog</span></div>
-    <p class="muted small">Logiciel de fiches techniques et de coût de revient pour la pâtisserie.</p>
-    <p class="muted small">© <span id="year">2026</span> RecipeLog</p>
+    <div class="brand"><img src="favicon.svg" alt="" width="24" height="24"><span class="wm">Recipe<b>Log</b></span></div>
+    <p class="muted petit">Logiciel de fiches techniques et de coût de revient pour la pâtisserie.</p>
+    <p class="muted petit">© <span id="year">2026</span> RecipeLog</p>
   </div>
 </footer>
 
-<!-- Aide de la marge : se ferme seulement avec la croix (ou Échap) -->
-<div class="pop" id="help-marge" role="dialog" aria-modal="true" aria-labelledby="help-marge-t" hidden>
-  <div class="pop-box card">
-    <button class="pop-x" type="button" data-close aria-label="Fermer">×</button>
-    <h3 id="help-marge-t">Le calcul de la marge</h3>
-    <p><b>Coût de revient</b> : la somme des ingrédients, chacun à son prix d'achat HT. <b>Coût par pièce</b> : le coût de revient divisé par le nombre de pièces.</p>
-    <p><b>Prix HT</b> : le prix TTC sans la TVA. <b>Marge brute</b> : ce qui reste du prix HT une fois les matières payées.</p>
-    <pre>prix HT     = prix TTC ÷ (1 + TVA)
-marge brute = prix HT − coût par pièce
-taux        = marge brute ÷ prix HT
-coefficient = prix TTC ÷ coût par pièce</pre>
-    <p class="muted small">Exemple : 1,80 € TTC à 5,5 % font 1,71 € HT. Avec un coût de 0,15 €, la marge brute est de 1,56 €, soit 91 %.</p>
+    </main>
   </div>
 </div>
 
-<script src="app.js"></script>
+<!-- Barre d'onglets flottante en verre : téléphone et tablette. -->
+<nav class="tabbar" aria-label="Navigation">
+  <a class="tab" href="#accueil" data-page="accueil"><span class="ti"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-home"/></svg></span>Accueil</a>
+  <a class="tab" href="#rentabilite" data-page="rentabilite"><span class="ti"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-chart"/></svg></span>Rentabilité</a>
+  <a class="tab" href="#achats" data-page="achats"><span class="ti"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-ticket"/></svg></span>Achats</a>
+  <a class="tab" href="#offre" data-page="offre"><span class="ti"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-star"/></svg></span>Offre</a>
+  <button class="tab" type="button" data-encre-plus="encre-plus" aria-haspopup="dialog"><span class="ti"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-dots"/></svg></span>Plus</button>
+</nav>
+
+<!-- Contenu de la feuille « Plus » : de grandes tuiles, puis des lignes. -->
+<template id="encre-plus">
+  <div class="q-tuiles plus-t">
+    <a class="qt" href="#production"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-clock"/></svg>Production</a>
+    <a class="qt" href="#fonctions"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-grid"/></svg>Fonctions</a>
+    <a class="qt" href="#equipe"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-users"/></svg>Équipe</a>
+    <a class="qt" href="#assistant"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-sparkle"/></svg>Assistant IA</a>
+    <a class="qt" href="#service"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-shield"/></svg>Service</a>
+    <a class="qt" href="#faq"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-help"/></svg>Questions</a>
+    <a class="qt" data-demo href="#demo"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-play"/></svg>Démo en ligne</a>
+    <a class="qt" href="#contact"><svg class="i s22" aria-hidden="true"><use href="encre/icones.svg#i-mail"/></svg>Contact</a>
+  </div>
+  <button class="q-ext" type="button" data-apparence><svg class="i" aria-hidden="true"><use href="encre/icones.svg#i-palette"/></svg>Apparence<span class="esp"></span><svg class="i s18 muted" aria-hidden="true"><use href="encre/icones.svg#i-chev"/></svg></button>
+</template>
+
+<!-- Apparence : couleur d'accent et thème (branchés tout seuls par encre.js). -->
+<template id="apparence">
+  <div class="reg-sec" style="margin-top: 4px">
+    <div class="lbl-mono">Couleur d'accent</div>
+    <div class="pastilles" data-encre-accent role="radiogroup" aria-label="Couleur d'accent">
+      <button type="button" class="past" data-v="or" role="radio"><i></i>Or</button>
+      <button type="button" class="past" data-v="ambre" role="radio"><i></i>Ambre</button>
+      <button type="button" class="past" data-v="corail" role="radio"><i></i>Corail</button>
+      <button type="button" class="past" data-v="menthe" role="radio"><i></i>Menthe</button>
+      <button type="button" class="past" data-v="lavande" role="radio"><i></i>Lavande</button>
+    </div>
+  </div>
+  <div class="reg-sec">
+    <div class="lbl-mono">Thème</div>
+    <div class="seg" data-encre-theme role="group" aria-label="Thème">
+      <button type="button" data-v="auto">Automatique</button><button type="button" data-v="clair">Clair</button><button type="button" data-v="sombre">Sombre</button>
+    </div>
+  </div>
+  <p class="muted petit" style="margin-top: 16px">Le choix reste sur cet appareil.</p>
+</template>
+
+<!-- Aide de la marge : se ferme seulement avec la croix (ou Échap). -->
+<template id="aide-marge">
+  <div class="aide">
+    <p><b>Coût de revient</b> : la somme des ingrédients, chacun à son prix d'achat HT. <b>Coût par pièce</b> : le coût de revient divisé par le nombre de pièces.</p>
+    <p><b>Prix HT</b> : le prix TTC sans la TVA. <b>Marge brute</b> : ce qui reste du prix HT une fois les matières payées.</p>
+    <pre class="bloc-code">prix HT     = prix TTC ÷ (1 + TVA)
+marge brute = prix HT − coût par pièce
+taux        = marge brute ÷ prix HT
+coefficient = prix TTC ÷ coût par pièce</pre>
+    <p class="muted petit">Exemple : 1,80 € TTC à 5,5 % font 1,71 € HT. Avec un coût de 0,15 €, la marge brute est de 1,56 €, soit 91 %.</p>
+  </div>
+</template>
+
 </body>
 </html>
