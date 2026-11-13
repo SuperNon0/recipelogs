@@ -81,6 +81,28 @@ Pas besoin de lancer la commande de Cloudflare, l'installation s'en charge.
 | `www.recipelog.fr` | `HTTP` → `localhost:8080` (vitrine) |
 | `demo.recipelog.fr` | `HTTP` → `localhost:80` (démo) |
 
+**Variante : le tunnel dans son propre conteneur.** Si tu préfères un petit conteneur qui ne
+fait que le tunnel :
+
+1. Crée le tunnel dans Cloudflare (étape b) et copie le jeton.
+2. Dans le shell de l'hôte Proxmox, crée le conteneur du tunnel (il demande le jeton) :
+   ```bash
+   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/site-vitrine/tunnel.sh)"
+   ```
+3. Lance l'installation de la vitrine (partie 4) en laissant **vide** la question du jeton.
+4. Le résumé de fin affiche l'adresse du conteneur vitrine (ex. `192.168.1.50`). Dans le tunnel,
+   mets alors ces trois lignes à la place de celles de l'étape c :
+
+| Adresse | Service |
+|---|---|
+| `recipelog.fr` | `HTTP` → `192.168.1.50:8080` (vitrine) |
+| `www.recipelog.fr` | `HTTP` → `192.168.1.50:8080` (vitrine) |
+| `demo.recipelog.fr` | `HTTP` → `192.168.1.50:8081` (démo) |
+
+Pour la démo c'est bien **8081** et non 80 : RecipeLog n'écoute sur le port 80 qu'à l'intérieur
+de son conteneur, le 8081 sert de porte d'entrée depuis le réseau. Fixe l'adresse du conteneur
+vitrine (réservation DHCP dans ta box) pour qu'elle ne change pas.
+
 **d. Ne pas créer d'application Access pour ce domaine.** La vitrine et la démo sont publiques
 (voir la [partie 9](#9-cloudflare-access--ce-qui-est-public-ce-qui-est-protégé)).
 

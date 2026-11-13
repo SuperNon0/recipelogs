@@ -66,6 +66,31 @@ cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
     location ~ /\. { deny all; }
 }
 NGINX
+# Démo dans le même conteneur (RecipeLog n'écoute que sur 127.0.0.1:80) : une porte sur le
+# réseau local, port 8081, pour un tunnel Cloudflare installé dans un AUTRE conteneur.
+if [ -f /opt/recipelog/.env ]; then
+  cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
+
+# Démo RecipeLog vue depuis le réseau local (tunnel dans un autre conteneur)
+server {
+    listen 8081;
+    listen [::]:8081;
+    server_name _;
+    client_max_body_size 25M;
+    location / {
+        proxy_pass         http://127.0.0.1:80;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        'upgrade';
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 120s;
+    }
+}
+NGINX
+fi
 ln -sf /etc/nginx/sites-available/vitrine /etc/nginx/sites-enabled/vitrine
 rm -f /etc/nginx/sites-enabled/default
 nginx -t -q
@@ -84,5 +109,8 @@ if [ -n "${VITRINE_TUNNEL_TOKEN:-}" ]; then
   cloudflared service install "$VITRINE_TUNNEL_TOKEN" >/dev/null 2>&1 || echo "    (tunnel déjà installé)"
 fi
 
-if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow "${PORT}/tcp" >/dev/null || true; fi
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw allow "${PORT}/tcp" >/dev/null || true
+  [ -f /opt/recipelog/.env ] && ufw allow 8081/tcp >/dev/null || true
+fi
 echo "==> Site vitrine prêt : http://$(hostname -I | awk '{print $1}'):${PORT}"
