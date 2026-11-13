@@ -62,7 +62,8 @@ pct exec "$VMID" -- env TOKEN="$TUNNEL_TOKEN" bash -c '
   echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" > /etc/apt/sources.list.d/cloudflared.list
   apt-get update -qq && apt-get install -y -qq cloudflared >/dev/null
   cloudflared service install "$TOKEN" >/dev/null 2>&1
-  systemctl is-active --quiet cloudflared
+  for i in $(seq 1 15); do systemctl is-active --quiet cloudflared && exit 0; sleep 2; done
+  echo "cloudflared ne démarre pas : vérifie le jeton (systemctl status cloudflared)" >&2; exit 1
 '
 echo ""
 echo "======================================================"

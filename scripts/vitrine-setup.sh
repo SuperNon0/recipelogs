@@ -36,7 +36,6 @@ echo "==> nginx…"
 cat > /etc/nginx/sites-available/vitrine <<NGINX_HEAD
 server {
     listen ${PORT};
-    listen [::]:${PORT};
 NGINX_HEAD
 cat >> /etc/nginx/sites-available/vitrine <<'NGINX'
     server_name _;
@@ -74,7 +73,6 @@ if [ -f /opt/recipelog/.env ]; then
 # Démo RecipeLog vue depuis le réseau local (tunnel dans un autre conteneur)
 server {
     listen 8081;
-    listen [::]:8081;
     server_name _;
     client_max_body_size 25M;
     location / {
