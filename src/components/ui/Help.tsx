@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { CircleHelp, X } from "lucide-react";
 import { useEscape, useIsPhone } from "./useMedia";
 import { STOP } from "./Menu";
+import { useOverlayOpen } from "./overlay";
 
 /**
  * Petit « ? » à côté d'une information. Au clic, ouvre une bulle qui explique
@@ -35,6 +36,7 @@ export function Help({
   const phone = useIsPhone();
   const close = useCallback(() => setOpen(false), []);
   useEscape(open, close);
+  useOverlayOpen(open && phone);
 
   useLayoutEffect(() => {
     if (!open || phone || !btnRef.current || !popRef.current) return;

@@ -12,6 +12,7 @@ import { scaleStepParts } from "@/lib/stepQty";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { findDurations, formatClock } from "@/lib/durations";
 import { useEscape } from "@/components/ui/useMedia";
+import { useOverlayOpen } from "@/components/ui/overlay";
 import { loadStored, saveStored, type LabTimers } from "./labTimers";
 
 type Line = { key: string; name: string; qty: string } | { key: string; title: string };
@@ -144,6 +145,7 @@ export function KitchenMode({
 
   // Échap pour fermer (seulement si aucune autre fenêtre n'est par-dessus), page derrière figée.
   useEscape(true, () => closeRef.current?.click());
+  useOverlayOpen(true);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";

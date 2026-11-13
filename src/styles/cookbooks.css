@@ -87,7 +87,7 @@
 
 .cb-radio:has(input:checked) {
   background: var(--accent-dim);
-  border-color: rgba(240, 166, 74, 0.35);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   color: var(--accent);
 }
 
@@ -118,7 +118,7 @@
   position: relative;
   z-index: 5;
   background: var(--pop);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow);
 }
 
 .cb-row {
@@ -131,7 +131,7 @@
 }
 
 .cb-row:hover {
-  background: rgba(255, 255, 255, 0.018);
+  background: color-mix(in srgb, var(--text) 1.8%, transparent);
 }
 
 .cb-row[data-menu-open="true"] {
@@ -351,7 +351,7 @@
 }
 
 .cb-theme[data-current="true"] {
-  border-color: rgba(240, 166, 74, 0.35);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   background: var(--accent-dim);
 }
 

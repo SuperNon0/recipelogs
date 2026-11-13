@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, MoreVertical, type LucideIcon } from "lucide-react";
 import { useEscape, useIsPhone } from "./useMedia";
+import { useOverlayOpen } from "./overlay";
 
 /**
  * Menu d'actions façon clic droit Windows.
@@ -210,6 +211,7 @@ export function ActionMenuPopup({
   const phone = useIsPhone();
   const router = useRouter();
   useEscape(true, onClose);
+  useOverlayOpen(phone);
 
   const run = useCallback(
     (a: MenuAction) => {

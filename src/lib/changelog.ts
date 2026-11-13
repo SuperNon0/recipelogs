@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.15",
+    date: "2026-11-13",
+    title: "Nouveau look « encre » : clair, sombre et couleur au choix",
+    summary:
+      "RecipeLog prend le design « encre » : nouvelles polices, barre d'onglets flottante en verre flouté sur téléphone, et surtout un thème clair en plus du sombre. Tu choisis le thème et la couleur dans Réglages → Apparence. Rien ne change dans tes recettes ni dans ce que fait chaque bouton.",
+    features: [
+      "Réglages → Apparence : thème Automatique (suit le téléphone ou l'ordinateur), Clair ou Sombre, et couleur d'accent Ambre (celle de RecipeLog, par défaut), Or, Corail, Menthe ou Lavande. Le choix est gardé sur chaque appareil, avec un « ? » qui l'explique",
+      "Téléphone : la barre d'onglets flotte en bas, détachée des bords, et laisse voir le contenu flouté dessous. Elle se cache quand une fenêtre s'ouvre. Recettes, Favoris, Cahiers, Courses, et « Plus » qui ouvre une feuille avec Production, Historique, Ingrédients, Prix fournisseurs, Thèmes PDF, Réglages, la recherche et l'apparence",
+      "Nouvelles polices : DM Serif Display pour les titres, Archivo pour le texte, DM Mono pour les petits libellés. Elles sont servies par RecipeLog lui-même (plus d'appel à Google Fonts)",
+      "Menu de gauche sur ordinateur et barre du haut redessinés, icônes au trait plus fin",
+    ],
+  },
+  {
     version: "V2.14",
     date: "2026-11-13",
     title: "Sous-recettes pendant l'écriture d'une recette",

@@ -116,7 +116,7 @@
 }
 
 .sup-cell:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .sup-cell.best {
@@ -400,7 +400,7 @@ button.cost-line {
 }
 
 button.cost-line:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
 }
 
 .cost-line b {

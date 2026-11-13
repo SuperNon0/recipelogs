@@ -87,7 +87,7 @@ export function PdfPreview({
           c.style.display = "block";
           c.style.background = "#fff";
           c.style.borderRadius = "6px";
-          c.style.boxShadow = "0 10px 30px rgba(0,0,0,.35)";
+          c.style.boxShadow = "var(--shadow-s)";
           await page.render({ canvasContext: c.getContext("2d")!, viewport: vp }).promise;
           if (cancelled) return;
           canvases.push(c);
