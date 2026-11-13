@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # recipelog-demo-reset — remet la démo dans l'état figé par recipelog-demo-figer.
 set -euo pipefail
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV_FILE=/opt/recipelog/.env
 APP_DIR=/opt/recipelog
 SNAP=/var/lib/recipelog-demo
