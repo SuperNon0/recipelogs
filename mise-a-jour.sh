@@ -57,6 +57,17 @@ if command -v pct >/dev/null 2>&1; then
 fi
 
 # ── Dans le conteneur de la vitrine ──
+if [ "$AVEC_DEMO" = 1 ]; then
+  [ -x /usr/local/sbin/recipelog-deploy ] || { echo "RecipeLog introuvable : démo non mise à jour." >&2; exit 1; }
+  /usr/local/sbin/recipelog-deploy
+  TMP="$(mktemp)"
+  trap 'rm -f "$TMP"' EXIT
+  curl -fsSL "${VITRINE_RAW_BASE:-$RAW_DEFAULT}/scripts/demo-setup.sh" -o "$TMP"
+  VITRINE_RAW_BASE="${VITRINE_RAW_BASE:-$RAW_DEFAULT}" bash "$TMP"
+  rm -f "$TMP"
+  trap - EXIT
+fi
+[ "$AVEC_VITRINE" = 1 ] || exit 0
 DIR=/opt/vitrine
 [ -d "$DIR/.git" ] || { echo "Site vitrine introuvable dans $DIR." >&2; exit 1; }
 BRANCH="$(cat "$DIR/.branche" 2>/dev/null || echo site-vitrine)"

@@ -14,6 +14,11 @@ contact="$(cat "$CONF/contact" 2>/dev/null || true)"
 cle="${1:-}"; val="${2:-}"
 case "$val" in *'"'*|*'\'*|*'<'*|*' '*) echo "Valeur invalide." >&2; exit 1 ;; esac
 case "$cle" in
+  proxy)
+    python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' "$val" || { echo "Adresse IP du tunnel invalide." >&2; exit 1; }
+    printf 'set_real_ip_from 127.0.0.1;\nset_real_ip_from ::1;\nset_real_ip_from %s;\n' "$val" > "$CONF/trusted-proxy.conf"
+    nginx -t && systemctl reload nginx
+    exit 0 ;;
   demo)
     case "$val" in ""|http://*|https://*) ;; *) echo "L'adresse doit commencer par https://" >&2; exit 1 ;; esac
     demo="$val"; printf '%s' "$demo" > "$CONF/demo" ;;
