@@ -17,6 +17,7 @@ const SAUVEGARDES = `${DONNEES}/sauvegardes`;
 // Heure des sauvegardes de la nuit (heure de Paris, TZ du conteneur) et jour du test (0 = dimanche).
 const HEURE_SAUVEGARDE = Number(process.env.SAUVEGARDE_HEURE ?? 3);
 const JOUR_TEST = Number(process.env.SAUVEGARDE_JOUR_TEST ?? 0);
+const HEURE_DEMO = Number(process.env.DEMO_HEURE ?? 4); // remise à zéro des démos à HEURE_DEMO h 30
 const EMAIL_RE = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 
 if (CLE.length < 32) {
@@ -132,6 +133,24 @@ async function resumeSauvegardes(nom) {
   return { nombre: ids.length, derniere, test };
 }
 
+// Vitrine : demandes reçues par le formulaire, bandeau, version du code.
+async function vitrine() {
+  const r = await outil("vitrine", "demandes", "--json");
+  let donnees = { demandes: [], traitees: [] };
+  try {
+    donnees = JSON.parse(r.sortie);
+  } catch {
+    /* pas encore de vitrine */
+  }
+  const lire = async (f) => (await readFile(`${DONNEES}/vitrine/${f}`, "utf8").catch(() => "")).trim();
+  const traitees = new Set(donnees.traitees);
+  return {
+    version: (await lire("code/.version")) || null,
+    bandeau: await lire("reglages/bandeau.txt"),
+    demandes: donnees.demandes.reverse().map((d) => ({ ...d, cle: `${d.date}|${d.email}`, traitee: traitees.has(`${d.date}|${d.email}`) })),
+  };
+}
+
 async function journal(n = 100) {
   try {
     const lignes = (await readFile(JOURNAL, "utf8")).trim().split("\n").filter(Boolean);
@@ -201,6 +220,10 @@ async function action(qui, nom, act, corps) {
       exiger(corps.confirmation === nom, "Tape le nom du client pour confirmer.");
       details = { sauvegarde: corps.sauvegarde };
       r = await unParUn(() => outil("restaurer", nom, corps.sauvegarde, "--oui"));
+      break;
+    case "demo-figer":
+    case "demo-remettre":
+      r = await unParUn(() => outil(act, nom));
       break;
     case "supprimer":
       exiger(corps.confirmation === nom, "Tape le nom du client pour confirmer.");
@@ -298,6 +321,25 @@ createServer(async (req, res) => {
       req.on("close", () => p.kill("SIGTERM"));
       return;
     }
+    if (req.method === "GET" && url.pathname === "/vitrine") return repondre(res, 200, await vitrine());
+    if (req.method === "POST" && url.pathname === "/vitrine/maj") {
+      const r = await unParUn(() => outil("vitrine", "maj"));
+      await noter(qui, "vitrine-maj", "vitrine", r);
+      return repondre(res, r.ok ? 200 : 500, r);
+    }
+    if (req.method === "POST" && url.pathname === "/vitrine/bandeau") {
+      const c = await lireCorps(req);
+      exiger(typeof c.texte === "string" && c.texte.length <= 300 && !/[\r\n]/.test(c.texte), "Bandeau : une ligne, 300 caractères au plus.");
+      const r = await unParUn(() => outil("vitrine", "bandeau", c.texte.trim()));
+      await noter(qui, "vitrine-bandeau", "vitrine", r, { texte: c.texte.trim() || null });
+      return repondre(res, r.ok ? 200 : 500, r);
+    }
+    if (req.method === "POST" && url.pathname === "/vitrine/traitee") {
+      const c = await lireCorps(req);
+      exiger(typeof c.cle === "string" && c.cle.length < 300, "Demande inconnue.");
+      const r = await unParUn(() => outil("vitrine", "traitee", c.cle));
+      return repondre(res, r.ok ? 200 : 400, r);
+    }
     if (req.method === "POST" && url.pathname === "/clients") {
       const r = await creer(qui, await lireCorps(req));
       return repondre(res, r.ok ? 200 : 500, r);
@@ -349,6 +391,19 @@ async function planning() {
     await writeFile(PLANNING, JSON.stringify(fait), { mode: 0o600 }).catch(() => {});
     const r = await unParUn(() => outil("sauvegarder", "--tous", "--etiquette", "auto"));
     await noter("automatique", "sauvegardes-nuit", "tous", r);
+  }
+  // Démos : retour à leur état de référence chaque nuit (4 h 30 par défaut).
+  const minutes = heure * 60 + maintenant.getMinutes();
+  // Premier démarrage du moteur : pas de remise à zéro surprise en pleine journée.
+  if (fait.demo === undefined) {
+    fait.demo = aujourdhui;
+    await writeFile(PLANNING, JSON.stringify(fait), { mode: 0o600 }).catch(() => {});
+  }
+  if (minutes >= HEURE_DEMO * 60 + 30 && fait.demo !== aujourdhui) {
+    fait.demo = aujourdhui;
+    await writeFile(PLANNING, JSON.stringify(fait), { mode: 0o600 }).catch(() => {});
+    const r = await unParUn(() => outil("demo-remettre", "--toutes"));
+    if (r.sortie) await noter("automatique", "demo-remettre", "démos", r);
   }
   if (maintenant.getDay() === JOUR_TEST && heure >= HEURE_SAUVEGARDE + 1 && fait.test !== aujourdhui) {
     fait.test = aujourdhui;

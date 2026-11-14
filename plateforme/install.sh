@@ -207,6 +207,9 @@ docker exec recipelog-postgres psql -q -U postgres -c "REVOKE ALL ON DATABASE au
 mkdir -p "${DONNEES}/authentik/media"
 chown -R 1000:1000 "${DONNEES}/authentik" # utilisateur d'Authentik dans son image
 
+# Dossiers de la vitrine (lot 4) avant son démarrage : réglages et messages reçus.
+recipelog-instance vitrine reglages >/dev/null
+
 info "Démarrage de Traefik, du tunnel, d'Authentik et de la passerelle…"
 recipelog-plateforme up -d --build --wait
 info "Attente d'Authentik (2 à 5 minutes au premier démarrage)…"
@@ -227,6 +230,9 @@ else
   echo "⚠️  Panel non branché sur Authentik. À relancer : bash install.sh"
 fi
 
+info "Site vitrine (branche site-vitrine)…"
+recipelog-instance vitrine maj || echo "⚠️  Vitrine non téléchargée. À relancer : recipelog-instance vitrine maj"
+
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"
 if [ "${CREER_TEST}" = 1 ] && [ ! -d "${DONNEES}/instances/test" ]; then
@@ -243,6 +249,7 @@ Fichiers           : ${APP_DIR} (dépôt, branche ${RECIPELOG_BRANCH})
 Données et réglages: ${DONNEES}  (.env, postgres/, instances/, archives/)
 Tunnel Cloudflare  : $([ -n "${CF_TUNNEL_TOKEN}" ] && echo "branché" || echo "PAS ENCORE : ajouter CF_TUNNEL_TOKEN et COMPOSE_PROFILES=tunnel dans ${DONNEES}/.env, puis recipelog-plateforme up -d")
 Panel admin        : https://admin.${DOMAINE} (super-admins seulement)
+Vitrine            : https://${DOMAINE} (si l'adresse pointe sur ce tunnel : A-FAIRE.md, étape E)
 Connexion          : https://auth.${DOMAINE} (Authentik)
   Ton compte       : ${ADMIN_EMAILS:-aucun} (email « Choisis ton mot de passe » envoyé)
   Compte de secours: akadmin, mot de passe AUTHENTIK_BOOTSTRAP_PASSWORD dans ${DONNEES}/.env

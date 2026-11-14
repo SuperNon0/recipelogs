@@ -8,6 +8,7 @@ const dateFr = (iso) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: 
 const heureFr = (iso) => new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 let CLIENTS = [];
+let VITRINE = null;
 
 // ------------------------------------------------------------ API
 async function api(methode, chemin, corps) {
@@ -138,13 +139,14 @@ function afficher() {
       <div class="info"><span class="lbl">État</span>${etat(c)}</div>
       <div class="info"><span class="lbl">Places</span>${places(c)}</div>
       <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small></div>
-      <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}</div>
+      <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}${c.demo ? ` <span class="etiquette prog">démo</span>` : ""}</div>
       <div class="info"><span class="lbl">Sauvegarde</span>${sauvegarde(c)}</div>
       <div class="actions">
         <a class="btn petit" href="${e(c.adresse)}" target="_blank" rel="noopener">Ouvrir</a>
         ${c.connexion === "authentik" ? `<button class="btn petit" data-act="equipe">Équipe</button>` : ""}
         <button class="btn petit" data-act="reglages">Réglages</button>
         <button class="btn petit" data-act="sauvegardes">Sauvegardes</button>
+        ${c.demo ? `<button class="btn petit" data-act="demo">Démo</button>` : ""}
         ${c.suspendu ? `<button class="btn petit" data-act="reactiver">Réactiver</button>` : `<button class="btn petit" data-act="mettre-a-jour">Mettre à jour</button><button class="btn petit" data-act="suspendre">Pause</button>`}
         <button class="btn petit danger" data-act="supprimer">Supprimer</button>
       </div>
@@ -173,6 +175,10 @@ const NOMS_ACTIONS = {
   telecharger: "a téléchargé une sauvegarde de",
   "sauvegardes-nuit": "a sauvegardé (nuit)",
   "test-sauvegardes": "a testé les sauvegardes (semaine)",
+  "demo-figer": "a figé la démo",
+  "demo-remettre": "a remis à zéro",
+  "vitrine-maj": "a mis à jour la",
+  "vitrine-bandeau": "a changé le bandeau de la",
 };
 let JOURNAL = [];
 function afficherJournal() {
@@ -183,7 +189,7 @@ function afficherJournal() {
   $("#journal").innerHTML = JOURNAL.slice(0, 40)
     .map((l, i) => {
       const d = l.details ?? {};
-      const plus = d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined ? ` (MCP ${d.mcp ? "permis" : "coupé"})` : "";
+      const plus = d.texte !== undefined ? ` (${d.texte ? `« ${e(d.texte)} »` : "retiré"})` : d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined ? ` (MCP ${d.mcp ? "permis" : "coupé"})` : "";
       return `<div class="ligne"><time>${heureFr(l.date)}</time><span class="qui">${e(l.qui)}</span>
         <span>${e(NOMS_ACTIONS[l.action] ?? l.action)} <b>${e(l.client)}</b>${plus} ${l.ok ? "" : `<span class="etiquette ko">échec</span>`}</span>
         <button type="button" data-journal="${i}">Détails</button></div>`;
@@ -198,7 +204,9 @@ $("#journal").addEventListener("click", (ev) => {
 });
 
 async function charger() {
-  const [c, j] = await Promise.all([api("GET", "/clients"), api("GET", "/journal")]);
+  const [c, j, v] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine")]);
+  VITRINE = v.demandes ? v : null;
+  afficherVitrine();
   if (c.clients) CLIENTS = c.clients.sort((a, b) => a.nom.localeCompare(b.nom));
   else $("#clients").innerHTML = `<div class="vide">Liste indisponible : ${e(c.message ?? "le moteur ne répond pas")}</div>`;
   JOURNAL = j.journal ?? [];
@@ -208,19 +216,21 @@ async function charger() {
 $("#recherche").addEventListener("input", afficher);
 
 // ------------------------------------------------------------ nouveau client
-$("#nouveau").addEventListener("click", () => {
+$("#nouveau").addEventListener("click", () => fenetreNouveau());
+// pre : valeurs proposées (demande reçue par la vitrine) ; apres : appelé si la création réussit.
+function fenetreNouveau(pre = {}, apres = null) {
   ouvrir(
     "Nouveau client",
     `<p class="sub">Crée son RecipeLog, sa base, son accès dans Authentik, puis envoie l'invitation au responsable.</p>
     <form id="f-nouveau" novalidate>
       <div class="champ"><label for="n-nom">Nom ${aide("a-nom", `Devient l'adresse du site : <b>nom.${e(DOMAINE)}</b>. Minuscules, chiffres et tirets, 2 à 32 caractères. Ne peut plus être changé ensuite.`)}
-        <div class="suffixe"><input id="n-nom" type="text" required pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" autocapitalize="none" spellcheck="false" placeholder="patisserie-martin"><span>.${e(DOMAINE)}</span></div></div>
+        <div class="suffixe"><input id="n-nom" type="text" required pattern="[a-z0-9][a-z0-9-]{0,30}[a-z0-9]" autocapitalize="none" spellcheck="false" placeholder="patisserie-martin" value="${e(pre.nom ?? "")}"><span>.${e(DOMAINE)}</span></div></div>
       <div class="champ"><label for="n-resp">Email du responsable ${aide("a-resp", "Il reçoit l'email « Choisis ton mot de passe » et devient administrateur de son RecipeLog à sa première connexion. Il invite ensuite lui-même son équipe. Laisser vide : tu inviteras plus tard (bouton Équipe).")}
-        <input id="n-resp" type="email" autocapitalize="none" placeholder="chef@patisserie.fr"></div>
+        <input id="n-resp" type="email" autocapitalize="none" placeholder="chef@patisserie.fr" value="${e(pre.responsable ?? "")}"></div>
       <div class="champ"><label for="n-max">Nombre de comptes ${aide("a-max", "Combien de personnes de son équipe peuvent se connecter (le responsable compte). 0 = pas de limite. Toi, tu ne comptes jamais.")}
         <input id="n-max" type="number" min="0" max="10000" value="10"></div>
       <div class="champ"><label for="n-essai">Essai gratuit ${aide("a-essai", "Nombre de jours d'essai. À la fin, le site se met en pause tout seul (les données sont gardées) jusqu'à ce que tu le réactives. 0 = pas d'essai.")}
-        <div class="suffixe"><input id="n-essai" type="number" min="0" max="3650" value="0"><span>jours</span></div></div>
+        <div class="suffixe"><input id="n-essai" type="number" min="0" max="3650" value="${e(pre.essai ?? 0)}"><span>jours</span></div></div>
       <div class="champ"><label for="n-canal">Version ${aide("a-canal", "Stable : la version des clients, testée. Bêta : suit ton site (main). Plateforme : suit le chantier en cours, pour tes essais.")}
         <select id="n-canal"><option value="stable">Stable (conseillé)</option><option value="beta">Bêta</option><option value="plateforme">Plateforme (essais)</option></select></div>
       <div class="champ"><label class="case"><input id="n-mcp" type="checkbox" checked> Accès MCP (Claude) ${aide("a-mcp", "Permet au client de brancher Claude sur son RecipeLog (Réglages → Accès MCP). Décoché : le menu disparaît chez lui et l'adresse MCP est fermée.")}</div>
@@ -241,9 +251,10 @@ $("#nouveau").addEventListener("click", () => {
     if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/.test(corps.nom)) return ($("#n-erreur").textContent = "Nom : 2 à 32 caractères, minuscules, chiffres et tirets.");
     if (CLIENTS.some((c) => c.nom === corps.nom)) return ($("#n-erreur").textContent = "Ce client existe déjà.");
     if (corps.responsable && !/^\S+@\S+\.\S+$/.test(corps.responsable)) return ($("#n-erreur").textContent = "Adresse du responsable invalide.");
-    await executer(`Création de ${corps.nom}`, () => api("POST", "/clients", corps));
+    const r = await executer(`Création de ${corps.nom}`, () => api("POST", "/clients", corps));
+    if (r.ok && apres) await apres();
   });
-});
+}
 
 $("#tout-maj").addEventListener("click", () =>
   executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour")),
@@ -262,6 +273,7 @@ $("#clients").addEventListener("click", (ev) => {
   if (act === "reglages") fenetreReglages(c);
   if (act === "equipe") fenetreEquipe(c);
   if (act === "sauvegardes") fenetreSauvegardes(c);
+  if (act === "demo") fenetreDemo(c);
 });
 
 const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
@@ -426,3 +438,93 @@ charger();
 setInterval(() => {
   if (!voile.classList.contains("ouvert")) charger();
 }, 30000);
+
+// ------------------------------------------------------------ démo
+function fenetreDemo(c) {
+  ouvrir(
+    `Démo ${c.nom}`,
+    `<p class="sub">Les visiteurs peuvent tout essayer sur la démo ; chaque nuit vers 4 h 30, elle revient toute seule à son état de référence.</p>
+    <div class="champ"><label>Remettre à zéro maintenant ${aide("d-a1", "Recharge l'état de référence tout de suite : tout ce que les visiteurs ont changé depuis disparaît. Le site est coupé une minute.")}</div>
+    <div class="pied pied-gauche"><button class="btn" id="d-remettre" type="button">Remettre à zéro</button></div>
+    <div class="champ"><label>Garder l'état actuel comme référence ${aide("d-a2", "Prépare d'abord la démo comme tu veux la montrer (recettes, fournisseurs, photos), puis clique ici : c'est cet état qui reviendra chaque nuit.")}</div>
+    <div class="pied pied-gauche"><button class="btn principal" id="d-figer" type="button">Figer comme référence</button></div>`,
+  );
+  $("#d-remettre").addEventListener("click", () => executer(`Remise à zéro de ${c.nom}`, () => api("POST", `/clients/${c.nom}/demo-remettre`)));
+  $("#d-figer").addEventListener("click", () => executer(`Référence de ${c.nom}`, () => api("POST", `/clients/${c.nom}/demo-figer`)));
+}
+
+// ------------------------------------------------------------ vitrine
+const TYPES_DEMANDE = { demo: "Démonstration", devis: "Devis", question: "Question" };
+// Nom de client proposé à partir de l'établissement (ou du nom) : « Pâtisserie Martin » → patisserie-martin.
+const nomPropose = (d) =>
+  (d.etab || d.nom || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32)
+    .replace(/-+$/, "");
+let voirTraitees = false;
+
+function afficherVitrine() {
+  const zone = $("#vitrine");
+  if (!VITRINE) {
+    zone.innerHTML = `<div class="vide">Vitrine indisponible.</div>`;
+    return;
+  }
+  const aFaire = VITRINE.demandes.filter((d) => !d.traitee);
+  const faites = VITRINE.demandes.filter((d) => d.traitee);
+  const liste = (voirTraitees ? VITRINE.demandes : aFaire)
+    .map(
+      (d) => `<article class="demande${d.traitee ? " traitee" : ""}" data-cle="${e(d.cle)}">
+      <div><span class="etiquette ${d.type === "question" ? "acc" : "prog"}">${e(TYPES_DEMANDE[d.type] ?? d.type)}</span> <b>${e(d.nom)}</b>${d.etab ? ` · ${e(d.etab)}` : ""}
+        <small>${e(d.date.slice(8, 10))}/${e(d.date.slice(5, 7))} ${e(d.date.slice(11, 16))} · <a href="mailto:${e(d.email)}">${e(d.email)}</a>${d.tel ? ` · ${e(d.tel)}` : ""}</small>
+        ${d.msg ? `<p>${e(d.msg.length > 400 ? `${d.msg.slice(0, 400)}…` : d.msg)}</p>` : ""}</div>
+      ${d.traitee ? `<span class="etiquette ok">Traitée</span>` : `<div class="actions"><button class="btn petit principal" type="button" data-v="creer">Créer le client</button><button class="btn petit" type="button" data-v="traitee">Traitée</button></div>`}
+    </article>`,
+    )
+    .join("");
+  zone.innerHTML = `<div class="carte-vitrine">
+      <div class="ligne-vitrine"><div><b>${e(DOMAINE)}</b><small>${VITRINE.version ? `Version ${e(VITRINE.version)}` : "Pas encore téléchargée"}</small></div>
+        <a class="btn petit" href="https://${e(DOMAINE)}" target="_blank" rel="noopener">Ouvrir</a>
+        <button class="btn petit" type="button" id="v-maj">Mettre à jour la vitrine</button>
+        <button class="aide" type="button" data-aide="v-a-maj" aria-label="Aide">?</button></div>
+      <p class="texte-aide" id="v-a-maj">Télécharge la dernière version du site vitrine (branche site-vitrine) et la met en ligne en quelques secondes. Tes réglages (adresse de la démo, bandeau) sont gardés.</p>
+      <form id="f-bandeau" class="champ" novalidate><label for="v-bandeau">Bandeau en haut du site ${aide("v-a-band", "Une phrase affichée tout en haut de la vitrine, par exemple « Offre de lancement : 1 mois d'essai gratuit ». Laisser vide puis Enregistrer pour l'enlever. 300 caractères au plus.")}
+        <div class="suffixe"><input id="v-bandeau" type="text" maxlength="300" value="${e(VITRINE.bandeau)}" placeholder="Aucun bandeau"><button class="btn" type="submit">Enregistrer</button></div>
+        <p class="erreur" id="v-erreur"></p></form>
+    </div>
+    <h3 class="titre-demandes">Demandes reçues <span class="etiquette ${aFaire.length ? "prog" : "ok"}">${aFaire.length} à traiter</span>
+      ${faites.length ? `<button class="lien" type="button" id="v-toutes">${voirTraitees ? "Cacher les traitées" : `Voir aussi les ${faites.length} traitées`}</button>` : ""}
+      <button class="aide" type="button" data-aide="v-a-dem" aria-label="Aide">?</button></h3>
+    <p class="texte-aide" id="v-a-dem">Les messages du formulaire « Nous écrire » de la vitrine (ils arrivent aussi par email). « Créer le client » ouvre la création avec son adresse en responsable et 14 jours d'essai : tu vérifies, puis tu valides. La demande passe alors en « Traitée ».</p>
+    <div class="demandes">${liste || `<div class="vide">${VITRINE.demandes.length ? "Toutes les demandes sont traitées." : "Aucune demande pour l'instant."}</div>`}</div>`;
+  $("#v-maj").addEventListener("click", () => executer("Mise à jour de la vitrine", () => api("POST", "/vitrine/maj")));
+  $("#v-toutes")?.addEventListener("click", () => {
+    voirTraitees = !voirTraitees;
+    afficherVitrine();
+  });
+  $("#f-bandeau").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const texte = $("#v-bandeau").value.trim();
+    $("#v-erreur").textContent = "Enregistrement…";
+    const r = await api("POST", "/vitrine/bandeau", { texte });
+    $("#v-erreur").textContent = r.ok ? "" : (r.message || r.sortie || "Échec").replace(/^❌\s*/, "");
+    if (r.ok) charger();
+  });
+  zone.querySelectorAll("[data-v]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const cle = b.closest("[data-cle]").dataset.cle;
+      const d = VITRINE.demandes.find((x) => x.cle === cle);
+      const traiter = () => api("POST", "/vitrine/traitee", { cle });
+      if (b.dataset.v === "traitee") {
+        b.disabled = true;
+        await traiter();
+        charger();
+      } else {
+        fenetreNouveau({ nom: nomPropose(d), responsable: d.email, essai: 14 }, traiter);
+      }
+    }),
+  );
+}

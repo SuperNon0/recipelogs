@@ -3,7 +3,8 @@
 #
 #   Cloudflare ──tunnel──> cloudflared ──> Traefik ──> un conteneur par client
 #                                                 ├──> Authentik (auth.<domaine>) : comptes de tous les clients
-#                                                 └──> (plus tard) panel, vitrine, démo
+#                                                 ├──> panel (admin.<domaine>), vitrine (<domaine>, www)
+#                                                 └──> démo (demo.<domaine>) : un client comme les autres
 #   passerelle : seule à détenir la clé d'Authentik ; les clients lui demandent
 #                d'inviter ou de retirer leurs collaborateurs (connexion.md).
 #   PostgreSQL : un seul serveur, une base par client.
@@ -245,3 +246,43 @@ services:
       # fichier, et un fichier monté seul resterait sur l'ancienne version.
       - ./bin:/opt/recipelog/bin:ro
     networks: [recipelog]
+
+  # Site vitrine (lot 4) sur <domaine> et www.<domaine>. Le code vient de la
+  # branche site-vitrine : recipelog-instance vitrine maj (ou le panel).
+  vitrine:
+    image: nginx:1.27-alpine
+    container_name: recipelog-vitrine
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    volumes:
+      - ./vitrine:/etc/nginx/conf.d:ro
+      - ${DONNEES:-/srv/recipelog}/vitrine:/vitrine:ro
+    networks: [recipelog]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/config.js"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.vitrine.rule: Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)
+      traefik.http.routers.vitrine.entrypoints: web
+      traefik.http.routers.vitrine.middlewares: securite@file,limite@file
+      traefik.http.services.vitrine.loadbalancer.server.port: "80"
+
+  # Formulaire « Nous écrire » de la vitrine (script de la branche site-vitrine),
+  # dans le même réseau que nginx : il n'écoute que sur 127.0.0.1:8090.
+  vitrine-contact:
+    image: python:3.12-alpine
+    container_name: recipelog-vitrine-contact
+    restart: unless-stopped
+    network_mode: service:vitrine
+    depends_on: [vitrine]
+    user: "1000:1000"
+    read_only: true
+    command: ["python3", "/vitrine/code/scripts/vitrine-contact.py"]
+    volumes:
+      - ${DONNEES:-/srv/recipelog}/vitrine/code:/vitrine/code:ro
+      - ${DONNEES:-/srv/recipelog}/vitrine/reglages:/etc/recipelog-vitrine:ro
+      - ${DONNEES:-/srv/recipelog}/vitrine/messages:/var/lib/recipelog-vitrine

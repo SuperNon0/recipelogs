@@ -31,6 +31,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Le compteur « Places utilisées » montre combien de personnes de l'équipe peuvent se connecter sur le nombre compris dans l'offre. Toutes les places sont prises ? Le site propose d'en demander plus",
       "Le responsable du site devient administrateur tout seul à sa première connexion",
       "RecipeLog en ligne : les recettes, photos et factures de chaque client sont sauvegardées chaque nuit, et peuvent être remises à une date précédente en cas d'erreur",
+      "RecipeLog en ligne : la démo publique revient toute seule chaque nuit à son état de départ",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },
