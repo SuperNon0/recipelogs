@@ -1078,3 +1078,39 @@ button.set-row:first-child {
     margin: 0;
   }
 }
+
+/* ─── Lecture des factures par IA (plateforme, lot 7) ─────── */
+.ia-modes {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.ia-modes legend {
+  margin-bottom: 6px;
+}
+.sup-form label.ia-mode {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.ia-mode:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.ia-mode input {
+  margin-top: 3px;
+}
+.ia-mode span {
+  display: grid;
+  gap: 2px;
+}
+.ia-mode small {
+  color: var(--muted);
+  font-size: 12.5px;
+}

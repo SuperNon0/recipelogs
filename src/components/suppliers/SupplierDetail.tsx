@@ -12,6 +12,7 @@ import { Change } from "./PriceComparison";
 import { ProductHistoryModal } from "./ProductHistoryModal";
 import { InvoiceList } from "./InvoiceList";
 import { DeleteSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
+import { AiReaderButton } from "./AiReader";
 
 type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 
@@ -33,6 +34,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         <h1>{supplier.name}</h1>
         {editable && (
           <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AiReaderButton type="mercuriale" fournisseur={{ id: supplier.id, name: supplier.name }} />
             <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("edit")}>
               <Pencil size={15} /> Modifier
             </button>

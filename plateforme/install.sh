@@ -209,6 +209,8 @@ chown -R 1000:1000 "${DONNEES}/authentik" # utilisateur d'Authentik dans son ima
 mkdir -p "${DONNEES}/support"
 chown 1000:1000 "${DONNEES}/support" # demandes « Signaler un problème » (passerelle : utilisateur 1000)
 mkdir -p "${DONNEES}/annonces" # maintenance et bandeaux (lot 6), écrits par le moteur
+mkdir -p "${DONNEES}/ia/usage"
+chown -R 1000:1000 "${DONNEES}/ia" # lectures par IA (lot 7) : compteurs écrits par la passerelle
 
 # Dossiers de la vitrine (lot 4) avant son démarrage : réglages et messages reçus.
 recipelog-instance vitrine reglages >/dev/null

@@ -194,6 +194,33 @@ Dans le panel, partie **Maintenance et messages** :
 Tout est rangé dans `/srv/recipelog/annonces/` (écrit par le moteur, lu par la passerelle).
 Si la passerelle ne répond pas, les sites marchent normalement, sans bandeau.
 
+## Lecture des factures par IA et mercuriales (lot 7)
+
+Dans RecipeLog, page **Factures** → **Lire une facture avec l'IA** : une photo ou un PDF
+devient des lignes de prix (produit, référence, quantité, contenance, prix du colis, prix au
+kg / L / pièce). Le client vérifie et corrige chaque ligne (les doutes de l'IA sont en
+orange, « Nouveau » marque un produit jamais acheté, l'évolution du prix s'affiche), puis
+enregistre : c'est la même chose qu'une facture envoyée à Claude, fichier joint compris.
+Rien n'est écrit avant « Enregistrer ».
+
+Sur la fiche d'un fournisseur, **Importer une mercuriale** : un Excel (.xlsx) ou un CSV est
+lu directement, sans IA (le site devine les colonnes d'après les titres, le client corrige) ;
+un PDF ou une photo passe par l'IA. Les prix entrent dans l'historique à la date choisie,
+sans apparaître dans la liste des factures.
+
+D'où vient l'IA (Réglages → **Lecture des factures par IA**, réservé à l'administrateur) :
+
+- **IA de RecipeLog** : la passerelle appelle Claude avec **ta** clé Anthropic
+  (`IA_ANTHROPIC_CLE`), que les clients ne voient jamais, et compte les lectures. Dans le
+  panel, partie **Lecture des factures par IA** : lectures du mois de chaque client, coût
+  estimé, et le nombre de lectures par mois (30 par défaut, un nombre à part par client,
+  0 = coupé). Le compteur revient à zéro le 1er du mois.
+- **Sa propre clé** : Claude, ChatGPT ou Gemini. Le client paie son fournisseur d'IA, sans
+  limite, et ça ne passe pas par toi.
+
+Une lecture tourne en arrière-plan (20 s à 2 min) : pas de coupure Cloudflare au bout de
+100 s. Fichiers : `/srv/recipelog/ia/` (réglages écrits par le panel, compteurs par la passerelle).
+
 ## Au quotidien (dans la VM, en root)
 
 ```bash
@@ -269,6 +296,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-14 | 7. IA et prix | Lecture des factures par IA (photo ou PDF) avec vérification ligne par ligne avant d'enregistrer, fichier joint à la facture. Import des mercuriales : Excel et CSV lus sans IA (colonnes devinées puis corrigeables), PDF et photo par l'IA. Réglages de l'appli : IA de RecipeLog (ta clé, avec un nombre de lectures par mois) ou clé du client (Claude, ChatGPT ou Gemini). Panel : lectures et coût estimé de chaque client, quotas réglables. Testé dans un vrai navigateur avec une fausse API Claude (pas de vraie clé dans le bac à sable) ; ChatGPT et Gemini ne sont pas testés pour de vrai. Captures dans la PR. | Créer ta clé Anthropic et l'ajouter : [A-FAIRE.md](A-FAIRE.md), étape G. Puis lire une vraie facture Ribera pour vérifier. |
 | 2026-11-14 | 6. Maintenance et messages | Maintenances programmées (tout le parc, un client ou la vitrine) avec bandeau et email de préavis, page « Petite pause technique » pendant la plage (les super-admins entrent quand même), réouverture automatique, affichage sur la page de statut. Emails aux équipes des clients avec modèles (incident, résolu, nouveautés), option bandeau, journal des envois. Bandeaux dans l'appli, fermables. Testé dans un vrai navigateur : préavis reçu par email, bandeaux, maintenance immédiate (chef bloqué, super-admin entre), fin et réouverture, vitrine en maintenance. Captures dans la PR. | Rien. |
 | 2026-11-14 | 5. Surveillance et support | Vérification de chaque site et service chaque minute, alertes par email (et Telegram ou Discord si réglés) en cas de panne, de retour, de disque plein ou de nouvelle demande. Page de statut publique `status.recipelog.cc` (90 jours). Panel : partie Santé (machine et usage de chaque client), bouton Journaux en direct, partie Support (répondre, noter, fermer). Appli : Réglages → « Signaler un problème » avec la conversation et les réponses. Testé dans un vrai navigateur : demande envoyée, réponse reçue par email et dans l'appli, panne simulée détectée en 2 minutes puis retour, alerte d'essai. Captures dans la PR. | Facultatif : alertes sur ton téléphone par Telegram ou Discord, [A-FAIRE.md](A-FAIRE.md), étape F. |
 | 2026-11-14 | 4. Déménagement | Outils pour passer ton site, la démo et la vitrine sur la plateforme : `exporter-ancien.sh` (lit l'ancien conteneur sans le toucher), `importer` (testé : recettes, photos, comptes et rôles gardés), `inviter-comptes`. Démo publique avec référence et remise à zéro chaque nuit ou en 1 clic. Vitrine servie par la plateforme (branche `site-vitrine` inchangée) : mise à jour en 1 clic, bandeau, demandes du formulaire transformées en client en 1 clic. Testé dans un vrai navigateur, captures dans la PR. | Le déménagement lui-même, quand tu veux : [A-FAIRE.md](A-FAIRE.md), étape E. |

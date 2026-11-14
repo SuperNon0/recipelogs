@@ -5,13 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { listPurchaseOrders } from "@/lib/purchaseOrders";
 import { formatEuro } from "@/lib/cost";
 import { InvoiceList } from "@/components/suppliers/InvoiceList";
+import { AiReaderButton } from "@/components/suppliers/AiReader";
+import { viewerCan } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
 const day = (v: string | string[] | undefined) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requirePage("costs.view");
+  const viewer = await requirePage("costs.view");
   const sp = await searchParams;
   const from = day(sp.du);
   const to = day(sp.au);
@@ -30,6 +32,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </Link>
       <div className="page-head">
         <h1>Factures</h1>
+        {viewerCan(viewer, "costs.edit") && <AiReaderButton type="facture" fournisseurs={suppliers.map((s) => s.name)} />}
         <p className="sub">
           {orders.length} facture{orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} HT` : ""}

@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { ErreurPasserelle, clientParCle, equipe, inviter, retirer, renvoyer } from "./authentik.mjs";
 import { annoncesPour } from "./annonces.mjs";
 import { ajouterMessage, creerDemande, listerDemandes, marquerLu } from "./support.mjs";
+import { noterEtat, quota, relayer } from "./ia.mjs";
 
 const PORT = Number(process.env.PORT || 8000);
 
@@ -45,6 +46,9 @@ async function traiter(req, res) {
   }
   // Maintenance et bandeaux (lot 6) : lus par l'appli toutes les 30 secondes.
   if (chemin === "/v1/annonces" && req.method === "GET") return repondre(res, 200, await annoncesPour(nom));
+  // Lecture des factures par IA (lot 7) : quota du mois, et relais vers Claude avec la clé de la plateforme.
+  if (chemin === "/v1/ia/quota" && req.method === "GET") return repondre(res, 200, await quota(nom));
+  if (chemin === "/v1/ia/anthropic/v1/messages" && req.method === "POST") return relayer(nom, req, res, url.search);
   // Support : « Signaler un problème » depuis l'appli (le client est celui de la clé).
   if (chemin === "/v1/support" && req.method === "POST") return repondre(res, 201, { demande: await creerDemande(nom, await lireJson(req)) });
   if (chemin === "/v1/support" && req.method === "GET") return repondre(res, 200, { demandes: await listerDemandes(nom, url.searchParams.get("email") ?? "") });
@@ -81,4 +85,7 @@ createServer((req, res) => {
     .finally(() => {
       if (req.url !== "/sante") console.log(`${req.method} ${req.url?.replace(/\/v1\/equipe\/[^/]+/, "/v1/equipe/…")} ${res.statusCode} ${Date.now() - debut}ms`);
     });
-}).listen(PORT, () => console.log(`Passerelle RecipeLog sur le port ${PORT}.`));
+}).listen(PORT, () => {
+  console.log(`Passerelle RecipeLog sur le port ${PORT}.`);
+  void noterEtat();
+});
