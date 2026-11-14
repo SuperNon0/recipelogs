@@ -21,6 +21,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Dossier « plateforme » : Traefik envoie chaque <client>.recipelog.cc vers le bon RecipeLog, un seul PostgreSQL garde une base séparée par client, le tunnel Cloudflare relie la machine sans ouvrir de port",
       "creer-vm.sh crée la VM sur Proxmox et installe tout seul la plateforme avec un client de test ; recipelog-instance crée, liste, met à jour (avec retour à la version précédente en cas de problème) et supprime un client en gardant une archive",
       "La page « Version et nouveautés » affiche aussi la liste des dernières mises à jour dans la version Docker",
+      "RecipeLog en ligne : on se connecte avec son e-mail et son mot de passe sur auth.recipelog.cc, puis on revient tout seul sur la page qu'on voulait ouvrir. La connexion dure 7 jours sur chaque appareil",
+      "« Mot de passe oublié » sur la page de connexion envoie un e-mail pour en choisir un nouveau",
+      "Réglages → « Se déconnecter » pour quitter RecipeLog sur cet appareil (aussi sur les pages « Demande en attente » ou « Accès suspendu », pour changer de compte)",
+      "Réglages → Comptes → « Inviter un collaborateur » : son e-mail et son rôle, et il reçoit un e-mail pour choisir son mot de passe. Son compte est prêt tout de suite. « Renvoyer l'invitation » si l'e-mail s'est perdu ; supprimer un compte retire aussi la personne de l'équipe",
+      "Le compteur « Places utilisées » montre combien de personnes de l'équipe peuvent se connecter sur le nombre compris dans l'offre. Toutes les places sont prises ? Le site propose d'en demander plus",
+      "Le responsable du site devient administrateur tout seul à sa première connexion",
+      "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },
   {

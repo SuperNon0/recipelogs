@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SHARE_ENABLED } from "@/lib/features";
-import { PATH_HEADER } from "@/lib/auth/path";
+import { PATH_HEADER, SEARCH_HEADER } from "@/lib/auth/path";
 
 
 /**
@@ -41,6 +41,7 @@ export function middleware(req: NextRequest) {
 
   const headers = new Headers(req.headers);
   headers.set(PATH_HEADER, path);
+  headers.set(SEARCH_HEADER, req.nextUrl.search);
   return NextResponse.next({ request: { headers } });
 }
 
