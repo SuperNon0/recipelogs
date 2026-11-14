@@ -1,5 +1,6 @@
 import { BOOT_TIME } from "@/lib/bootTime";
 import { prisma } from "@/lib/prisma";
+import { fullVersion } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function GET(req: Request) {
   }
   return Response.json({
     ok: true,
+    version: fullVersion(),
     bootedAt: BOOT_TIME,
     now: Date.now(),
   });

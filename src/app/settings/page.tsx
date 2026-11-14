@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { getSiteUrl } from "@/app/actions/settings";
 import { getMcpToken } from "@/lib/mcp/token";
+import { mcpAllowed } from "@/lib/mcp/allowed";
 import { SiteSettings } from "@/components/settings/SiteSettings";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { requirePage } from "@/lib/auth/guard";
@@ -185,7 +186,7 @@ export default async function SettingsPage() {
             <h2>Claude</h2>
           </div>
           <div className="fl-list">
-            {can("mcp.manage") && (
+            {can("mcp.manage") && mcpAllowed() && (
               <Row
                 href="/settings/mcp"
                 icon={Plug}

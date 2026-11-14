@@ -404,3 +404,72 @@ export async function brancherGoogle(clientId, secret) {
   }
   return { ok: true, adresseDeRetourGoogle: `${URL_PUBLIQUE}/source/oauth/callback/google/` };
 }
+
+/**
+ * Le panel admin (admin.<domaine>) : une application Authentik réservée au
+ * groupe super-admins. Rappelé à chaque installation : le secret est alors
+ * renouvelé (install.sh le réécrit dans .env).
+ */
+export async function creerPanel(url = `https://admin.${DOMAINE}`) {
+  const slug = "rl-admin";
+  const secret = randomBytes(48).toString("hex");
+  const [autorisation, invalidation, openid, emailP, profil, cert] = await Promise.all([
+    flux("default-provider-authorization-implicit-consent"),
+    flux("recipelog-deconnexion"),
+    portee("goauthentik.io/providers/oauth2/scope-openid"),
+    portee("goauthentik.io/providers/oauth2/scope-email"),
+    portee("goauthentik.io/providers/oauth2/scope-profile"),
+    certificat(),
+  ]);
+  const corps = {
+    name: "RecipeLog panel admin",
+    authorization_flow: autorisation.pk,
+    invalidation_flow: invalidation.pk,
+    client_type: "confidential",
+    client_id: slug,
+    client_secret: secret,
+    redirect_uris: [{ matching_mode: "strict", url: `${url}/auth/retour` }],
+    property_mappings: [openid.pk, emailP.pk, profil.pk],
+    signing_key: cert.pk,
+    include_claims_in_id_token: true,
+    sub_mode: "hashed_user_id",
+    issuer_mode: "per_provider",
+    access_code_validity: "minutes=2",
+    access_token_validity: "minutes=10",
+  };
+  const [existant] = await tous("/providers/oauth2/", { client_id: slug });
+  const fournisseur = existant ? await api("PATCH", `/providers/oauth2/${existant.pk}/`, corps) : await api("POST", "/providers/oauth2/", corps);
+  let [appli] = await tous("/core/applications/", { slug });
+  if (!appli) {
+    appli = await api("POST", "/core/applications/", {
+      name: "RecipeLog panel admin",
+      slug,
+      provider: fournisseur.pk,
+      meta_launch_url: url,
+      policy_engine_mode: "any",
+    });
+    const sup = await groupeObligatoire(GROUPE_SUPER);
+    await api("POST", "/policies/bindings/", { target: appli.pk, group: sup.pk, order: 0, enabled: true, negate: false, timeout: 30 });
+  }
+  return {
+    PANEL_OIDC_ISSUER: `${URL_PUBLIQUE}/application/o/${slug}/`,
+    PANEL_OIDC_CLIENT_ID: slug,
+    PANEL_OIDC_CLIENT_SECRET: secret,
+  };
+}
+
+/** Pour le panel : places de chaque client en une fois { nom: { max, membres } }. */
+export async function resumeClients() {
+  const groupes = await tous("/core/groups/", { name__startswith: "client-", include_users: "false" });
+  const r = {};
+  await Promise.all(
+    groupes
+      .filter((g) => g.name.startsWith("client-"))
+      .map(async (g) => {
+        const nom = g.name.slice("client-".length);
+        const e = await equipe(nom);
+        r[nom] = { max: e.max, membres: e.membres.length };
+      }),
+  );
+  return r;
+}

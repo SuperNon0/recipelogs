@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel RecipeLog</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body data-domaine="{{DOMAINE}}">
+  <header class="haut">
+    <p class="marque">RecipeLog <small>panel admin</small></p>
+    <div class="moi">{{EMAIL}}<a href="/auth/deconnexion">Se déconnecter</a></div>
+  </header>
+
+  <main class="panel">
+    <h1>Clients</h1>
+    <p class="sub">Chaque client a son propre RecipeLog sur &lt;nom&gt;.{{DOMAINE}}, avec sa base et son équipe.</p>
+
+    <section class="chiffres" id="chiffres" aria-label="Résumé"></section>
+
+    <div class="barre">
+      <button class="btn principal" id="nouveau" type="button">+ Nouveau client</button>
+      <button class="btn" id="tout-maj" type="button">Tout mettre à jour</button>
+      <button class="aide" type="button" data-aide="aide-maj" aria-label="Aide : tout mettre à jour">?</button>
+      <input class="recherche" id="recherche" type="search" placeholder="Chercher un client…" aria-label="Chercher un client">
+    </div>
+    <p class="texte-aide" id="aide-maj">Télécharge la dernière version de chaque client, l'un après l'autre (2 à 3 minutes chacun). Un client qui ne redémarre pas revient tout seul à sa version d'avant, et la suite s'arrête. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
+
+    <section class="clients" id="clients" aria-live="polite"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></section>
+
+    <h2>Journal de tes actions</h2>
+    <section class="journal" id="journal"></section>
+  </main>
+
+  <!-- Une seule fenêtre, remplie selon l'action. Elle ne se ferme que par la croix. -->
+  <div class="voile" id="voile" role="dialog" aria-modal="true" aria-labelledby="fenetre-titre">
+    <div class="fenetre">
+      <button class="croix" id="croix" type="button" aria-label="Fermer">×</button>
+      <h3 id="fenetre-titre"></h3>
+      <div id="fenetre-corps"></div>
+    </div>
+  </div>
+</body>
+</html>
