@@ -1,0 +1,76 @@
+# Construit l'image Docker de RecipeLog pour la plateforme (plateforme/README.md)
+# et la publie sur ghcr.io/supernon0/recipelog :
+#   main   → étiquettes « beta » et « sha-<commit> »
+#   stable → étiquettes « stable » et « sha-<commit> »
+# Sur une PR : vérifie seulement que l'image se construit, rien n'est publié.
+#
+# Indépendant de server-build.yml, qui reste le build des installations LXC.
+name: Image Docker
+
+on:
+  push:
+    branches: [main, stable]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE: ghcr.io/supernon0/recipelog
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # la liste des PR fusionnées vient de git log
+
+      # L'image n'a pas l'historique git : on lui donne la liste des PR
+      # fusionnées dans un fichier, lu par next.config.ts.
+      - name: Historique des PR pour « Version et nouveautés »
+        run: git log --first-parent -200 --format='%cs%x1f%s%x1f%b%x1e' > .git-log.txt
+
+      - name: Étiquettes
+        id: tags
+        run: |
+          short="${GITHUB_SHA::7}"
+          case "${GITHUB_REF}" in
+            refs/heads/main)   canal=beta ;;
+            refs/heads/stable) canal=stable ;;
+            *)                 canal="" ;;
+          esac
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:sha-${short}"
+            [ -n "${canal}" ] && echo "${IMAGE}:${canal}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=RecipeLog
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

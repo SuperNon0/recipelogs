@@ -1,0 +1,36 @@
+# Configuration de Traefik (l'aiguilleur). Voir ../README.md.
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+    # Le HTTPS est fait par Cloudflare ; cloudflared arrive ici en HTTP depuis
+    # le réseau Docker. On garde les en-têtes X-Forwarded qu'il envoie.
+    forwardedHeaders:
+      trustedIPs: ["127.0.0.1/32", "172.16.0.0/12", "10.0.0.0/8", "192.168.0.0/16"]
+  ping:
+    address: ":8082"
+
+ping:
+  entryPoint: ping
+
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false # seuls les conteneurs marqués traefik.enable=true sont publiés
+    network: recipelog
+  file:
+    filename: /etc/traefik/dynamique.yml
+
+api:
+  dashboard: false
+
+log:
+  level: INFO
+accessLog:
+  fields:
+    headers:
+      names:
+        Cf-Connecting-Ip: keep

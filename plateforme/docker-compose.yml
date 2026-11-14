@@ -1,0 +1,95 @@
+# ============================================================
+# Plateforme RecipeLog : tout tourne sur une seule machine avec Docker.
+#
+#   Cloudflare ──tunnel──> cloudflared ──> Traefik ──> un conteneur par client
+#                                                 └──> (plus tard) panel, Authentik, vitrine, démo
+#   PostgreSQL : un seul serveur, une base par client.
+#
+# Lancé par install.sh avec :
+#   docker compose --project-directory <ce dossier> --env-file /srv/recipelog/.env up -d
+# Les clients ne sont PAS dans ce fichier : bin/recipelog-instance les crée
+# (un conteneur chacun, sur le réseau « recipelog »).
+# ============================================================
+name: recipelog
+
+networks:
+  recipelog:
+    name: recipelog
+  socket:
+    name: recipelog-socket
+    internal: true # le proxy Docker n'est joignable que par Traefik (et plus tard le panel)
+
+services:
+  # Accès à Docker limité : Traefik peut LIRE la liste des conteneurs, rien d'autre.
+  socket-proxy:
+    image: linuxserver/socket-proxy:3.4.7-r0-ls105
+    container_name: recipelog-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      SERVICES: 0
+      TASKS: 0
+      POST: 0
+      LOG_LEVEL: warning
+      DISABLE_IPV6: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+    networks: [socket]
+
+  # Aiguilleur : envoie chaque sous-domaine vers le bon conteneur.
+  traefik:
+    image: traefik:v3.6.4
+    container_name: recipelog-traefik
+    restart: unless-stopped
+    depends_on: [socket-proxy]
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamique.yml:/etc/traefik/dynamique.yml:ro
+    # Aucun port ouvert vers l'extérieur : seulement 127.0.0.1:8080 sur la
+    # machine, pour tester avec curl. Les visiteurs arrivent par cloudflared.
+    ports:
+      - "127.0.0.1:8080:80"
+    networks: [recipelog, socket]
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Un seul PostgreSQL pour tous les clients (une base chacun).
+  postgres:
+    image: postgres:16-alpine
+    container_name: recipelog-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans /srv/recipelog/.env}
+      POSTGRES_DB: postgres
+    volumes:
+      - ${DONNEES:-/srv/recipelog}/postgres:/var/lib/postgresql/data
+    shm_size: 256mb
+    networks: [recipelog]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Tunnel Cloudflare : relie la machine à Cloudflare sans ouvrir de port.
+  # Démarré seulement si CF_TUNNEL_TOKEN est rempli (COMPOSE_PROFILES=tunnel).
+  cloudflared:
+    image: cloudflare/cloudflared:2025.4.2
+    container_name: recipelog-cloudflared
+    restart: unless-stopped
+    profiles: [tunnel]
+    depends_on: [traefik]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    networks: [recipelog]

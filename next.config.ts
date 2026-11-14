@@ -1,10 +1,13 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { NextConfig } from "next";
 import { parseGitLog, type MergedPr } from "./src/lib/pr-log";
 
 // Liste des PR fusionnées, lue dans git au moment du build et affichée dans
-// Réglages → « Version et nouveautés ». Sans git (archive, Docker) : liste vide.
+// Réglages → « Version et nouveautés ». Sans git (image Docker) : on lit
+// .git-log.txt, que le workflow docker-image.yml écrit avant le build avec la
+// même commande. Sans l'un ni l'autre : liste vide.
 function mergedPrs(): MergedPr[] {
   try {
     const raw = execSync("git log --first-parent -200 --format=%cs%x1f%s%x1f%b%x1e", {
@@ -13,7 +16,11 @@ function mergedPrs(): MergedPr[] {
     });
     return parseGitLog(raw);
   } catch {
-    return [];
+    try {
+      return parseGitLog(readFileSync(path.join(__dirname, ".git-log.txt"), "utf8"));
+    } catch {
+      return [];
+    }
   }
 }
 

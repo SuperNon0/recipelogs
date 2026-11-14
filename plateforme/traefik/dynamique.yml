@@ -1,0 +1,31 @@
+# Réglages communs à tous les sites, utilisés par les étiquettes des conteneurs
+# (par exemple « securite@file,limite@file »).
+http:
+  middlewares:
+    # En-têtes de sécurité envoyés au navigateur.
+    securite:
+      headers:
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        referrerPolicy: strict-origin-when-cross-origin
+        customFrameOptionsValue: SAMEORIGIN
+
+    # Limite les abus : au-delà de 30 requêtes par seconde (pointes à 120)
+    # pour une même adresse, Traefik répond « trop de requêtes ». L'adresse
+    # réelle du visiteur vient de l'en-tête ajouté par Cloudflare.
+    limite:
+      rateLimit:
+        average: 30
+        period: 1s
+        burst: 120
+        sourceCriterion:
+          requestHeaderName: Cf-Connecting-Ip
+
+    # Plus strict, pour les pages de connexion et les formulaires (lot 1).
+    limite-connexion:
+      rateLimit:
+        average: 10
+        period: 1m
+        burst: 20
+        sourceCriterion:
+          requestHeaderName: Cf-Connecting-Ip

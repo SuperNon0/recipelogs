@@ -1,0 +1,14 @@
+.git
+node_modules
+.next
+.next-*
+coverage
+data
+.env
+.env.*
+tests
+design-encre
+docs
+*.md
+!README.md
+plateforme
