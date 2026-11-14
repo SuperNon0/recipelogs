@@ -1,0 +1,7 @@
+Bonjour,
+
+Pour te connecter à RecipeLog, choisis ton mot de passe avec ce lien :
+{{ url }}
+
+Ton identifiant est ton adresse : {{ user.email }}
+Ce lien est valable 3 jours et ne sert qu'une fois. Si tu n'as rien demandé, ignore simplement cet email.

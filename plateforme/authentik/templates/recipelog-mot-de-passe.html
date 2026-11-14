@@ -1,0 +1,22 @@
+{% load humanize %}<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RecipeLog</title></head>
+<body style="margin:0;padding:24px 12px;background:#f5f3ee;font-family:Arial,Helvetica,sans-serif;color:#1b1d22;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e7e2d7;border-radius:14px;">
+    <tr><td style="padding:28px 28px 8px;font-family:Georgia,'Times New Roman',serif;font-size:26px;">Recipe<i style="color:#5a48d0;">Log</i></td></tr>
+    <tr><td style="padding:8px 28px;font-size:16px;line-height:1.5;">
+      Bonjour{% if user.name and user.name != user.email %} {{ user.name }}{% endif %},<br><br>
+      Pour te connecter à RecipeLog, choisis ton mot de passe avec le bouton ci-dessous.
+      Ton identifiant est ton adresse : <b>{{ user.email }}</b>.
+    </td></tr>
+    <tr><td style="padding:16px 28px 8px;">
+      <a href="{{ url }}" style="display:inline-block;background:#5a48d0;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px;">Choisir mon mot de passe</a>
+    </td></tr>
+    <tr><td style="padding:8px 28px 28px;font-size:13px;line-height:1.5;color:#666b77;">
+      Ce lien est valable 3 jours et ne sert qu'une fois. Si tu n'as rien demandé, ignore simplement cet email.<br>
+      Si le bouton ne marche pas, copie cette adresse dans ton navigateur :<br>
+      <span style="word-break:break-all;">{{ url }}</span>
+    </td></tr>
+  </table>
+</body>
+</html>
