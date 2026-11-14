@@ -3,7 +3,7 @@
 # creer-vm.sh — crée la VM de la plateforme RecipeLog, depuis le shell de
 # l'hôte Proxmox (en root) :
 #
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/plateforme/creer-vm.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/creer-vm.sh)"
 #
 # Une VM Debian 12 (image cloud officielle), démarrée avec cloud-init, qui
 # lance toute seule plateforme/install.sh au premier démarrage.
@@ -14,7 +14,7 @@
 #   VM_MEMOIRE (Mo, 12288), VM_DISQUE (Go, 100), VM_STOCKAGE (local-lvm),
 #   VM_PONT (vmbr0), VM_CLE_SSH (fichier de clés publiques, défaut
 #   /root/.ssh/authorized_keys de l'hôte), ADMIN_EMAILS, CF_TUNNEL_TOKEN,
-#   RECIPELOG_BRANCH (main)
+#   RECIPELOG_BRANCH (plateforme)
 # ============================================================
 set -euo pipefail
 
@@ -56,7 +56,7 @@ ask VM_PONT "Pont réseau" "vmbr0"
 ask VM_CLE_SSH "Fichier des clés SSH autorisées" "/root/.ssh/authorized_keys"
 ask ADMIN_EMAILS "Ton adresse email (administrateur caché des clients)" ""
 ask CF_TUNNEL_TOKEN "Jeton du tunnel Cloudflare de la plateforme (Entrée = plus tard)" "" secret
-ask RECIPELOG_BRANCH "Branche du dépôt" "main"
+ask RECIPELOG_BRANCH "Branche du dépôt" "plateforme"
 
 [[ "${VMID}" =~ ^[0-9]+$ ]] || die "Numéro de VM invalide : ${VMID}"
 qm status "${VMID}" >/dev/null 2>&1 && die "La VM ${VMID} existe déjà."

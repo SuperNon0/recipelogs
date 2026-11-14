@@ -4,7 +4,7 @@
 # Un client = une base dans le PostgreSQL partagé + un conteneur RecipeLog
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
-#   recipelog-instance creer <nom> [--canal beta|stable] [--admin email] [--demo]
+#   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]
 #   recipelog-instance liste
 #   recipelog-instance mettre-a-jour <nom>|--tous
 #   recipelog-instance redemarrer <nom>
@@ -107,9 +107,9 @@ cmd_creer() {
       *) [ -z "${nom}" ] || die "Un seul nom à la fois."; nom="$1"; shift ;;
     esac
   done
-  [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal beta|stable] [--admin email] [--demo]"
+  [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]"
   nom_valide "${nom}"
-  [[ "${canal}" =~ ^(beta|stable)$ ]] || die "Canal « ${canal} » inconnu (beta ou stable)."
+  [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (beta, stable ou plateforme)."
   existe "${nom}" && die "Le client « ${nom} » existe déjà."
 
   local dir="${INSTANCES}/${nom}" db mdp

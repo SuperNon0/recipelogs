@@ -3,7 +3,7 @@
 # install.sh — prépare une machine Debian 12 vierge pour la plateforme
 # RecipeLog, en root, dans la VM :
 #
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/plateforme/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/install.sh)"
 #
 # (creer-vm.sh, lancé sur l'hôte Proxmox, crée la VM et lance ce script tout seul.)
 #
@@ -20,7 +20,7 @@
 #   CF_TUNNEL_TOKEN    jeton du tunnel Cloudflare de la plateforme (facultatif)
 #   ADMIN_EMAILS       ton adresse (administrateur caché des clients)
 #   DOMAINE            défaut : recipelog.cc
-#   RECIPELOG_BRANCH   branche du dépôt pour les fichiers de la plateforme (défaut : main)
+#   RECIPELOG_BRANCH   branche du dépôt pour les fichiers de la plateforme (défaut : plateforme)
 #   CREER_TEST         1 = créer le client « test » (défaut : 1)
 # Relancer le script est sans danger : il garde le .env et les clients existants.
 # ============================================================
@@ -104,7 +104,7 @@ systemctl enable nftables >/dev/null 2>&1
 nft -f /etc/nftables.conf
 
 # ------------------------------------------------------------ 3. Fichiers
-ask RECIPELOG_BRANCH "Branche du dépôt" "main"
+ask RECIPELOG_BRANCH "Branche du dépôt" "plateforme"
 info "Fichiers de la plateforme (${RECIPELOG_BRANCH}) dans ${APP_DIR}…"
 if [ -d "${APP_DIR}/.git" ]; then
   git -C "${APP_DIR}" fetch -q --depth 1 origin "${RECIPELOG_BRANCH}"
@@ -156,7 +156,7 @@ recipelog-plateforme up -d --wait
 CREER_TEST="${CREER_TEST:-1}"
 if [ "${CREER_TEST}" = 1 ] && [ ! -d "${DONNEES}/instances/test" ]; then
   info "Client de test « test »…"
-  recipelog-instance creer test --canal beta || echo "⚠️  Le client de test n'a pas démarré ; la plateforme, elle, tourne. Voir : recipelog-instance journaux test"
+  recipelog-instance creer test --canal plateforme || echo "⚠️  Le client de test n'a pas démarré ; la plateforme, elle, tourne. Voir : recipelog-instance journaux test"
 fi
 
 IP="$(hostname -I | awk '{print $1}')"

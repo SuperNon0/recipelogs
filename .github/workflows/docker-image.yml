@@ -2,6 +2,7 @@
 # et la publie sur ghcr.io/supernon0/recipelog :
 #   main   → étiquettes « beta » et « sha-<commit> »
 #   stable → étiquettes « stable » et « sha-<commit> »
+#   plateforme (branche de travail de la plateforme) → « plateforme » et « sha-<commit> »
 # Sur une PR : vérifie seulement que l'image se construit, rien n'est publié.
 #
 # Indépendant de server-build.yml, qui reste le build des installations LXC.
@@ -9,7 +10,7 @@ name: Image Docker
 
 on:
   push:
-    branches: [main, stable]
+    branches: [main, stable, plateforme]
   pull_request:
   workflow_dispatch:
 
@@ -44,6 +45,7 @@ jobs:
           case "${GITHUB_REF}" in
             refs/heads/main)   canal=beta ;;
             refs/heads/stable) canal=stable ;;
+            refs/heads/plateforme) canal=plateforme ;;
             *)                 canal="" ;;
           esac
           {

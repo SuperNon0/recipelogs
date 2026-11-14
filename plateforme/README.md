@@ -18,13 +18,15 @@ Visiteurs ── Cloudflare ── tunnel ──> cloudflared ──> Traefik �
 | `creer-vm.sh` | Crée la VM sur l'hôte Proxmox et lance `install.sh` dedans |
 
 L'image de l'appli est construite par GitHub Actions (`.github/workflows/docker-image.yml`) :
-`ghcr.io/supernon0/recipelog:beta` suit `main`, `:stable` suit `stable`.
+`ghcr.io/supernon0/recipelog:beta` suit `main`, `:stable` suit `stable`, et `:plateforme`
+suit la branche `plateforme`, où se construit tout le chantier avant d'arriver dans `main`.
+Le client de test suit `:plateforme`.
 
 ## Installer
 
 ### 1. Une fois sur GitHub : rendre l'image publique
 
-Après le premier build de `main`, ouvrir **github.com/SuperNon0 → Packages → recipelog →
+Après le premier build de la branche `plateforme`, ouvrir **github.com/SuperNon0 → Packages → recipelog →
 Package settings → Change visibility → Public**. Le code est déjà public ; sinon la VM
 devrait se connecter à ghcr.io avec un jeton.
 
@@ -41,7 +43,7 @@ devrait se connecter à ghcr.io avec un jeton.
 ### 3. Sur l'hôte Proxmox : créer la VM
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/main/plateforme/creer-vm.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/creer-vm.sh)"
 ```
 
 Le script demande le numéro de VM, la taille (4 cœurs, 12 Go, 100 Go proposés), ton
@@ -62,6 +64,7 @@ ouvert à qui connaît son adresse. Dans **Zero Trust → Access → Application
 recipelog-instance liste                    # les clients et leur état
 recipelog-instance creer chanka             # nouveau client sur chanka.recipelog.cc (canal stable)
 recipelog-instance creer essai --canal beta # suit la bêta (main)
+recipelog-instance creer essai2 --canal plateforme # suit la branche du chantier
 recipelog-instance mettre-a-jour test       # un client
 recipelog-instance mettre-a-jour --tous     # tous, l'un après l'autre, arrêt au premier échec
 recipelog-instance journaux test            # journaux en direct
