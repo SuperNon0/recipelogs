@@ -1,3 +1,4 @@
+import { mcpAllowed } from "@/lib/mcp/allowed";
 import { attachInvoiceFile, consumeUploadLink } from "@/lib/invoiceFiles";
 
 /**
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ jeton: string }> };
 
 async function upload(req: Request, ctx: Ctx) {
+  if (!mcpAllowed()) return Response.json({ error: "Accès MCP non compris dans l'offre." }, { status: 404 });
   const orderId = consumeUploadLink((await ctx.params).jeton);
   if (orderId == null) return Response.json({ error: "Lien inconnu, déjà utilisé ou expiré." }, { status: 404 });
   let bytes: Buffer;

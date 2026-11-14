@@ -143,28 +143,36 @@ docker exec recipelog-passerelle node cli.mjs google '<ID client>' '<code secret
 Si quelque chose bloque : dans la VM, `recipelog-plateforme ps` (tout doit être `healthy`)
 et `recipelog-instance journaux test`. Envoie-moi ce qui s'affiche.
 
-### ☐ C3. Un vrai client (quand tu veux)
+### ☐ C3. Le panel admin (lot 2)
 
-```bash
-recipelog-instance creer chanka --responsable adresse@du-responsable.fr --max 10
-```
+1. Ouvrir **https://admin.recipelog.cc** et se connecter avec ton compte.
+2. Tu vois le client `test`. Essaie **Équipe**, **Réglages**, **Pause** puis **Réactiver**.
+
+Si la page dit « Panel pas encore réglé » : relancer `install.sh` dans la VM (voir
+« Déjà installé ? » plus bas).
+
+### ☐ C4. Un vrai client (quand tu veux)
+
+Dans le panel : **+ Nouveau client** → nom, email du responsable, nombre de comptes.
+(Ou en ligne de commande : `recipelog-instance creer chanka --responsable adresse@du-responsable.fr --max 10`.)
 
 Le responsable reçoit son email, choisit son mot de passe, et invite lui-même son équipe
-depuis **Réglages → Comptes**. Sans `--max` : pas de limite de comptes.
+depuis **Réglages → Comptes**. 0 compte = pas de limite.
 
 ---
 
-## Déjà installé avant le lot 1 ?
+## Déjà installé ?
 
-Si tu avais déjà lancé `creer-vm.sh` avant la fusion du lot 1, pas besoin de refaire la VM.
-Dans la VM, en root :
+Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
+Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2) sans
+toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/install.sh)"
-recipelog-instance brancher-authentik test
+recipelog-instance brancher-authentik test   # seulement si test date d'avant le lot 1
 ```
 
-Puis faire B2, B3 et C, et retirer la protection Cloudflare Access de `test.recipelog.cc`
+Puis faire B2, B3 et C (si pas déjà faits), et retirer la protection Cloudflare Access de `test.recipelog.cc`
 (**Zero Trust → Access → Applications**).
 
 ---
@@ -176,3 +184,4 @@ Puis faire B2, B3 et C, et retirer la protection Cloudflare Access de `test.reci
 | Mot de passe de secours d'Authentik (compte `akadmin`) | dans la VM : `grep BOOTSTRAP_PASSWORD /srv/recipelog/.env` |
 | Tous les autres secrets | `/srv/recipelog/.env` dans la VM (lisible seulement par root) |
 | Résumé de l'installation | `/root/recipelog-plateforme.txt` dans la VM |
+| Le panel admin | https://admin.recipelog.cc (ton compte super-admin) |

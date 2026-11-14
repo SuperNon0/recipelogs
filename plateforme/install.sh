@@ -177,6 +177,10 @@ ajouter AUTHENTIK_DB_PASSWORD "$(openssl rand -hex 32)"
 ajouter AUTHENTIK_BOOTSTRAP_EMAIL "secours@${DOMAINE}"
 ajouter AUTHENTIK_BOOTSTRAP_PASSWORD "$(openssl rand -base64 24 | tr -d '/+=')"
 ajouter AUTHENTIK_BOOTSTRAP_TOKEN "$(openssl rand -hex 48)"
+# Lot 2 : panel admin.
+ajouter MOTEUR_CLE "$(openssl rand -hex 32)"
+ajouter PANEL_SESSION_SECRET "$(openssl rand -hex 32)"
+ajouter DOMAINE_REGEX "${DOMAINE//./\\.}"
 ajouter SMTP_HOTE "${SMTP_HOTE:-}"
 ajouter SMTP_PORT "${SMTP_PORT:-587}"
 ajouter SMTP_UTILISATEUR "${SMTP_UTILISATEUR:-}"
@@ -212,6 +216,16 @@ if [ -n "${ADMIN_EMAILS}" ]; then
   docker exec recipelog-passerelle node cli.mjs initialiser "${ADMIN_EMAILS}" >/dev/null \
     || echo "⚠️  Compte super-admin non créé. À relancer : docker exec recipelog-passerelle node cli.mjs initialiser"
 fi
+info "Accès du panel admin (admin.${DOMAINE}) dans Authentik…"
+if PANEL="$(docker exec recipelog-passerelle node cli.mjs panel-creer "https://admin.${DOMAINE}" --env)"; then
+  sed -i '/^PANEL_OIDC_/d' "${DONNEES}/.env"
+  umask 077; printf '%s\n' "${PANEL}" | sed "s/=\(.*\)$/='\1'/" >> "${DONNEES}/.env"; umask 022
+  # shellcheck disable=SC1091
+  set -a; . "${DONNEES}/.env"; set +a
+  recipelog-plateforme up -d panel >/dev/null
+else
+  echo "⚠️  Panel non branché sur Authentik. À relancer : bash install.sh"
+fi
 
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"
@@ -228,6 +242,7 @@ Machine            : ${IP}
 Fichiers           : ${APP_DIR} (dépôt, branche ${RECIPELOG_BRANCH})
 Données et réglages: ${DONNEES}  (.env, postgres/, instances/, archives/)
 Tunnel Cloudflare  : $([ -n "${CF_TUNNEL_TOKEN}" ] && echo "branché" || echo "PAS ENCORE : ajouter CF_TUNNEL_TOKEN et COMPOSE_PROFILES=tunnel dans ${DONNEES}/.env, puis recipelog-plateforme up -d")
+Panel admin        : https://admin.${DOMAINE} (super-admins seulement)
 Connexion          : https://auth.${DOMAINE} (Authentik)
   Ton compte       : ${ADMIN_EMAILS:-aucun} (email « Choisis ton mot de passe » envoyé)
   Compte de secours: akadmin, mot de passe AUTHENTIK_BOOTSTRAP_PASSWORD dans ${DONNEES}/.env

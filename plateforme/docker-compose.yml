@@ -169,3 +169,73 @@ services:
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     read_only: true
     networks: [recipelog]
+
+  # Panel admin (admin.<domaine>), réservé aux super-admins. Il n'a aucun accès à
+  # Docker : il demande tout au moteur. Il sert aussi la page « site en pause »
+  # pour les adresses *.<domaine> qui n'ont pas de RecipeLog en ligne.
+  panel:
+    build:
+      context: ..
+      dockerfile: plateforme/panel/Dockerfile
+    image: recipelog-panel:local
+    container_name: recipelog-panel
+    restart: unless-stopped
+    user: node
+    read_only: true
+    depends_on: [moteur]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/sante').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+    environment:
+      DOMAINE: ${DOMAINE:-recipelog.cc}
+      PANEL_URL: https://admin.${DOMAINE:-recipelog.cc}
+      PANEL_OIDC_ISSUER: ${PANEL_OIDC_ISSUER:-}
+      PANEL_OIDC_CLIENT_ID: ${PANEL_OIDC_CLIENT_ID:-}
+      PANEL_OIDC_CLIENT_SECRET: ${PANEL_OIDC_CLIENT_SECRET:-}
+      PANEL_SESSION_SECRET: ${PANEL_SESSION_SECRET:-}
+      OIDC_INTERNE: http://recipelog-authentik:9000
+      MOTEUR_URL: http://recipelog-moteur:8000
+      MOTEUR_CLE: ${MOTEUR_CLE:-}
+    networks: [recipelog]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.panel.rule: Host(`admin.${DOMAINE:-recipelog.cc}`)
+      traefik.http.routers.panel.entrypoints: web
+      traefik.http.routers.panel.middlewares: securite@file,limite@file
+      traefik.http.routers.panel.service: panel
+      # Toute autre adresse *.<domaine> sans RecipeLog en ligne (en pause, en
+      # train de redémarrer, inconnue) : priorité la plus basse.
+      traefik.http.routers.pause.rule: HostRegexp(`^[a-z0-9-]+\.${DOMAINE_REGEX:-recipelog\.cc}$`)
+      traefik.http.routers.pause.priority: "1"
+      traefik.http.routers.pause.entrypoints: web
+      traefik.http.routers.pause.middlewares: securite@file,limite@file
+      traefik.http.routers.pause.service: panel
+      traefik.http.services.panel.loadbalancer.server.port: "3000"
+
+  # Le moteur du panel : le seul à piloter Docker (il lance recipelog-instance).
+  # Jamais publié par Traefik ; le panel l'appelle avec MOTEUR_CLE.
+  moteur:
+    build:
+      context: ..
+      dockerfile: plateforme/panel/Dockerfile
+    image: recipelog-panel:local
+    container_name: recipelog-moteur
+    restart: unless-stopped
+    command: ["node", "moteur.mjs"]
+    depends_on: [passerelle]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8000/sante').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+    environment:
+      DONNEES: ${DONNEES:-/srv/recipelog}
+      MOTEUR_CLE: ${MOTEUR_CLE:?MOTEUR_CLE manquant dans /srv/recipelog/.env}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Même chemin que sur la machine : recipelog-instance donne ces chemins à Docker.
+      - ${DONNEES:-/srv/recipelog}:${DONNEES:-/srv/recipelog}
+      - ./bin/recipelog-instance:/usr/local/bin/recipelog-instance:ro
+    networks: [recipelog]

@@ -20,6 +20,7 @@ Visiteurs ── Cloudflare ── tunnel ──> cloudflared ──> Traefik �
 | `authentik/` | Réglages d'Authentik appliqués tout seuls (connexion par email, mot de passe oublié, déconnexion, super-admins) et l'email d'invitation en français |
 | `passerelle/` | Le seul service qui a la clé d'Authentik : crée les clients, invite, compte les places. Chaque RecipeLog lui parle avec sa propre clé |
 | `connexion.md` | Comment l'appli, Authentik et la passerelle se parlent |
+| `panel/` | Le panel admin sur `admin.recipelog.cc` (réservé aux super-admins) et son moteur, le seul à piloter Docker. Sert aussi la page « site en pause » |
 | `traefik/` | Réglages de Traefik : en-têtes de sécurité, limitation des abus |
 | `bin/recipelog-instance` | Créer, lister, mettre à jour, supprimer un client |
 | `install.sh` | Prépare une Debian 12 vierge (Docker, pare-feu, réglages, démarrage) |
@@ -97,6 +98,25 @@ En secours, le compte `akadmin` a son mot de passe dans `/srv/recipelog/.env`
 
 Google ne crée jamais de compte : il ne sert qu'aux personnes déjà invitées avec la même adresse.
 
+## Au quotidien : le panel admin
+
+**https://admin.recipelog.cc**, avec ton compte super-admin. Tout ce qui suit se fait en un clic :
+
+- tableau des clients : état, places utilisées, version, essai, MCP ;
+- **Nouveau client** : nom, responsable (il reçoit son invitation), nombre de comptes,
+  jours d'essai, version, accès MCP ;
+- par client : **Ouvrir** (tu entres comme administrateur caché), **Équipe** (inviter,
+  renvoyer, retirer), **Réglages** (places, essai, MCP), **Mettre à jour**, **Pause** /
+  **Réactiver**, **Supprimer** (en tapant son nom ; une archive est gardée) ;
+- **Tout mettre à jour**, client par client, avec retour en arrière en cas de problème ;
+- **Journal de tes actions**, avec le détail de chaque opération.
+
+Un essai terminé met le client en pause tout seul (vérifié toutes les heures). Un client en
+pause affiche « Ce RecipeLog est en pause » ; ses données restent là.
+
+Le panel n'a aucun accès à Docker : il passe par le **moteur**, joignable seulement sur le
+réseau interne avec une clé. Le moteur lance `recipelog-instance`, comme en ligne de commande.
+
 ## Au quotidien (dans la VM, en root)
 
 ```bash
@@ -110,6 +130,9 @@ recipelog-instance equipe chanka            # qui peut se connecter, et les plac
 recipelog-instance inviter chanka a@b.fr    # inviter quelqu'un (l'appli le fait aussi : Réglages → Comptes)
 recipelog-instance quota chanka 15          # changer le nombre de places (0 = pas de plafond)
 recipelog-instance brancher-authentik test  # passer un client créé avant le lot 1 sur Authentik
+recipelog-instance suspendre chanka         # pause (reactiver chanka pour rouvrir)
+recipelog-instance essai chanka 14          # essai de 14 jours (0 = plus d'essai)
+recipelog-instance options chanka --mcp non # couper l'accès MCP
 recipelog-instance mettre-a-jour test       # un client
 recipelog-instance mettre-a-jour --tous     # tous, l'un après l'autre, arrêt au premier échec
 recipelog-instance journaux test            # journaux en direct
@@ -150,5 +173,6 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-14 | 2. Panel | Panel admin sur `admin.recipelog.cc` (super-admins seulement, connexion Authentik) dans le thème encre : tableau des clients, création en 1 clic avec invitation du responsable, équipe, places, essais (pause automatique à la fin), accès MCP par client, mise à jour d'un client ou de tous, pause / réactivation, suppression avec archive, journal de tes actions. Page « Ce RecipeLog est en pause ». Le moteur (seul à piloter Docker) reste interne. Testé dans un vrai navigateur, captures dans la PR. | Rien de nouveau à créer : voir [A-FAIRE.md](A-FAIRE.md), étape C4. |
 | 2026-11-14 | 1. Connexion | Authentik sur `auth.recipelog.cc` (connexion par email, mot de passe oublié, Google en option, double authentification), réglé tout seul et en français. La passerelle crée chaque client dans Authentik, invite par email (lien valable 3 jours) et compte les places. Dans l'appli : connexion et retour sur la page demandée, « Se déconnecter » (qui déconnecte vraiment, même sur une tablette partagée), Réglages → Comptes → « Inviter un collaborateur » et « Places utilisées », responsable administrateur à sa première connexion. `recipelog-instance creer --responsable … --max …`. Testé dans un vrai navigateur : invitation, choix du mot de passe, connexion, invitation depuis l'appli, plafond, refus d'un membre sur un autre client, super-admin caché, déconnexion. | Tout est dans [A-FAIRE.md](A-FAIRE.md) : compte Brevo pour les emails, Google si tu veux, puis installation et vérifications. |
 | 2026-11-14 | 0. Socle | Branche `plateforme` créée depuis `main` (rien d'autre n'est touché). Image Docker de l'appli publiée en `:plateforme`, pile Traefik + PostgreSQL + proxy Docker + tunnel, scripts `creer-vm.sh`, `install.sh` et `recipelog-instance`. Testé dans Docker : client de test en ligne via Traefik, bases séparées entre clients. PR #149 vers `plateforme`. | Après la fusion : rendre l'image publique, créer le tunnel, lancer `creer-vm.sh`, protéger `test.recipelog.cc` avec Cloudflare Access (en attendant le lot 1). |

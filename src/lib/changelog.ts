@@ -26,6 +26,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → « Se déconnecter » pour quitter RecipeLog sur cet appareil (aussi sur les pages « Demande en attente » ou « Accès suspendu », pour changer de compte). La personne suivante sur la même tablette doit bien se reconnecter",
       "Réglages → « Mot de passe et sécurité » : changer son mot de passe et activer la double authentification (un code sur le téléphone en plus du mot de passe)",
       "Bouton « Google » sur la page de connexion, pour les personnes invitées avec leur adresse Gmail",
+      "RecipeLog en ligne : l'accès MCP (Claude) peut être compris ou non dans l'offre. Quand il ne l'est pas, le menu « Accès MCP » disparaît des réglages",
       "Réglages → Comptes → « Inviter un collaborateur » : son e-mail et son rôle, et il reçoit un e-mail pour choisir son mot de passe. Son compte est prêt tout de suite. « Renvoyer l'invitation » si l'e-mail s'est perdu ; supprimer un compte retire aussi la personne de l'équipe",
       "Le compteur « Places utilisées » montre combien de personnes de l'équipe peuvent se connecter sur le nombre compris dans l'offre. Toutes les places sont prises ? Le site propose d'en demander plus",
       "Le responsable du site devient administrateur tout seul à sa première connexion",

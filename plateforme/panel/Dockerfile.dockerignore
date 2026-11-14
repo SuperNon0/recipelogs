@@ -1,0 +1,4 @@
+# Seuls les fichiers du panel et les polices entrent dans l'image.
+*
+!plateforme/panel/
+!public/polices/

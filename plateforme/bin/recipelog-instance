@@ -5,8 +5,13 @@
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
 #   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--responsable email]
-#                                  [--max N] [--admin email] [--demo] [--sans-authentik]
-#   recipelog-instance liste
+#                                  [--max N] [--essai jours] [--sans-mcp] [--admin email]
+#                                  [--demo] [--sans-authentik]
+#   recipelog-instance liste [--json]
+#   recipelog-instance suspendre <nom> | reactiver <nom>
+#   recipelog-instance options <nom> --mcp oui|non
+#   recipelog-instance essai <nom> <jours|0>     (0 = plus d'essai : client normal)
+#   recipelog-instance verifier-essais           (met en pause les essais terminés)
 #   recipelog-instance equipe <nom>
 #   recipelog-instance inviter <nom> <email> [nom affiché]
 #   recipelog-instance quota <nom> <N|0>          (0 = pas de plafond)
@@ -18,7 +23,8 @@
 #
 # Réglages lus dans /srv/recipelog/.env (écrit par install.sh).
 # Chaque client a son dossier /srv/recipelog/instances/<nom>/ :
-#   instance.conf  canal, date de création, connexion (authentik ou cloudflare)
+#   instance.conf  canal, date de création, connexion (authentik ou cloudflare),
+#                  pause (SUSPENDU=1), fin d'essai (ESSAI_FIN), MCP (oui/non)
 #   instance.env   variables du conteneur (mot de passe de sa base, réglages
 #                  de connexion Authentik : voir ../connexion.md)
 #   uploads/       photos et factures envoyées
@@ -50,6 +56,8 @@ nom_valide() {
   [[ "${RESERVES}" != *" ${n} "* ]] || die "« ${n} » est réservé à la plateforme."
 }
 conteneur() { echo "rl-$1"; }
+# aleatoire <octets> : secret en hexadécimal (sans dépendre d'openssl).
+aleatoire() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 # Télécharge l'image ; sans réseau, garde celle déjà présente sur la machine.
 tirer() {
   docker pull -q "$1" >/dev/null 2>&1 && return 0
@@ -76,7 +84,7 @@ brancher() {
     echo "RECIPELOG_AUTH_MODE=oidc"
     echo "RECIPELOG_URL=https://${nom}.${DOMAINE}"
     echo "${reglages}"
-    echo "RECIPELOG_SESSION_SECRET=$(openssl rand -hex 32)"
+    echo "RECIPELOG_SESSION_SECRET=$(aleatoire 32)"
     echo "RECIPELOG_PASSERELLE_URL=http://recipelog-passerelle:8000"
     [ -n "${resp}" ] && echo "RECIPELOG_RESPONSABLE_EMAIL=${resp}"
   } >> "${dir}/instance.env"
@@ -95,6 +103,15 @@ inviter_responsable() {
     echo "⚠️  Invitation de ${resp} impossible. À relancer : recipelog-instance inviter ${nom} ${resp}" >&2
   fi
 }
+
+# Lit / écrit une ligne CLE=valeur de instance.conf.
+conf_lire() { sed -n "s/^$2=//p" "${INSTANCES}/$1/instance.conf" 2>/dev/null | tail -1; }
+conf_ecrire() { # conf_ecrire <nom> <CLE> [valeur]  (sans valeur : retire la ligne)
+  local f="${INSTANCES}/$1/instance.conf"
+  sed -i "/^$2=/d" "${f}"
+  [ $# -lt 3 ] || echo "$2=$3" >> "${f}"
+}
+suspendu() { [ "$(conf_lire "$1" SUSPENDU)" = 1 ]; }
 
 verifier_email() { [[ "$1" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Adresse email invalide : $1"; }
 verifier_max() { [[ "$1" =~ ^[0-9]+$ ]] || die "Nombre de comptes invalide : $1 (0 = pas de plafond)."; }
@@ -143,7 +160,7 @@ attendre() {
 }
 
 cmd_creer() {
-  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1
+  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1 essai=0 mcp=oui
   while [ $# -gt 0 ]; do
     case "$1" in
       --canal) canal="${2:-}"; shift 2 ;;
@@ -151,6 +168,8 @@ cmd_creer() {
       --responsable) resp="${2:-}"; shift 2 ;;
       --max) max="${2:-}"; shift 2 ;;
       --sans-authentik) authentik=0; shift ;;
+      --essai) essai="${2:-}"; shift 2 ;;
+      --sans-mcp) mcp=non; shift ;;
       --demo) demo=1; shift ;;
       -*) die "Option inconnue : $1" ;;
       *) [ -z "${nom}" ] || die "Un seul nom à la fois."; nom="$1"; shift ;;
@@ -160,13 +179,14 @@ cmd_creer() {
   nom_valide "${nom}"
   [ -z "${resp}" ] || verifier_email "${resp}"
   verifier_max "${max}"
+  [[ "${essai}" =~ ^[0-9]+$ ]] || die "Durée d'essai invalide : ${essai} (en jours)."
   [ "${authentik}" = 0 ] || passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps). Sans Authentik : --sans-authentik."
   [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (beta, stable ou plateforme)."
   existe "${nom}" && die "Le client « ${nom} » existe déjà."
 
   local dir="${INSTANCES}/${nom}" db mdp
   db="$(base "${nom}")"
-  mdp="$(openssl rand -hex 24)"
+  mdp="$(aleatoire 24)"
 
   info "Base ${db} dans PostgreSQL…"
   psql_admin <<SQL
@@ -184,12 +204,15 @@ SQL
 CANAL=${canal}
 CREE_LE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 CONNEXION=cloudflare
+MCP=${mcp}
+$([ "${essai}" -gt 0 ] && echo "ESSAI_FIN=$(date -u -d "+${essai} days" +%Y-%m-%d)")
 CONF
   {
     echo "DATABASE_URL=postgresql://${db}:${mdp}@${PG}:5432/${db}"
     echo "RECIPELOG_INSTANCE=${nom}"
     echo "RECIPELOG_ADMIN_EMAILS=${admin}"
     [ "${demo}" = 1 ] && echo "RECIPELOG_DEMO=1"
+    [ "${mcp}" = non ] && echo "RECIPELOG_MCP=0"
   } > "${dir}/instance.env"
   umask 022
   [ "${authentik}" = 1 ] && brancher "${nom}" "${max}" "${resp}"
@@ -250,16 +273,104 @@ cmd_quota() {
   passerelle quota "$1" "$2" >/dev/null && info "✅ $1 : $([ "$2" = 0 ] && echo "pas de plafond" || echo "$2 comptes au plus")."
 }
 
+etat_conteneur() {
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "$1")" 2>/dev/null || echo arrêté
+}
+
 cmd_liste() {
+  local json=0 d nom etat canal cx premier=1
+  [ "${1:-}" = "--json" ] && json=1
+  if [ "${json}" = 1 ]; then
+    printf '['
+    for d in "${INSTANCES}"/*/; do
+      [ -d "${d}" ] || continue
+      nom="$(basename "${d}")"
+      [ "${premier}" = 1 ] || printf ','
+      premier=0
+      # Valeurs contrôlées (noms, dates, mots-clés) : pas de guillemets à échapper.
+      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","mcp":%s}' \
+        "${nom}" "$(conf_lire "${nom}" CANAL)" "$(conf_lire "${nom}" CONNEXION)" "$(etat_conteneur "${nom}")" \
+        "${nom}" "${DOMAINE}" "$(conf_lire "${nom}" CREE_LE)" \
+        "$(suspendu "${nom}" && echo true || echo false)" "$(conf_lire "${nom}" ESSAI_FIN)" \
+        "$([ "$(conf_lire "${nom}" MCP)" = non ] && echo false || echo true)"
+    done
+    printf ']\n'
+    return
+  fi
   printf "%-20s %-10s %-10s %-10s %s\n" "CLIENT" "CANAL" "CONNEXION" "ÉTAT" "ADRESSE"
-  local d nom etat canal cx
   for d in "${INSTANCES}"/*/; do
     [ -d "${d}" ] || continue
     nom="$(basename "${d}")"
-    canal="$(sed -n 's/^CANAL=//p' "${d}/instance.conf" 2>/dev/null)"
-    cx="$(sed -n 's/^CONNEXION=//p' "${d}/instance.conf" 2>/dev/null)"
-    etat="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "${nom}")" 2>/dev/null || echo arrêté)"
+    canal="$(conf_lire "${nom}" CANAL)"
+    cx="$(conf_lire "${nom}" CONNEXION)"
+    etat="$(etat_conteneur "${nom}")"
+    suspendu "${nom}" && etat="en pause"
     printf "%-20s %-10s %-10s %-10s %s\n" "${nom}" "${canal}" "${cx:-cloudflare}" "${etat}" "https://${nom}.${DOMAINE}"
+  done
+}
+
+cmd_suspendre() {
+  [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance suspendre <nom existant>"
+  suspendu "$1" && { info "$1 est déjà en pause."; return 0; }
+  docker stop "$(conteneur "$1")" >/dev/null 2>&1 || true
+  conf_ecrire "$1" SUSPENDU 1
+  info "⏸️  $1 est en pause : son adresse affiche « site en pause ». Les données sont gardées."
+}
+
+cmd_reactiver() {
+  [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance reactiver <nom existant>"
+  conf_ecrire "$1" SUSPENDU
+  tirer "${IMAGE}:$(conf_lire "$1" CANAL)"
+  lancer "$1"
+  attendre "$1" && info "✅ $1 est de nouveau en ligne." || die "$1 ne démarre pas : recipelog-instance journaux $1"
+}
+
+cmd_options() {
+  local nom="${1:-}" mcp=""
+  shift || true
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --mcp) mcp="${2:-}"; shift 2 ;;
+      *) die "Option inconnue : $1" ;;
+    esac
+  done
+  [ -n "${nom}" ] && existe "${nom}" && [[ "${mcp}" =~ ^(oui|non)$ ]] || die "Usage : recipelog-instance options <nom existant> --mcp oui|non"
+  local f="${INSTANCES}/${nom}/instance.env"
+  sed -i '/^RECIPELOG_MCP=/d' "${f}"
+  [ "${mcp}" = non ] && echo "RECIPELOG_MCP=0" >> "${f}"
+  conf_ecrire "${nom}" MCP "${mcp}"
+  if ! suspendu "${nom}"; then
+    lancer "${nom}"
+    attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom}"
+  fi
+  info "✅ ${nom} : accès MCP $([ "${mcp}" = oui ] && echo permis || echo coupé)."
+}
+
+cmd_essai() {
+  [ $# -eq 2 ] && existe "$1" && [[ "$2" =~ ^[0-9]+$ ]] || die "Usage : recipelog-instance essai <nom existant> <jours|0>"
+  if [ "$2" = 0 ]; then
+    conf_ecrire "$1" ESSAI_FIN
+    info "✅ $1 n'est plus en essai."
+  else
+    conf_ecrire "$1" ESSAI_FIN "$(date -u -d "+$2 days" +%Y-%m-%d)"
+    info "✅ $1 : essai jusqu'au $(conf_lire "$1" ESSAI_FIN) inclus."
+  fi
+}
+
+# Met en pause les clients dont l'essai est fini (lancé toutes les heures par le moteur).
+cmd_verifier_essais() {
+  local d nom fin aujourdhui
+  aujourdhui="$(date -u +%Y-%m-%d)"
+  for d in "${INSTANCES}"/*/; do
+    [ -d "${d}" ] || continue
+    nom="$(basename "${d}")"
+    fin="$(conf_lire "${nom}" ESSAI_FIN)"
+    [ -n "${fin}" ] || continue
+    suspendu "${nom}" && continue
+    if [[ "${fin}" < "${aujourdhui}" ]]; then
+      info "Essai de ${nom} terminé le ${fin} : mise en pause."
+      cmd_suspendre "${nom}"
+    fi
   done
 }
 
@@ -268,6 +379,10 @@ cmd_liste() {
 maj_un() {
   local nom="$1" c ancienne canal
   existe "${nom}" || die "Client « ${nom} » inconnu."
+  if suspendu "${nom}"; then
+    info "${nom} est en pause : il prendra la dernière version à sa réactivation."
+    return 0
+  fi
   c="$(conteneur "${nom}")"
   canal="$(sed -n 's/^CANAL=//p' "${INSTANCES}/${nom}/instance.conf")"
   ancienne="$(docker inspect -f '{{.Image}}' "${c}" 2>/dev/null || true)"
@@ -307,6 +422,7 @@ cmd_maj() {
 
 cmd_redemarrer() {
   [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance redemarrer <nom existant>"
+  suspendu "$1" && die "$1 est en pause : recipelog-instance reactiver $1"
   lancer "$1"
   attendre "$1" && info "✅ $1 a redémarré." || die "$1 ne démarre pas : recipelog-instance journaux $1"
 }
@@ -347,7 +463,12 @@ mkdir -p "${INSTANCES}" "${ARCHIVES}"
 action="${1:-}"; shift || true
 case "${action}" in
   creer) cmd_creer "$@" ;;
-  liste) cmd_liste ;;
+  liste) cmd_liste "$@" ;;
+  suspendre) cmd_suspendre "$@" ;;
+  reactiver) cmd_reactiver "$@" ;;
+  options) cmd_options "$@" ;;
+  essai) cmd_essai "$@" ;;
+  verifier-essais) cmd_verifier_essais ;;
   equipe) cmd_equipe "$@" ;;
   inviter) cmd_inviter "$@" ;;
   quota) cmd_quota "$@" ;;
@@ -356,5 +477,5 @@ case "${action}" in
   redemarrer) cmd_redemarrer "$@" ;;
   journaux) cmd_journaux "$@" ;;
   supprimer) cmd_supprimer "$@" ;;
-  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
