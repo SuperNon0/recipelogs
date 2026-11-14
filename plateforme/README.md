@@ -1,5 +1,9 @@
 # Plateforme RecipeLog
 
+> **Où en est le chantier :** voir [Journal du chantier](#journal-du-chantier) en bas de cette page.
+> Tout le travail se fait sur la branche `plateforme` et sur les branches `claude/…` qui y
+> fusionnent. `main`, `stable` et les autres branches ne sont jamais modifiées par ce chantier.
+
 Tout RecipeLog en ligne sur **une seule machine** de ton Proxmox : chaque client a
 son propre RecipeLog sur `<nom>.recipelog.cc`, avec sa propre base.
 
@@ -92,3 +96,13 @@ Les sauvegardes automatiques de ce dossier arrivent au lot 3.
 - Traefik ne lit Docker qu'à travers un proxy qui n'autorise que la lecture des conteneurs.
 - Chaque client a son propre utilisateur PostgreSQL, qui ne peut ouvrir que sa base.
 - Limitation des abus : 30 requêtes par seconde par visiteur (pointes à 120).
+
+## Journal du chantier
+
+Une ligne par étape, la plus récente en haut. Le plan complet : 9 lots (socle, connexion,
+panel, sauvegardes, déménagement, surveillance et support, maintenance et messages, IA et
+prix, vente).
+
+| Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
+|---|---|---|---|
+| 2026-11-14 | 0. Socle | Branche `plateforme` créée depuis `main` (rien d'autre n'est touché). Image Docker de l'appli publiée en `:plateforme`, pile Traefik + PostgreSQL + proxy Docker + tunnel, scripts `creer-vm.sh`, `install.sh` et `recipelog-instance`. Testé dans Docker : client de test en ligne via Traefik, bases séparées entre clients. PR #149 vers `plateforme`. | Après la fusion : rendre l'image publique, créer le tunnel, lancer `creer-vm.sh`, protéger `test.recipelog.cc` (étapes 1 à 4 ci-dessus). |
