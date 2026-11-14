@@ -55,3 +55,4 @@ prisma/*.db-journal
 # docker volumes
 /data/pgdata/
 .claude/
+.git-log.txt

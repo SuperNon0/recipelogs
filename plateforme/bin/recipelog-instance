@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+# ============================================================
+# recipelog-instance : gérer les clients de la plateforme RecipeLog.
+# Un client = une base dans le PostgreSQL partagé + un conteneur RecipeLog
+# sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
+#
+#   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]
+#   recipelog-instance liste
+#   recipelog-instance mettre-a-jour <nom>|--tous
+#   recipelog-instance redemarrer <nom>
+#   recipelog-instance journaux <nom>
+#   recipelog-instance supprimer <nom> --oui
+#
+# Réglages lus dans /srv/recipelog/.env (écrit par install.sh).
+# Chaque client a son dossier /srv/recipelog/instances/<nom>/ :
+#   instance.conf  canal, adresse admin, mode démo
+#   instance.env   variables du conteneur (dont le mot de passe de sa base)
+#   uploads/       photos et factures envoyées
+# ============================================================
+set -euo pipefail
+
+DONNEES="${DONNEES:-/srv/recipelog}"
+ENV_FILE="${DONNEES}/.env"
+[ -r "${ENV_FILE}" ] || { echo "❌ ${ENV_FILE} introuvable : lancer d'abord install.sh." >&2; exit 1; }
+set -a
+# shellcheck source=/dev/null
+. "${ENV_FILE}"
+set +a
+
+DOMAINE="${DOMAINE:-recipelog.cc}"
+IMAGE="${IMAGE:-ghcr.io/supernon0/recipelog}"
+INSTANCES="${DONNEES}/instances"
+ARCHIVES="${DONNEES}/archives"
+PG="recipelog-postgres"
+RESERVES=" www admin auth demo api status mail smtp traefik panel plateforme "
+MEMOIRE="${INSTANCE_MEMOIRE:-1g}"
+
+die() { echo "❌ $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+nom_valide() {
+  local n="$1"
+  [[ "${n}" =~ ^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$ ]] || die "Nom « ${n} » refusé : 2 à 32 caractères, minuscules, chiffres et tirets (pas au début ni à la fin)."
+  [[ "${RESERVES}" != *" ${n} "* ]] || die "« ${n} » est réservé à la plateforme."
+}
+conteneur() { echo "rl-$1"; }
+# Télécharge l'image ; sans réseau, garde celle déjà présente sur la machine.
+tirer() {
+  docker pull -q "$1" >/dev/null 2>&1 && return 0
+  docker image inspect "$1" >/dev/null 2>&1 || die "Impossible de télécharger $1."
+  echo "⚠️  Téléchargement de $1 impossible : la version déjà présente est utilisée." >&2
+}
+base() { echo "rl_${1//-/_}"; }
+existe() { [ -d "${INSTANCES}/$1" ]; }
+
+psql_admin() { docker exec -i "${PG}" psql -v ON_ERROR_STOP=1 -q -U postgres "$@"; }
+
+# Lance (ou relance) le conteneur d'un client à partir de son dossier.
+# $2 facultatif : image exacte à utiliser (retour en arrière).
+lancer() {
+  local nom="$1" image_forcee="${2:-}" dir="${INSTANCES}/$1" c
+  c="$(conteneur "${nom}")"
+  # shellcheck disable=SC1091
+  . "${dir}/instance.conf"
+  local image="${image_forcee:-${IMAGE}:${CANAL}}"
+  docker rm -f "${c}" >/dev/null 2>&1 || true
+  docker run -d --name "${c}" \
+    --network recipelog \
+    --restart unless-stopped \
+    --memory "${MEMOIRE}" \
+    --shm-size 256m \
+    --env-file "${dir}/instance.env" \
+    -v "${dir}/uploads:/data/uploads" \
+    --label "recipelog.instance=${nom}" \
+    --label "recipelog.canal=${CANAL}" \
+    --label "traefik.enable=true" \
+    --label "traefik.http.routers.${c}.rule=Host(\`${nom}.${DOMAINE}\`)" \
+    --label "traefik.http.routers.${c}.entrypoints=web" \
+    --label "traefik.http.routers.${c}.middlewares=securite@file,limite@file" \
+    --label "traefik.http.services.${c}.loadbalancer.server.port=3000" \
+    "${image}" >/dev/null
+}
+
+# Attend que le conteneur réponde (migrations + démarrage). 0 = prêt.
+attendre() {
+  local c; c="$(conteneur "$1")"
+  local etat
+  for _ in $(seq 1 60); do
+    etat="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${c}" 2>/dev/null || echo absent)"
+    case "${etat}" in
+      healthy) return 0 ;;
+      exited|dead|absent) return 1 ;;
+    esac
+    sleep 3
+  done
+  return 1
+}
+
+cmd_creer() {
+  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --canal) canal="${2:-}"; shift 2 ;;
+      --admin) admin="${2:-}"; shift 2 ;;
+      --demo) demo=1; shift ;;
+      -*) die "Option inconnue : $1" ;;
+      *) [ -z "${nom}" ] || die "Un seul nom à la fois."; nom="$1"; shift ;;
+    esac
+  done
+  [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]"
+  nom_valide "${nom}"
+  [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (beta, stable ou plateforme)."
+  existe "${nom}" && die "Le client « ${nom} » existe déjà."
+
+  local dir="${INSTANCES}/${nom}" db mdp
+  db="$(base "${nom}")"
+  mdp="$(openssl rand -hex 24)"
+
+  info "Base ${db} dans PostgreSQL…"
+  psql_admin <<SQL
+CREATE ROLE ${db} LOGIN PASSWORD '${mdp}';
+CREATE DATABASE ${db} OWNER ${db};
+REVOKE ALL ON DATABASE ${db} FROM PUBLIC;
+SQL
+  psql_admin -d "${db}" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+  info "Dossier ${dir}…"
+  mkdir -p "${dir}/uploads"
+  chown 1000:1000 "${dir}/uploads" # utilisateur « node » de l'image
+  umask 077
+  cat > "${dir}/instance.conf" <<CONF
+CANAL=${canal}
+CREE_LE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+CONF
+  {
+    echo "DATABASE_URL=postgresql://${db}:${mdp}@${PG}:5432/${db}"
+    echo "RECIPELOG_INSTANCE=${nom}"
+    echo "RECIPELOG_ADMIN_EMAILS=${admin}"
+    [ "${demo}" = 1 ] && echo "RECIPELOG_DEMO=1"
+  } > "${dir}/instance.env"
+  umask 022
+
+  info "Téléchargement de ${IMAGE}:${canal}…"
+  tirer "${IMAGE}:${canal}"
+  info "Démarrage de $(conteneur "${nom}")…"
+  lancer "${nom}"
+  if attendre "${nom}"; then
+    info "✅ ${nom} est prêt : https://${nom}.${DOMAINE}"
+    echo "   Pense à protéger cette adresse dans Cloudflare Access tant que la connexion par Authentik (lot 1) n'est pas là."
+  else
+    docker logs --tail 40 "$(conteneur "${nom}")" >&2 || true
+    die "${nom} ne démarre pas (journaux ci-dessus). Le dossier et la base sont gardés : recipelog-instance redemarrer ${nom}"
+  fi
+}
+
+cmd_liste() {
+  printf "%-20s %-8s %-10s %s\n" "CLIENT" "CANAL" "ÉTAT" "ADRESSE"
+  local d nom etat canal
+  for d in "${INSTANCES}"/*/; do
+    [ -d "${d}" ] || continue
+    nom="$(basename "${d}")"
+    canal="$(sed -n 's/^CANAL=//p' "${d}/instance.conf" 2>/dev/null)"
+    etat="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "${nom}")" 2>/dev/null || echo arrêté)"
+    printf "%-20s %-8s %-10s %s\n" "${nom}" "${canal}" "${etat}" "https://${nom}.${DOMAINE}"
+  done
+}
+
+# Met à jour un client : nouvelle image, puis retour à l'ancienne s'il ne
+# redémarre pas. Avec --tous : un client après l'autre, arrêt au premier échec.
+maj_un() {
+  local nom="$1" c ancienne canal
+  existe "${nom}" || die "Client « ${nom} » inconnu."
+  c="$(conteneur "${nom}")"
+  canal="$(sed -n 's/^CANAL=//p' "${INSTANCES}/${nom}/instance.conf")"
+  ancienne="$(docker inspect -f '{{.Image}}' "${c}" 2>/dev/null || true)"
+  info "${nom} : téléchargement de ${IMAGE}:${canal}…"
+  tirer "${IMAGE}:${canal}"
+  if [ -n "${ancienne}" ] && [ "$(docker image inspect -f '{{.Id}}' "${IMAGE}:${canal}")" = "${ancienne}" ]; then
+    info "${nom} : déjà à jour."
+    return 0
+  fi
+  lancer "${nom}"
+  if attendre "${nom}"; then
+    info "✅ ${nom} : mis à jour."
+    return 0
+  fi
+  echo "⚠️  ${nom} ne redémarre pas avec la nouvelle version :" >&2
+  docker logs --tail 30 "${c}" >&2 || true
+  if [ -n "${ancienne}" ]; then
+    info "${nom} : retour à la version précédente…"
+    lancer "${nom}" "${ancienne}"
+    attendre "${nom}" && info "${nom} : version précédente remise." || echo "❌ ${nom} : la version précédente ne redémarre pas non plus." >&2
+  fi
+  return 1
+}
+
+cmd_maj() {
+  [ $# -eq 1 ] || die "Usage : recipelog-instance mettre-a-jour <nom>|--tous"
+  if [ "$1" = "--tous" ]; then
+    local d
+    for d in "${INSTANCES}"/*/; do
+      [ -d "${d}" ] || continue
+      maj_un "$(basename "${d}")" || die "Arrêt : les clients suivants n'ont pas été mis à jour."
+    done
+  else
+    maj_un "$1"
+  fi
+}
+
+cmd_redemarrer() {
+  [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance redemarrer <nom existant>"
+  lancer "$1"
+  attendre "$1" && info "✅ $1 a redémarré." || die "$1 ne démarre pas : recipelog-instance journaux $1"
+}
+
+cmd_journaux() {
+  [ $# -eq 1 ] || die "Usage : recipelog-instance journaux <nom>"
+  docker logs -f --tail 100 "$(conteneur "$1")"
+}
+
+# Supprime un client en gardant une archive (base + fichiers) dans archives/.
+cmd_supprimer() {
+  local nom="${1:-}" ok="${2:-}"
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance supprimer <nom existant> --oui"
+  [ "${ok}" = "--oui" ] || die "Ajoute --oui pour confirmer la suppression de « ${nom} »."
+  local db arch
+  db="$(base "${nom}")"
+  arch="${ARCHIVES}/${nom}-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "${arch}"
+  info "Archive de la base et des fichiers dans ${arch}…"
+  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${arch}/base.dump"
+  tar -C "${INSTANCES}/${nom}" -czf "${arch}/fichiers.tar.gz" .
+  chmod -R go-rwx "${arch}"
+  docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
+  psql_admin <<SQL
+DROP DATABASE IF EXISTS ${db};
+DROP ROLE IF EXISTS ${db};
+SQL
+  rm -rf "${INSTANCES:?}/${nom}"
+  info "✅ ${nom} supprimé. Archive : ${arch}"
+}
+
+[ "$(id -u)" -eq 0 ] || die "À lancer en root."
+mkdir -p "${INSTANCES}" "${ARCHIVES}"
+action="${1:-}"; shift || true
+case "${action}" in
+  creer) cmd_creer "$@" ;;
+  liste) cmd_liste ;;
+  mettre-a-jour) cmd_maj "$@" ;;
+  redemarrer) cmd_redemarrer "$@" ;;
+  journaux) cmd_journaux "$@" ;;
+  supprimer) cmd_supprimer "$@" ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

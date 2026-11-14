@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.18",
+    date: "2026-11-14",
+    title: "RecipeLog prêt pour la plateforme en ligne",
+    summary:
+      "Première étape de RecipeLog en ligne : l'appli existe maintenant aussi en image Docker, et une seule machine peut faire tourner un RecipeLog séparé pour chaque client, avec sa propre adresse et sa propre base. Rien ne change dans ton site actuel.",
+    features: [
+      "Image Docker de RecipeLog construite à chaque mise à jour : « beta » suit main, « stable » suit stable. Chromium (PDF), ffmpeg et yt-dlp (vidéos) sont inclus, et les migrations de la base se font toutes seules au démarrage",
+      "Dossier « plateforme » : Traefik envoie chaque <client>.recipelog.cc vers le bon RecipeLog, un seul PostgreSQL garde une base séparée par client, le tunnel Cloudflare relie la machine sans ouvrir de port",
+      "creer-vm.sh crée la VM sur Proxmox et installe tout seul la plateforme avec un client de test ; recipelog-instance crée, liste, met à jour (avec retour à la version précédente en cas de problème) et supprime un client en gardant une archive",
+      "La page « Version et nouveautés » affiche aussi la liste des dernières mises à jour dans la version Docker",
+    ],
+  },
+  {
     version: "V2.17",
     date: "2026-11-14",
     title: "Fournisseurs et prix gérés à la main",
