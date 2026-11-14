@@ -167,6 +167,94 @@ pre.sortie { background: var(--creux); border: 1px solid var(--line); border-rad
   main.panel { padding: 16px 16px 50px; }
 }
 
+/* ---------------------------------------------------------------- santé (lot 5) */
+.cartes-sante { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.carte-sante { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; }
+.carte-sante .lbl, .tableau-sante th { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.carte-sante .lbl { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+.carte-sante .lbl + .texte-aide { text-transform: none; letter-spacing: 0; font-family: var(--f-body); }
+.carte-sante small, .tableau-sante small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.jauge { height: 8px; border-radius: 999px; background: var(--creux); overflow: hidden; }
+.jauge span { display: block; height: 100%; border-radius: 999px; background: var(--ok); }
+.jauge.pause span { background: var(--warn); }
+.jauge.ko span { background: var(--danger); }
+.jauge .j0 { width: 0%; }
+.jauge .j5 { width: 5%; }
+.jauge .j10 { width: 10%; }
+.jauge .j15 { width: 15%; }
+.jauge .j20 { width: 20%; }
+.jauge .j25 { width: 25%; }
+.jauge .j30 { width: 30%; }
+.jauge .j35 { width: 35%; }
+.jauge .j40 { width: 40%; }
+.jauge .j45 { width: 45%; }
+.jauge .j50 { width: 50%; }
+.jauge .j55 { width: 55%; }
+.jauge .j60 { width: 60%; }
+.jauge .j65 { width: 65%; }
+.jauge .j70 { width: 70%; }
+.jauge .j75 { width: 75%; }
+.jauge .j80 { width: 80%; }
+.jauge .j85 { width: 85%; }
+.jauge .j90 { width: 90%; }
+.jauge .j95 { width: 95%; }
+.jauge .j100 { width: 100%; }
+.etiquettes { display: flex; flex-wrap: wrap; gap: 6px; }
+.alertes { margin-bottom: 12px; }
+.alertes .erreur:empty { display: none; }
+.tableau-sante { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); overflow-x: auto; }
+.tableau-sante table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tableau-sante th, .tableau-sante td { text-align: left; padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+.tableau-sante thead th { border-top: 0; }
+.tableau-sante tbody th { font-family: var(--f-body); font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--text); font-weight: 700; }
+.dispo { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; font-weight: 400; }
+.dispo.bas { color: var(--warn); }
+.discret { margin-top: 8px; background: none; color: var(--muted); padding: 0; }
+
+/* ---------------------------------------------------------------- support (lot 5) */
+.ticket.non-lu { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.ticket .actions { align-items: center; }
+.fil { display: grid; gap: 8px; margin: 12px 0 16px; max-height: 45vh; overflow-y: auto; }
+.bulle { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 12px; margin-right: 40px; }
+.bulle.moi { background: var(--acc-dim); border-color: transparent; margin: 0 0 0 40px; }
+.bulle small { color: var(--muted); font-size: 12px; }
+.bulle p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.contexte { background: var(--creux); border-radius: var(--r-md); padding: 8px 12px; font-size: 13.5px; }
+.contexte summary { cursor: pointer; font-weight: 600; }
+.contexte summary .texte-aide { font-weight: 400; margin-top: 8px; }
+.contexte dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; margin: 10px 0 2px; }
+.contexte dt { color: var(--muted); }
+.contexte dd { margin: 0; overflow-wrap: anywhere; }
+.champ textarea { width: 100%; background: var(--creux); border: 1px solid var(--line2); border-radius: var(--r-md); padding: 10px 12px; font: inherit; font-size: 16px; color: inherit; resize: vertical; }
+.champ.note { border-top: 1px solid var(--line); padding-top: 14px; margin: 18px 0 0; }
+.case { display: flex; gap: 8px; align-items: center; }
+pre.journaux { max-height: 60vh; font-size: 11.5px; }
+@media (min-width: 861px) { .voile .fenetre:has(pre.journaux) { width: min(980px, 100%); } }
+
+/* ---------------------------------------------------------------- page de statut publique (status.<domaine>) */
+body.statut { min-height: 100vh; }
+.page-statut { max-width: 760px; margin: 0 auto; padding: 40px 16px 60px; }
+.marque-statut { font-family: var(--f-mono); letter-spacing: .14em; text-transform: uppercase; font-size: 12px; color: var(--accent); margin: 0 0 14px; }
+.bandeau-statut { font-family: var(--f-title); font-size: 26px; padding: 18px 20px; border-radius: var(--r-lg); margin-bottom: 22px; }
+.bandeau-statut.ok { background: var(--ok-dim); color: var(--ok); }
+.bandeau-statut.ko { background: var(--danger-dim); color: var(--danger); }
+.bandeau-statut.pause { background: var(--warn-dim); color: var(--warn); }
+.composant { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 12px; }
+.composant-tete { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 12px; }
+.barres { display: flex; gap: 2px; height: 34px; }
+.barres i { flex: 1; border-radius: 2px; background: var(--ok); opacity: .85; }
+.barres i.pause { background: var(--warn); }
+.barres i.ko { background: var(--danger); }
+.barres-legende { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.page-statut .petit { color: var(--muted); font-size: 12.5px; font-family: var(--f-mono); }
+@media (max-width: 600px) { .barres i:nth-child(-n+60) { display: none; } .l90 { display: none; } .l30 { display: inline !important; } }
+.l30 { display: none; }
+
+@media (max-width: 860px) {
+  .cartes-sante { grid-template-columns: 1fr 1fr; }
+  .bulle, .bulle.moi { margin-left: 0; margin-right: 0; }
+}
+
 /* ---------------------------------------------------------------- page « en pause » */
 body.pause { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .carte-pause { max-width: 460px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 30px 28px; text-align: center; box-shadow: var(--shadow); }

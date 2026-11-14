@@ -169,6 +169,9 @@ services:
       DOMAINE: ${DOMAINE:-recipelog.cc}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     read_only: true
+    volumes:
+      # Demandes « Signaler un problème » (lot 5), lues aussi par le moteur du panel.
+      - ${DONNEES:-/srv/recipelog}/support:/support
     networks: [recipelog]
 
   # Panel admin (admin.<domaine>), réservé aux super-admins. Il n'a aucun accès à
@@ -208,6 +211,11 @@ services:
       traefik.http.routers.panel.service: panel
       # Toute autre adresse *.<domaine> sans RecipeLog en ligne (en pause, en
       # train de redémarrer, inconnue) : priorité la plus basse.
+      # Page de statut publique (lot 5), sans connexion.
+      traefik.http.routers.statut.rule: Host(`status.${DOMAINE:-recipelog.cc}`)
+      traefik.http.routers.statut.entrypoints: web
+      traefik.http.routers.statut.middlewares: securite@file,limite@file
+      traefik.http.routers.statut.service: panel
       traefik.http.routers.pause.rule: HostRegexp(`^[a-z0-9-]+\.${DOMAINE_REGEX:-recipelog\.cc}$`)
       traefik.http.routers.pause.priority: "1"
       traefik.http.routers.pause.entrypoints: web
@@ -238,6 +246,19 @@ services:
       TZ: ${TZ:-Europe/Paris}
       SAUVEGARDE_HEURE: ${SAUVEGARDE_HEURE:-3}
       SAUVEGARDE_JOUR_TEST: ${SAUVEGARDE_JOUR_TEST:-0}
+      # Surveillance et support (lot 5) : alertes et réponses aux demandes.
+      DOMAINE: ${DOMAINE:-recipelog.cc}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      SMTP_HOTE: ${SMTP_HOTE:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_UTILISATEUR: ${SMTP_UTILISATEUR:-}
+      SMTP_MOT_DE_PASSE: ${SMTP_MOT_DE_PASSE:-}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      SMTP_EXPEDITEUR: ${SMTP_EXPEDITEUR:-RecipeLog <noreply@recipelog.cc>}
+      ALERTE_TELEGRAM_JETON: ${ALERTE_TELEGRAM_JETON:-}
+      ALERTE_TELEGRAM_CHAT: ${ALERTE_TELEGRAM_CHAT:-}
+      ALERTE_DISCORD_URL: ${ALERTE_DISCORD_URL:-}
+      ALERTE_EMAIL: ${ALERTE_EMAIL:-oui}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Même chemin que sur la machine : recipelog-instance donne ces chemins à Docker.

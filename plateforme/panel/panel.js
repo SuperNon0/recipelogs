@@ -9,6 +9,8 @@ const heureFr = (iso) => new Date(iso).toLocaleString("fr-FR", { day: "2-digit",
 
 let CLIENTS = [];
 let VITRINE = null;
+let SANTE = null;
+let SUPPORT = [];
 
 // ------------------------------------------------------------ API
 async function api(methode, chemin, corps) {
@@ -80,6 +82,8 @@ async function executer(titre, requete) {
 // ------------------------------------------------------------ affichage
 function etat(c) {
   if (c.suspendu) return `<span class="etiquette pause">En pause</span>`;
+  const s = SANTE?.services?.[`client:${c.nom}`];
+  if (s && !s.ok) return `<span class="etiquette ko" title="Ne répond plus depuis le ${e(heureFr(s.depuis))}">En panne</span>`;
   if (c.etat === "healthy") return `<span class="etiquette ok">En ligne</span>`;
   if (c.etat === "starting") return `<span class="etiquette prog">Démarre</span>`;
   return `<span class="etiquette ko">${e(c.etat === "unhealthy" ? "En panne" : "Arrêté")}</span>`;
@@ -98,7 +102,12 @@ function offre(c) {
 }
 
 // Dernière sauvegarde : plus de 36 h, ou test raté = à regarder.
-const taille = (o) => (o >= 1048576 ? `${(o / 1048576).toFixed(1).replace(".", ",")} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`);
+const taille = (o) =>
+  o >= 1073741824
+    ? `${(o / 1073741824).toFixed(1).replace(".", ",")} Go`
+    : o >= 1048576
+      ? `${(o / 1048576).toFixed(1).replace(".", ",")} Mo`
+      : `${o > 0 ? Math.max(1, Math.round(o / 1024)) : 0} Ko`;
 const dateSauv = (id) => new Date(`${id.slice(0, 4)}-${id.slice(4, 6)}-${id.slice(6, 8)}T${id.slice(9, 11)}:${id.slice(11, 13)}:${id.slice(13, 15)}Z`);
 function sauvegarde(c) {
   const s = c.sauvegarde;
@@ -136,7 +145,7 @@ function afficher() {
     .map(
       (c) => `<article class="client" data-nom="${e(c.nom)}">
       <div class="nom"><b>${e(c.nom)}</b><a href="${e(c.adresse)}" target="_blank" rel="noopener">${e(c.adresse.replace("https://", ""))} ↗</a></div>
-      <div class="info"><span class="lbl">État</span>${etat(c)}</div>
+      <div class="info"><span class="lbl">État</span>${etat(c)}${dispo(`client:${c.nom}`)}</div>
       <div class="info"><span class="lbl">Places</span>${places(c)}</div>
       <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small></div>
       <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}${c.demo ? ` <span class="etiquette prog">démo</span>` : ""}</div>
@@ -146,6 +155,7 @@ function afficher() {
         ${c.connexion === "authentik" ? `<button class="btn petit" data-act="equipe">Équipe</button>` : ""}
         <button class="btn petit" data-act="reglages">Réglages</button>
         <button class="btn petit" data-act="sauvegardes">Sauvegardes</button>
+        <button class="btn petit" data-act="journaux">Journaux</button>
         ${c.demo ? `<button class="btn petit" data-act="demo">Démo</button>` : ""}
         ${c.suspendu ? `<button class="btn petit" data-act="reactiver">Réactiver</button>` : `<button class="btn petit" data-act="mettre-a-jour">Mettre à jour</button><button class="btn petit" data-act="suspendre">Pause</button>`}
         <button class="btn petit danger" data-act="supprimer">Supprimer</button>
@@ -179,6 +189,11 @@ const NOMS_ACTIONS = {
   "demo-remettre": "a remis à zéro",
   "vitrine-maj": "a mis à jour la",
   "vitrine-bandeau": "a changé le bandeau de la",
+  panne: "a vu une panne :",
+  retour: "a vu le retour de",
+  "support-repondre": "a répondu à une demande de",
+  "support-fermer": "a fermé une demande de",
+  "support-rouvrir": "a rouvert une demande de",
 };
 let JOURNAL = [];
 function afficherJournal() {
@@ -204,13 +219,17 @@ $("#journal").addEventListener("click", (ev) => {
 });
 
 async function charger() {
-  const [c, j, v] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine")]);
+  const [c, j, v, sa, su] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support")]);
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
+  SANTE = sa.machine ? sa : null;
+  SUPPORT = su.demandes ?? null;
+  afficherSupport();
   if (c.clients) CLIENTS = c.clients.sort((a, b) => a.nom.localeCompare(b.nom));
   else $("#clients").innerHTML = `<div class="vide">Liste indisponible : ${e(c.message ?? "le moteur ne répond pas")}</div>`;
   JOURNAL = j.journal ?? [];
   if (c.clients) afficher();
+  afficherSante();
   afficherJournal();
 }
 $("#recherche").addEventListener("input", afficher);
@@ -274,6 +293,7 @@ $("#clients").addEventListener("click", (ev) => {
   if (act === "equipe") fenetreEquipe(c);
   if (act === "sauvegardes") fenetreSauvegardes(c);
   if (act === "demo") fenetreDemo(c);
+  if (act === "journaux") fenetreJournaux(c);
 });
 
 const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
@@ -527,4 +547,220 @@ function afficherVitrine() {
       }
     }),
   );
+}
+
+// ------------------------------------------------------------ santé (lot 5)
+const pct = (v) => `${v.toFixed(v >= 99.95 || v < 10 ? 1 : 2).replace(".", ",")} %`;
+// Disponibilité sur 30 jours (petite ligne sous l'état). Aucune panne notée = 100 %.
+function dispo(cible) {
+  if (!SANTE) return "";
+  const v = SANTE.disponibilite?.[cible] ?? 100;
+  return `<small class="dispo${v < 99 ? " bas" : ""}" title="Temps en ligne sur les 30 derniers jours">${e(pct(v))} sur 30 j</small>`;
+}
+const jauge = (part, texte) => {
+  const p = Math.max(0, Math.min(100, Math.round(part)));
+  return `<div class="jauge ${p >= 90 ? "ko" : p >= 75 ? "pause" : "ok"}"><span class="j${Math.round(p / 5) * 5}"></span></div><small>${texte}</small>`;
+};
+const depuisFr = (iso) => {
+  if (!iso) return "jamais";
+  const j = Math.floor((Date.now() - Date.parse(iso)) / 86400000);
+  return j <= 0 ? "aujourd'hui" : j === 1 ? "hier" : `il y a ${j} j`;
+};
+
+function afficherSante() {
+  const zone = $("#sante");
+  if (!SANTE) {
+    zone.innerHTML = `<div class="vide">Mesures indisponibles (le moteur ne répond pas).</div>`;
+    return;
+  }
+  const m = SANTE.machine;
+  const memUtil = m.memoire.total - m.memoire.libre;
+  const charge = (m.charge[0] / m.coeurs) * 100;
+  const services = [
+    ["service:connexion", "Connexion"],
+    ["service:passerelle", "Passerelle"],
+    ["service:vitrine", "Vitrine"],
+  ]
+    .map(([id, nom]) => {
+      const s = SANTE.services[id];
+      const ok = !s || s.ok;
+      return `<span class="etiquette ${ok ? "ok" : "ko"}" title="${ok ? "Répond" : `Ne répond plus depuis le ${e(heureFr(s.depuis))}`}">${e(nom)}</span>`;
+    })
+    .join(" ");
+  const canaux = Object.entries({ telegram: "Telegram", discord: "Discord", email: "Email" })
+    .map(([k, n]) => `<span class="etiquette ${SANTE.alertes[k] ? "ok" : "pause"}">${n} ${SANTE.alertes[k] ? "réglé" : "pas réglé"}</span>`)
+    .join(" ");
+  const lignes = CLIENTS.map((c) => {
+    const s = SANTE.clients[c.nom] ?? {};
+    const u = s.usage;
+    return `<tr><th scope="row">${e(c.nom)}${dispo(`client:${c.nom}`)}</th>
+      <td data-l="Processeur">${s.cpu == null ? "—" : `${e(s.cpu.toFixed(1).replace(".", ","))} %`}</td>
+      <td data-l="Mémoire">${s.memoire == null ? "—" : e(taille(s.memoire))}</td>
+      <td data-l="Base">${u ? e(taille(u.base)) : "—"}</td>
+      <td data-l="Fichiers">${s.fichiers == null ? "—" : e(taille(s.fichiers))}</td>
+      <td data-l="Sauvegardes">${s.sauvegardes == null ? "—" : e(taille(s.sauvegardes))}</td>
+      <td data-l="Recettes">${u ? `${e(u.recettes)} <small>${e(u.recettes30)} modif. 30 j</small>` : "—"}</td>
+      <td data-l="Comptes">${u ? e(u.comptes) : "—"}</td>
+      <td data-l="Dernière activité">${u ? e(depuisFr(u.derniereActivite)) : "—"}</td></tr>`;
+  }).join("");
+  zone.innerHTML = `<div class="cartes-sante">
+      <div class="carte-sante"><span class="lbl">Processeur ${aide("sa-cpu", "Charge moyenne sur la dernière minute, rapportée au nombre de cœurs de la VM. Au-dessus de 100 %, des tâches attendent leur tour : la machine est trop petite ou un client tourne en boucle.")}</span>
+        ${jauge(charge, `${e(m.charge[0].toFixed(2).replace(".", ","))} pour ${e(m.coeurs)} cœurs`)}</div>
+      <div class="carte-sante"><span class="lbl">Mémoire ${aide("sa-mem", "Mémoire vraiment utilisée (le cache que Linux rend tout seul n'est pas compté). Chaque client prend environ 150 à 250 Mo.")}</span>
+        ${jauge((memUtil / m.memoire.total) * 100, `${e(taille(memUtil))} sur ${e(taille(m.memoire.total))}`)}</div>
+      <div class="carte-sante"><span class="lbl">Disque ${aide("sa-disque", "Place prise sur le disque des données (/srv/recipelog : bases, photos, factures, sauvegardes). Une alerte part à 90 %.")}</span>
+        ${m.disque ? jauge(m.disque.pourcent, `${e(taille(m.disque.libre))} libres sur ${e(taille(m.disque.total))}`) : "<small>—</small>"}</div>
+      <div class="carte-sante"><span class="lbl">Services ${aide("sa-serv", "Vérifiés chaque minute, comme les sites des clients. Rouge = ne répond plus depuis au moins 2 minutes ; tu as reçu une alerte.")}</span>
+        <div class="etiquettes">${services}</div><small>${m.demarre ? `VM démarrée ${e(depuisFr(m.demarre))}` : ""}</small></div>
+    </div>
+    <div class="carte-vitrine alertes"><div class="ligne-vitrine"><div><b>Alertes</b><small>Chaque minute, chaque site est vérifié. S'il ne répond plus 2 minutes de suite, tu es prévenu, puis encore quand il revient. Aussi : disque presque plein, nouvelle demande de support.</small></div>
+      <button class="btn petit" type="button" id="sa-essai">Tester les alertes</button>
+      <button class="aide" type="button" data-aide="sa-a-al" aria-label="Aide">?</button></div>
+      <p class="texte-aide" id="sa-a-al">L'email part vers les adresses super-admin (ADMIN_EMAILS). Pour recevoir aussi les alertes sur ton téléphone par Telegram ou Discord, suis l'étape F de A-FAIRE.md (2 minutes). « Tester » envoie un message d'essai sur tous les canaux réglés.</p>
+      <div class="etiquettes">${canaux}</div><p class="erreur" id="sa-erreur"></p></div>
+    <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Processeur</th><th>Mémoire</th><th>Base</th><th>Fichiers</th><th>Sauvegardes</th><th>Recettes</th><th>Comptes</th><th>Dernière activité</th></tr></thead>
+      <tbody>${lignes || `<tr><td colspan="9">Pas encore de client.</td></tr>`}</tbody></table></div>
+    <p class="texte-aide visible discret">Mesuré le ${e(heureFr(SANTE.date))} (rafraîchi chaque minute). Comptes = comptes actifs dans son RecipeLog ; dernière activité = dernière visite d'un de ses comptes.</p>`;
+  $("#sa-essai").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    $("#sa-erreur").textContent = "Envoi…";
+    const r = await api("POST", "/alertes/essai");
+    ev.target.disabled = false;
+    $("#sa-erreur").textContent = r.ok ? "" : r.sortie || r.message || "Échec.";
+    if (r.ok) ev.target.textContent = "Envoyée ✓";
+  });
+}
+
+// ------------------------------------------------------------ journaux d'un client
+function fenetreJournaux(c) {
+  let suivre = true;
+  let jeton = {};
+  const moi = jeton;
+  ouvrir(
+    `Journaux de ${c.nom}`,
+    `<p class="sub">Les 300 dernières lignes écrites par son RecipeLog (démarrage, erreurs, connexions). Rafraîchi toutes les 3 secondes. ${aide("jx-a", "Utile quand un client signale un problème : cherche les lignes « Error » au moment où il a eu le souci. Les heures sont en UTC (une heure de moins qu'en France l'hiver, deux l'été).")}</p>
+    <div class="barre serree"><label class="case"><input type="checkbox" id="jx-suivre" checked> Suivre en direct</label></div>
+    <pre class="sortie journaux" id="jx-sortie">Chargement…</pre>`,
+    () => (jeton = null),
+  );
+  $("#jx-suivre").addEventListener("change", (ev) => (suivre = ev.target.checked));
+  const tour = async () => {
+    if (jeton !== moi) return;
+    if (suivre) {
+      const r = await api("GET", `/clients/${c.nom}/journaux`).catch(() => ({ lignes: "Le moteur ne répond pas." }));
+      if (jeton !== moi) return;
+      const pre = $("#jx-sortie");
+      if (!pre) return;
+      const enBas = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+      pre.textContent = (r.lignes || "(aucune ligne)").replace(/^(\d{4}-\d\d-\d\d)T(\d\d:\d\d:\d\d)\.\d+Z /gm, "$1 $2 ");
+      if (enBas) pre.scrollTop = pre.scrollHeight;
+    }
+    setTimeout(tour, 3000);
+  };
+  tour();
+}
+
+// ------------------------------------------------------------ support (lot 5)
+const TYPES_TICKET = { bug: ["Problème", "ko"], question: ["Question", "acc"], idee: ["Idée", "prog"] };
+const STATUTS = { ouvert: ["À répondre", "prog"], repondu: ["Répondu", "ok"], ferme: ["Fermé", "pause"] };
+let voirFermes = false;
+
+function afficherSupport() {
+  const zone = $("#support");
+  if (!SUPPORT) {
+    zone.innerHTML = `<div class="vide">Support indisponible.</div>`;
+    return;
+  }
+  const ouverts = SUPPORT.filter((t) => t.statut !== "ferme");
+  const aRepondre = SUPPORT.filter((t) => t.statut === "ouvert").length;
+  const liste = (voirFermes ? SUPPORT : ouverts)
+    .map((t) => {
+      const [ty, cl] = TYPES_TICKET[t.type] ?? [t.type, "acc"];
+      const [st, sc] = STATUTS[t.statut] ?? [t.statut, "acc"];
+      const dernier = t.messages.at(-1);
+      return `<article class="demande ticket${t.statut === "ferme" ? " traitee" : ""}${t.luSupport ? "" : " non-lu"}" data-ticket="${e(t.client)}/${e(t.id)}">
+        <div><span class="etiquette ${cl}">${e(ty)}</span> <b>${e(t.client)}</b> · ${e(t.email)}
+          <small>${e(heureFr(t.maj))} · ${t.messages.length} message${t.messages.length > 1 ? "s" : ""}${t.luSupport ? "" : " · <b>nouveau</b>"}</small>
+          <p>${dernier.de === "support" ? "<i>Toi :</i> " : ""}${e(dernier.texte.length > 240 ? `${dernier.texte.slice(0, 240)}…` : dernier.texte)}</p></div>
+        <div class="actions"><span class="etiquette ${sc}">${e(st)}</span><button class="btn petit principal" type="button">Ouvrir</button></div>
+      </article>`;
+    })
+    .join("");
+  const fermes = SUPPORT.length - ouverts.length;
+  zone.innerHTML = `<h3 class="titre-demandes">Demandes des clients <span class="etiquette ${aRepondre ? "prog" : "ok"}">${aRepondre} à répondre</span>
+      ${fermes ? `<button class="lien" type="button" id="su-fermes">${voirFermes ? "Cacher les fermées" : `Voir aussi les ${fermes} fermées`}</button>` : ""}
+      <button class="aide" type="button" data-aide="su-a" aria-label="Aide">?</button></h3>
+    <p class="texte-aide" id="su-a">Envoyées par les équipes de tes clients depuis leur RecipeLog (Réglages → Signaler un problème), avec la page où ils étaient, leur navigateur et leur version. Tu es prévenu à chaque nouvelle demande. Ta réponse part par email et s'affiche dans leur RecipeLog ; ils peuvent y répondre à leur tour.</p>
+    <div class="demandes">${liste || `<div class="vide">${SUPPORT.length ? "Aucune demande ouverte." : "Aucune demande pour l'instant."}</div>`}</div>`;
+  $("#su-fermes")?.addEventListener("click", () => {
+    voirFermes = !voirFermes;
+    afficherSupport();
+  });
+  zone.querySelectorAll("[data-ticket]").forEach((a) =>
+    a.querySelector("button").addEventListener("click", () => {
+      const [client, id] = a.dataset.ticket.split("/");
+      fenetreTicket(client, id);
+    }),
+  );
+}
+
+async function actionSupport(t, act, corps = {}) {
+  const r = await api("POST", `/support/${t.client}/${t.id}/${act}`, corps);
+  if (r.demande) SUPPORT = SUPPORT.map((x) => (x.id === t.id && x.client === t.client ? r.demande : x));
+  return r;
+}
+
+async function fenetreTicket(client, id) {
+  let t = SUPPORT.find((x) => x.client === client && x.id === id);
+  if (!t) return;
+  if (!t.luSupport) {
+    await actionSupport(t, "lu");
+    t = SUPPORT.find((x) => x.client === client && x.id === id);
+  }
+  const [ty] = TYPES_TICKET[t.type] ?? [t.type];
+  const [st, sc] = STATUTS[t.statut] ?? [t.statut, "acc"];
+  const ctx = t.contexte ?? {};
+  const fils = t.messages
+    .map((m) => `<div class="bulle ${m.de === "support" ? "moi" : ""}"><small>${m.de === "support" ? "Toi" : e(m.qui)} · ${e(heureFr(m.date))}</small><p>${e(m.texte)}</p></div>`)
+    .join("");
+  ouvrir(
+    `${ty} de ${t.client}`,
+    `<p class="sub"><span class="etiquette ${sc}">${e(st)}</span> ${e(t.email)} · ouverte le ${e(heureFr(t.date))}</p>
+    <details class="contexte"><summary>Où et avec quoi ${aide("tk-a-ctx", "Envoyé tout seul avec la demande : la page où était la personne, son navigateur, la taille de son écran, la version de RecipeLog et son rôle. Pratique pour reproduire le problème.")}</summary>
+      <dl><dt>Page</dt><dd>${ctx.page ? `<a href="https://${e(t.client)}.${e(DOMAINE)}${e(ctx.page)}" target="_blank" rel="noopener">${e(ctx.page)}</a>` : "—"}</dd><dt>Version</dt><dd>${e(ctx.version || "—")}</dd><dt>Rôle</dt><dd>${e(ctx.role || "—")}</dd><dt>Écran</dt><dd>${e(ctx.ecran || "—")}</dd><dt>Navigateur</dt><dd>${e(ctx.navigateur || "—")}</dd></dl></details>
+    <div class="fil">${fils}</div>
+    <form id="f-repondre" novalidate>
+      <div class="champ"><label for="tk-texte">Ta réponse ${aide("tk-a-rep", "Envoyée par email à la personne et affichée dans son RecipeLog (Réglages → Signaler un problème). Elle peut te répondre de là : tu seras prévenu.")}
+        <textarea id="tk-texte" rows="5" maxlength="5000" placeholder="Bonjour, …"></textarea></div>
+      <div class="champ"><label class="case"><input type="checkbox" id="tk-fermer"> Fermer la demande après l'envoi ${aide("tk-a-ferm", "À cocher quand le problème est réglé. Si la personne répond quand même, la demande se rouvre toute seule.")}</div>
+      <p class="erreur" id="tk-erreur"></p>
+      <div class="pied">${t.statut === "ferme" ? `<button class="btn" type="button" id="tk-rouvrir">Rouvrir</button>` : `<button class="btn" type="button" id="tk-clore">Fermer sans répondre</button>`}<button class="btn principal" type="submit">Envoyer la réponse</button></div>
+    </form>
+    <div class="champ note"><label for="tk-note">Note pour toi ${aide("tk-a-note", "Jamais montrée au client. Par exemple : « corrigé dans la PR 160, à dire quand c'est en ligne ».")}
+      <div class="suffixe"><input id="tk-note" type="text" maxlength="2000" value="${e(t.notes ?? "")}" placeholder="Rien"><button class="btn" type="button" id="tk-note-ok">Garder</button></div></div>`,
+    afficherSupport,
+  );
+  $("#f-repondre").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const texte = $("#tk-texte").value.trim();
+    if (!texte) return ($("#tk-erreur").textContent = "Écris ta réponse d'abord.");
+    $("#tk-erreur").textContent = "Envoi…";
+    const r = await actionSupport(t, "repondre", { texte, fermer: $("#tk-fermer").checked });
+    if (!r.ok) return ($("#tk-erreur").textContent = r.message || "Échec.");
+    fenetreTicket(client, id);
+    if (r.email === "echec") $("#tk-erreur").textContent = "Réponse gardée, mais l'email n'est pas parti (réglages SMTP). La personne la verra dans son RecipeLog.";
+    else if (r.email === null) $("#tk-erreur").textContent = "Réponse gardée. Emails pas réglés : la personne la verra dans son RecipeLog.";
+  });
+  $("#tk-clore")?.addEventListener("click", async () => {
+    await actionSupport(t, "fermer");
+    fenetreTicket(client, id);
+  });
+  $("#tk-rouvrir")?.addEventListener("click", async () => {
+    await actionSupport(t, "rouvrir");
+    fenetreTicket(client, id);
+  });
+  $("#tk-note-ok").addEventListener("click", async (ev) => {
+    const r = await actionSupport(t, "note", { texte: $("#tk-note").value });
+    ev.target.textContent = r.ok ? "Gardée ✓" : "Échec";
+  });
 }

@@ -206,6 +206,8 @@ docker exec recipelog-postgres psql -tA -U postgres -c "SELECT 1 FROM pg_databas
 docker exec recipelog-postgres psql -q -U postgres -c "REVOKE ALL ON DATABASE authentik FROM PUBLIC"
 mkdir -p "${DONNEES}/authentik/media"
 chown -R 1000:1000 "${DONNEES}/authentik" # utilisateur d'Authentik dans son image
+mkdir -p "${DONNEES}/support"
+chown 1000:1000 "${DONNEES}/support" # demandes « Signaler un problème » (passerelle : utilisateur 1000)
 
 # Dossiers de la vitrine (lot 4) avant son démarrage : réglages et messages reçus.
 recipelog-instance vitrine reglages >/dev/null

@@ -261,11 +261,44 @@ adresses de E4 sur l'ancien tunnel suffit à tout remettre comme avant.
 
 ---
 
+## F. Les alertes sur ton téléphone (lot 5, facultatif, 5 min)
+
+Les alertes (site en panne, retour, disque plein, nouvelle demande de support) arrivent déjà
+par **email** aux adresses super-admin. Pour les recevoir aussi en notification sur ton
+téléphone, choisis **Telegram** ou **Discord** (ou les deux).
+
+### ☐ F1. Telegram
+1. Dans Telegram, écris à **@BotFather** → `/newbot` → un nom (« RecipeLog alertes ») → il
+   te donne un **jeton** (`123456:ABC…`).
+2. Écris n'importe quoi à ton nouveau bot, puis ouvre
+   `https://api.telegram.org/bot<jeton>/getUpdates` : note le nombre après `"chat":{"id":`.
+3. Dans la VM, en root : `nano /srv/recipelog/.env`, ajoute
+   ```
+   ALERTE_TELEGRAM_JETON=123456:ABC…
+   ALERTE_TELEGRAM_CHAT=987654321
+   ```
+
+### ☐ F2. Discord
+Sur ton serveur Discord : **Paramètres du salon → Intégrations → Webhooks → Nouveau
+webhook → Copier l'URL**. Dans `/srv/recipelog/.env` : `ALERTE_DISCORD_URL=https://discord.com/api/webhooks/…`
+
+### ☐ F3. Appliquer et essayer
+```bash
+recipelog-plateforme up -d
+```
+Puis dans le panel, partie **Santé de la machine** → **Tester les alertes** : tu dois recevoir
+le message partout. (Pour couper les emails d'alerte : `ALERTE_EMAIL=non` dans le `.env`.)
+
+La page de statut **https://status.recipelog.cc** marche toute seule (elle passe par `*`
+dans Cloudflare) : rien à faire.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4) sans
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
@@ -286,4 +319,5 @@ Puis faire B2, B3 et C (si pas déjà faits), et retirer la protection Cloudflar
 | Tous les autres secrets | `/srv/recipelog/.env` dans la VM (lisible seulement par root) |
 | Résumé de l'installation | `/root/recipelog-plateforme.txt` dans la VM |
 | Le panel admin | https://admin.recipelog.cc (ton compte super-admin) |
+| La page de statut (à donner aux clients) | https://status.recipelog.cc |
 | Les sauvegardes des clients | dans la VM : `/srv/recipelog/sauvegardes/`, et dans ta sauvegarde PBS → OVH |
