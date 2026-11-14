@@ -172,6 +172,8 @@ services:
     volumes:
       # Demandes « Signaler un problème » (lot 5), lues aussi par le moteur du panel.
       - ${DONNEES:-/srv/recipelog}/support:/support
+      # Maintenance et bandeaux (lot 6), écrits par le moteur.
+      - ${DONNEES:-/srv/recipelog}/annonces:/annonces:ro
     networks: [recipelog]
 
   # Panel admin (admin.<domaine>), réservé aux super-admins. Il n'a aucun accès à

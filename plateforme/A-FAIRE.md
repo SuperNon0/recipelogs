@@ -298,7 +298,7 @@ dans Cloudflare) : rien à faire.
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5) sans
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
