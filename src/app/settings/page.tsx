@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Users, Euro, Receipt, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -137,6 +137,14 @@ export default async function SettingsPage() {
                   sub={`${plural(invoiceCount, "facture")} · envoyées à Claude, avec tout l'historique des prix`}
                 />
               </>
+            )}
+            {can("site.update") && (
+              <Row
+                href="/settings/ia"
+                icon={Sparkles}
+                title="Lecture des factures par IA"
+                sub="IA de RecipeLog ou ta propre clé (Claude, ChatGPT, Gemini) · photo ou PDF lu en lignes de prix"
+              />
             )}
           </div>
         </>

@@ -1,0 +1,287 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireAccess } from "@/lib/auth/guard";
+import type { Viewer } from "@/lib/auth/viewer";
+import { prisma } from "@/lib/prisma";
+import { getQuotaIA } from "@/lib/auth/passerelle";
+import { lireAvecIA, testerCle, fichierAccepte, type ResultatIA } from "@/lib/ia/appel";
+import { nettoyerDocument, type DocumentLu, type LigneLue, type TypeLecture } from "@/lib/ia/document";
+import {
+  getReglagesIA,
+  saveReglagesIA,
+  versPublic,
+  type FournisseurIA,
+  type ModeIA,
+  type ReglagesIAPublic,
+} from "@/lib/ia/reglages";
+import { lancer, suivre } from "@/lib/ia/travaux";
+import { recordPurchaseOrder, type PurchaseOrderSummary } from "@/lib/purchaseOrders";
+import { INVOICE_MAX_BYTES, attachInvoiceFile, sniffInvoiceExt } from "@/lib/invoiceFiles";
+import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
+import { lireTableur } from "@/lib/mercurialeFichier";
+
+/**
+ * Lecture des factures et des mercuriales par IA (lot 7 de la plateforme).
+ * 1. lancerLecture : le fichier part à l'IA en arrière-plan ;
+ * 2. suivreLecture : le navigateur demande où elle en est ;
+ * 3. l'utilisateur vérifie et corrige les lignes ;
+ * 4. enregistrerFactureLue / enregistrerMercuriale : rien n'est écrit avant.
+ */
+
+type Erreur = { ok: false; error: string };
+const erreur = (e: unknown): Erreur => ({ ok: false, error: e instanceof Error ? e.message : "Erreur inattendue." });
+const refresh = () => revalidatePath("/", "layout");
+
+function qui(viewer: Viewer): string {
+  return viewer.kind === "account" ? `compte:${viewer.account.id}` : viewer.kind;
+}
+
+/** Mime d'après le contenu (le navigateur peut se tromper) : PDF, JPG, PNG ou WebP. */
+function mimeDe(bytes: Buffer): string | null {
+  const ext = sniffInvoiceExt(bytes);
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".jpg") return "image/jpeg";
+  if (ext === ".png") return "image/png";
+  if (ext === ".webp") return "image/webp";
+  return null;
+}
+
+// ─────────────────────────────────────────────
+// État (boutons des pages Factures et Fournisseur)
+// ─────────────────────────────────────────────
+
+export type EtatIA = {
+  mode: ModeIA;
+  /** Prête à lire : réglée, et pour la plateforme, clé présente et lectures restantes. */
+  prete: boolean;
+  message: string | null;
+  quota: { limite: number; utilise: number } | null;
+};
+
+export async function etatLectureIA(): Promise<EtatIA> {
+  await requireAccess("costs.edit");
+  const r = await getReglagesIA();
+  if (r.mode === "off") return { mode: "off", prete: false, message: "La lecture par IA est coupée : un administrateur peut l'activer dans Réglages → Lecture des factures par IA.", quota: null };
+  if (r.mode === "cle") return { mode: "cle", prete: !!r.cle, message: r.cle ? null : "Aucune clé d'API enregistrée.", quota: null };
+  const q = await getQuotaIA();
+  if (!q.ok) return { mode: "plateforme", prete: false, message: q.message, quota: null };
+  const { disponible, limite, utilise } = q.quota;
+  if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog, ou mets ta propre clé d'IA dans les réglages.", quota: { limite, utilise } };
+  if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois ; tu peux aussi mettre ta propre clé d'IA dans les réglages.`, quota: { limite, utilise } };
+  return { mode: "plateforme", prete: true, message: null, quota: { limite, utilise } };
+}
+
+// ─────────────────────────────────────────────
+// Lecture d'un fichier
+// ─────────────────────────────────────────────
+
+export type ResultatLecture = ResultatIA;
+
+/** fd : fichier (PDF ou photo), type (facture | mercuriale), fournisseurId (mercuriale). */
+export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: string } | Erreur> {
+  const viewer = await requireAccess("costs.edit");
+  try {
+    const f = fd.get("fichier");
+    if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
+    if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: `Fichier trop lourd (${Math.round(INVOICE_MAX_BYTES / 1024 / 1024)} Mo au plus).` };
+    const data = Buffer.from(await f.arrayBuffer());
+    const mime = mimeDe(data);
+    if (!mime || !fichierAccepte(mime)) return { ok: false, error: "Envoie un PDF ou une photo (JPG, PNG ou WebP)." };
+    const type: TypeLecture = fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
+    const fournisseurId = Number(fd.get("fournisseurId")) || null;
+
+    const reglages = await getReglagesIA();
+    if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures par IA)." };
+    const [produits, fournisseur] = await Promise.all([
+      prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 400 }),
+      fournisseurId ? prisma.supplier.findUnique({ where: { id: fournisseurId }, select: { name: true } }) : null,
+    ]);
+    const ctx = { articles: produits.map((p) => p.article!).filter(Boolean), fournisseur: fournisseur?.name ?? null };
+    const id = lancer<ResultatLecture>(
+      qui(viewer),
+      () => lireAvecIA(reglages, { data, mime, nom: f.name }, type, ctx),
+      () => ({ ok: false, code: "ia_erreur", message: "Erreur inattendue pendant la lecture." }),
+    );
+    return { ok: true, id };
+  } catch (e) {
+    return erreur(e);
+  }
+}
+
+export async function suivreLecture(id: string): Promise<{ etat: "en_cours" } | { etat: "fini"; resultat: ResultatLecture } | { etat: "perdu" }> {
+  const viewer = await requireAccess("costs.edit");
+  const t = suivre<ResultatLecture>(qui(viewer), String(id));
+  return t ?? { etat: "perdu" };
+}
+
+/** Produits déjà connus chez ce fournisseur (pour marquer les lignes nouvelles et les prix qui changent). */
+export async function produitsConnus(fournisseur: string): Promise<{ nom: string; reference: string | null; prix: number | null; unite: string; contenance: number | null }[]> {
+  await requireAccess("costs.edit");
+  const nom = fournisseur.trim();
+  if (!nom) return [];
+  const s = await prisma.supplier.findFirst({ where: { name: { equals: nom, mode: "insensitive" } }, select: { id: true } });
+  if (!s) return [];
+  const p = await prisma.supplierProduct.findMany({
+    where: { supplierId: s.id },
+    select: { name: true, reference: true, price: true, priceUnit: true, packSize: true },
+  });
+  return p.map((x) => ({ nom: x.name, reference: x.reference, prix: x.price == null ? null : Number(x.price), unite: x.priceUnit, contenance: x.packSize == null ? null : Number(x.packSize) }));
+}
+
+// ─────────────────────────────────────────────
+// Enregistrement après vérification
+// ─────────────────────────────────────────────
+
+function versLignes(lignes: LigneLue[]) {
+  return lignes.map((l) => ({
+    product: l.produit,
+    reference: l.reference,
+    article: l.article,
+    family: l.famille,
+    quantity: l.quantite,
+    packSize: l.contenance,
+    unit: l.unite,
+    unitPrice: l.prixUnitaire,
+    packPrice: l.prixColis,
+    lineTotal: l.montant,
+  }));
+}
+
+/** Relit ce que le navigateur renvoie (même nettoyage que la réponse de l'IA). */
+function relire(doc: unknown): DocumentLu {
+  const d = (doc && typeof doc === "object" ? doc : {}) as Record<string, unknown>;
+  const lignes = Array.isArray(d.lignes) ? d.lignes : [];
+  return nettoyerDocument({
+    fournisseur: d.fournisseur,
+    date: d.date,
+    numero: d.numero,
+    total_ht: d.total,
+    remarque: d.remarque,
+    lignes: lignes.map((x) => {
+      const l = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+      return {
+        produit: l.produit, reference: l.reference, article: l.article, famille: l.famille, quantite: l.quantite,
+        contenance: l.contenance, unite_prix: l.unite, prix_unitaire: l.prixUnitaire, prix_colis: l.prixColis,
+        montant_ligne: l.montant, a_verifier: null,
+      };
+    }),
+  });
+}
+
+/** fd : document (JSON vérifié), remplacer (« 1 »), fichier (joint à la facture). */
+export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; resume: PurchaseOrderSummary; fichierJoint: boolean } | Erreur> {
+  await requireAccess("costs.edit");
+  try {
+    const doc = relire(JSON.parse(String(fd.get("document") ?? "{}")));
+    if (!doc.fournisseur) return { ok: false, error: "Indique le fournisseur." };
+    if (!doc.date) return { ok: false, error: "Indique la date de la facture." };
+    if (!doc.lignes.length) return { ok: false, error: "Aucune ligne à enregistrer." };
+    const note = String(fd.get("note") ?? "").trim().slice(0, 2000) || null;
+    const resume = await recordPurchaseOrder({
+      supplier: doc.fournisseur,
+      date: doc.date,
+      number: doc.numero,
+      total: doc.total,
+      note,
+      replace: fd.get("remplacer") === "1",
+      lines: versLignes(doc.lignes),
+    });
+    let fichierJoint = false;
+    const f = fd.get("fichier");
+    if (f instanceof File && f.size > 0) {
+      try {
+        await attachInvoiceFile(resume.facture_id, Buffer.from(await f.arrayBuffer()));
+        fichierJoint = true;
+      } catch {
+        fichierJoint = false;
+      }
+    }
+    refresh();
+    return { ok: true, resume, fichierJoint };
+  } catch (e) {
+    return erreur(e);
+  }
+}
+
+/** Mercuriale : les prix entrent dans l'historique du fournisseur, à la date choisie, sans compter comme une facture. */
+export async function enregistrerMercuriale(input: { fournisseurId: number; date: string; nomFichier: string; lignes: LigneLue[] }): Promise<{ ok: true; resume: PurchaseOrderSummary } | Erreur> {
+  await requireAccess("costs.edit");
+  try {
+    const s = await prisma.supplier.findUnique({ where: { id: Number(input.fournisseurId) || 0 }, select: { name: true } });
+    if (!s) return { ok: false, error: "Fournisseur introuvable." };
+    const doc = relire({ fournisseur: s.name, date: input.date, lignes: input.lignes });
+    if (!doc.date) return { ok: false, error: "Indique la date des prix." };
+    if (!doc.lignes.length) return { ok: false, error: "Aucune ligne avec un prix." };
+    const resume = await recordPurchaseOrder({
+      supplier: s.name,
+      date: doc.date,
+      manual: true,
+      note: `Mercuriale importée${input.nomFichier ? ` (${String(input.nomFichier).slice(0, 120)})` : ""}`,
+      lines: versLignes(doc.lignes),
+    });
+    refresh();
+    return { ok: true, resume };
+  } catch (e) {
+    return erreur(e);
+  }
+}
+
+/** Tableau Excel ou CSV : cases en texte, ligne des titres et colonnes devinées. */
+export async function lireTableurMercuriale(fd: FormData): Promise<{ ok: true; lignes: string[][]; entete: number; colonnes: ReturnType<typeof devinerColonnes> } | Erreur> {
+  await requireAccess("costs.edit");
+  try {
+    const f = fd.get("fichier");
+    if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
+    if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: "Fichier trop lourd." };
+    const lignes = await lireTableur(f.name, Buffer.from(await f.arrayBuffer()));
+    if (!lignes.length) return { ok: false, error: "Le fichier est vide." };
+    const entete = ligneEntete(lignes);
+    return { ok: true, lignes, entete, colonnes: devinerColonnes(lignes[entete] ?? []) };
+  } catch (e) {
+    return erreur(e);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Réglages
+// ─────────────────────────────────────────────
+
+export type InfosReglagesIA = { reglages: ReglagesIAPublic; quota: { disponible: boolean; limite: number; utilise: number } | null };
+
+export async function lireReglagesIA(): Promise<InfosReglagesIA> {
+  await requireAccess("site.update");
+  const r = versPublic(await getReglagesIA());
+  let quota: InfosReglagesIA["quota"] = null;
+  if (r.plateforme) {
+    const q = await getQuotaIA();
+    if (q.ok) quota = { disponible: q.quota.disponible, limite: q.quota.limite, utilise: q.quota.utilise };
+  }
+  return { reglages: r, quota };
+}
+
+export async function sauverReglagesIA(input: { mode: ModeIA; fournisseur: FournisseurIA; cle?: string; modele?: string }): Promise<{ ok: true; reglages: ReglagesIAPublic } | Erreur> {
+  await requireAccess("site.update");
+  try {
+    const mode: ModeIA = input.mode === "cle" || input.mode === "plateforme" ? input.mode : "off";
+    const fournisseur: FournisseurIA = input.fournisseur === "openai" || input.fournisseur === "gemini" ? input.fournisseur : "anthropic";
+    const r = await saveReglagesIA({ mode, fournisseur, cle: input.cle, modele: input.modele });
+    return { ok: true, reglages: versPublic(r) };
+  } catch (e) {
+    return erreur(e);
+  }
+}
+
+export async function testerReglagesIA(): Promise<{ ok: true; message: string } | Erreur> {
+  await requireAccess("site.update");
+  const r = await getReglagesIA();
+  if (r.mode === "off") return { ok: false, error: "La lecture par IA est coupée." };
+  if (r.mode === "plateforme") {
+    const q = await getQuotaIA();
+    if (!q.ok) return { ok: false, error: q.message };
+    if (!q.quota.disponible) return { ok: false, error: "La plateforme n'a pas encore ouvert la lecture par IA pour ton offre." };
+    return { ok: true, message: `La plateforme répond : ${Math.max(0, q.quota.limite - q.quota.utilise)} lectures restantes ce mois-ci.` };
+  }
+  const t = await testerCle(r);
+  return t.ok ? { ok: true, message: "La clé marche." } : { ok: false, error: t.message };
+}

@@ -444,3 +444,177 @@ button.cost-line:hover {
 .modal > div:has(> details.fl-card) {
   flex-shrink: 0;
 }
+
+/* ─── Lecture des factures par IA et mercuriales (plateforme, lot 7) ─── */
+.ia-tourne {
+  animation: ia-tourne 1s linear infinite;
+}
+@keyframes ia-tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ia-etat {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--danger);
+}
+.ia-etat[data-ok="true"] {
+  color: var(--accent-2);
+}
+.ia-lecture {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--accent);
+}
+.ia-lecture .sub {
+  max-width: 380px;
+}
+.ia-modele {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ia-alerte {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  background: color-mix(in srgb, var(--accent-3) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent-3) 40%, transparent);
+}
+.ia-alerte svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-3);
+}
+.ia-entete,
+.ia-colonnes {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.ia-entete label,
+.ia-colonnes label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ia-lignes-titre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ia-lignes {
+  display: grid;
+  gap: 8px;
+}
+.ia-ligne {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.ia-ligne[data-doute="true"] {
+  border-color: color-mix(in srgb, var(--accent-3) 60%, transparent);
+  background: color-mix(in srgb, var(--accent-3) 6%, var(--surface));
+}
+.ia-ligne-haut {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ia-produit {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+.ia-ligne-champs {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+.ia-ligne-champs label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ia-ligne-champs span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ia-ligne-champs .fl-input {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.fl-input[data-err="true"] {
+  border-color: var(--danger);
+}
+.ia-ligne-bas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 12.5px;
+}
+.ia-pu {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ia-badge {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.ia-badge[data-sens="hausse"] {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.ia-badge[data-sens="baisse"] {
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+  color: var(--accent-2);
+}
+.ia-doute {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--accent-3);
+}
+.ia-apercu {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ia-apercu table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 100%;
+}
+.ia-apercu th,
+.ia-apercu td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ia-apercu th {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.modal > .ia-lignes,
+.modal > div:has(> .ia-lignes) {
+  flex-shrink: 0;
+}

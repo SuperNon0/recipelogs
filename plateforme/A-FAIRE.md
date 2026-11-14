@@ -294,11 +294,38 @@ dans Cloudflare) : rien à faire.
 
 ---
 
+## G. La lecture des factures par IA (lot 7, 10 min)
+
+Sans cette étape, tes clients peuvent déjà lire leurs factures avec **leur propre** clé d'IA
+(Réglages → Lecture des factures par IA) et importer leurs mercuriales Excel / CSV. Pour leur
+**fournir** l'IA, avec un nombre de lectures par mois :
+
+### ☐ G1. Créer une clé Anthropic
+1. Sur **https://platform.claude.com**, connecte-toi, puis **Billing** : ajoute un moyen de
+   paiement et quelques dollars de crédit (une facture coûte de l'ordre de quelques centimes).
+   Mets une **limite de dépense mensuelle** (Limits) pour ne jamais avoir de surprise.
+2. **API keys → Create key** (nom : « RecipeLog plateforme ») et copie la clé (`sk-ant-…`).
+
+### ☐ G2. L'ajouter dans la VM (en root)
+```bash
+nano /srv/recipelog/.env        # ajoute : IA_ANTHROPIC_CLE=sk-ant-…
+recipelog-plateforme up -d
+```
+Le panel affiche alors « Clé Claude de la plateforme réglée » dans **Lecture des factures par IA**.
+
+### ☐ G3. Régler et essayer
+1. Dans le panel, **Changer le défaut** si 30 lectures par mois et par client ne te vont pas,
+   ou **Régler** pour un client à part (0 = coupé).
+2. Sur le RecipeLog de test : **Factures → Lire une facture avec l'IA**, avec une vraie
+   facture Ribera en photo. Vérifie les lignes, puis enregistre.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6) sans
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash

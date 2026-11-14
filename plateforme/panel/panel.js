@@ -12,6 +12,7 @@ let VITRINE = null;
 let SANTE = null;
 let SUPPORT = [];
 let ANNONCES = null;
+let IA = null;
 
 // ------------------------------------------------------------ API
 async function api(methode, chemin, corps) {
@@ -198,6 +199,7 @@ const NOMS_ACTIONS = {
   "maintenance-prevue": "a programmé une maintenance :",
   "maintenance-finie": "a terminé la maintenance :",
   "maintenance-annulee": "a annulé la maintenance :",
+  "ia-quota": "a changé les lectures par IA de",
   preavis: "a envoyé le préavis de maintenance :",
   bandeau: "a mis un bandeau :",
   message: "a écrit à",
@@ -226,7 +228,8 @@ $("#journal").addEventListener("click", (ev) => {
 });
 
 async function charger() {
-  const [c, j, v, sa, su, an] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces")]);
+  const [c, j, v, sa, su, an, ia] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia")]);
+  IA = ia.usage ? ia : null;
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
   SANTE = sa.machine ? sa : null;
@@ -238,6 +241,7 @@ async function charger() {
   JOURNAL = j.journal ?? [];
   if (c.clients) afficher();
   afficherAnnonces();
+  afficherIA();
   afficherSante();
   afficherJournal();
 }
@@ -1006,3 +1010,76 @@ document.addEventListener("change", (ev) => {
   if (i.value === "*" && i.checked) toutes.forEach((x) => x.value !== "*" && x.value !== "vitrine" && (x.checked = false));
   else if (i.value !== "*" && i.value !== "vitrine" && i.checked) toutes.forEach((x) => x.value === "*" && (x.checked = false));
 });
+
+
+// ------------------------------------------------------------ lecture des factures par IA (lot 7)
+const nombreFr = (n) => Number(n || 0).toLocaleString("fr-FR");
+const dollars = (n) => `${Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+
+function afficherIA() {
+  const zone = $("#ia");
+  if (!IA) {
+    zone.innerHTML = `<div class="vide">Indisponible (le moteur ne répond pas).</div>`;
+    return;
+  }
+  const defaut = IA.defaut ?? 30;
+  const noms = [...new Set([...CLIENTS.map((c) => c.nom), ...Object.keys(IA.usage)])].sort();
+  let total = { lectures: 0, cout: 0 };
+  const lignes = noms
+    .map((nom) => {
+      const u = IA.usage[nom] ?? { mois: { lectures: 0, entree: 0, sortie: 0, cout: 0 }, precedent: { lectures: 0, cout: 0 } };
+      const propre = typeof IA.clients[nom] === "number";
+      const limite = propre ? IA.clients[nom] : defaut;
+      total = { lectures: total.lectures + u.mois.lectures, cout: total.cout + u.mois.cout };
+      const pct = limite > 0 ? Math.min(100, Math.round((u.mois.lectures / limite) * 100)) : 0;
+      const plein = limite > 0 && u.mois.lectures >= limite;
+      return `<tr><td><b>${e(nom)}</b></td>
+        <td>${limite === 0 ? `<span class="etiquette pause">coupée</span>` : `${nombreFr(u.mois.lectures)} / ${nombreFr(limite)} ${plein ? `<span class="etiquette ko">plein</span>` : ""}<div class="jauge"><span class="j${Math.round(pct / 10) * 10}"></span></div>`}</td>
+        <td>${propre ? "à part" : "défaut"}</td>
+        <td>${nombreFr(u.mois.entree)} / ${nombreFr(u.mois.sortie)}</td>
+        <td>${dollars(u.mois.cout)}</td>
+        <td>${nombreFr(u.precedent.lectures)} · ${dollars(u.precedent.cout)}</td>
+        <td><button class="btn petit" type="button" data-ia="${e(nom)}">Régler</button></td></tr>`;
+    })
+    .join("");
+  zone.innerHTML = `<div class="barre serree">
+      <span class="etiquette ${IA.cle ? "ok" : "pause"}">${IA.cle ? "Clé Claude de la plateforme réglée" : "Pas de clé Claude : les clients doivent mettre la leur"}</span>
+      <span class="sub">Par défaut : <b>${nombreFr(defaut)}</b> lectures par mois et par client</span>
+      <button class="btn" type="button" id="ia-defaut">Changer le défaut</button>
+      <button class="aide" type="button" data-aide="ia-a" aria-label="Aide">?</button></div>
+    <p class="texte-aide" id="ia-a">Dans leur RecipeLog, tes clients prennent une facture en photo ou en PDF et l'IA la recopie en lignes de prix à vérifier. Avec ta clé (IA_ANTHROPIC_CLE, voir A-FAIRE.md étape G), chaque lecture compte dans leur quota du mois, remis à zéro le 1er. 0 = lecture par IA coupée pour ce client (il peut toujours mettre sa propre clé Claude, ChatGPT ou Gemini dans ses réglages : elle ne passe pas par toi et ne compte pas ici). Le coût est une estimation au prix de Claude Opus 5.5 (4 $ par million de jetons lus, 20 $ par million écrits).</p>
+    <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Lectures ce mois-ci (${e(IA.mois)})</th><th>Quota</th><th>Jetons lus / écrits</th><th>Coût estimé</th><th>Mois dernier</th><th></th></tr></thead>
+    <tbody>${lignes || `<tr><td colspan="7">Aucun client.</td></tr>`}</tbody>
+    <tfoot><tr><td>Total</td><td>${nombreFr(total.lectures)}</td><td></td><td></td><td>${dollars(total.cout)}</td><td></td><td></td></tr></tfoot></table></div>`;
+  $("#ia-defaut").addEventListener("click", () => fenetreQuotaIA("*", defaut));
+  zone.querySelectorAll("[data-ia]").forEach((b) =>
+    b.addEventListener("click", () => fenetreQuotaIA(b.dataset.ia, typeof IA.clients[b.dataset.ia] === "number" ? IA.clients[b.dataset.ia] : null)),
+  );
+}
+
+function fenetreQuotaIA(client, actuel) {
+  const tous = client === "*";
+  ouvrir(
+    tous ? "Lectures par IA : défaut" : `Lectures par IA : ${client}`,
+    `<form id="f-ia" novalidate>
+      <div class="champ"><label for="ia-limite">Lectures par mois ${aide("ia-a-l", tous ? "Ce que reçoit chaque client qui n'a pas de réglage à part. Une lecture = une facture ou une mercuriale lue par l'IA. 0 = coupée pour tous." : "Une lecture = une facture ou une mercuriale lue par l'IA. 0 = coupée pour ce client. « Revenir au défaut » : il suit le nombre par défaut.")}
+        <div class="suffixe"><input id="ia-limite" type="number" min="0" max="100000" step="1" value="${actuel ?? ""}" placeholder="${tous ? "30" : `défaut (${IA.defaut ?? 30})`}"><span>par mois</span></div></div>
+      <p class="erreur" id="ia-erreur"></p>
+      <div class="pied">${tous ? "" : `<button class="btn" type="button" id="ia-reset">Revenir au défaut</button>`}<button class="btn principal" type="submit">Enregistrer</button></div>
+    </form>`,
+    charger,
+  );
+  const envoyer = async (limite) => {
+    const r = await api("POST", "/ia/quota", { client, limite });
+    if (!r.usage) return ($("#ia-erreur").textContent = r.message || "Échec.");
+    IA = r;
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Enregistré</p><p class="sub">Pris en compte tout de suite pour ${tous ? "tous les clients sans réglage à part" : e(client)}.</p>`;
+  };
+  $("#f-ia").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const v = $("#ia-limite").value.trim();
+    if (!/^\d+$/.test(v)) return ($("#ia-erreur").textContent = "Écris un nombre entier (0 pour couper).");
+    envoyer(Number(v));
+  });
+  if (!tous) $("#ia-reset").addEventListener("click", () => envoyer(null));
+}

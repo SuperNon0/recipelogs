@@ -168,8 +168,14 @@ services:
       AUTHENTIK_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:?AUTHENTIK_BOOTSTRAP_TOKEN manquant}
       DOMAINE: ${DOMAINE:-recipelog.cc}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Lecture des factures par IA (lot 7) : clé Anthropic de la plateforme (vide = pas d'IA fournie)
+      # et nombre de lectures par mois quand le panel n'a rien réglé pour un client.
+      IA_ANTHROPIC_CLE: ${IA_ANTHROPIC_CLE:-}
+      IA_QUOTA_DEFAUT: ${IA_QUOTA_DEFAUT:-30}
     read_only: true
     volumes:
+      # Lectures par IA (lot 7) : quotas écrits par le panel, compteurs écrits par la passerelle.
+      - ${DONNEES:-/srv/recipelog}/ia:/ia
       # Demandes « Signaler un problème » (lot 5), lues aussi par le moteur du panel.
       - ${DONNEES:-/srv/recipelog}/support:/support
       # Maintenance et bandeaux (lot 6), écrits par le moteur.

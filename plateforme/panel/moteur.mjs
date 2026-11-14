@@ -8,6 +8,7 @@ import { appendFile, chown, mkdir, readFile, readdir, rename, writeFile } from "
 import { timingSafeEqual, randomBytes } from "node:crypto";
 import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
+import { RefusIA, reglerQuota, resume as resumeIA } from "./ia.mjs";
 import { RefusAnnonce, action as actionAnnonce, pourStatut, resume as resumeAnnonces, tour as tourAnnonces } from "./annonces.mjs";
 
 const CLE = process.env.MOTEUR_CLE || "";
@@ -528,6 +529,19 @@ createServer(async (req, res) => {
         throw e;
       }
     }
+    // Lecture des factures par IA (lot 7) : quotas par client et lectures du mois.
+    if (req.method === "GET" && url.pathname === "/ia") return repondre(res, 200, await resumeIA(DONNEES));
+    if (req.method === "POST" && url.pathname === "/ia/quota") {
+      const corps = await lireCorps(req);
+      try {
+        await reglerQuota(DONNEES, corps);
+      } catch (e) {
+        if (e instanceof RefusIA) throw new Refus(400, e.message);
+        throw e;
+      }
+      await noter(qui, "ia-quota", corps.client === "*" ? "tous" : corps.client, { ok: true, sortie: "" }, { limite: corps.limite });
+      return repondre(res, 200, await resumeIA(DONNEES));
+    }
     if (req.method === "GET" && url.pathname === "/support") return repondre(res, 200, { demandes: await tickets() });
     if (req.method === "POST" && morceaux[0] === "support" && morceaux.length === 4) {
       return repondre(res, 200, await actionTicket(qui, morceaux[1], morceaux[2], morceaux[3], await lireCorps(req)));
@@ -664,6 +678,8 @@ async function surveiller() {
 }
 await mkdir(SUPPORT, { recursive: true }).catch(() => {});
 await mkdir(`${DONNEES}/annonces`, { recursive: true }).catch(() => {});
+await mkdir(`${DONNEES}/ia/usage`, { recursive: true }).then(() => chown(`${DONNEES}/ia/usage`, 1000, 1000)).catch(() => {});
+await chown(`${DONNEES}/ia`, 1000, 1000).catch(() => {});
 await chown(SUPPORT, 1000, 1000).catch(() => {});
 setTimeout(surveiller, 30 * 1000);
 setInterval(surveiller, 60 * 1000);

@@ -273,3 +273,4 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .annonces .journal { margin-top: 0; }
 .maintenance-statut p { margin: 0; color: var(--soft); }
 @media (max-width: 600px) { .deux { grid-template-columns: 1fr; } }
+.tableau-sante tfoot td { font-weight: 600; border-top: 1px solid var(--bord, #ddd); }

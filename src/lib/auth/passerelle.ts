@@ -270,3 +270,24 @@ export async function getAnnonces(opts: PasserelleOptions = {}): Promise<Annonce
   if (!opts.fetch) cache = { valeur, jusqua: Date.now() + (r.ok ? 30000 : 10000) };
   return valeur;
 }
+
+// ------------------------------------------------------------ lecture des factures par IA (lot 7)
+
+/** Lectures par IA avec la clé de la plateforme : limite du mois réglée dans le panel. */
+export type QuotaIA = { disponible: boolean; limite: number; utilise: number; mois: string };
+
+/** GET /v1/ia/quota. disponible = false : la plateforme n'a pas (encore) de clé d'IA. */
+export async function getQuotaIA(opts: PasserelleOptions = {}): Promise<PasserelleResult<{ quota: QuotaIA }>> {
+  const r = await call("GET", "/v1/ia/quota", undefined, { timeoutMs: 4000, ...opts });
+  if (!r.ok) return r;
+  const j = r.json ?? {};
+  return {
+    ok: true,
+    quota: {
+      disponible: j.disponible === true,
+      limite: typeof j.limite === "number" ? j.limite : 0,
+      utilise: typeof j.utilise === "number" ? j.utilise : 0,
+      mois: typeof j.mois === "string" ? j.mois : "",
+    },
+  };
+}

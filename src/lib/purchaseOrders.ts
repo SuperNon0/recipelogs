@@ -211,6 +211,8 @@ export type PurchaseOrderInput = {
   note?: string | null;
   /** Une facture avec le même numéro chez ce fournisseur est remplacée. */
   replace?: boolean;
+  /** Liste de prix (mercuriale) : les prix entrent dans l'historique, mais pas dans la liste des factures. */
+  manual?: boolean;
   lines: PurchaseLineInput[];
 };
 
@@ -265,7 +267,10 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         }
       }
 
-      const data = { supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || keptNote };
+      const data = {
+        supplierId: supplier.id, date, number, total: input.total ?? null, note: input.note?.trim() || keptNote,
+        ...(input.manual ? { manual: true } : {}),
+      };
       const order = replacedId === null
         ? await tx.purchaseOrder.create({ data })
         : await tx.purchaseOrder.update({ where: { id: replacedId }, data: { ...data, lines: { deleteMany: {} } } });
@@ -348,7 +353,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       }
 
       if (lineCount === 0) throw new Error("aucune ligne avec un prix : rien n'a été enregistré");
-      if (input.total == null && computedTotal > 0) {
+      if (input.total == null && computedTotal > 0 && !input.manual) {
         await tx.purchaseOrder.update({ where: { id: order.id }, data: { total: Math.round(computedTotal * 100) / 100 } });
       }
 
