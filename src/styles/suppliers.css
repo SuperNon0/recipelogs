@@ -421,3 +421,26 @@ button.cost-line:hover {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Ligne de facture avec le crayon « Corriger » au bout. */
+.inv-line:has(> .fl-btn-icon) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding-right: 8px;
+}
+
+.sup-list-head {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Fenêtre « historique d'un prix » plus haute que l'écran : les blocs gardent leur
+   taille et la fenêtre défile (sinon la liste des prix était écrasée à zéro). */
+.modal > .fl-list,
+.modal > .fl-card,
+.modal > .sup-hist-stats,
+.modal > .sup-range,
+.modal > div:has(> details.fl-card) {
+  flex-shrink: 0;
+}

@@ -5,8 +5,20 @@ import { requireAccess } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
 import {
+  addManualPrice,
   chooseProductForIngredient,
+  createProduct,
+  createSupplier,
+  deletePriceLine,
+  deleteProduct,
   deletePurchaseOrder,
+  deleteSupplier,
+  supplierDeletionInfo,
+  updatePriceLine,
+  updateProduct,
+  updatePurchaseOrder,
+  updateSupplier,
+  type ProductInput,
   linkProductToIngredient,
   productChoicesFor,
   searchableProducts,
@@ -68,13 +80,92 @@ export async function updateProductInfo(productId: number, data: { article?: str
 
 export async function renameSupplier(id: number, name: string): Promise<ActionResult> {
   await requireAccess("costs.edit");
-  const n = name.trim();
-  if (!n) return { ok: false, error: "Le nom est vide." };
-  const taken = await prisma.supplier.findFirst({ where: { name: { equals: n, mode: "insensitive" }, NOT: { id } } });
-  if (taken) return { ok: false, error: `« ${taken.name} » existe déjà.` };
-  await prisma.supplier.update({ where: { id }, data: { name: n } });
+  return edit(() => updateSupplier(id, { name }));
+}
+
+/** Runs a library call (after the permission check): error message, page refresh. */
+async function edit(fn: () => Promise<unknown>): Promise<ActionResult> {
+  try {
+    await fn();
+  } catch (e) {
+    return fail(e);
+  }
   refresh();
   return { ok: true };
+}
+
+export async function addSupplier(data: { name: string; note?: string | null }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+  await requireAccess("costs.edit");
+  try {
+    const s = await createSupplier(data);
+    refresh();
+    return { ok: true, id: s.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erreur inattendue." };
+  }
+}
+
+export async function editSupplier(id: number, data: { name?: string; note?: string | null }): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => updateSupplier(id, data));
+}
+
+export async function getSupplierDeletionInfo(id: number) {
+  await requireAccess("costs.edit");
+  return supplierDeletionInfo(id);
+}
+
+export async function removeSupplier(id: number): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  try {
+    const { filePaths } = await deleteSupplier(id);
+    for (const f of filePaths) await removeInvoiceFile(f);
+  } catch (e) {
+    return fail(e);
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function addProduct(
+  supplierId: number,
+  data: ProductInput & { name: string; price?: number | null; date?: string | null },
+): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => createProduct(supplierId, data));
+}
+
+export async function editProduct(id: number, data: ProductInput): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => updateProduct(id, data));
+}
+
+export async function removeProduct(id: number): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => deleteProduct(id));
+}
+
+export async function addPrice(productId: number, data: { price: number; date: string; quantity?: number | null }): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => addManualPrice(productId, data));
+}
+
+export async function editPrice(lineId: number, data: { price?: number; quantity?: number | null; date?: string }): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => updatePriceLine(lineId, data));
+}
+
+export async function removePrice(lineId: number): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => deletePriceLine(lineId));
+}
+
+export async function editInvoice(
+  id: number,
+  data: { date?: string; number?: string | null; total?: number | null; note?: string | null },
+): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => updatePurchaseOrder(id, data));
 }
 
 /** Supprime une facture (ses prix sortent de l'historique). */

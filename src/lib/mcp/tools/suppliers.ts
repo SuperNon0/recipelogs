@@ -4,7 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { PRICE_UNITS } from "@/lib/cost";
 import { SUPPLIER_FAMILIES, groupByArticle } from "@/lib/suppliers";
 import {
+  addManualPrice,
   chooseProductForIngredient,
+  createProduct,
+  createSupplier,
+  deletePriceLine,
+  deleteProduct,
+  deleteSupplier,
+  supplierDeletionInfo,
+  updatePriceLine,
+  updateProduct,
+  updatePurchaseOrder,
+  updateSupplier,
   deletePurchaseOrder,
   linkProductToIngredient,
   listPurchaseOrders,
@@ -332,8 +343,8 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           date: h.date,
           produit: h.productName,
           prix: `${h.price} €/${h.unit}`,
-          facture_id: h.orderId,
-          numero: h.number,
+          ligne_id: h.lineId,
+          ...(h.manual ? { saisi_a_la_main: true } : { facture_id: h.orderId, numero: h.number }),
         })),
       });
     },
@@ -449,6 +460,301 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       await removeInvoiceFile(filePath);
       refresh();
       return text({ supprimee: a.id });
+    },
+  },
+
+  // ── Gérer à la main : fournisseurs, produits, prix, factures ──
+
+  {
+    name: "creer_fournisseur",
+    title: "Créer un fournisseur",
+    description:
+      "Crée un fournisseur vide (sans facture). Inutile avant enregistrer_facture, qui crée le fournisseur tout seul. Ensuite : ajouter_produit_fournisseur pour lui ajouter des produits et leurs prix.",
+    inputSchema: {
+      type: "object",
+      properties: { nom: js.str("Nom du fournisseur"), note: js.str("Remarque libre (jour de livraison, contact…)") },
+      required: ["nom"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ nom: z.string().trim().min(1).max(120), note: z.string().max(2000).optional() }), args);
+      const s = await createSupplier({ name: a.nom, note: a.note });
+      refresh();
+      return text({ fournisseur_id: s.id, nom: s.name });
+    },
+  },
+
+  {
+    name: "modifier_fournisseur",
+    title: "Renommer ou modifier un fournisseur",
+    description:
+      "Renomme un fournisseur et / ou change sa remarque. Ses produits, ses prix et ses factures restent. Refusé si un autre fournisseur porte déjà ce nom (pour réunir deux fournisseurs, demande à l'utilisateur).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: js.int("Id du fournisseur (voir comparer_prix_fournisseurs)"),
+        nom: js.str("Nouveau nom"),
+        note: js.str("Nouvelle remarque (texte vide pour l'effacer)"),
+      },
+      required: ["id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ id, nom: z.string().trim().min(1).max(120).optional(), note: z.string().max(2000).optional() }),
+        args,
+      );
+      if (a.nom === undefined && a.note === undefined) throw new Error("rien à changer : donne nom ou note");
+      const s = await updateSupplier(a.id, { name: a.nom, note: a.note });
+      refresh();
+      return text({ fournisseur_id: s.id, nom: s.name, note: s.note });
+    },
+  },
+
+  {
+    name: "supprimer_fournisseur",
+    title: "Supprimer un fournisseur",
+    description:
+      "Supprime un fournisseur avec TOUS ses produits, ses prix et ses factures (et leurs fichiers joints). Les ingrédients des recettes qui prenaient leur prix chez lui gardent leur dernier prix. Irréversible : appelle d'abord sans confirmer=true pour voir ce qui part, montre-le à l'utilisateur et demande-lui confirmation, puis rappelle avec confirmer=true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: js.int("Id du fournisseur"),
+        confirmer: js.bool("true pour supprimer vraiment (après l'accord de l'utilisateur)"),
+      },
+      required: ["id"],
+    },
+    annotations: DELETE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ id, confirmer: z.boolean().optional() }), args);
+      const info = await supplierDeletionInfo(a.id);
+      if (!info) throw new Error("fournisseur introuvable");
+      const resume = {
+        fournisseur: info.name,
+        produits: info.products,
+        factures: info.invoices,
+        fichiers_joints: info.files,
+        prix_tapes_a_la_main: info.manualPrices,
+        ingredients_qui_gardent_leur_dernier_prix: info.ingredients,
+      };
+      if (!a.confirmer) return text({ a_confirmer: true, ...resume, message: "Rien n'est supprimé. Demande confirmation, puis rappelle avec confirmer=true." });
+      const { filePaths } = await deleteSupplier(a.id);
+      for (const f of filePaths) await removeInvoiceFile(f);
+      refresh();
+      return text({ supprime: true, ...resume });
+    },
+  },
+
+  {
+    name: "ajouter_produit_fournisseur",
+    title: "Ajouter un produit à un fournisseur",
+    description:
+      "Ajoute à la main un produit chez un fournisseur (sans facture), avec son premier prix si on le connaît. Pour une facture, utilise plutôt enregistrer_facture. Réutilise l'article existant (même orthographe) pour regrouper les variantes. " +
+      FAMILIES_HELP,
+    inputSchema: {
+      type: "object",
+      properties: {
+        fournisseur_id: js.int("Id du fournisseur"),
+        produit: js.str("Nom du produit (désignation exacte)"),
+        article: js.str("Nom commun pour comparer et regrouper les variantes"),
+        famille: js.str("Famille du tableau comparatif"),
+        unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg, L ou pièce (défaut kg)"),
+        contenance: js.num("Contenance d'un colis dans l'unité (25 pour un sac de 25 kg)"),
+        reference: js.str("Code article du fournisseur"),
+        prix: js.num("Premier prix, en € HT par unité de prix"),
+        date: js.str("Date de ce prix, AAAA-MM-JJ (défaut : aujourd'hui)"),
+      },
+      required: ["fournisseur_id", "produit"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({
+          fournisseur_id: id,
+          produit: z.string().trim().min(1).max(300),
+          article: z.string().trim().max(200).optional(),
+          famille: z.string().trim().max(80).optional(),
+          unite_prix: z.enum(PRICE_UNITS).default("kg"),
+          contenance: z.number().positive().max(1_000_000).optional(),
+          reference: z.string().trim().max(100).optional(),
+          prix: money.optional(),
+          date: day.optional(),
+        }),
+        args,
+      );
+      const p = await createProduct(a.fournisseur_id, {
+        name: a.produit,
+        article: a.article,
+        family: a.famille,
+        unit: a.unite_prix,
+        packSize: a.contenance,
+        reference: a.reference,
+        price: a.prix,
+        date: a.date,
+      });
+      refresh();
+      return text({ produit_id: p.id, produit: p.name });
+    },
+  },
+
+  {
+    name: "modifier_produit_fournisseur",
+    title: "Modifier un produit d'un fournisseur",
+    description:
+      "Corrige un produit : nom, référence, article (nom pour comparer), famille, contenance d'un colis, et unité de prix tant qu'il n'a aucun prix. Ses prix restent. Pour un prix faux, utilise corriger_prix.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        produit_id: js.int("Id du produit"),
+        produit: js.str("Nouveau nom"),
+        article: js.str("Nom pour comparer (texte vide = le nom du produit)"),
+        famille: js.str("Famille"),
+        unite_prix: js.enum(PRICE_UNITS, "kg, L ou pièce (seulement si le produit n'a pas encore de prix)"),
+        contenance: js.num("Contenance d'un colis (0 pour l'effacer)"),
+        reference: js.str("Référence (texte vide pour l'effacer)"),
+      },
+      required: ["produit_id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({
+          produit_id: id,
+          produit: z.string().trim().min(1).max(300).optional(),
+          article: z.string().max(200).optional(),
+          famille: z.string().max(80).optional(),
+          unite_prix: z.enum(PRICE_UNITS).optional(),
+          contenance: z.number().min(0).max(1_000_000).optional(),
+          reference: z.string().max(100).optional(),
+        }),
+        args,
+      );
+      await updateProduct(a.produit_id, {
+        name: a.produit,
+        article: a.article,
+        family: a.famille,
+        unit: a.unite_prix,
+        packSize: a.contenance === undefined ? undefined : a.contenance || null,
+        reference: a.reference,
+      });
+      refresh();
+      return text({ modifie: a.produit_id });
+    },
+  },
+
+  {
+    name: "supprimer_produit_fournisseur",
+    title: "Supprimer un produit d'un fournisseur",
+    description:
+      "Supprime un produit et tous ses prix ; il est aussi retiré des factures où il apparaît (leur total écrit ne change pas). L'ingrédient qui suivait ce prix garde son dernier prix. Demande confirmation avant.",
+    inputSchema: { type: "object", properties: { produit_id: js.int("Id du produit") }, required: ["produit_id"] },
+    annotations: DELETE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ produit_id: id }), args);
+      const r = await deleteProduct(a.produit_id);
+      refresh();
+      return text({ supprime: r.name, retire_de_factures: r.invoices });
+    },
+  },
+
+  {
+    name: "ajouter_prix",
+    title: "Ajouter un prix à la main",
+    description:
+      "Ajoute un prix à un produit à une date, sans facture (tarif annoncé, prix au téléphone…). Il entre dans l'historique et devient le prix actuel s'il est le plus récent. Pour une vraie facture, utilise enregistrer_facture.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        produit_id: js.int("Id du produit"),
+        prix: js.num("Prix en € HT par unité de prix du produit (kg, L ou pièce)"),
+        date: js.str("Date du prix, AAAA-MM-JJ (défaut : aujourd'hui)"),
+        quantite: js.num("Nombre de colis achetés (facultatif)"),
+      },
+      required: ["produit_id", "prix"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ produit_id: id, prix: money, date: day.optional(), quantite: z.number().positive().max(1_000_000).optional() }),
+        args,
+      );
+      const o = await addManualPrice(a.produit_id, {
+        price: a.prix,
+        date: a.date ?? new Date().toISOString().slice(0, 10),
+        quantity: a.quantite,
+      });
+      refresh();
+      return text({ ajoute: true, produit_id: a.produit_id, saisie_id: o.id });
+    },
+  },
+
+  {
+    name: "corriger_prix",
+    title: "Corriger un prix de l'historique",
+    description:
+      "Corrige un prix (une ligne de facture ou un prix tapé à la main) : prix par unité, quantité, et date si c'est un prix tapé à la main (la date d'une facture se change avec modifier_facture). ligne_id vient de historique_prix ou de voir_facture (lignes[].id). Le prix actuel du produit et des ingrédients qui le suivent est recalculé.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ligne_id: js.int("Id de la ligne (historique_prix → ligne_id, voir_facture → lignes[].id)"),
+        prix: js.num("Bon prix en € HT par unité de prix"),
+        quantite: js.num("Nombre de colis achetés"),
+        date: js.str("Nouvelle date, AAAA-MM-JJ (prix tapé à la main seulement)"),
+      },
+      required: ["ligne_id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ ligne_id: id, prix: money.optional(), quantite: z.number().positive().max(1_000_000).optional(), date: day.optional() }),
+        args,
+      );
+      await updatePriceLine(a.ligne_id, { price: a.prix, quantity: a.quantite, date: a.date });
+      refresh();
+      return text({ corrige: a.ligne_id });
+    },
+  },
+
+  {
+    name: "supprimer_prix",
+    title: "Supprimer un prix de l'historique",
+    description:
+      "Retire un prix de l'historique (ligne de facture ou prix tapé à la main). Le produit reste avec ses autres prix. Demande confirmation avant.",
+    inputSchema: { type: "object", properties: { ligne_id: js.int("Id de la ligne") }, required: ["ligne_id"] },
+    annotations: DELETE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ ligne_id: id }), args);
+      await deletePriceLine(a.ligne_id);
+      refresh();
+      return text({ supprime: a.ligne_id });
+    },
+  },
+
+  {
+    name: "modifier_facture",
+    title: "Modifier une facture",
+    description:
+      "Corrige la date, le numéro, le total HT ou la remarque d'une facture enregistrée. Changer la date déplace tous ses prix dans l'historique. Pour une ligne, utilise corriger_prix ou supprimer_prix.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: js.int("Id de la facture"),
+        date: js.str("AAAA-MM-JJ"),
+        numero: js.str("Numéro (texte vide pour l'effacer)"),
+        total: js.num("Total HT en €"),
+        note: js.str("Remarque (texte vide pour l'effacer)"),
+      },
+      required: ["id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ id, date: day.optional(), numero: z.string().max(100).optional(), total: money.optional(), note: z.string().max(2000).optional() }),
+        args,
+      );
+      await updatePurchaseOrder(a.id, { date: a.date, number: a.numero, total: a.total, note: a.note });
+      refresh();
+      return text({ modifiee: a.id });
     },
   },
 ];
