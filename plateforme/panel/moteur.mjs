@@ -8,6 +8,7 @@ import { appendFile, chown, mkdir, readFile, readdir, rename, writeFile } from "
 import { timingSafeEqual, randomBytes } from "node:crypto";
 import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
+import { RefusAnnonce, action as actionAnnonce, pourStatut, resume as resumeAnnonces, tour as tourAnnonces } from "./annonces.mjs";
 
 const CLE = process.env.MOTEUR_CLE || "";
 const DONNEES = process.env.DONNEES || "/srv/recipelog";
@@ -337,6 +338,22 @@ async function actionTicket(qui, nom, id, act, corps) {
   return { ok: true, demande: t, email: envoi };
 }
 
+// ------------------------------------------------------------ maintenance et messages (lot 6)
+async function contexteAnnonces(qui) {
+  const liste = await outil("liste", "--json");
+  let noms = [];
+  try {
+    noms = JSON.parse(liste.sortie || "[]").map((c) => c.nom);
+  } catch {
+    noms = [];
+  }
+  const equipe = async (nom) => {
+    const r = await passerelle("equipe", nom);
+    return r.ok ? (JSON.parse(r.sortie).membres ?? []) : null;
+  };
+  return { qui, clients: noms, equipe, noter };
+}
+
 // ------------------------------------------------------------ routes
 class Refus extends Error {
   constructor(statut, message) {
@@ -500,7 +517,17 @@ createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/vitrine") return repondre(res, 200, await vitrine());
     if (req.method === "GET" && url.pathname === "/mesures") return repondre(res, 200, await sante());
-    if (req.method === "GET" && url.pathname === "/statut") return repondre(res, 200, await statutPublic());
+    if (req.method === "GET" && url.pathname === "/statut") return repondre(res, 200, { ...(await statutPublic()), maintenances: await pourStatut() });
+    if (req.method === "GET" && url.pathname === "/annonces") return repondre(res, 200, await resumeAnnonces());
+    if (req.method === "POST" && morceaux[0] === "annonces" && morceaux.length >= 2 && morceaux.length <= 3) {
+      try {
+        const corps = await lireCorps(req);
+        return repondre(res, 200, await actionAnnonce(morceaux[1], morceaux[2] ?? null, corps, await contexteAnnonces(qui)));
+      } catch (e) {
+        if (e instanceof RefusAnnonce) throw new Refus(e.statut, e.message);
+        throw e;
+      }
+    }
     if (req.method === "GET" && url.pathname === "/support") return repondre(res, 200, { demandes: await tickets() });
     if (req.method === "POST" && morceaux[0] === "support" && morceaux.length === 4) {
       return repondre(res, 200, await actionTicket(qui, morceaux[1], morceaux[2], morceaux[3], await lireCorps(req)));
@@ -618,6 +645,11 @@ async function surveiller() {
     console.error("Surveillance :", e.message);
   }
   try {
+    await tourAnnonces(await contexteAnnonces("automatique"));
+  } catch (e) {
+    console.error("Maintenance :", e.message);
+  }
+  try {
     const nouveaux = (await tickets()).filter((t) => !t.luSupport && !ticketsVus.has(`${t.id}:${t.messages.length}`));
     for (const t of nouveaux) {
       ticketsVus.add(`${t.id}:${t.messages.length}`);
@@ -631,6 +663,7 @@ async function surveiller() {
   }
 }
 await mkdir(SUPPORT, { recursive: true }).catch(() => {});
+await mkdir(`${DONNEES}/annonces`, { recursive: true }).catch(() => {});
 await chown(SUPPORT, 1000, 1000).catch(() => {});
 setTimeout(surveiller, 30 * 1000);
 setInterval(surveiller, 60 * 1000);

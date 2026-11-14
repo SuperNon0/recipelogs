@@ -361,3 +361,57 @@ body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* Bandeaux de la plateforme (maintenance prévue, informations de l'équipe RecipeLog) */
+.pf-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 44px 8px 16px;
+  position: relative;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+.pf-banner > svg {
+  color: var(--accent);
+  flex: none;
+}
+.pf-banner b {
+  font-weight: 600;
+}
+.pf-alerte {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-bottom-color: var(--danger);
+}
+.pf-alerte > svg {
+  color: var(--danger);
+}
+.pf-close {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pf-close:hover {
+  color: var(--text);
+  background: var(--pop);
+}
+.pf-maint-icon {
+  color: var(--accent);
+}
+.pf-underline {
+  text-decoration: underline;
+}

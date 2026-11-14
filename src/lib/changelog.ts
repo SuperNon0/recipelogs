@@ -34,6 +34,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "RecipeLog en ligne : la démo publique revient toute seule chaque nuit à son état de départ",
       "RecipeLog en ligne : Réglages → « Signaler un problème » envoie un souci, une question ou une idée à l'équipe RecipeLog, avec la page et la version utilisées. La réponse arrive par e-mail et s'affiche dans la même page, où l'on peut répondre à son tour",
       "RecipeLog en ligne : chaque site est vérifié toutes les minutes, et l'équipe RecipeLog est prévenue tout de suite s'il ne répond plus. L'état du service est affiché sur status.recipelog.cc",
+      "RecipeLog en ligne : quand une maintenance est prévue, un bandeau prévient en haut de l'appli et un e-mail arrive à l'avance. Pendant la maintenance, une page « Petite pause technique » s'affiche, puis le site revient tout seul",
+      "RecipeLog en ligne : l'équipe RecipeLog peut afficher une information en haut de l'appli (nouveauté, incident). Chacun peut la fermer avec la croix",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },

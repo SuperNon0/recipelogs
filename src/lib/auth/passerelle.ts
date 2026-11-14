@@ -227,3 +227,46 @@ export async function marquerDemandeLue(id: string, email: string, opts: Passere
   const r = await call("POST", `/v1/support/${encodeURIComponent(id)}/lu`, { email }, opts);
   return r.ok ? { ok: true } : r;
 }
+
+// ------------------------------------------------------------ maintenance et bandeaux (lot 6)
+
+export type Bandeau = { id: string; niveau: "info" | "alerte"; texte: string; maintenance?: { debut: string; fin: string | null } };
+export type Annonces = { maintenance: { message: string; fin: string | null } | null; bandeaux: Bandeau[] };
+
+const AUCUNE: Annonces = { maintenance: null, bandeaux: [] };
+let cache: { valeur: Annonces; jusqua: number } | null = null;
+
+function toAnnonces(j: Record<string, unknown> | null): Annonces {
+  const m = j?.maintenance as Record<string, unknown> | null | undefined;
+  const bandeaux = Array.isArray(j?.bandeaux) ? j.bandeaux : [];
+  return {
+    maintenance:
+      m && typeof m === "object"
+        ? { message: typeof m.message === "string" ? m.message : "", fin: typeof m.fin === "string" ? m.fin : null }
+        : null,
+    bandeaux: bandeaux
+      .filter((b): b is Record<string, unknown> => !!b && typeof b === "object" && typeof b.id === "string" && typeof b.texte === "string")
+      .map((b) => {
+        const mt = b.maintenance as Record<string, unknown> | undefined;
+        return {
+          id: b.id as string,
+          niveau: b.niveau === "alerte" ? ("alerte" as const) : ("info" as const),
+          texte: b.texte as string,
+          ...(mt && typeof mt.debut === "string" ? { maintenance: { debut: mt.debut, fin: typeof mt.fin === "string" ? mt.fin : null } } : {}),
+        };
+      }),
+  };
+}
+
+/**
+ * GET /v1/annonces : maintenance en cours et bandeaux de la plateforme pour ce site.
+ * Gardé 30 secondes (chaque page le demande). Plateforme injoignable = rien à afficher :
+ * une panne de la passerelle ne doit jamais bloquer le site.
+ */
+export async function getAnnonces(opts: PasserelleOptions = {}): Promise<Annonces> {
+  if (!opts.fetch && cache && cache.jusqua > Date.now()) return cache.valeur;
+  const r = await call("GET", "/v1/annonces", undefined, { timeoutMs: 3000, ...opts });
+  const valeur = r.ok ? toAnnonces(r.json) : AUCUNE;
+  if (!opts.fetch) cache = { valeur, jusqua: Date.now() + (r.ok ? 30000 : 10000) };
+  return valeur;
+}

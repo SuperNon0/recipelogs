@@ -175,6 +175,25 @@ réseau interne avec une clé. Le moteur lance `recipelog-instance`, comme en li
   son tour. Notes internes, fermer / rouvrir. Les demandes sont des fichiers dans
   `/srv/recipelog/support/<client>/`.
 
+## Maintenance et messages (lot 6)
+
+Dans le panel, partie **Maintenance et messages** :
+
+- **Programmer une maintenance** pour tous les clients, quelques-uns, et/ou la vitrine :
+  début et fin (ou « tout de suite », jusqu'à « Terminer »). Avant le début, un bandeau
+  prévient dans leur RecipeLog et un email part à chaque compte de leur équipe (préavis,
+  24 h par défaut). Pendant la plage, leur site affiche « Petite pause technique » ; toi
+  (adresses super-admin), tu entres quand même, avec un bandeau qui te le rappelle. À la
+  fin, tout se rouvre tout seul. La page de statut l'affiche aussi quand c'est tout le parc.
+- **Écrire aux clients** : un email à chaque compte actif des clients choisis (ou de tous),
+  avec des modèles « incident en cours », « incident résolu », « nouveautés » ou libre, et
+  si tu veux le même message en bandeau dans l'appli. Les derniers envois sont listés.
+- **Nouveau bandeau** : un message en haut de leur RecipeLog pendant quelques jours, que
+  chacun peut fermer.
+
+Tout est rangé dans `/srv/recipelog/annonces/` (écrit par le moteur, lu par la passerelle).
+Si la passerelle ne répond pas, les sites marchent normalement, sans bandeau.
+
 ## Au quotidien (dans la VM, en root)
 
 ```bash
@@ -250,6 +269,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-14 | 6. Maintenance et messages | Maintenances programmées (tout le parc, un client ou la vitrine) avec bandeau et email de préavis, page « Petite pause technique » pendant la plage (les super-admins entrent quand même), réouverture automatique, affichage sur la page de statut. Emails aux équipes des clients avec modèles (incident, résolu, nouveautés), option bandeau, journal des envois. Bandeaux dans l'appli, fermables. Testé dans un vrai navigateur : préavis reçu par email, bandeaux, maintenance immédiate (chef bloqué, super-admin entre), fin et réouverture, vitrine en maintenance. Captures dans la PR. | Rien. |
 | 2026-11-14 | 5. Surveillance et support | Vérification de chaque site et service chaque minute, alertes par email (et Telegram ou Discord si réglés) en cas de panne, de retour, de disque plein ou de nouvelle demande. Page de statut publique `status.recipelog.cc` (90 jours). Panel : partie Santé (machine et usage de chaque client), bouton Journaux en direct, partie Support (répondre, noter, fermer). Appli : Réglages → « Signaler un problème » avec la conversation et les réponses. Testé dans un vrai navigateur : demande envoyée, réponse reçue par email et dans l'appli, panne simulée détectée en 2 minutes puis retour, alerte d'essai. Captures dans la PR. | Facultatif : alertes sur ton téléphone par Telegram ou Discord, [A-FAIRE.md](A-FAIRE.md), étape F. |
 | 2026-11-14 | 4. Déménagement | Outils pour passer ton site, la démo et la vitrine sur la plateforme : `exporter-ancien.sh` (lit l'ancien conteneur sans le toucher), `importer` (testé : recettes, photos, comptes et rôles gardés), `inviter-comptes`. Démo publique avec référence et remise à zéro chaque nuit ou en 1 clic. Vitrine servie par la plateforme (branche `site-vitrine` inchangée) : mise à jour en 1 clic, bandeau, demandes du formulaire transformées en client en 1 clic. Testé dans un vrai navigateur, captures dans la PR. | Le déménagement lui-même, quand tu veux : [A-FAIRE.md](A-FAIRE.md), étape E. |
 | 2026-11-14 | 3. Sauvegardes | Chaque nuit à 3 h, sauvegarde de chaque client (base, photos et factures, réglages à part), gardée 7 jours, 4 semaines et 6 mois. Dans le panel, bouton « Sauvegardes » : sauvegarder maintenant, télécharger (sans mot de passe), restaurer en 1 clic (avec sauvegarde de l'état d'avant et retour automatique si ça rate), test de restauration chaque dimanche dans une base à part. Dernière sauvegarde affichée pour chaque client. Le moteur suit maintenant tout seul les mises à jour de `recipelog-instance`. Testé dans un vrai navigateur, captures dans la PR. | Vérifier que ta sauvegarde PBS → OVH inclut la nouvelle VM : [A-FAIRE.md](A-FAIRE.md), étape D1. |

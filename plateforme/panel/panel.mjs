@@ -183,6 +183,13 @@ async function pageStatut(res) {
         return `<i class="${cl}" title="${d} : ${m === 0 ? "aucune panne" : `${m} min de panne`}"></i>`;
       })
       .join("");
+  // Maintenances de tout le parc seulement (celle d'un seul client ne regarde que lui).
+  const quand = (iso) => new Date(iso).toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  const prevues = (statut?.maintenances ?? []).filter((m) => m.tous);
+  const enMaintenance = prevues.some((m) => m.etat === "en-cours");
+  const maintenances = prevues
+    .map((m) => `<section class="composant maintenance-statut"><div class="composant-tete"><b>${m.etat === "en-cours" ? "Maintenance en cours" : "Maintenance prévue"}</b><span class="etiquette pause">${m.fin ? `${quand(m.debut)} → ${quand(m.fin)}` : `depuis le ${quand(m.debut)}`}</span></div><p>${echapper(m.message)}</p></section>`)
+    .join("");
   const corps = statut
     ? statut.composants
         .map(
@@ -195,8 +202,8 @@ async function pageStatut(res) {
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>État de RecipeLog</title><link rel="stylesheet" href="/panel.css"></head>
 <body class="statut"><main class="page-statut"><p class="marque-statut">RecipeLog · état du service</p>
-<div class="bandeau-statut ${!statut ? "pause" : tousOk ? "ok" : "ko"}">${!statut ? "État indisponible" : tousOk ? "Tout fonctionne normalement" : "Un service est perturbé : nous nous en occupons"}</div>
-${corps}<p class="petit">Mis à jour ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · vérifié chaque minute</p></main></body></html>`);
+<div class="bandeau-statut ${!statut ? "pause" : enMaintenance ? "pause" : tousOk ? "ok" : "ko"}">${!statut ? "État indisponible" : enMaintenance ? "Maintenance en cours" : tousOk ? "Tout fonctionne normalement" : "Un service est perturbé : nous nous en occupons"}</div>
+${maintenances}${corps}<p class="petit">Mis à jour ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · vérifié chaque minute</p></main></body></html>`);
 }
 
 function pageErreur(res, statut, titre, texte) {
@@ -323,7 +330,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|alertes\/essai)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|alertes\/essai)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();

@@ -11,6 +11,7 @@ let CLIENTS = [];
 let VITRINE = null;
 let SANTE = null;
 let SUPPORT = [];
+let ANNONCES = null;
 
 // ------------------------------------------------------------ API
 async function api(methode, chemin, corps) {
@@ -194,6 +195,12 @@ const NOMS_ACTIONS = {
   "support-repondre": "a répondu à une demande de",
   "support-fermer": "a fermé une demande de",
   "support-rouvrir": "a rouvert une demande de",
+  "maintenance-prevue": "a programmé une maintenance :",
+  "maintenance-finie": "a terminé la maintenance :",
+  "maintenance-annulee": "a annulé la maintenance :",
+  preavis: "a envoyé le préavis de maintenance :",
+  bandeau: "a mis un bandeau :",
+  message: "a écrit à",
 };
 let JOURNAL = [];
 function afficherJournal() {
@@ -219,16 +226,18 @@ $("#journal").addEventListener("click", (ev) => {
 });
 
 async function charger() {
-  const [c, j, v, sa, su] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support")]);
+  const [c, j, v, sa, su, an] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces")]);
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
   SANTE = sa.machine ? sa : null;
   SUPPORT = su.demandes ?? null;
   afficherSupport();
+  ANNONCES = an.maintenances ? an : null;
   if (c.clients) CLIENTS = c.clients.sort((a, b) => a.nom.localeCompare(b.nom));
   else $("#clients").innerHTML = `<div class="vide">Liste indisponible : ${e(c.message ?? "le moteur ne répond pas")}</div>`;
   JOURNAL = j.journal ?? [];
   if (c.clients) afficher();
+  afficherAnnonces();
   afficherSante();
   afficherJournal();
 }
@@ -764,3 +773,236 @@ async function fenetreTicket(client, id) {
     ev.target.textContent = r.ok ? "Gardée ✓" : "Échec";
   });
 }
+
+// ------------------------------------------------------------ maintenance et messages (lot 6)
+const quandFr = (iso) => new Date(iso).toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const nomsCibles = (c) => (c.includes("*") ? `Tous les clients${c.includes("vitrine") ? " + vitrine" : ""}` : c.map((x) => (x === "vitrine" ? "vitrine" : x)).join(", "));
+const ETATS_MAINT = { "en-cours": ["En cours", "ko"], prevue: ["Prévue", "prog"], finie: ["Finie", "ok"] };
+
+// Choix des cibles : « Tous les clients » ou une liste, plus la vitrine si permise.
+function champCibles(id, vitrine) {
+  const cases = CLIENTS.map((c) => `<label class="case"><input type="checkbox" name="${id}" value="${e(c.nom)}"> ${e(c.nom)}</label>`).join("");
+  return `<div class="champ"><label>Pour qui ${aide(`${id}-a`, vitrine ? "« Tous les clients » vise aussi ceux créés plus tard. Le site vitrine se coche à part (recipelog.cc). Toi (équipe RecipeLog), tu entres toujours, même en maintenance." : "« Tous les clients » vise aussi ceux créés plus tard. L'email part à chaque compte actif de leur équipe, un par un (personne ne voit les autres adresses).")}
+    <div class="cibles"><label class="case"><input type="checkbox" name="${id}" value="*" checked> <b>Tous les clients</b></label>${vitrine ? `<label class="case"><input type="checkbox" name="${id}" value="vitrine"> Site vitrine</label>` : ""}${cases}</div></div>`;
+}
+const lireCibles = (id) => [...document.querySelectorAll(`input[name="${id}"]:checked`)].map((i) => i.value);
+// Date de <input type="datetime-local"> (heure de ton navigateur) → ISO ; vide → null.
+const isoLocal = (v) => (v ? new Date(v).toISOString() : null);
+const pourChamp = (d) => {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+function afficherAnnonces() {
+  const zone = $("#annonces");
+  if (!ANNONCES) {
+    zone.innerHTML = `<div class="vide">Indisponible (le moteur ne répond pas).</div>`;
+    return;
+  }
+  const maint = ANNONCES.maintenances
+    .sort((a, b) => a.debut.localeCompare(b.debut))
+    .map((m) => {
+      const [et, cl] = ETATS_MAINT[m.etat] ?? [m.etat, "acc"];
+      return `<article class="demande${m.etat === "finie" ? " traitee" : ""}" data-maint="${e(m.id)}"><div><span class="etiquette ${cl}">${e(et)}</span> <b>${e(nomsCibles(m.cibles))}</b>
+        <small>${e(quandFr(m.debut))} → ${m.fin ? e(quandFr(m.fin)) : "jusqu'à « Terminer »"}${m.etat === "prevue" ? ` · préavis ${m.preavisHeures} h avant${m.emailPreavis ? (m.preavisEnvoye ? " · email envoyé" : " · email prévu") : " · sans email"}` : ""}</small><p>${e(m.message)}</p></div>
+        ${m.etat === "finie" ? "" : `<div class="actions">${m.etat === "en-cours" ? `<button class="btn petit principal" type="button" data-m="terminer">Terminer</button>` : `<button class="btn petit danger" type="button" data-m="annuler">Annuler</button>`}</div>`}</article>`;
+    })
+    .join("");
+  const band = ANNONCES.bandeaux
+    .map(
+      (b) => `<article class="demande" data-band="${e(b.id)}"><div><span class="etiquette ${b.niveau === "alerte" ? "ko" : "acc"}">${b.niveau === "alerte" ? "Important" : "Info"}</span> <b>${e(nomsCibles(b.cibles))}</b>
+        <small>${b.jusqua ? `jusqu'au ${e(quandFr(b.jusqua))}` : "sans fin"}</small><p>${e(b.texte)}</p></div>
+        <div class="actions"><button class="btn petit" type="button" data-b="retirer">Retirer</button></div></article>`,
+    )
+    .join("");
+  const env = ANNONCES.envois
+    .slice(0, 8)
+    .map(
+      (l) => `<div class="ligne"><time>${heureFr(l.date)}</time><span class="qui">${e(l.qui)}</span><span>${l.raison === "preavis" ? "Préavis de maintenance" : `« ${e(l.sujet)} »`} → <b>${e(nomsCibles(l.cibles))}</b> : ${l.envoyes} envoyé${l.envoyes > 1 ? "s" : ""}${l.echecs ? ` <span class="etiquette ko">${l.echecs} échec${l.echecs > 1 ? "s" : ""}</span>` : ""}</span><span></span></div>`,
+    )
+    .join("");
+  zone.innerHTML = `<div class="barre serree">
+      <button class="btn principal" type="button" id="an-maint">Programmer une maintenance</button>
+      <button class="btn" type="button" id="an-message">Écrire aux clients</button>
+      <button class="btn" type="button" id="an-bandeau">Nouveau bandeau</button>
+      <button class="aide" type="button" data-aide="an-a" aria-label="Aide">?</button></div>
+    <p class="texte-aide" id="an-a"><b>Maintenance</b> : pendant la plage choisie, les RecipeLog visés (ou la vitrine) affichent « Petite pause technique » ; toi, tu entres quand même. Avant, un bandeau prévient dans l'appli et un email part aux équipes (préavis). À la fin, tout se rouvre tout seul. <b>Écrire aux clients</b> : un email à chaque compte des clients choisis, avec des modèles (incident, maintenance), et si tu veux le même texte en bandeau dans l'appli. <b>Bandeau</b> : un message en haut de leur RecipeLog, que chacun peut fermer.</p>
+    <h3 class="titre-demandes">Maintenances</h3>
+    <div class="demandes">${maint || `<div class="vide">Aucune maintenance prévue.</div>`}</div>
+    <h3 class="titre-demandes">Bandeaux dans l'appli</h3>
+    <div class="demandes">${band || `<div class="vide">Aucun bandeau.</div>`}</div>
+    <h3 class="titre-demandes">Derniers envois d'emails ${ANNONCES.email ? "" : `<span class="etiquette pause">emails pas réglés</span>`}</h3>
+    <section class="journal">${env || `<div class="ligne"><span>Aucun envoi pour l'instant.</span></div>`}</section>`;
+  $("#an-maint").addEventListener("click", fenetreMaintenance);
+  $("#an-message").addEventListener("click", () => fenetreMessage());
+  $("#an-bandeau").addEventListener("click", fenetreBandeau);
+  zone.querySelectorAll("[data-m]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      if (b.dataset.m === "annuler" && b.dataset.confirme !== "1") {
+        b.dataset.confirme = "1";
+        b.textContent = "Confirmer";
+        return;
+      }
+      b.disabled = true;
+      await api("POST", `/annonces/${b.dataset.m}/${b.closest("[data-maint]").dataset.maint}`);
+      charger();
+    }),
+  );
+  zone.querySelectorAll("[data-b]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      await api("POST", `/annonces/retirer-bandeau/${b.closest("[data-band]").dataset.band}`);
+      charger();
+    }),
+  );
+}
+
+function fenetreMaintenance() {
+  const demain = new Date(Date.now() + 86400000);
+  demain.setHours(22, 0, 0, 0);
+  const fin = new Date(demain.getTime() + 3600000);
+  ouvrir(
+    "Programmer une maintenance",
+    `<form id="f-maint" novalidate>
+      ${champCibles("mt-c", true)}
+      <div class="champ"><label class="case"><input type="checkbox" id="mt-now"> Tout de suite ${aide("mt-a-now", "Bascule maintenant, sans préavis. Pratique pour une intervention urgente : tu cliqueras sur « Terminer » quand c'est fini.")}</div>
+      <div class="deux" id="mt-dates">
+        <div class="champ"><label for="mt-debut">Début ${aide("mt-a-deb", "Heure de ton navigateur (France). À cette heure, la page d'attente s'affiche toute seule.")}<input id="mt-debut" type="datetime-local" value="${pourChamp(demain)}"></div>
+        <div class="champ"><label for="mt-fin">Fin ${aide("mt-a-fin", "À cette heure, les sites se rouvrent tout seuls. Laisser vide : ouvert jusqu'à ce que tu cliques « Terminer ».")}<input id="mt-fin" type="datetime-local" value="${pourChamp(fin)}"></div>
+      </div>
+      <div class="champ"><label for="mt-msg">Message affiché ${aide("mt-a-msg", "Sur la page d'attente, dans le bandeau de préavis et dans l'email. Phrase simple, sans détail technique.")}
+        <textarea id="mt-msg" rows="3" maxlength="1000">Nous installons une mise à jour de RecipeLog. Le site revient très vite, avec toutes tes recettes.</textarea></div>
+      <div class="deux" id="mt-pre">
+        <div class="champ"><label for="mt-h">Préavis ${aide("mt-a-h", "Combien d'heures avant le début le bandeau apparaît dans l'appli et l'email part. 24 h, c'est bien.")}<div class="suffixe"><input id="mt-h" type="number" min="1" max="168" value="24"><span>heures avant</span></div></div>
+        <div class="champ"><label class="case"><input type="checkbox" id="mt-email" checked> Prévenir aussi par email ${aide("mt-a-em", "Un email à chaque compte actif des clients visés, au moment du préavis.")}</div>
+      </div>
+      <p class="erreur" id="mt-erreur"></p>
+      <div class="pied"><button class="btn principal" type="submit">Programmer</button></div>
+    </form>`,
+    charger,
+  );
+  $("#mt-now").addEventListener("change", (ev) => {
+    $("#mt-debut").disabled = ev.target.checked;
+    $("#mt-pre").classList.toggle("cache", ev.target.checked);
+    if (ev.target.checked) $("#mt-fin").value = "";
+  });
+  $("#f-maint").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const maintenant = $("#mt-now").checked;
+    const corps = {
+      cibles: lireCibles("mt-c"),
+      debut: maintenant ? null : isoLocal($("#mt-debut").value),
+      fin: isoLocal($("#mt-fin").value),
+      message: $("#mt-msg").value,
+      preavisHeures: Number($("#mt-h").value || 24),
+      emailPreavis: !maintenant && $("#mt-email").checked,
+    };
+    if (!corps.cibles.length) return ($("#mt-erreur").textContent = "Choisis au moins une cible.");
+    if (!maintenant && !corps.debut) return ($("#mt-erreur").textContent = "Choisis le début, ou coche « Tout de suite ».");
+    $("#mt-erreur").textContent = "Enregistrement…";
+    const r = await api("POST", "/annonces/maintenance", corps);
+    if (!r.ok) return ($("#mt-erreur").textContent = r.message || "Échec.");
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Programmée</p><p class="sub">${maintenant ? "Les sites visés affichent maintenant la page d'attente (dans 30 secondes au plus). Toi, tu entres toujours." : "Le bandeau et l'email de préavis partiront tout seuls, puis la bascule et la réouverture se feront à l'heure dite."}</p>`;
+  });
+}
+
+const MODELES = {
+  incident: ["RecipeLog : incident en cours", "Bonjour,\n\nRecipeLog rencontre en ce moment un problème : certaines pages peuvent être lentes ou ne pas s'ouvrir. Nous sommes dessus et te tenons au courant.\n\nToutes tes recettes et tes données sont en sécurité.", "Incident en cours : RecipeLog peut être lent ou indisponible. Nous sommes dessus.", "alerte"],
+  resolu: ["RecipeLog : incident résolu", "Bonjour,\n\nLe problème de tout à l'heure est réglé : RecipeLog marche de nouveau normalement. Merci de ta patience.\n\nSi quelque chose te semble encore bizarre, écris-nous depuis Réglages → Signaler un problème.", "Incident résolu : RecipeLog marche de nouveau normalement.", "info"],
+  nouveaute: ["RecipeLog : du nouveau", "Bonjour,\n\nRecipeLog vient d'être mis à jour. Voici ce qui change :\n\n- \n\nTu retrouves le détail dans Réglages → Version et nouveautés.", "Mise à jour de RecipeLog : découvre les nouveautés dans Réglages → Version et nouveautés.", "info"],
+  libre: ["", "Bonjour,\n\n", "", "info"],
+};
+function fenetreMessage(modele = "incident") {
+  ouvrir(
+    "Écrire aux clients",
+    `<form id="f-msg" novalidate>
+      ${champCibles("ms-c", false)}
+      <div class="champ"><label for="ms-mod">Modèle ${aide("ms-a-mod", "Remplit le sujet et le texte : tu peux tout changer ensuite.")}
+        <select id="ms-mod"><option value="incident">Incident en cours</option><option value="resolu">Incident résolu</option><option value="nouveaute">Nouveautés</option><option value="libre">Message libre</option></select></div>
+      <div class="champ"><label for="ms-sujet">Sujet</label><input id="ms-sujet" type="text" maxlength="200"></div>
+      <div class="champ"><label for="ms-texte">Message ${aide("ms-a-txt", "Texte simple. La signature « L'équipe RecipeLog » et l'adresse du RecipeLog du client sont ajoutées en bas.")}<textarea id="ms-texte" rows="7" maxlength="10000"></textarea></div>
+      <div class="champ"><label class="case"><input type="checkbox" id="ms-band"> Aussi en bandeau dans l'appli ${aide("ms-a-band", "Le texte court ci-dessous s'affiche en haut de leur RecipeLog pendant le nombre de jours choisi.")}</div>
+      <div class="cache" id="ms-bandeau">
+        <div class="champ"><label for="ms-btexte">Texte du bandeau</label><input id="ms-btexte" type="text" maxlength="300"></div>
+        <div class="champ"><label for="ms-jours">Pendant</label><div class="suffixe"><input id="ms-jours" type="number" min="1" max="90" value="3"><span>jours</span></div></div>
+      </div>
+      <p class="erreur" id="ms-erreur"></p>
+      <div class="pied"><button class="btn principal" type="submit">Envoyer</button></div>
+    </form>`,
+    charger,
+  );
+  const remplir = (m) => {
+    const [s, t, b] = MODELES[m];
+    $("#ms-sujet").value = s;
+    $("#ms-texte").value = t;
+    $("#ms-btexte").value = b;
+  };
+  $("#ms-mod").value = modele;
+  remplir(modele);
+  $("#ms-mod").addEventListener("change", (ev) => remplir(ev.target.value));
+  $("#ms-band").addEventListener("change", (ev) => $("#ms-bandeau").classList.toggle("cache", !ev.target.checked));
+  $("#f-msg").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const corps = {
+      cibles: lireCibles("ms-c"),
+      sujet: $("#ms-sujet").value,
+      texte: $("#ms-texte").value,
+      bandeau: $("#ms-band").checked,
+      texteBandeau: $("#ms-btexte").value,
+      jours: Number($("#ms-jours").value || 3),
+      niveau: MODELES[$("#ms-mod").value][3],
+    };
+    if (!corps.cibles.length) return ($("#ms-erreur").textContent = "Choisis au moins un client.");
+    if (corps.sujet.trim().length < 3 || corps.texte.trim().length < 3) return ($("#ms-erreur").textContent = "Écris un sujet et un message.");
+    if (corps.bandeau && corps.texteBandeau.trim().length < 3) return ($("#ms-erreur").textContent = "Écris le texte du bandeau.");
+    const qui = corps.cibles.includes("*") ? "tous tes clients" : corps.cibles.join(", ");
+    const b = ev.submitter;
+    if (b.dataset.confirme !== "1") {
+      b.dataset.confirme = "1";
+      b.textContent = `Confirmer l'envoi à ${qui}`;
+      return;
+    }
+    b.disabled = true;
+    const r = await api("POST", "/annonces/message", corps);
+    if (!r.ok) {
+      b.disabled = false;
+      return ($("#ms-erreur").textContent = r.message || "Échec.");
+    }
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Envoi lancé</p><p class="sub">${e(r.sortie)}</p>`;
+  });
+}
+
+function fenetreBandeau() {
+  ouvrir(
+    "Nouveau bandeau",
+    `<form id="f-band" novalidate>
+      ${champCibles("bd-c", false)}
+      <div class="champ"><label for="bd-texte">Texte ${aide("bd-a-txt", "Une phrase courte, affichée en haut de chaque page de leur RecipeLog. Chacun peut la fermer avec la croix (elle ne revient pas sur cet appareil).")}<input id="bd-texte" type="text" maxlength="300" placeholder="Nouveau : les fiches de vente arrivent la semaine prochaine !"></div>
+      <div class="deux">
+        <div class="champ"><label for="bd-niveau">Couleur</label><select id="bd-niveau"><option value="info">Information</option><option value="alerte">Important (rouge)</option></select></div>
+        <div class="champ"><label for="bd-jours">Pendant ${aide("bd-a-j", "Le bandeau disparaît tout seul après ce nombre de jours. Tu peux aussi le retirer avant.")}<div class="suffixe"><input id="bd-jours" type="number" min="1" max="90" value="7"><span>jours</span></div></div>
+      </div>
+      <p class="erreur" id="bd-erreur"></p>
+      <div class="pied"><button class="btn principal" type="submit">Afficher</button></div>
+    </form>`,
+    charger,
+  );
+  $("#f-band").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const corps = { cibles: lireCibles("bd-c"), texte: $("#bd-texte").value, niveau: $("#bd-niveau").value, jours: Number($("#bd-jours").value || 7) };
+    if (!corps.cibles.length) return ($("#bd-erreur").textContent = "Choisis au moins un client.");
+    if (corps.texte.trim().length < 3) return ($("#bd-erreur").textContent = "Écris le texte.");
+    const r = await api("POST", "/annonces/bandeau", corps);
+    if (!r.ok) return ($("#bd-erreur").textContent = r.message || "Échec.");
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Affiché</p><p class="sub">Le bandeau apparaît dans leur RecipeLog d'ici 30 secondes.</p>`;
+  });
+}
+
+// « Tous les clients » coché : les autres cases ne servent à rien.
+document.addEventListener("change", (ev) => {
+  const i = ev.target;
+  if (!(i instanceof HTMLInputElement) || i.type !== "checkbox" || !i.closest(".cibles")) return;
+  const toutes = [...document.querySelectorAll(`input[name="${i.name}"]`)];
+  if (i.value === "*" && i.checked) toutes.forEach((x) => x.value !== "*" && x.value !== "vitrine" && (x.checked = false));
+  else if (i.value !== "*" && i.value !== "vitrine" && i.checked) toutes.forEach((x) => x.value === "*" && (x.checked = false));
+});

@@ -3,6 +3,7 @@
 // Contrat : ../connexion.md. Joignable seulement sur le réseau Docker.
 import { createServer } from "node:http";
 import { ErreurPasserelle, clientParCle, equipe, inviter, retirer, renvoyer } from "./authentik.mjs";
+import { annoncesPour } from "./annonces.mjs";
 import { ajouterMessage, creerDemande, listerDemandes, marquerLu } from "./support.mjs";
 
 const PORT = Number(process.env.PORT || 8000);
@@ -42,6 +43,8 @@ async function traiter(req, res) {
     const { email, nom: nomAffiche } = await lireJson(req);
     return repondre(res, 201, await inviter(nom, email, nomAffiche));
   }
+  // Maintenance et bandeaux (lot 6) : lus par l'appli toutes les 30 secondes.
+  if (chemin === "/v1/annonces" && req.method === "GET") return repondre(res, 200, await annoncesPour(nom));
   // Support : « Signaler un problème » depuis l'appli (le client est celui de la clé).
   if (chemin === "/v1/support" && req.method === "POST") return repondre(res, 201, { demande: await creerDemande(nom, await lireJson(req)) });
   if (chemin === "/v1/support" && req.method === "GET") return repondre(res, 200, { demandes: await listerDemandes(nom, url.searchParams.get("email") ?? "") });

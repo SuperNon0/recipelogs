@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
 import { headers } from "next/headers";
 import Script from "next/script";
-import { getViewer, viewerCan, viewerPermissions } from "@/lib/auth/viewer";
+import { getViewer, realAccountOf, viewerCan, viewerPermissions } from "@/lib/auth/viewer";
 import { PATH_HEADER, SEARCH_HEADER } from "@/lib/auth/path";
 import { authMode } from "@/lib/auth/config";
 import { safeReturnPath } from "@/lib/auth/oidc";
@@ -19,6 +19,10 @@ import { AccessGate } from "@/components/auth/AccessGate";
 import { ViewAsBanner } from "@/components/auth/AccessButtons";
 import { DemoBanner } from "@/components/DemoBanner";
 import { isDemo } from "@/lib/demo";
+import { getAnnonces, type Annonces } from "@/lib/auth/passerelle";
+import { isMaintenanceEmail } from "@/lib/auth/maintenance";
+import { PlatformBanners } from "@/components/PlatformBanners";
+import { MaintenancePage } from "@/components/MaintenancePage";
 import { hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
@@ -122,6 +126,21 @@ export default async function RootLayout({
     redirect(`/auth/connexion?retour=${encodeURIComponent(safeReturnPath(`${path || "/"}${search}`))}`);
   }
 
+  // Plateforme : maintenance en cours (page d'attente, sauf pour l'équipe RecipeLog) et bandeaux.
+  const annonces: Annonces = authMode() === "oidc" ? await getAnnonces() : { maintenance: null, bandeaux: [] };
+  const equipeRecipeLog = isMaintenanceEmail(viewer.kind === "unknown" ? viewer.email : realAccountOf(viewer)?.email);
+  if (annonces.maintenance && !equipeRecipeLog && !path.startsWith("/share")) {
+    return (
+      <EncreHtml>
+        {fonts}
+        <body>
+          <MaintenancePage message={annonces.maintenance.message} fin={annonces.maintenance.fin} logout />
+          {encreJs}
+        </body>
+      </EncreHtml>
+    );
+  }
+
   // Comptes activés et visiteur sans accès : page de demande, d'attente, de refus ou de blocage.
   if (gated) {
     return (
@@ -146,6 +165,7 @@ export default async function RootLayout({
       {fonts}
       <body data-no={missing.length ? missing.join(" ") : undefined}>
         {isDemo() && <DemoBanner />}
+        <PlatformBanners bandeaux={annonces.bandeaux} maintenanceEnCours={annonces.maintenance ? annonces.maintenance.message : null} />
         {viewingAs && <ViewAsBanner email={viewingAs.email} role={viewingAs.role?.name ?? "sans rôle"} />}
         <PermissionsProvider permissions={perms}>
         <div className="app">
