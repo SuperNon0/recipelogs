@@ -87,7 +87,7 @@ function uniteTexte(v: string): PriceUnit | null {
   if (!t) return null;
   if (t === "kg" || t === "kilo" || t === "k") return "kg";
   if (t === "l" || t === "litre" || t === "lt") return "L";
-  if (/^(p|pc|pce|piece|u|un|unite|colis|ct|carton|bt|boite|sac|pot)/.test(t)) return "pièce";
+  if (/^(p|pc|pce|piece|u|un|unite|colis|ct|carton|bt|boite|botte|barq|bq|sac|pot|plateau|sachet|lot|douz)/.test(t)) return "pièce";
   return null;
 }
 

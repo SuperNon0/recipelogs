@@ -1034,7 +1034,7 @@ function afficherIA() {
       const pct = limite > 0 ? Math.min(100, Math.round((u.mois.lectures / limite) * 100)) : 0;
       const plein = limite > 0 && u.mois.lectures >= limite;
       return `<tr><td><b>${e(nom)}</b></td>
-        <td>${limite === 0 ? `<span class="etiquette pause">coupée</span>` : `${nombreFr(u.mois.lectures)} / ${nombreFr(limite)} ${plein ? `<span class="etiquette ko">plein</span>` : ""}<div class="jauge"><span class="j${Math.round(pct / 10) * 10}"></span></div>`}</td>
+        <td>${limite === 0 ? `<span class="etiquette pause">coupée</span>` : `${nombreFr(u.mois.lectures)} / ${nombreFr(limite)} ${plein ? `<span class="etiquette ko">plein</span>` : ""}<div class="jauge"><span class="j${pct > 0 ? Math.max(5, Math.round(pct / 5) * 5) : 0}"></span></div>`}</td>
         <td>${propre ? "à part" : "défaut"}</td>
         <td>${nombreFr(u.mois.entree)} / ${nombreFr(u.mois.sortie)}</td>
         <td>${dollars(u.mois.cout)}</td>
