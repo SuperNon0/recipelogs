@@ -151,3 +151,79 @@ export async function renvoyerInvitation(
   if (!r.ok) return r;
   return { ok: true, invitationEnvoyee: r.json?.invitationEnvoyee === true };
 }
+
+// ------------------------------------------------------------ support (« Signaler un problème »)
+
+export type TypeDemande = "bug" | "question" | "idee";
+export type MessageDemande = { de: "client" | "support"; qui: string; texte: string; date: string };
+export type Demande = {
+  id: string;
+  date: string;
+  maj: string;
+  type: TypeDemande;
+  email: string;
+  statut: "ouvert" | "repondu" | "ferme";
+  luClient: boolean;
+  messages: MessageDemande[];
+};
+export type ContexteDemande = { page?: string; navigateur?: string; ecran?: string; version?: string; role?: string };
+
+function toDemande(v: unknown): Demande | null {
+  if (!v || typeof v !== "object") return null;
+  const d = v as Record<string, unknown>;
+  if (typeof d.id !== "string" || !Array.isArray(d.messages)) return null;
+  const messages = d.messages
+    .filter((m): m is Record<string, unknown> => !!m && typeof m === "object")
+    .map((m) => ({
+      de: m.de === "support" ? ("support" as const) : ("client" as const),
+      qui: typeof m.qui === "string" ? m.qui : "",
+      texte: typeof m.texte === "string" ? m.texte : "",
+      date: typeof m.date === "string" ? m.date : "",
+    }));
+  return {
+    id: d.id,
+    date: typeof d.date === "string" ? d.date : "",
+    maj: typeof d.maj === "string" ? d.maj : "",
+    type: d.type === "bug" || d.type === "idee" ? d.type : "question",
+    email: typeof d.email === "string" ? d.email : "",
+    statut: d.statut === "repondu" || d.statut === "ferme" ? d.statut : "ouvert",
+    luClient: d.luClient !== false,
+    messages,
+  };
+}
+
+/** POST /v1/support : nouvelle demande, envoyée au support de RecipeLog. */
+export async function creerDemande(
+  demande: { email: string; type: TypeDemande; message: string; contexte: ContexteDemande },
+  opts: PasserelleOptions = {},
+): Promise<PasserelleResult<{ demande: Demande | null }>> {
+  const r = await call("POST", "/v1/support", demande, opts);
+  if (!r.ok) return r;
+  return { ok: true, demande: toDemande(r.json?.demande) };
+}
+
+/** GET /v1/support?email= : les demandes de cette personne, la plus récente d'abord. */
+export async function listerDemandes(email: string, opts: PasserelleOptions = {}): Promise<PasserelleResult<{ demandes: Demande[] }>> {
+  const r = await call("GET", `/v1/support?email=${enc(email)}`, undefined, opts);
+  if (!r.ok) return r;
+  const liste = Array.isArray(r.json?.demandes) ? r.json.demandes : [];
+  return { ok: true, demandes: liste.map(toDemande).filter((d): d is Demande => !!d) };
+}
+
+/** POST /v1/support/<id>/messages : la personne répond dans sa demande (elle se rouvre). */
+export async function ajouterMessageDemande(
+  id: string,
+  email: string,
+  message: string,
+  opts: PasserelleOptions = {},
+): Promise<PasserelleResult<{ demande: Demande | null }>> {
+  const r = await call("POST", `/v1/support/${encodeURIComponent(id)}/messages`, { email, message }, opts);
+  if (!r.ok) return r;
+  return { ok: true, demande: toDemande(r.json?.demande) };
+}
+
+/** POST /v1/support/<id>/lu : la personne a vu la réponse. */
+export async function marquerDemandeLue(id: string, email: string, opts: PasserelleOptions = {}): Promise<PasserelleResult<object>> {
+  const r = await call("POST", `/v1/support/${encodeURIComponent(id)}/lu`, { email }, opts);
+  return r.ok ? { ok: true } : r;
+}

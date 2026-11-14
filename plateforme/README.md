@@ -154,6 +154,27 @@ pause affiche « Ce RecipeLog est en pause » ; ses données restent là.
 Le panel n'a aucun accès à Docker : il passe par le **moteur**, joignable seulement sur le
 réseau interne avec une clé. Le moteur lance `recipelog-instance`, comme en ligne de commande.
 
+## Surveillance et support (lot 5)
+
+- **Chaque minute**, le moteur vérifie que chaque client et chaque service (connexion,
+  passerelle, vitrine) répond. Après 2 minutes sans réponse, tu reçois une **alerte**, puis
+  une autre quand il revient (avec la durée de la panne). Aussi : disque à 90 % (une fois par
+  jour) et chaque nouvelle demande de support. Les alertes partent par **email** (adresses
+  super-admin, même compte Brevo) et, si tu le règles, par **Telegram** ou **Discord** :
+  [A-FAIRE.md](A-FAIRE.md), étape F.
+- **Page de statut publique** sur `status.recipelog.cc` : chaque partie du service, avec
+  90 jours d'historique, sans aucun nom de client. À donner aux clients.
+- Dans le panel, partie **Santé de la machine** : processeur, mémoire, disque, état des
+  services, et pour chaque client sa mémoire, sa base, ses fichiers, ses sauvegardes, ses
+  recettes, ses comptes actifs, sa dernière activité et sa disponibilité sur 30 jours.
+  Bouton **Journaux** sur chaque client : ce que son RecipeLog écrit, en direct.
+- **Support** : dans son RecipeLog, chaque personne a Réglages → **Signaler un problème**
+  (problème, question ou idée ; la page, le navigateur, l'écran, la version et le rôle sont
+  joints tout seuls). Tu reçois une alerte, tu réponds depuis le panel (partie **Support**) :
+  la réponse part par email et s'affiche dans son RecipeLog, où la personne peut répondre à
+  son tour. Notes internes, fermer / rouvrir. Les demandes sont des fichiers dans
+  `/srv/recipelog/support/<client>/`.
+
 ## Au quotidien (dans la VM, en root)
 
 ```bash
@@ -229,6 +250,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-14 | 5. Surveillance et support | Vérification de chaque site et service chaque minute, alertes par email (et Telegram ou Discord si réglés) en cas de panne, de retour, de disque plein ou de nouvelle demande. Page de statut publique `status.recipelog.cc` (90 jours). Panel : partie Santé (machine et usage de chaque client), bouton Journaux en direct, partie Support (répondre, noter, fermer). Appli : Réglages → « Signaler un problème » avec la conversation et les réponses. Testé dans un vrai navigateur : demande envoyée, réponse reçue par email et dans l'appli, panne simulée détectée en 2 minutes puis retour, alerte d'essai. Captures dans la PR. | Facultatif : alertes sur ton téléphone par Telegram ou Discord, [A-FAIRE.md](A-FAIRE.md), étape F. |
 | 2026-11-14 | 4. Déménagement | Outils pour passer ton site, la démo et la vitrine sur la plateforme : `exporter-ancien.sh` (lit l'ancien conteneur sans le toucher), `importer` (testé : recettes, photos, comptes et rôles gardés), `inviter-comptes`. Démo publique avec référence et remise à zéro chaque nuit ou en 1 clic. Vitrine servie par la plateforme (branche `site-vitrine` inchangée) : mise à jour en 1 clic, bandeau, demandes du formulaire transformées en client en 1 clic. Testé dans un vrai navigateur, captures dans la PR. | Le déménagement lui-même, quand tu veux : [A-FAIRE.md](A-FAIRE.md), étape E. |
 | 2026-11-14 | 3. Sauvegardes | Chaque nuit à 3 h, sauvegarde de chaque client (base, photos et factures, réglages à part), gardée 7 jours, 4 semaines et 6 mois. Dans le panel, bouton « Sauvegardes » : sauvegarder maintenant, télécharger (sans mot de passe), restaurer en 1 clic (avec sauvegarde de l'état d'avant et retour automatique si ça rate), test de restauration chaque dimanche dans une base à part. Dernière sauvegarde affichée pour chaque client. Le moteur suit maintenant tout seul les mises à jour de `recipelog-instance`. Testé dans un vrai navigateur, captures dans la PR. | Vérifier que ta sauvegarde PBS → OVH inclut la nouvelle VM : [A-FAIRE.md](A-FAIRE.md), étape D1. |
 | 2026-11-14 | 2. Panel | Panel admin sur `admin.recipelog.cc` (super-admins seulement, connexion Authentik) dans le thème encre : tableau des clients, création en 1 clic avec invitation du responsable, équipe, places, essais (pause automatique à la fin), accès MCP par client, mise à jour d'un client ou de tous, pause / réactivation, suppression avec archive, journal de tes actions. Page « Ce RecipeLog est en pause ». Le moteur (seul à piloter Docker) reste interne. Testé dans un vrai navigateur, captures dans la PR. | Rien de nouveau à créer : voir [A-FAIRE.md](A-FAIRE.md), étape C4. |

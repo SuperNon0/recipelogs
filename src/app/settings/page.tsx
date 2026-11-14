@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, KeyRound, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -231,6 +231,18 @@ export default async function SettingsPage() {
                 <ChevronRight size={16} className="set-chev" />
               </a>
             )}
+            <Link href="/settings/support" className="fl-row">
+              <span className="ic">
+                <LifeBuoy size={17} />
+              </span>
+              <span className="set-tx">
+                <b>
+                  <span>Signaler un problème</span>
+                </b>
+                <small>Un souci, une question ou une idée : l'équipe RecipeLog te répond ici et par e-mail</small>
+              </span>
+              <ChevronRight size={16} className="set-chev" />
+            </Link>
             {/* Simple lien (pas next/link) : un préchargement ne doit jamais déconnecter. */}
             <a href="/auth/deconnexion" className="fl-row">
               <span className="ic">

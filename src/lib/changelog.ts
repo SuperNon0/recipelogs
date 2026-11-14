@@ -32,6 +32,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Le responsable du site devient administrateur tout seul à sa première connexion",
       "RecipeLog en ligne : les recettes, photos et factures de chaque client sont sauvegardées chaque nuit, et peuvent être remises à une date précédente en cas d'erreur",
       "RecipeLog en ligne : la démo publique revient toute seule chaque nuit à son état de départ",
+      "RecipeLog en ligne : Réglages → « Signaler un problème » envoie un souci, une question ou une idée à l'équipe RecipeLog, avec la page et la version utilisées. La réponse arrive par e-mail et s'affiche dans la même page, où l'on peut répondre à son tour",
+      "RecipeLog en ligne : chaque site est vérifié toutes les minutes, et l'équipe RecipeLog est prévenue tout de suite s'il ne répond plus. L'état du service est affiché sur status.recipelog.cc",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },

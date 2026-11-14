@@ -159,6 +159,46 @@ async function pagePause(res, hote) {
 <p class="petit">${echapper(hote)}</p></main></body></html>`);
 }
 
+// Page de statut publique (status.<domaine>) : aucun nom de client, aucune connexion.
+async function pageStatut(res) {
+  let statut = null;
+  try {
+    const r = await moteur("GET", "/statut", "page-statut");
+    statut = r.statut === 200 ? JSON.parse(r.corps) : null;
+  } catch {
+    statut = null;
+  }
+  const jours = [...Array(90)].map((_, i) => new Date(Date.now() - (89 - i) * 86400000).toISOString().slice(0, 10));
+  const tousOk = statut?.composants.every((c) => c.ok);
+  const dispo = (c) => {
+    const minutes = jours.reduce((s, j) => s + (c.jours[j] ?? 0), 0);
+    return (100 - (minutes / (90 * 1440)) * 100).toFixed(2).replace(".", ",");
+  };
+  const barres = (c) =>
+    jours
+      .map((j) => {
+        const m = c.jours[j] ?? 0;
+        const cl = m === 0 ? "ok" : m < 30 ? "pause" : "ko";
+        const d = new Date(`${j}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+        return `<i class="${cl}" title="${d} : ${m === 0 ? "aucune panne" : `${m} min de panne`}"></i>`;
+      })
+      .join("");
+  const corps = statut
+    ? statut.composants
+        .map(
+          (c) => `<section class="composant"><div class="composant-tete"><b>${echapper(c.nom)}</b><span class="etiquette ${c.ok ? "ok" : "ko"}">${c.ok ? "Fonctionne" : "Perturbé"}</span></div>
+      <div class="barres">${barres(c)}</div><div class="barres-legende"><span class="l90">il y a 90 jours</span><span class="l30">il y a 30 jours</span><span>${dispo(c)} % disponible</span><span>aujourd'hui</span></div></section>`,
+        )
+        .join("")
+    : `<p class="sub">État indisponible pour le moment.</p>`;
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", Refresh: "60" });
+  res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>État de RecipeLog</title><link rel="stylesheet" href="/panel.css"></head>
+<body class="statut"><main class="page-statut"><p class="marque-statut">RecipeLog · état du service</p>
+<div class="bandeau-statut ${!statut ? "pause" : tousOk ? "ok" : "ko"}">${!statut ? "État indisponible" : tousOk ? "Tout fonctionne normalement" : "Un service est perturbé : nous nous en occupons"}</div>
+${corps}<p class="petit">Mis à jour ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · vérifié chaque minute</p></main></body></html>`);
+}
+
 function pageErreur(res, statut, titre, texte) {
   res.writeHead(statut, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -183,6 +223,7 @@ createServer(async (req, res) => {
     }
     if (url.pathname === "/sante") return res.end("ok");
 
+    if (hote === `status.${DOMAINE}` && req.method === "GET" && url.pathname === "/") return pageStatut(res);
     if (hote !== HOTE_PANEL) return pagePause(res, hote);
     if (!pret) return pageErreur(res, 503, "Panel pas encore réglé", "Relance install.sh sur la machine : il crée l'accès du panel dans Authentik.");
 
@@ -282,7 +323,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|alertes\/essai)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();

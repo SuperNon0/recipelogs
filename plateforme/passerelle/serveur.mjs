@@ -3,6 +3,7 @@
 // Contrat : ../connexion.md. Joignable seulement sur le réseau Docker.
 import { createServer } from "node:http";
 import { ErreurPasserelle, clientParCle, equipe, inviter, retirer, renvoyer } from "./authentik.mjs";
+import { ajouterMessage, creerDemande, listerDemandes, marquerLu } from "./support.mjs";
 
 const PORT = Number(process.env.PORT || 8000);
 
@@ -16,7 +17,7 @@ async function lireJson(req) {
   const morceaux = [];
   for await (const m of req) {
     taille += m.length;
-    if (taille > 16 * 1024) throw new ErreurPasserelle(413, "trop_gros", "Requête trop grosse.");
+    if (taille > 48 * 1024) throw new ErreurPasserelle(413, "trop_gros", "Requête trop grosse.");
     morceaux.push(m);
   }
   if (!morceaux.length) return {};
@@ -40,6 +41,15 @@ async function traiter(req, res) {
   if (chemin === "/v1/equipe" && req.method === "POST") {
     const { email, nom: nomAffiche } = await lireJson(req);
     return repondre(res, 201, await inviter(nom, email, nomAffiche));
+  }
+  // Support : « Signaler un problème » depuis l'appli (le client est celui de la clé).
+  if (chemin === "/v1/support" && req.method === "POST") return repondre(res, 201, { demande: await creerDemande(nom, await lireJson(req)) });
+  if (chemin === "/v1/support" && req.method === "GET") return repondre(res, 200, { demandes: await listerDemandes(nom, url.searchParams.get("email") ?? "") });
+  const s = chemin.match(/^\/v1\/support\/([0-9a-f-]+)\/(messages|lu)$/);
+  if (s && req.method === "POST") {
+    const corps = await lireJson(req);
+    if (s[2] === "messages") return repondre(res, 200, { demande: await ajouterMessage(nom, s[1], corps) });
+    return repondre(res, 200, { demande: await marquerLu(nom, s[1], corps.email) });
   }
   const m = chemin.match(/^\/v1\/equipe\/([^/]+)(\/invitation)?$/);
   if (m) {

@@ -4,8 +4,10 @@
 // ligne de commande) et la passerelle, puis note chaque action dans le journal.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { timingSafeEqual } from "node:crypto";
+import { appendFile, chown, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { timingSafeEqual, randomBytes } from "node:crypto";
+import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
+import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
 
 const CLE = process.env.MOTEUR_CLE || "";
 const DONNEES = process.env.DONNEES || "/srv/recipelog";
@@ -158,6 +160,181 @@ async function journal(n = 100) {
   } catch {
     return [];
   }
+}
+
+// ------------------------------------------------------------ santé et usage (lot 5)
+const DOMAINE = process.env.DOMAINE || "recipelog.cc";
+let santeCache = null;
+
+const octets = (t) => {
+  const m = String(t).trim().match(/^([\d.]+)\s*([KMGT]?i?B)$/i);
+  if (!m) return null;
+  const u = { B: 1, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, KIB: 1024, MIB: 1024 ** 2, GIB: 1024 ** 3, TIB: 1024 ** 4 }[m[2].toUpperCase()] ?? 1;
+  return Math.round(Number(m[1]) * u);
+};
+
+// Usage de l'appli d'un client, lu dans sa base (lecture seule).
+async function usage(nom) {
+  const db = `rl_${nom.replace(/-/g, "_")}`;
+  const sql = `SELECT (SELECT count(*) FROM recipes), (SELECT count(*) FROM recipes WHERE updated_at > now() - interval '30 days'), (SELECT count(*) FROM accounts WHERE status = 'active'), (SELECT to_char(max(last_seen_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') FROM accounts), (SELECT count(*) FROM purchase_orders), pg_database_size(current_database())`;
+  const r = await lancer("docker", ["exec", "recipelog-postgres", "psql", "-U", "postgres", "-d", db, "-tA", "-F", "|", "-c", sql], 20000);
+  if (!r.ok) return null;
+  const [recettes, recettes30, comptes, derniere, factures, base] = r.sortie.split("|");
+  return { recettes: Number(recettes), recettes30: Number(recettes30), comptes: Number(comptes), derniereActivite: derniere || null, factures: Number(factures), base: Number(base) };
+}
+
+async function sante() {
+  if (santeCache && santeCache.jusqua > Date.now()) return santeCache.valeur;
+  const liste = await outil("liste", "--json");
+  const tous = liste.ok ? JSON.parse(liste.sortie || "[]") : [];
+  const stats = await lancer("docker", ["stats", "--no-stream", "--format", "{{json .}}"], 30000);
+  const parConteneur = {};
+  for (const l of stats.ok ? stats.sortie.split("\n") : []) {
+    try {
+      const j = JSON.parse(l);
+      const [mem, max] = String(j.MemUsage).split("/");
+      parConteneur[j.Name] = { cpu: Number.parseFloat(j.CPUPerc) || 0, memoire: octets(mem), memoireMax: octets(max) };
+    } catch {
+      /* ligne illisible */
+    }
+  }
+  const clients = {};
+  await Promise.all(
+    tous.map(async (c) => {
+      clients[c.nom] = {
+        ...(parConteneur[`rl-${c.nom}`] ?? { cpu: null, memoire: null, memoireMax: null }),
+        fichiers: await taille(`${DONNEES}/instances/${c.nom}/uploads`),
+        sauvegardes: await taille(`${DONNEES}/sauvegardes/${c.nom}`),
+        usage: await usage(c.nom),
+      };
+    }),
+  );
+  const plateforme = Object.entries(parConteneur)
+    .filter(([n]) => !n.startsWith("rl-"))
+    .reduce((s, [, v]) => ({ cpu: s.cpu + v.cpu, memoire: s.memoire + (v.memoire ?? 0) }), { cpu: 0, memoire: 0 });
+  const valeur = {
+    date: new Date().toISOString(),
+    machine: await machine(),
+    plateforme,
+    clients,
+    services: etatCourant(),
+    disponibilite: await disponibilites(30),
+    alertes: canauxAlerte(),
+  };
+  santeCache = { valeur, jusqua: Date.now() + 60000 };
+  return valeur;
+}
+
+// Page de statut publique : par composant, minutes de panne par jour (90 jours), sans nom de client.
+async function statutPublic() {
+  const p = await pannesParJour(90);
+  const fusion = (filtre) => {
+    const jours = {};
+    for (const [cible, j] of Object.entries(p)) if (filtre(cible)) for (const [d, m] of Object.entries(j)) jours[d] = Math.max(jours[d] ?? 0, Math.round(m));
+    return jours;
+  };
+  const courant = etatCourant();
+  const enPanne = (filtre) => Object.entries(courant).some(([c, v]) => filtre(c) && !v.ok);
+  const sites = (c) => c.startsWith("client:") && c !== "client:demo";
+  const composants = [
+    ["Sites RecipeLog des clients", sites],
+    ["Connexion", (c) => c === "service:connexion"],
+    ["Site vitrine", (c) => c === "service:vitrine"],
+    ["Démo en ligne", (c) => c === "client:demo"],
+  ].map(([nom, f]) => ({ nom, ok: !enPanne(f), jours: fusion(f) }));
+  return { date: new Date().toISOString(), composants };
+}
+
+// ------------------------------------------------------------ support (lot 5)
+const SUPPORT = `${DONNEES}/support`;
+const ID_TICKET = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{4}$/;
+
+async function tickets() {
+  const tous = [];
+  let clients = [];
+  try {
+    clients = (await readdir(SUPPORT, { withFileTypes: true })).filter((d) => d.isDirectory() && NOM_RE.test(d.name)).map((d) => d.name);
+  } catch {
+    return [];
+  }
+  for (const c of clients) {
+    for (const f of (await readdir(`${SUPPORT}/${c}`).catch(() => [])).filter((n) => n.endsWith(".json"))) {
+      try {
+        tous.push(JSON.parse(await readFile(`${SUPPORT}/${c}/${f}`, "utf8")));
+      } catch {
+        /* en cours d'écriture */
+      }
+    }
+  }
+  return tous.sort((a, b) => String(b.maj).localeCompare(String(a.maj)));
+}
+
+async function ecrireTicket(t) {
+  const f = `${SUPPORT}/${t.client}/${t.id}.json`;
+  const tmp = `${f}.${randomBytes(4).toString("hex")}.tmp`;
+  await writeFile(tmp, JSON.stringify(t, null, 1), { mode: 0o644 });
+  await chown(tmp, 1000, 1000).catch(() => {});
+  await rename(tmp, f);
+}
+
+async function actionTicket(qui, nom, id, act, corps) {
+  exiger(NOM_RE.test(nom) && ID_TICKET.test(id), "Demande inconnue.");
+  let t;
+  try {
+    t = JSON.parse(await readFile(`${SUPPORT}/${nom}/${id}.json`, "utf8"));
+  } catch {
+    throw new Refus(404, "Demande introuvable.");
+  }
+  const date = new Date().toISOString();
+  let courriel = null;
+  switch (act) {
+    case "repondre": {
+      const texte = typeof corps.texte === "string" ? corps.texte.replace(/\r/g, "").trim().slice(0, 5000) : "";
+      exiger(texte.length > 0, "La réponse est vide.");
+      t.messages.push({ de: "support", qui, texte, date });
+      t.statut = corps.fermer ? "ferme" : "repondu";
+      t.luClient = false;
+      t.luSupport = true;
+      t.maj = date;
+      courriel = texte;
+      break;
+    }
+    case "fermer":
+      t.statut = "ferme";
+      t.luSupport = true;
+      t.maj = date;
+      break;
+    case "rouvrir":
+      t.statut = "ouvert";
+      t.maj = date;
+      break;
+    case "lu":
+      t.luSupport = true;
+      break;
+    case "note": {
+      const texte = typeof corps.texte === "string" ? corps.texte.trim().slice(0, 2000) : "";
+      t.notes = texte;
+      break;
+    }
+    default:
+      throw new Refus(404, "Action inconnue.");
+  }
+  await ecrireTicket(t);
+  let envoi = null;
+  if (courriel && courrielRegle()) {
+    envoi = await envoyerCourriel({
+      a: t.email,
+      sujet: "RecipeLog : réponse à ta demande",
+      texte: `Bonjour,\n\n${courriel}\n\n—\nRetrouve la conversation dans RecipeLog : https://${nom}.${DOMAINE}/settings/support\n(Réglages → Signaler un problème). Pour répondre, écris-y directement.`,
+    })
+      .then(() => "envoye")
+      .catch((e) => {
+        console.error("Réponse non envoyée par email :", e.message);
+        return "echec";
+      });
+  }
+  if (act !== "lu" && act !== "note") await noter(qui, `support-${act}`, nom, { ok: true, sortie: "" }, { demande: id, ...(envoi ? { courriel: envoi } : {}) });
+  return { ok: true, demande: t, email: envoi };
 }
 
 // ------------------------------------------------------------ routes
@@ -322,6 +499,21 @@ createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/vitrine") return repondre(res, 200, await vitrine());
+    if (req.method === "GET" && url.pathname === "/mesures") return repondre(res, 200, await sante());
+    if (req.method === "GET" && url.pathname === "/statut") return repondre(res, 200, await statutPublic());
+    if (req.method === "GET" && url.pathname === "/support") return repondre(res, 200, { demandes: await tickets() });
+    if (req.method === "POST" && morceaux[0] === "support" && morceaux.length === 4) {
+      return repondre(res, 200, await actionTicket(qui, morceaux[1], morceaux[2], morceaux[3], await lireCorps(req)));
+    }
+    if (req.method === "POST" && url.pathname === "/alertes/essai") {
+      const ok = await alerter("🔔 Essai d'alerte RecipeLog", `Envoyé depuis le panel par ${qui}. Si tu lis ceci, les alertes marchent.`);
+      return repondre(res, ok ? 200 : 500, { ok, sortie: ok ? "Alerte envoyée." : "Aucun canal n'a marché (voir A-FAIRE.md, étape F)." });
+    }
+    if (req.method === "GET" && morceaux[0] === "clients" && morceaux[2] === "journaux" && morceaux.length === 3) {
+      exiger(NOM_RE.test(morceaux[1]), "Nom de client invalide.");
+      const r = await lancer("docker", ["logs", "--tail", "300", "--timestamps", `rl-${morceaux[1]}`], 15000);
+      return repondre(res, 200, { ok: r.ok, lignes: r.sortie });
+    }
     if (req.method === "POST" && url.pathname === "/vitrine/maj") {
       const r = await unParUn(() => outil("vitrine", "maj"));
       await noter(qui, "vitrine-maj", "vitrine", r);
@@ -414,3 +606,31 @@ async function planning() {
 }
 setTimeout(planning, 2 * 60 * 1000);
 setInterval(planning, 5 * 60 * 1000);
+
+// Chaque minute : chaque site et service répond-il ? Nouvelles demandes de support ?
+const ticketsVus = new Set();
+let ticketsInitialises = false;
+async function surveiller() {
+  try {
+    const liste = await outil("liste", "--json");
+    if (liste.ok) await verifier(JSON.parse(liste.sortie || "[]"), noter);
+  } catch (e) {
+    console.error("Surveillance :", e.message);
+  }
+  try {
+    const nouveaux = (await tickets()).filter((t) => !t.luSupport && !ticketsVus.has(`${t.id}:${t.messages.length}`));
+    for (const t of nouveaux) {
+      ticketsVus.add(`${t.id}:${t.messages.length}`);
+      if (!ticketsInitialises) continue; // au démarrage : pas de rafale pour les anciennes
+      const dernier = t.messages.at(-1);
+      await alerter(`📩 ${t.messages.length > 1 ? "Nouveau message" : "Nouvelle demande"} de ${t.client}`, `${t.email} : ${String(dernier?.texte ?? "").slice(0, 300)}`);
+    }
+    ticketsInitialises = true;
+  } catch (e) {
+    console.error("Support :", e.message);
+  }
+}
+await mkdir(SUPPORT, { recursive: true }).catch(() => {});
+await chown(SUPPORT, 1000, 1000).catch(() => {});
+setTimeout(surveiller, 30 * 1000);
+setInterval(surveiller, 60 * 1000);

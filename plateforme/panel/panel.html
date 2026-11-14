@@ -10,7 +10,7 @@
 <body data-domaine="{{DOMAINE}}">
   <header class="haut">
     <p class="marque">RecipeLog <small>panel admin</small></p>
-    <div class="moi">{{EMAIL}}<a href="/auth/deconnexion">Se déconnecter</a></div>
+    <div class="moi">{{EMAIL}}<a href="https://status.{{DOMAINE}}" target="_blank" rel="noopener">Page de statut ↗</a><a href="/auth/deconnexion">Se déconnecter</a></div>
   </header>
 
   <main class="panel">
@@ -28,6 +28,12 @@
     <p class="texte-aide" id="aide-maj">Télécharge la dernière version de chaque client, l'un après l'autre (2 à 3 minutes chacun). Un client qui ne redémarre pas revient tout seul à sa version d'avant, et la suite s'arrête. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
 
     <section class="clients" id="clients" aria-live="polite"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></section>
+
+    <h2>Support</h2>
+    <section class="support" id="support"><div class="vide">Chargement…</div></section>
+
+    <h2>Santé de la machine</h2>
+    <section class="sante" id="sante"><div class="vide">Chargement…</div></section>
 
     <h2>Site vitrine</h2>
     <section class="vitrine" id="vitrine"><div class="vide">Chargement…</div></section>
