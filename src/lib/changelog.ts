@@ -15,7 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-11-14",
     title: "RecipeLog prêt pour la plateforme en ligne",
     summary:
-      "Première étape de RecipeLog en ligne : l'appli existe maintenant aussi en image Docker, et une seule machine peut faire tourner un RecipeLog séparé pour chaque client, avec sa propre adresse et sa propre base. Rien ne change dans ton site actuel.",
+      "Premières étapes de RecipeLog en ligne : une seule machine fait tourner un RecipeLog séparé pour chaque client, avec sa propre adresse et sa propre base, et chacun se connecte avec son e-mail et son mot de passe (ou Google). Rien ne change dans ton site actuel.",
     features: [
       "Image Docker de RecipeLog construite à chaque mise à jour : « beta » suit main, « stable » suit stable. Chromium (PDF), ffmpeg et yt-dlp (vidéos) sont inclus, et les migrations de la base se font toutes seules au démarrage",
       "Dossier « plateforme » : Traefik envoie chaque <client>.recipelog.cc vers le bon RecipeLog, un seul PostgreSQL garde une base séparée par client, le tunnel Cloudflare relie la machine sans ouvrir de port",
@@ -23,7 +23,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "La page « Version et nouveautés » affiche aussi la liste des dernières mises à jour dans la version Docker",
       "RecipeLog en ligne : on se connecte avec son e-mail et son mot de passe sur auth.recipelog.cc, puis on revient tout seul sur la page qu'on voulait ouvrir. La connexion dure 7 jours sur chaque appareil",
       "« Mot de passe oublié » sur la page de connexion envoie un e-mail pour en choisir un nouveau",
-      "Réglages → « Se déconnecter » pour quitter RecipeLog sur cet appareil (aussi sur les pages « Demande en attente » ou « Accès suspendu », pour changer de compte)",
+      "Réglages → « Se déconnecter » pour quitter RecipeLog sur cet appareil (aussi sur les pages « Demande en attente » ou « Accès suspendu », pour changer de compte). La personne suivante sur la même tablette doit bien se reconnecter",
+      "Réglages → « Mot de passe et sécurité » : changer son mot de passe et activer la double authentification (un code sur le téléphone en plus du mot de passe)",
+      "Bouton « Google » sur la page de connexion, pour les personnes invitées avec leur adresse Gmail",
       "Réglages → Comptes → « Inviter un collaborateur » : son e-mail et son rôle, et il reçoit un e-mail pour choisir son mot de passe. Son compte est prêt tout de suite. « Renvoyer l'invitation » si l'e-mail s'est perdu ; supprimer un compte retire aussi la personne de l'équipe",
       "Le compteur « Places utilisées » montre combien de personnes de l'équipe peuvent se connecter sur le nombre compris dans l'offre. Toutes les places sont prises ? Le site propose d'en demander plus",
       "Le responsable du site devient administrateur tout seul à sa première connexion",

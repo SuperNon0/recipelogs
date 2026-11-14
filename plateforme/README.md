@@ -15,7 +15,10 @@ Visiteurs ── Cloudflare ── tunnel ──> cloudflared ──> Traefik �
 
 | Élément | Rôle |
 |---|---|
-| `docker-compose.yml` | Traefik (l'aiguilleur), PostgreSQL, l'accès Docker limité, le tunnel Cloudflare |
+| `docker-compose.yml` | Traefik (l'aiguilleur), PostgreSQL, l'accès Docker limité, le tunnel Cloudflare, Authentik (la connexion, sur `auth.recipelog.cc`) et la passerelle |
+| `authentik/` | Réglages d'Authentik appliqués tout seuls (connexion par email, mot de passe oublié, déconnexion, super-admins) et l'email d'invitation en français |
+| `passerelle/` | Le seul service qui a la clé d'Authentik : crée les clients, invite, compte les places. Chaque RecipeLog lui parle avec sa propre clé |
+| `connexion.md` | Comment l'appli, Authentik et la passerelle se parlent |
 | `traefik/` | Réglages de Traefik : en-têtes de sécurité, limitation des abus |
 | `bin/recipelog-instance` | Créer, lister, mettre à jour, supprimer un client |
 | `install.sh` | Prépare une Debian 12 vierge (Docker, pare-feu, réglages, démarrage) |
@@ -55,25 +58,62 @@ adresse email et le jeton du tunnel. Il crée une VM Debian 12, qui installe tou
 seule la plateforme et le client de test. Compter 5 à 10 minutes ; le résumé
 s'affiche à la fin. Connexion ensuite : `ssh recipelog@<adresse de la VM>` puis `sudo -i`.
 
-### 4. Protéger le client de test
+### 4. Les emails (invitations, mot de passe oublié)
 
-Tant que la connexion par Authentik (lot 1) n'existe pas, un client tout neuf est
-ouvert à qui connaît son adresse. Dans **Zero Trust → Access → Applications**, ajouter
-`test.recipelog.cc` avec ta règle habituelle (ton email). **Ne pas** protéger
-`*.recipelog.cc` en entier : la démo et la vitrine seraient bloquées.
+Sans serveur d'envoi, personne ne reçoit son email « Choisis ton mot de passe ». Avec
+**Brevo** (gratuit jusqu'à 300 emails par jour) :
+
+1. Créer un compte sur brevo.com, puis **Expéditeurs, domaines → Domaines → Ajouter**
+   `recipelog.cc` et ajouter dans Cloudflare les enregistrements DNS qu'il donne.
+2. **SMTP et API → SMTP** : noter l'identifiant et créer une clé SMTP.
+3. Dans la VM, compléter `/srv/recipelog/.env` :
+   ```
+   SMTP_HOTE='smtp-relay.brevo.com'
+   SMTP_PORT='587'
+   SMTP_UTILISATEUR='<identifiant Brevo>'
+   SMTP_MOT_DE_PASSE='<clé SMTP>'
+   SMTP_EXPEDITEUR='RecipeLog <noreply@recipelog.cc>'
+   ```
+4. `recipelog-plateforme up -d` puis renvoyer ton email :
+   `docker exec recipelog-passerelle node cli.mjs initialiser`.
+
+### 5. Ta connexion
+
+L'installation t'a créé un compte sur `auth.recipelog.cc` (groupe **super-admins** : tu entres
+sur tous les clients, sans compter dans leurs places, et tu peux régler Authentik). Ouvre
+l'email « Choisis ton mot de passe ». Conseillé : active la double authentification dans
+`https://auth.recipelog.cc/if/user/#/settings`.
+
+En secours, le compte `akadmin` a son mot de passe dans `/srv/recipelog/.env`
+(`AUTHENTIK_BOOTSTRAP_PASSWORD`).
+
+### 6. (Facultatif) Le bouton « Google »
+
+1. **console.cloud.google.com → API et services → Identifiants → Créer → ID client OAuth**,
+   type *Application Web*, URI de redirection autorisée :
+   `https://auth.recipelog.cc/source/oauth/callback/google/`.
+2. Dans la VM : `docker exec recipelog-passerelle node cli.mjs google <ID client> <secret>`.
+
+Google ne crée jamais de compte : il ne sert qu'aux personnes déjà invitées avec la même adresse.
 
 ## Au quotidien (dans la VM, en root)
 
 ```bash
 recipelog-instance liste                    # les clients et leur état
-recipelog-instance creer chanka             # nouveau client sur chanka.recipelog.cc (canal stable)
+recipelog-instance creer chanka --responsable chef@patisserie.fr --max 10
+                                            # nouveau client sur chanka.recipelog.cc (canal stable) :
+                                            # le responsable reçoit son invitation et sera administrateur,
+                                            # 10 comptes au plus (sans --max : pas de plafond)
 recipelog-instance creer essai --canal beta # suit la bêta (main)
-recipelog-instance creer essai2 --canal plateforme # suit la branche du chantier
+recipelog-instance equipe chanka            # qui peut se connecter, et les places
+recipelog-instance inviter chanka a@b.fr    # inviter quelqu'un (l'appli le fait aussi : Réglages → Comptes)
+recipelog-instance quota chanka 15          # changer le nombre de places (0 = pas de plafond)
+recipelog-instance brancher-authentik test  # passer un client créé avant le lot 1 sur Authentik
 recipelog-instance mettre-a-jour test       # un client
 recipelog-instance mettre-a-jour --tous     # tous, l'un après l'autre, arrêt au premier échec
 recipelog-instance journaux test            # journaux en direct
 recipelog-instance supprimer test --oui     # supprime en gardant une archive (base + fichiers)
-recipelog-plateforme ps                     # état de Traefik, PostgreSQL, tunnel
+recipelog-plateforme ps                     # état de Traefik, PostgreSQL, tunnel, Authentik, passerelle
 ```
 
 Une mise à jour qui ne redémarre pas revient toute seule à la version précédente.
@@ -96,6 +136,10 @@ Les sauvegardes automatiques de ce dossier arrivent au lot 3.
 - Traefik ne lit Docker qu'à travers un proxy qui n'autorise que la lecture des conteneurs.
 - Chaque client a son propre utilisateur PostgreSQL, qui ne peut ouvrir que sa base.
 - Limitation des abus : 30 requêtes par seconde par visiteur (pointes à 120).
+- Connexion : Authentik ne laisse entrer sur un client que les membres de son groupe
+  (`client-<nom>`) et les super-admins. Il n'y a pas d'inscription libre : seuls les comptes
+  invités existent. La clé d'Authentik n'est que dans la passerelle ; chaque client a sa
+  propre clé de passerelle, qui ne donne accès qu'à sa propre équipe.
 
 ## Journal du chantier
 
@@ -105,4 +149,5 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
-| 2026-11-14 | 0. Socle | Branche `plateforme` créée depuis `main` (rien d'autre n'est touché). Image Docker de l'appli publiée en `:plateforme`, pile Traefik + PostgreSQL + proxy Docker + tunnel, scripts `creer-vm.sh`, `install.sh` et `recipelog-instance`. Testé dans Docker : client de test en ligne via Traefik, bases séparées entre clients. PR #149 vers `plateforme`. | Après la fusion : rendre l'image publique, créer le tunnel, lancer `creer-vm.sh`, protéger `test.recipelog.cc` (étapes 1 à 4 ci-dessus). |
+| 2026-11-14 | 1. Connexion | Authentik sur `auth.recipelog.cc` (connexion par email, mot de passe oublié, Google en option, double authentification), réglé tout seul et en français. La passerelle crée chaque client dans Authentik, invite par email (lien valable 3 jours) et compte les places. Dans l'appli : connexion et retour sur la page demandée, « Se déconnecter » (qui déconnecte vraiment, même sur une tablette partagée), Réglages → Comptes → « Inviter un collaborateur » et « Places utilisées », responsable administrateur à sa première connexion. `recipelog-instance creer --responsable … --max …`. Testé dans un vrai navigateur : invitation, choix du mot de passe, connexion, invitation depuis l'appli, plafond, refus d'un membre sur un autre client, super-admin caché, déconnexion. | Après la fusion : réinstaller (`install.sh` ajoute Authentik à une plateforme déjà en place), régler les emails (étape 4), ouvrir ton email (étape 5), Google si tu veux (étape 6). Puis `recipelog-instance brancher-authentik test` et retirer la protection Cloudflare Access de `test.recipelog.cc`. |
+| 2026-11-14 | 0. Socle | Branche `plateforme` créée depuis `main` (rien d'autre n'est touché). Image Docker de l'appli publiée en `:plateforme`, pile Traefik + PostgreSQL + proxy Docker + tunnel, scripts `creer-vm.sh`, `install.sh` et `recipelog-instance`. Testé dans Docker : client de test en ligne via Traefik, bases séparées entre clients. PR #149 vers `plateforme`. | Après la fusion : rendre l'image publique, créer le tunnel, lancer `creer-vm.sh`, protéger `test.recipelog.cc` avec Cloudflare Access (en attendant le lot 1). |

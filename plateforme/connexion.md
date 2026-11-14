@@ -23,10 +23,10 @@ Navigateur ── <client>.recipelog.cc ──> RecipeLog (rl-<client>)
 | `RECIPELOG_AUTH_MODE` | `oidc` | Active la connexion par Authentik. Les comptes sont alors toujours activés (sauf `RECIPELOG_AUTH_OFF=1`, le secours). |
 | `RECIPELOG_URL` | `https://chanka.recipelog.cc` | Adresse publique. Retour OIDC : `${RECIPELOG_URL}/auth/retour`. |
 | `OIDC_ISSUER` | `https://auth.recipelog.cc/application/o/rl-chanka/` | Émetteur public (avec la barre finale). Découverte : `${OIDC_ISSUER}.well-known/openid-configuration`. |
-| `OIDC_INTERNE` | `http://recipelog-authentik:9000` | Facultatif. Les appels faits PAR LE SERVEUR (découverte, jeton, clés) partent vers cette origine au lieu de l'origine publique, avec les en-têtes `Host: auth.recipelog.cc` et `X-Forwarded-Proto: https` : Authentik répond alors avec les adresses publiques. Les redirections du navigateur, elles, utilisent toujours l'adresse publique. |
+| `OIDC_INTERNE` | `http://recipelog-authentik:9000` | Facultatif. Les appels faits PAR LE SERVEUR (découverte, jeton, clés) partent vers cette origine au lieu de l'origine publique, avec les en-têtes `Host: auth.recipelog.cc` et `X-Forwarded-Proto: https` : Authentik répond alors avec les adresses publiques (il fait confiance à ces en-têtes venant des réseaux privés, dont celui de Docker). Le `fetch` de Node ignore l'en-tête `Host` : l'appli et la passerelle passent par `node:http`. Les redirections du navigateur, elles, utilisent toujours l'adresse publique. |
 | `OIDC_CLIENT_ID` | `rl-chanka` | |
 | `OIDC_CLIENT_SECRET` | (secret) | |
-| `RECIPELOG_SESSION_SECRET` | 64 caractères hexadécimaux | Signe le cookie de session (HMAC-SHA256). |
+| `RECIPELOG_SESSION_SECRET` | 64 caractères hexadécimaux | Signe le cookie de session (HMAC-SHA256). Utilisé tel quel comme texte (pas décodé), au moins 32 caractères. |
 | `RECIPELOG_RESPONSABLE_EMAIL` | `chef@patisserie.fr` | Responsable du client : à sa première connexion, compte actif avec le rôle Administrateur (visible, contrairement à `RECIPELOG_ADMIN_EMAILS`). |
 | `RECIPELOG_ADMIN_EMAILS` | ton adresse | Inchangé : administrateur caché (toi, super-admin). |
 | `RECIPELOG_PASSERELLE_URL` | `http://recipelog-passerelle:8000` | API de la passerelle. |
@@ -39,6 +39,22 @@ Navigateur ── <client>.recipelog.cc ──> RecipeLog (rl-<client>)
 - Valeur : `base64url(JSON {email, exp, iat})` + `.` + `base64url(HMAC-SHA256(secret, partie1))`.
 - L'email est en minuscules, tiré de l'`id_token` vérifié (RS256 avec les clés `jwks_uri`, `iss` = `OIDC_ISSUER`, `aud` contient `OIDC_CLIENT_ID`, `exp`, `nonce`).
 - `email_verified` n'est pas exigé : Authentik ne laisse entrer que des comptes créés par la passerelle ou par toi.
+
+## Déconnexion
+
+`/auth/deconnexion` efface le cookie puis envoie sur la fin de session d'Authentik. Le flux
+`recipelog-deconnexion` (blueprint) ferme aussi la session Authentik, puis renvoie sur
+l'adresse du client (`meta_launch_url` de l'application), qui affiche la page de connexion.
+
+## Mot de passe, Google, double authentification (côté Authentik)
+
+- Invitation et « Mot de passe oublié » : flux `recipelog-recuperation`, lien valable 3 jours.
+  La passerelle déclenche l'email en jouant ce flux comme un visiteur anonyme. Ne jamais
+  modifier par l'API le jeton d'un lien de récupération : Authentik en fait une clé d'API.
+- Google : `docker exec recipelog-passerelle node cli.mjs google <id> <secret>`. Google relie
+  un compte Google à un compte existant de même email ; il ne crée jamais de compte.
+- Double authentification : facultative, chacun l'active dans « Mot de passe et sécurité »
+  (`https://auth.recipelog.cc/if/user/#/settings`) ; elle est ensuite demandée à chaque connexion.
 
 ## API de la passerelle (pour l'appli)
 

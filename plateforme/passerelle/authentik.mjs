@@ -290,7 +290,7 @@ export async function creerClient(nom, { max = null, url = `https://${nom}.${DOM
   });
   const [autorisation, invalidation, openid, emailP, profil, cert] = await Promise.all([
     flux("default-provider-authorization-implicit-consent"),
-    flux("default-provider-invalidation-flow"),
+    flux("recipelog-deconnexion"),
     portee("goauthentik.io/providers/oauth2/scope-openid"),
     portee("goauthentik.io/providers/oauth2/scope-email"),
     portee("goauthentik.io/providers/oauth2/scope-profile"),
@@ -370,4 +370,37 @@ export async function initialiser(adminEmails) {
     resultats.push({ email, cree: !existait, invitationEnvoyee: invitation });
   }
   return resultats;
+}
+
+/**
+ * Bouton « Se connecter avec Google » sur la page de connexion.
+ * Google ne crée jamais de compte : il relie seulement un compte Google à un
+ * compte RecipeLog qui a la même adresse email (créé par une invitation).
+ */
+export async function brancherGoogle(clientId, secret) {
+  if (!clientId || !secret) throw new ErreurPasserelle(400, "google", "Il faut l'identifiant et le secret du client OAuth Google.");
+  const flot = await flux("default-source-authentication");
+  const corps = {
+    name: "Google",
+    slug: "google",
+    enabled: true,
+    provider_type: "google",
+    consumer_key: clientId,
+    consumer_secret: secret,
+    authentication_flow: flot.pk,
+    enrollment_flow: null,
+    user_matching_mode: "email_link",
+    // Adresses de Google déjà connues d'Authentik : pas de découverte au réglage.
+    oidc_well_known_url: "",
+    oidc_jwks_url: "",
+    policy_engine_mode: "any",
+  };
+  const [existante] = await tous("/sources/oauth/", { slug: "google" });
+  const source = existante ? await api("PATCH", "/sources/oauth/google/", corps) : await api("POST", "/sources/oauth/", corps);
+  const [etape] = await tous("/stages/identification/", { name: "default-authentication-identification" });
+  if (!etape) throw new ErreurPasserelle(500, "configuration", "Étape de connexion introuvable.");
+  if (!etape.sources.includes(source.pk)) {
+    await api("PATCH", `/stages/identification/${etape.pk}/`, { sources: [...etape.sources, source.pk] });
+  }
+  return { ok: true, adresseDeRetourGoogle: `${URL_PUBLIQUE}/source/oauth/callback/google/` };
 }

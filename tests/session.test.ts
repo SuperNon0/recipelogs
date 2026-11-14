@@ -44,8 +44,8 @@ describe("cookie de session rl_session", () => {
   });
 
   it("le secret doit être assez long", () => {
-    expect(sessionSecret({ RECIPELOG_SESSION_SECRET: "court" })).toBeNull();
-    expect(sessionSecret({ RECIPELOG_SESSION_SECRET: SECRET })).toBe(SECRET);
+    expect(sessionSecret({ RECIPELOG_SESSION_SECRET: "court" } as unknown as NodeJS.ProcessEnv)).toBeNull();
+    expect(sessionSecret({ RECIPELOG_SESSION_SECRET: SECRET } as unknown as NodeJS.ProcessEnv)).toBe(SECRET);
   });
 });
 

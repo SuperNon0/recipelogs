@@ -226,13 +226,13 @@ describe("requête du serveur (node:http)", () => {
 
 describe("réglages", () => {
   it("liste ce qui manque", () => {
-    expect(oidcConfigCheck({}).missing).toEqual(["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "RECIPELOG_URL"]);
+    expect(oidcConfigCheck({} as NodeJS.ProcessEnv).missing).toEqual(["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "RECIPELOG_URL"]);
     const ok = oidcConfigCheck({
       OIDC_ISSUER: ISSUER,
       OIDC_CLIENT_ID: CLIENT,
       OIDC_CLIENT_SECRET: "x",
       RECIPELOG_URL: "https://chanka.recipelog.cc/",
-    });
+    } as unknown as NodeJS.ProcessEnv);
     expect(ok.config?.appUrl).toBe("https://chanka.recipelog.cc");
     expect(ok.config?.internal).toBeNull();
   });

@@ -4,8 +4,13 @@
 # Un client = une base dans le PostgreSQL partagé + un conteneur RecipeLog
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
-#   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]
+#   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--responsable email]
+#                                  [--max N] [--admin email] [--demo] [--sans-authentik]
 #   recipelog-instance liste
+#   recipelog-instance equipe <nom>
+#   recipelog-instance inviter <nom> <email> [nom affiché]
+#   recipelog-instance quota <nom> <N|0>          (0 = pas de plafond)
+#   recipelog-instance brancher-authentik <nom> [--responsable email] [--max N]
 #   recipelog-instance mettre-a-jour <nom>|--tous
 #   recipelog-instance redemarrer <nom>
 #   recipelog-instance journaux <nom>
@@ -13,8 +18,9 @@
 #
 # Réglages lus dans /srv/recipelog/.env (écrit par install.sh).
 # Chaque client a son dossier /srv/recipelog/instances/<nom>/ :
-#   instance.conf  canal, adresse admin, mode démo
-#   instance.env   variables du conteneur (dont le mot de passe de sa base)
+#   instance.conf  canal, date de création, connexion (authentik ou cloudflare)
+#   instance.env   variables du conteneur (mot de passe de sa base, réglages
+#                  de connexion Authentik : voir ../connexion.md)
 #   uploads/       photos et factures envoyées
 # ============================================================
 set -euo pipefail
@@ -52,6 +58,46 @@ tirer() {
 }
 base() { echo "rl_${1//-/_}"; }
 existe() { [ -d "${INSTANCES}/$1" ]; }
+
+# Commande d'administration de la passerelle (seule à parler à Authentik).
+passerelle() { docker exec recipelog-passerelle node cli.mjs "$@"; }
+passerelle_ok() { docker inspect -f '{{.State.Running}}' recipelog-passerelle 2>/dev/null | grep -q true; }
+
+# Crée le client dans Authentik et ajoute ses réglages de connexion à instance.env.
+# brancher <nom> <max> <responsable>
+brancher() {
+  local nom="$1" max="$2" resp="$3" dir="${INSTANCES}/$1" reglages
+  passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps). Sans Authentik : --sans-authentik."
+  info "Client « ${nom} » dans Authentik…"
+  reglages="$(passerelle client-creer "${nom}" "${max}" "https://${nom}.${DOMAINE}" --env)" || die "Authentik a refusé la création du client « ${nom} »."
+  sed -i '/^RECIPELOG_AUTH_MODE=/d;/^RECIPELOG_URL=/d;/^OIDC_/d;/^RECIPELOG_SESSION_SECRET=/d;/^RECIPELOG_PASSERELLE_/d;/^RECIPELOG_RESPONSABLE_EMAIL=/d' "${dir}/instance.env"
+  umask 077
+  {
+    echo "RECIPELOG_AUTH_MODE=oidc"
+    echo "RECIPELOG_URL=https://${nom}.${DOMAINE}"
+    echo "${reglages}"
+    echo "RECIPELOG_SESSION_SECRET=$(openssl rand -hex 32)"
+    echo "RECIPELOG_PASSERELLE_URL=http://recipelog-passerelle:8000"
+    [ -n "${resp}" ] && echo "RECIPELOG_RESPONSABLE_EMAIL=${resp}"
+  } >> "${dir}/instance.env"
+  umask 022
+  sed -i '/^CONNEXION=/d' "${dir}/instance.conf"
+  echo "CONNEXION=authentik" >> "${dir}/instance.conf"
+}
+
+# Invite le responsable (email « Choisis ton mot de passe »).
+inviter_responsable() {
+  local nom="$1" resp="$2"
+  [ -n "${resp}" ] || return 0
+  if passerelle inviter "${nom}" "${resp}" >/dev/null; then
+    info "Invitation envoyée à ${resp}."
+  else
+    echo "⚠️  Invitation de ${resp} impossible. À relancer : recipelog-instance inviter ${nom} ${resp}" >&2
+  fi
+}
+
+verifier_email() { [[ "$1" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Adresse email invalide : $1"; }
+verifier_max() { [[ "$1" =~ ^[0-9]+$ ]] || die "Nombre de comptes invalide : $1 (0 = pas de plafond)."; }
 
 psql_admin() { docker exec -i "${PG}" psql -v ON_ERROR_STOP=1 -q -U postgres "$@"; }
 
@@ -97,18 +143,24 @@ attendre() {
 }
 
 cmd_creer() {
-  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0
+  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1
   while [ $# -gt 0 ]; do
     case "$1" in
       --canal) canal="${2:-}"; shift 2 ;;
       --admin) admin="${2:-}"; shift 2 ;;
+      --responsable) resp="${2:-}"; shift 2 ;;
+      --max) max="${2:-}"; shift 2 ;;
+      --sans-authentik) authentik=0; shift ;;
       --demo) demo=1; shift ;;
       -*) die "Option inconnue : $1" ;;
       *) [ -z "${nom}" ] || die "Un seul nom à la fois."; nom="$1"; shift ;;
     esac
   done
-  [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--admin email] [--demo]"
+  [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal …] [--responsable email] [--max N] [--admin email] [--demo] [--sans-authentik]"
   nom_valide "${nom}"
+  [ -z "${resp}" ] || verifier_email "${resp}"
+  verifier_max "${max}"
+  [ "${authentik}" = 0 ] || passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps). Sans Authentik : --sans-authentik."
   [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (beta, stable ou plateforme)."
   existe "${nom}" && die "Le client « ${nom} » existe déjà."
 
@@ -131,6 +183,7 @@ SQL
   cat > "${dir}/instance.conf" <<CONF
 CANAL=${canal}
 CREE_LE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+CONNEXION=cloudflare
 CONF
   {
     echo "DATABASE_URL=postgresql://${db}:${mdp}@${PG}:5432/${db}"
@@ -139,6 +192,7 @@ CONF
     [ "${demo}" = 1 ] && echo "RECIPELOG_DEMO=1"
   } > "${dir}/instance.env"
   umask 022
+  [ "${authentik}" = 1 ] && brancher "${nom}" "${max}" "${resp}"
 
   info "Téléchargement de ${IMAGE}:${canal}…"
   tirer "${IMAGE}:${canal}"
@@ -146,22 +200,66 @@ CONF
   lancer "${nom}"
   if attendre "${nom}"; then
     info "✅ ${nom} est prêt : https://${nom}.${DOMAINE}"
-    echo "   Pense à protéger cette adresse dans Cloudflare Access tant que la connexion par Authentik (lot 1) n'est pas là."
+    if [ "${authentik}" = 1 ]; then
+      inviter_responsable "${nom}" "${resp}"
+    else
+      echo "   Sans Authentik : protège cette adresse dans Cloudflare Access."
+    fi
   else
     docker logs --tail 40 "$(conteneur "${nom}")" >&2 || true
     die "${nom} ne démarre pas (journaux ci-dessus). Le dossier et la base sont gardés : recipelog-instance redemarrer ${nom}"
   fi
 }
 
+# Passe un client existant (créé sans Authentik) sur la connexion par Authentik.
+cmd_brancher() {
+  local nom="" resp="" max=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --responsable) resp="${2:-}"; shift 2 ;;
+      --max) max="${2:-}"; shift 2 ;;
+      -*) die "Option inconnue : $1" ;;
+      *) nom="$1"; shift ;;
+    esac
+  done
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance brancher-authentik <nom existant> [--responsable email] [--max N]"
+  [ -z "${resp}" ] || verifier_email "${resp}"
+  verifier_max "${max}"
+  grep -q '^CONNEXION=authentik' "${INSTANCES}/${nom}/instance.conf" && die "« ${nom} » utilise déjà Authentik."
+  brancher "${nom}" "${max}" "${resp}"
+  lancer "${nom}"
+  attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom}"
+  inviter_responsable "${nom}" "${resp}"
+  info "✅ ${nom} se connecte maintenant par Authentik. Tu peux retirer sa protection Cloudflare Access."
+}
+
+cmd_equipe() {
+  [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance equipe <nom existant>"
+  passerelle equipe "$1"
+}
+
+cmd_inviter() {
+  [ $# -ge 2 ] && existe "$1" || die "Usage : recipelog-instance inviter <nom existant> <email> [nom affiché]"
+  verifier_email "$2"
+  passerelle inviter "$@"
+}
+
+cmd_quota() {
+  [ $# -eq 2 ] && existe "$1" || die "Usage : recipelog-instance quota <nom existant> <N|0>   (0 = pas de plafond)"
+  verifier_max "$2"
+  passerelle quota "$1" "$2" >/dev/null && info "✅ $1 : $([ "$2" = 0 ] && echo "pas de plafond" || echo "$2 comptes au plus")."
+}
+
 cmd_liste() {
-  printf "%-20s %-8s %-10s %s\n" "CLIENT" "CANAL" "ÉTAT" "ADRESSE"
-  local d nom etat canal
+  printf "%-20s %-10s %-10s %-10s %s\n" "CLIENT" "CANAL" "CONNEXION" "ÉTAT" "ADRESSE"
+  local d nom etat canal cx
   for d in "${INSTANCES}"/*/; do
     [ -d "${d}" ] || continue
     nom="$(basename "${d}")"
     canal="$(sed -n 's/^CANAL=//p' "${d}/instance.conf" 2>/dev/null)"
+    cx="$(sed -n 's/^CONNEXION=//p' "${d}/instance.conf" 2>/dev/null)"
     etat="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "${nom}")" 2>/dev/null || echo arrêté)"
-    printf "%-20s %-8s %-10s %s\n" "${nom}" "${canal}" "${etat}" "https://${nom}.${DOMAINE}"
+    printf "%-20s %-10s %-10s %-10s %s\n" "${nom}" "${canal}" "${cx:-cloudflare}" "${etat}" "https://${nom}.${DOMAINE}"
   done
 }
 
@@ -236,6 +334,10 @@ cmd_supprimer() {
 DROP DATABASE IF EXISTS ${db};
 DROP ROLE IF EXISTS ${db};
 SQL
+  if grep -q '^CONNEXION=authentik' "${INSTANCES}/${nom}/instance.conf"; then
+    info "Retrait du client dans Authentik (les comptes qui ne servent plus sont désactivés)…"
+    passerelle client-supprimer "${nom}" >/dev/null || echo "⚠️  Authentik : client « ${nom} » non retiré. À refaire : docker exec recipelog-passerelle node cli.mjs client-supprimer ${nom}" >&2
+  fi
   rm -rf "${INSTANCES:?}/${nom}"
   info "✅ ${nom} supprimé. Archive : ${arch}"
 }
@@ -246,9 +348,13 @@ action="${1:-}"; shift || true
 case "${action}" in
   creer) cmd_creer "$@" ;;
   liste) cmd_liste ;;
+  equipe) cmd_equipe "$@" ;;
+  inviter) cmd_inviter "$@" ;;
+  quota) cmd_quota "$@" ;;
+  brancher-authentik) cmd_brancher "$@" ;;
   mettre-a-jour) cmd_maj "$@" ;;
   redemarrer) cmd_redemarrer "$@" ;;
   journaux) cmd_journaux "$@" ;;
   supprimer) cmd_supprimer "$@" ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

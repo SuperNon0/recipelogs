@@ -1,9 +1,12 @@
 // Commandes d'administration de la passerelle, lancées par recipelog-instance
 // et install.sh avec : docker exec recipelog-passerelle node cli.mjs <commande> …
 // Répond en JSON sur la sortie standard ; message d'erreur et code 1 sinon.
-import { ErreurPasserelle, changerQuota, creerClient, equipe, initialiser, inviter, supprimerClient } from "./authentik.mjs";
+import { ErreurPasserelle, brancherGoogle, changerQuota, creerClient, equipe, initialiser, inviter, supprimerClient } from "./authentik.mjs";
 
-const [commande, ...args] = process.argv.slice(2);
+const tout = process.argv.slice(2);
+// --env : réponse en lignes CLE=valeur (pour un fichier .env), sinon JSON.
+const enEnv = tout.includes("--env");
+const [commande, ...args] = tout.filter((a) => a !== "--env");
 const entier = (v) => (v === undefined || v === "" || v === "0" ? null : Number.parseInt(v, 10));
 
 const commandes = {
@@ -16,6 +19,8 @@ const commandes = {
   equipe: () => equipe(args[0]),
   // inviter <nom> <email> [nom affiché]
   inviter: () => inviter(args[0], args[1], args.slice(2).join(" ")),
+  // google <identifiant client> <secret> : bouton « Se connecter avec Google »
+  google: () => brancherGoogle(args[0], args[1]),
   // attendre : jusqu'à ce qu'Authentik réponde et que les réglages RecipeLog soient appliqués
   attendre: async () => {
     const { groupe } = await import("./authentik.mjs");
@@ -31,11 +36,16 @@ const commandes = {
 
 const f = commandes[commande];
 if (!f) {
-  console.error("Commandes : initialiser, client-creer, client-supprimer, quota, equipe, inviter, attendre");
+  console.error("Commandes : initialiser, client-creer, client-supprimer, quota, equipe, inviter, google, attendre");
   process.exit(2);
 }
 try {
-  console.log(JSON.stringify(await f(), null, 1));
+  const r = await f();
+  if (enEnv && r && typeof r === "object") {
+    for (const [k, v] of Object.entries(r)) console.log(`${k}=${v ?? ""}`);
+  } else {
+    console.log(JSON.stringify(r, null, 1));
+  }
 } catch (e) {
   console.error(`❌ ${e.message}`);
   if (e.extra?.detail) console.error(JSON.stringify(e.extra.detail));

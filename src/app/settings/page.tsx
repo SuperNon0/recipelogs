@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -35,6 +35,13 @@ export default async function SettingsPage() {
   // Plateforme (connexion par Authentik) : « Se déconnecter ».
   const oidc = authMode() === "oidc";
   const email = realAccountOf(viewer)?.email ?? null;
+  // Page « Mon compte » d'Authentik : mot de passe et double authentification.
+  let compteAuthentik: string | null = null;
+  try {
+    if (oidc && process.env.OIDC_ISSUER) compteAuthentik = `${new URL(process.env.OIDC_ISSUER).origin}/if/user/#/settings`;
+  } catch {
+    compteAuthentik = null;
+  }
 
   const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
 
@@ -209,6 +216,20 @@ export default async function SettingsPage() {
             <h2>Mon compte</h2>
           </div>
           <div className="fl-list">
+            {compteAuthentik && (
+              <a href={compteAuthentik} className="fl-row" target="_blank" rel="noopener noreferrer">
+                <span className="ic">
+                  <KeyRound size={17} />
+                </span>
+                <span className="set-tx">
+                  <b>
+                    <span>Mot de passe et sécurité</span>
+                  </b>
+                  <small>Changer ton mot de passe, activer la double authentification (code sur ton téléphone)</small>
+                </span>
+                <ChevronRight size={16} className="set-chev" />
+              </a>
+            )}
             {/* Simple lien (pas next/link) : un préchargement ne doit jamais déconnecter. */}
             <a href="/auth/deconnexion" className="fl-row">
               <span className="ic">
