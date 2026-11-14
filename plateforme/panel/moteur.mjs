@@ -4,14 +4,19 @@
 // ligne de commande) et la passerelle, puis note chaque action dans le journal.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
 
 const CLE = process.env.MOTEUR_CLE || "";
 const DONNEES = process.env.DONNEES || "/srv/recipelog";
 const JOURNAL = `${DONNEES}/journal-panel.jsonl`;
-const OUTIL = "/usr/local/bin/recipelog-instance";
+const OUTIL = "/opt/recipelog/bin/recipelog-instance";
 const NOM_RE = /^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/;
+const SAUV_RE = /^[0-9]{8}-[0-9]{6}$/;
+const SAUVEGARDES = `${DONNEES}/sauvegardes`;
+// Heure des sauvegardes de la nuit (heure de Paris, TZ du conteneur) et jour du test (0 = dimanche).
+const HEURE_SAUVEGARDE = Number(process.env.SAUVEGARDE_HEURE ?? 3);
+const JOUR_TEST = Number(process.env.SAUVEGARDE_JOUR_TEST ?? 0);
 const EMAIL_RE = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 
 if (CLE.length < 32) {
@@ -97,9 +102,34 @@ async function clients() {
     tous.map(async (c) => {
       c.version = c.suspendu ? null : await versionDe(c.nom);
       c.places = places[c.nom] ?? null;
+      c.sauvegarde = await resumeSauvegardes(c.nom);
     }),
   );
   return tous;
+}
+
+// Dernière sauvegarde et dernier test, lus directement sur le disque.
+async function resumeSauvegardes(nom) {
+  const dossier = `${SAUVEGARDES}/${nom}`;
+  let ids = [];
+  try {
+    ids = (await readdir(dossier)).filter((x) => SAUV_RE.test(x)).sort().reverse();
+  } catch {
+    return { nombre: 0, derniere: null, test: null };
+  }
+  let derniere = null;
+  let test = null;
+  try {
+    derniere = ids[0] ? JSON.parse(await readFile(`${dossier}/${ids[0]}/infos.json`, "utf8")) : null;
+  } catch {
+    derniere = null;
+  }
+  try {
+    test = JSON.parse(await readFile(`${dossier}/dernier-test.json`, "utf8"));
+  } catch {
+    test = null;
+  }
+  return { nombre: ids.length, derniere, test };
 }
 
 async function journal(n = 100) {
@@ -159,6 +189,18 @@ async function action(qui, nom, act, corps) {
       exiger(EMAIL_RE.test(corps.email ?? ""), "Adresse email invalide.");
       details = { email: corps.email };
       r = await passerelle(act, nom, corps.email);
+      break;
+    case "sauvegarder":
+      r = await unParUn(() => outil("sauvegarder", nom, "--etiquette", "manuelle"));
+      break;
+    case "tester-sauvegarde":
+      r = await unParUn(() => outil("tester-sauvegarde", nom));
+      break;
+    case "restaurer":
+      exiger(SAUV_RE.test(corps.sauvegarde ?? ""), "Sauvegarde inconnue.");
+      exiger(corps.confirmation === nom, "Tape le nom du client pour confirmer.");
+      details = { sauvegarde: corps.sauvegarde };
+      r = await unParUn(() => outil("restaurer", nom, corps.sauvegarde, "--oui"));
       break;
     case "supprimer":
       exiger(corps.confirmation === nom, "Tape le nom du client pour confirmer.");
@@ -230,6 +272,32 @@ createServer(async (req, res) => {
       if (!r.ok) return repondre(res, 502, { error: "passerelle", message: r.sortie });
       return repondre(res, 200, JSON.parse(r.sortie));
     }
+    if (req.method === "GET" && morceaux[0] === "clients" && morceaux[2] === "sauvegardes" && morceaux.length === 3) {
+      exiger(NOM_RE.test(morceaux[1]), "Nom de client invalide.");
+      const r = await outil("sauvegardes", morceaux[1], "--json");
+      if (!r.ok) return repondre(res, 500, { error: "sauvegardes", message: r.sortie });
+      return repondre(res, 200, JSON.parse(r.sortie));
+    }
+    // Téléchargement : archive .tar.gz envoyée au fil de l'eau (base + fichiers, sans mots de passe).
+    if (req.method === "GET" && morceaux[0] === "clients" && morceaux[2] === "sauvegardes" && morceaux[4] === "export" && morceaux.length === 5) {
+      const [, nom, , id] = morceaux;
+      exiger(NOM_RE.test(nom) && SAUV_RE.test(id), "Sauvegarde inconnue.");
+      try {
+        await readFile(`${SAUVEGARDES}/${nom}/${id}/infos.json`);
+      } catch {
+        return repondre(res, 404, { error: "introuvable" });
+      }
+      await noter(qui, "telecharger", nom, { ok: true, sortie: "" }, { sauvegarde: id });
+      res.writeHead(200, {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": `attachment; filename="recipelog-${nom}-${id}.tar.gz"`,
+      });
+      const p = spawn(OUTIL, ["exporter", nom, id], { env: { ...process.env, DONNEES } });
+      p.stdout.pipe(res);
+      p.stderr.on("data", (d) => console.error("export :", String(d).trim()));
+      req.on("close", () => p.kill("SIGTERM"));
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/clients") {
       const r = await creer(qui, await lireCorps(req));
       return repondre(res, r.ok ? 200 : 500, r);
@@ -258,3 +326,36 @@ async function essais() {
 }
 setTimeout(essais, 60 * 1000);
 setInterval(essais, 60 * 60 * 1000);
+
+// Chaque nuit à HEURE_SAUVEGARDE : sauvegarde de tous les clients.
+// Une fois par semaine (JOUR_TEST), une heure après : test de restauration.
+// La date du dernier passage est gardée sur le disque pour ne pas refaire
+// (ou rater) une sauvegarde quand le moteur redémarre.
+const PLANNING = `${SAUVEGARDES}/planning.json`;
+const jourDe = (d) => d.toLocaleDateString("sv-SE"); // AAAA-MM-JJ, heure locale
+async function planning() {
+  await mkdir(SAUVEGARDES, { recursive: true, mode: 0o700 }).catch(() => {});
+  let fait = {};
+  try {
+    fait = JSON.parse(await readFile(PLANNING, "utf8"));
+  } catch {
+    fait = {};
+  }
+  const maintenant = new Date();
+  const aujourdhui = jourDe(maintenant);
+  const heure = maintenant.getHours();
+  if (heure >= HEURE_SAUVEGARDE && fait.sauvegarde !== aujourdhui) {
+    fait.sauvegarde = aujourdhui;
+    await writeFile(PLANNING, JSON.stringify(fait), { mode: 0o600 }).catch(() => {});
+    const r = await unParUn(() => outil("sauvegarder", "--tous", "--etiquette", "auto"));
+    await noter("automatique", "sauvegardes-nuit", "tous", r);
+  }
+  if (maintenant.getDay() === JOUR_TEST && heure >= HEURE_SAUVEGARDE + 1 && fait.test !== aujourdhui) {
+    fait.test = aujourdhui;
+    await writeFile(PLANNING, JSON.stringify(fait), { mode: 0o600 }).catch(() => {});
+    const r = await unParUn(() => outil("tester-sauvegarde", "--tous"));
+    await noter("automatique", "test-sauvegardes", "tous", r);
+  }
+}
+setTimeout(planning, 2 * 60 * 1000);
+setInterval(planning, 5 * 60 * 1000);

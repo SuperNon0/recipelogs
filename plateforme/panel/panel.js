@@ -96,6 +96,20 @@ function offre(c) {
   return j >= 0 ? `<span class="etiquette acc">Essai : ${j} j</span>` : `<span class="etiquette pause">Essai fini</span>`;
 }
 
+// Dernière sauvegarde : plus de 36 h, ou test raté = à regarder.
+const taille = (o) => (o >= 1048576 ? `${(o / 1048576).toFixed(1).replace(".", ",")} Mo` : `${Math.max(1, Math.round(o / 1024))} Ko`);
+const dateSauv = (id) => new Date(`${id.slice(0, 4)}-${id.slice(4, 6)}-${id.slice(6, 8)}T${id.slice(9, 11)}:${id.slice(11, 13)}:${id.slice(13, 15)}Z`);
+function sauvegarde(c) {
+  const s = c.sauvegarde;
+  if (!s?.derniere) return `<span class="etiquette pause">Aucune</span>`;
+  const quand = dateSauv(s.derniere.id);
+  const vieille = Date.now() - quand.getTime() > 36 * 3600 * 1000;
+  const testKo = s.test && !s.test.ok;
+  const texte = quand.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  if (testKo) return `<span class="etiquette ko" title="Le dernier test de restauration a échoué">Test raté</span>`;
+  return vieille ? `<span class="etiquette pause" title="Plus de 36 heures">${e(texte)}</span>` : e(texte);
+}
+
 function afficher() {
   const n = CLIENTS.length;
   const enLigne = CLIENTS.filter((c) => !c.suspendu && c.etat === "healthy").length;
@@ -125,10 +139,12 @@ function afficher() {
       <div class="info"><span class="lbl">Places</span>${places(c)}</div>
       <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small></div>
       <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}</div>
+      <div class="info"><span class="lbl">Sauvegarde</span>${sauvegarde(c)}</div>
       <div class="actions">
         <a class="btn petit" href="${e(c.adresse)}" target="_blank" rel="noopener">Ouvrir</a>
         ${c.connexion === "authentik" ? `<button class="btn petit" data-act="equipe">Équipe</button>` : ""}
         <button class="btn petit" data-act="reglages">Réglages</button>
+        <button class="btn petit" data-act="sauvegardes">Sauvegardes</button>
         ${c.suspendu ? `<button class="btn petit" data-act="reactiver">Réactiver</button>` : `<button class="btn petit" data-act="mettre-a-jour">Mettre à jour</button><button class="btn petit" data-act="suspendre">Pause</button>`}
         <button class="btn petit danger" data-act="supprimer">Supprimer</button>
       </div>
@@ -151,6 +167,12 @@ const NOMS_ACTIONS = {
   retirer: "a retiré de l'équipe de",
   supprimer: "a supprimé",
   "fin-essai": "a mis en pause (essai fini)",
+  sauvegarder: "a sauvegardé",
+  restaurer: "a restauré",
+  "tester-sauvegarde": "a testé la sauvegarde de",
+  telecharger: "a téléchargé une sauvegarde de",
+  "sauvegardes-nuit": "a sauvegardé (nuit)",
+  "test-sauvegardes": "a testé les sauvegardes (semaine)",
 };
 let JOURNAL = [];
 function afficherJournal() {
@@ -161,7 +183,7 @@ function afficherJournal() {
   $("#journal").innerHTML = JOURNAL.slice(0, 40)
     .map((l, i) => {
       const d = l.details ?? {};
-      const plus = d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined ? ` (MCP ${d.mcp ? "permis" : "coupé"})` : "";
+      const plus = d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined ? ` (MCP ${d.mcp ? "permis" : "coupé"})` : "";
       return `<div class="ligne"><time>${heureFr(l.date)}</time><span class="qui">${e(l.qui)}</span>
         <span>${e(NOMS_ACTIONS[l.action] ?? l.action)} <b>${e(l.client)}</b>${plus} ${l.ok ? "" : `<span class="etiquette ko">échec</span>`}</span>
         <button type="button" data-journal="${i}">Détails</button></div>`;
@@ -239,7 +261,57 @@ $("#clients").addEventListener("click", (ev) => {
   if (act === "supprimer") fenetreSuppression(c);
   if (act === "reglages") fenetreReglages(c);
   if (act === "equipe") fenetreEquipe(c);
+  if (act === "sauvegardes") fenetreSauvegardes(c);
 });
+
+const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
+async function fenetreSauvegardes(c) {
+  ouvrir(`Sauvegardes de ${c.nom}`, `<p class="attente"><span class="rond"></span>Chargement…</p>`, charger);
+  const r = await api("GET", `/clients/${c.nom}/sauvegardes`);
+  if (!r.sauvegardes) {
+    $("#fenetre-corps").innerHTML = `<p class="erreur">${e(r.message ?? "Sauvegardes indisponibles.")}</p>`;
+    return;
+  }
+  const t = r.test;
+  const test = t
+    ? `<p class="${t.ok ? "sub" : "erreur"}">Dernier test de restauration, le ${e(heureFr(t.date))} : ${t.ok ? `<span class="etiquette ok">réussi</span> (${e(t.recettes)} recettes relues)` : `<span class="etiquette ko">raté</span> : ${e(t.raison)}`}</p>`
+    : `<p class="sub">Pas encore de test de restauration (il se fait tout seul chaque dimanche matin).</p>`;
+  const lignes = r.sauvegardes.length
+    ? r.sauvegardes
+        .map(
+          (s) => `<div class="membre" data-id="${e(s.id)}"><div><b>${e(heureFr(dateSauv(s.id).toISOString()))}</b><small>${e(ETIQUETTES[s.etiquette] ?? s.etiquette)} · base ${e(taille(s.base))} · fichiers ${e(taille(s.fichiers))}${s.version ? ` · ${e(s.version)}` : ""}</small></div>
+          <a class="btn petit" href="/telecharger/${e(c.nom)}/${e(s.id)}" download>Télécharger</a><button class="btn petit danger" type="button" data-s="restaurer">Restaurer</button></div>`,
+        )
+        .join("")
+    : `<p class="sub">Aucune sauvegarde pour l'instant. La première se fera cette nuit, ou maintenant avec le bouton ci-dessous.</p>`;
+  $("#fenetre-corps").innerHTML = `<p class="sub">Chaque nuit vers 3 h, la base, les photos et les factures de ${e(c.nom)} sont sauvegardées sur la machine. On garde les 7 derniers jours, puis une par semaine pendant 4 semaines et une par mois pendant 6 mois. ${aide("sv-a", "Ces sauvegardes sont sur le disque de la VM. La copie hors de la machine, c'est ta sauvegarde Proxmox Backup Server vers OVH : elle emporte toute la VM, sauvegardes comprises.")}</p>
+    ${test}
+    <div class="barre serree"><button class="btn principal" type="button" id="sv-maintenant">Sauvegarder maintenant</button><button class="btn" type="button" id="sv-tester">Tester la dernière</button>
+    <button class="aide" type="button" data-aide="sv-a2" aria-label="Aide">?</button></div>
+    <p class="texte-aide" id="sv-a2"><b>Tester</b> recharge la dernière sauvegarde dans une base à part, compte ses recettes et vérifie les fichiers, sans toucher au site du client. <b>Télécharger</b> donne une archive avec la base et les fichiers, sans aucun mot de passe : à garder ou à remettre au client.</p>
+    <div class="membres">${lignes}</div>`;
+  $("#sv-maintenant").addEventListener("click", () => executer(`Sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/sauvegarder`)).then(() => (apresFermeture = () => fenetreSauvegardes(c))));
+  $("#sv-tester").addEventListener("click", () => executer(`Test de la sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/tester-sauvegarde`)).then(() => (apresFermeture = () => fenetreSauvegardes(c))));
+  $("#fenetre-corps").querySelectorAll("[data-s=restaurer]").forEach((b) =>
+    b.addEventListener("click", () => fenetreRestaurer(c, b.closest("[data-id]").dataset.id)),
+  );
+}
+
+function fenetreRestaurer(c, id) {
+  const quand = heureFr(dateSauv(id).toISOString());
+  ouvrir(
+    `Restaurer ${c.nom} ?`,
+    `<p class="sub">Les recettes, comptes, photos et factures de ${e(c.nom)} reviennent à leur état du <b>${e(quand)}</b>. Tout ce qui a été fait depuis disparaît du site. Le site est coupé environ une minute.</p>
+    <p class="texte-aide visible">Juste avant, l'état actuel est sauvegardé (étiquette « Avant restauration ») : tu peux revenir en arrière avec cette sauvegarde-là.</p>
+    <div class="champ"><label for="rs-nom">Tape <b>${e(c.nom)}</b> pour confirmer</label><input id="rs-nom" type="text" autocapitalize="none" spellcheck="false"></div>
+    <p class="erreur" id="rs-erreur"></p>
+    <div class="pied"><button class="btn danger" id="ok-restaurer" type="button">Restaurer</button></div>`,
+  );
+  $("#ok-restaurer").addEventListener("click", () => {
+    if ($("#rs-nom").value.trim() !== c.nom) return ($("#rs-erreur").textContent = "Le nom ne correspond pas.");
+    executer(`Restauration de ${c.nom}`, () => api("POST", `/clients/${c.nom}/restaurer`, { sauvegarde: id, confirmation: c.nom }));
+  });
+}
 
 function fenetrePause(c) {
   ouvrir(

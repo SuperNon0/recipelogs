@@ -20,6 +20,11 @@
 #   recipelog-instance redemarrer <nom>
 #   recipelog-instance journaux <nom>
 #   recipelog-instance supprimer <nom> --oui
+#   recipelog-instance sauvegarder <nom>|--tous [--etiquette mot]
+#   recipelog-instance sauvegardes <nom> [--json]
+#   recipelog-instance restaurer <nom> <sauvegarde> --oui
+#   recipelog-instance tester-sauvegarde <nom>|--tous
+#   recipelog-instance exporter <nom> <sauvegarde> > fichier.tar.gz   (sans mots de passe)
 #
 # Réglages lus dans /srv/recipelog/.env (écrit par install.sh).
 # Chaque client a son dossier /srv/recipelog/instances/<nom>/ :
@@ -28,6 +33,7 @@
 #   instance.env   variables du conteneur (mot de passe de sa base, réglages
 #                  de connexion Authentik : voir ../connexion.md)
 #   uploads/       photos et factures envoyées
+# Sauvegardes de chaque client dans /srv/recipelog/sauvegardes/<nom>/.
 # ============================================================
 set -euo pipefail
 
@@ -43,6 +49,10 @@ DOMAINE="${DOMAINE:-recipelog.cc}"
 IMAGE="${IMAGE:-ghcr.io/supernon0/recipelog}"
 INSTANCES="${DONNEES}/instances"
 ARCHIVES="${DONNEES}/archives"
+SAUVEGARDES="${DONNEES}/sauvegardes"
+GARDER_JOURS="${SAUVEGARDE_JOURS:-7}"
+GARDER_SEMAINES="${SAUVEGARDE_SEMAINES:-4}"
+GARDER_MOIS="${SAUVEGARDE_MOIS:-6}"
 PG="recipelog-postgres"
 RESERVES=" www admin auth demo api status mail smtp traefik panel plateforme "
 MEMOIRE="${INSTANCE_MEMOIRE:-1g}"
@@ -432,6 +442,219 @@ cmd_journaux() {
   docker logs -f --tail 100 "$(conteneur "$1")"
 }
 
+# ------------------------------------------------------------ sauvegardes (lot 3)
+# Une sauvegarde = un dossier sauvegardes/<nom>/<AAAAMMJJ-HHMMSS>/ :
+#   base.dump        la base du client (pg_dump, format compressé)
+#   fichiers.tar.gz  photos et factures (uploads/) + instance.conf
+#   reglages.tar.gz  instance.env (mots de passe : jamais dans un export)
+#   infos.json       date, étiquette, version, tailles
+# Rotation : TOUTES celles des GARDER_JOURS derniers jours ; avant, la plus récente
+# de chaque semaine (GARDER_SEMAINES semaines) et de chaque mois (GARDER_MOIS mois).
+dossier_sauv() { echo "${SAUVEGARDES}/$1"; }
+id_valide() { [[ "$1" =~ ^[0-9]{8}-[0-9]{6}$ ]] || die "Sauvegarde « $1 » inconnue."; }
+
+version_client() {
+  docker exec "$(conteneur "$1")" node -e 'fetch("http://127.0.0.1:3000/api/health").then(r=>r.json()).then(j=>console.log(j.version||"")).catch(()=>{})' 2>/dev/null || true
+}
+
+# sauvegarder_un <nom> [etiquette] [--sans-rotation] : affiche l'identifiant de la sauvegarde.
+sauvegarder_un() {
+  local nom="$1" etiquette="${2:-auto}" rotation="${3:-}" dir="${INSTANCES}/$1" racine id tmp db version
+  racine="$(dossier_sauv "${nom}")"
+  db="$(base "${nom}")"
+  mkdir -p "${racine}"; chmod 700 "${SAUVEGARDES}" "${racine}"
+  # Restes d'une sauvegarde interrompue.
+  find "${racine}" -mindepth 1 -maxdepth 1 -type d -name '*.partiel' -exec rm -rf {} +
+  id="$(date -u +%Y%m%d-%H%M%S)"
+  while [ -e "${racine}/${id}" ]; do sleep 1; id="$(date -u +%Y%m%d-%H%M%S)"; done
+  tmp="${racine}/${id}.partiel"
+  mkdir -m 700 "${tmp}"
+  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${tmp}/base.dump" || { echo "❌ ${nom} : la base n'a pas pu être sauvegardée." >&2; return 1; }
+  tar -C "${dir}" -czf "${tmp}/fichiers.tar.gz" uploads instance.conf || { echo "❌ ${nom} : les fichiers n'ont pas pu être sauvegardés." >&2; return 1; }
+  tar -C "${dir}" -czf "${tmp}/reglages.tar.gz" instance.env
+  version="$(version_client "${nom}")"
+  printf '{"id":"%s","date":"%s","etiquette":"%s","version":"%s","base":%s,"fichiers":%s}\n' \
+    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${etiquette}" "${version}" \
+    "$(stat -c %s "${tmp}/base.dump")" "$(stat -c %s "${tmp}/fichiers.tar.gz")" > "${tmp}/infos.json"
+  chmod 600 "${tmp}"/*
+  mv "${tmp}" "${racine}/${id}"
+  [ "${rotation}" = "--sans-rotation" ] || elaguer "${nom}"
+  echo "${id}"
+}
+
+# Garde la plus récente de chaque jour / semaine / mois dans les limites ; supprime le reste.
+elaguer() {
+  local racine id jour sem mois limite
+  racine="$(dossier_sauv "$1")"
+  limite="$(date -u -d "-$((GARDER_JOURS - 1)) days" +%Y%m%d)"
+  declare -A semaines=() moisv=() garder=()
+  local ids=()
+  mapfile -t ids < <(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r)
+  for id in "${ids[@]}"; do
+    jour="${id:0:8}"
+    sem="$(date -u -d "${jour}" +%G%V)"
+    mois="${id:0:6}"
+    if [[ ! "${jour}" < "${limite}" ]]; then garder[${id}]=1; continue; fi
+    if [ -z "${semaines[${sem}]:-}" ] && [ "${#semaines[@]}" -lt "${GARDER_SEMAINES}" ]; then semaines[${sem}]=1; garder[${id}]=1; fi
+    if [ -z "${moisv[${mois}]:-}" ] && [ "${#moisv[@]}" -lt "${GARDER_MOIS}" ]; then moisv[${mois}]=1; garder[${id}]=1; fi
+  done
+  for id in "${ids[@]}"; do
+    [ -n "${garder[${id}]:-}" ] || find "${racine}" -mindepth 1 -maxdepth 1 -type d -name "${id}" -exec rm -rf {} +
+  done
+}
+
+cmd_sauvegarder() {
+  local cible="${1:-}" etiquette="manuelle"
+  [ -n "${cible}" ] || die "Usage : recipelog-instance sauvegarder <nom>|--tous [--etiquette mot]"
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --etiquette) [[ "${2:-}" =~ ^[a-z0-9-]{1,30}$ ]] || die "Étiquette invalide."; etiquette="$2"; shift 2 ;;
+      *) die "Option inconnue : $1" ;;
+    esac
+  done
+  if [ "${cible}" = "--tous" ]; then
+    local d n echecs=0
+    for d in "${INSTANCES}"/*/; do
+      [ -d "${d}" ] || continue
+      n="$(basename "${d}")"
+      if id="$(sauvegarder_un "${n}" "${etiquette}")"; then info "${n} : sauvegarde ${id}"; else echecs=$((echecs + 1)); fi
+    done
+    [ "${echecs}" -eq 0 ] || die "${echecs} client(s) non sauvegardé(s)."
+  else
+    existe "${cible}" || die "Client « ${cible} » inconnu."
+    local id; id="$(sauvegarder_un "${cible}" "${etiquette}")" || die "Sauvegarde de ${cible} ratée."
+    info "✅ ${cible} : sauvegarde ${id}"
+  fi
+}
+
+cmd_sauvegardes() {
+  local nom="${1:-}" json="${2:-}" racine id
+  [ -n "${nom}" ] || die "Usage : recipelog-instance sauvegardes <nom> [--json]"
+  racine="$(dossier_sauv "${nom}")"
+  local ids=()
+  [ -d "${racine}" ] && mapfile -t ids < <(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r)
+  if [ "${json}" = "--json" ]; then
+    local sep="" test="null"
+    printf '{"sauvegardes":['
+    for id in "${ids[@]}"; do
+      [ -r "${racine}/${id}/infos.json" ] || continue
+      printf '%s%s' "${sep}" "$(tr -d '\n' < "${racine}/${id}/infos.json")"; sep=","
+    done
+    [ -r "${racine}/dernier-test.json" ] && test="$(tr -d '\n' < "${racine}/dernier-test.json")"
+    printf '],"test":%s}\n' "${test}"
+  else
+    [ "${#ids[@]}" -gt 0 ] || { echo "Aucune sauvegarde pour ${nom}."; return 0; }
+    printf '%-17s %-20s %10s %10s\n' SAUVEGARDE ETIQUETTE BASE FICHIERS
+    for id in "${ids[@]}"; do
+      local f="${racine}/${id}/infos.json"
+      printf '%-17s %-20s %10s %10s\n' "${id}" \
+        "$(sed -n 's/.*"etiquette":"\([^"]*\)".*/\1/p' "${f}")" \
+        "$(numfmt --to=iec "$(sed -n 's/.*"base":\([0-9]*\).*/\1/p' "${f}")")" \
+        "$(numfmt --to=iec "$(sed -n 's/.*"fichiers":\([0-9]*\).*/\1/p' "${f}")")"
+    done
+    [ -r "${racine}/dernier-test.json" ] && echo "Dernier test de restauration : $(cat "${racine}/dernier-test.json")"
+  fi
+}
+
+# charger_base <base> <rôle> <fichier dump> : recrée la base à partir d'une sauvegarde.
+charger_base() {
+  local db="$1" role="$2" dump="$3"
+  psql_admin >/dev/null <<SQL
+SET client_min_messages TO warning;
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${db}' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS ${db};
+CREATE DATABASE ${db} OWNER ${role};
+REVOKE ALL ON DATABASE ${db} FROM PUBLIC;
+SQL
+  docker exec -i "${PG}" pg_restore -U postgres -d "${db}" --no-owner --role="${role}" --exit-on-error < "${dump}"
+}
+
+cmd_restaurer() {
+  local nom="${1:-}" id="${2:-}" ok="${3:-}" dir sauv db secu
+  [ -n "${nom}" ] && [ -n "${id}" ] || die "Usage : recipelog-instance restaurer <nom> <sauvegarde> --oui"
+  existe "${nom}" || die "Client « ${nom} » inconnu."
+  id_valide "${id}"
+  sauv="$(dossier_sauv "${nom}")/${id}"
+  [ -r "${sauv}/base.dump" ] || die "Sauvegarde « ${id} » introuvable pour ${nom}."
+  [ "${ok}" = "--oui" ] || die "Ajoute --oui : les données actuelles de ${nom} seront remplacées."
+  dir="${INSTANCES}/${nom}"; db="$(base "${nom}")"
+  info "Sauvegarde de sécurité de l'état actuel…"
+  secu="$(sauvegarder_un "${nom}" avant-restauration --sans-rotation)" || die "Sauvegarde de sécurité ratée : rien n'a été changé."
+  info "Arrêt de ${nom}…"
+  docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
+  info "Remise de la base (${id})…"
+  if ! charger_base "${db}" "${db}" "${sauv}/base.dump"; then
+    echo "❌ La base n'a pas pu être remise. Retour à l'état d'avant (${secu})…" >&2
+    charger_base "${db}" "${db}" "$(dossier_sauv "${nom}")/${secu}/base.dump" || true
+    suspendu "${nom}" || lancer "${nom}"
+    die "Restauration annulée."
+  fi
+  info "Remise des photos et factures…"
+  local neuf="${dir}/uploads.neuf"
+  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.neuf' -exec rm -rf {} +
+  mkdir -p "${neuf}"
+  tar -C "${neuf}" -xzf "${sauv}/fichiers.tar.gz" uploads
+  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.avant' -exec rm -rf {} +
+  mv "${dir}/uploads" "${dir}/uploads.avant"
+  mv "${neuf}/uploads" "${dir}/uploads"
+  find "${dir}" -mindepth 1 -maxdepth 1 \( -name 'uploads.neuf' -o -name 'uploads.avant' \) -exec rm -rf {} +
+  chown -R 1000:1000 "${dir}/uploads"
+  if suspendu "${nom}"; then
+    info "✅ ${nom} restauré (${id}). Il reste en pause."
+  else
+    lancer "${nom}"
+    attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom} (état d'avant : ${secu})"
+    info "✅ ${nom} restauré (${id}). État d'avant gardé : ${secu}"
+  fi
+}
+
+# Restaure la dernière sauvegarde dans une base temporaire pour vérifier qu'elle est bonne.
+tester_un() {
+  local nom="$1" racine id essai recettes ok=true raison=""
+  racine="$(dossier_sauv "${nom}")"
+  id="$(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' 2>/dev/null | sort -r | head -1)"
+  [ -n "${id}" ] || { echo "⚠️  ${nom} : aucune sauvegarde à tester." >&2; return 1; }
+  essai="rl_essai_${nom//-/_}"
+  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai};" -c "CREATE DATABASE ${essai};" >/dev/null
+  if ! docker exec -i "${PG}" pg_restore -U postgres -d "${essai}" --no-owner --exit-on-error < "${racine}/${id}/base.dump" >/dev/null 2>&1; then
+    ok=false; raison="la base ne se recharge pas"
+  else
+    recettes="$(docker exec "${PG}" psql -U postgres -d "${essai}" -tAc 'SELECT count(*) FROM recipes' 2>/dev/null)" || { ok=false; raison="table des recettes absente"; }
+  fi
+  if ${ok} && ! tar -tzf "${racine}/${id}/fichiers.tar.gz" >/dev/null 2>&1; then ok=false; raison="archive des fichiers abîmée"; fi
+  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai};" >/dev/null || true
+  printf '{"date":"%s","sauvegarde":"%s","ok":%s,"recettes":%s,"raison":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${id}" "${ok}" "${recettes:-0}" "${raison}" > "${racine}/dernier-test.json"
+  if ${ok}; then info "${nom} : sauvegarde ${id} relue sans erreur (${recettes} recettes)."; else echo "❌ ${nom} : sauvegarde ${id} : ${raison}." >&2; return 1; fi
+}
+
+cmd_tester_sauvegarde() {
+  [ $# -eq 1 ] || die "Usage : recipelog-instance tester-sauvegarde <nom>|--tous"
+  if [ "$1" = "--tous" ]; then
+    local d echecs=0
+    for d in "${INSTANCES}"/*/; do
+      [ -d "${d}" ] || continue
+      tester_un "$(basename "${d}")" || echecs=$((echecs + 1))
+    done
+    [ "${echecs}" -eq 0 ] || die "${echecs} sauvegarde(s) en échec."
+  else
+    existe "$1" || die "Client « $1 » inconnu."
+    tester_un "$1" || exit 1
+  fi
+}
+
+# Archive .tar.gz sur la sortie standard : base + fichiers, sans les mots de passe.
+cmd_exporter() {
+  local nom="${1:-}" id="${2:-}" sauv
+  [ -n "${nom}" ] && [ -n "${id}" ] || die "Usage : recipelog-instance exporter <nom> <sauvegarde> > fichier.tar.gz"
+  id_valide "${id}"
+  sauv="$(dossier_sauv "${nom}")/${id}"
+  [ -r "${sauv}/base.dump" ] || die "Sauvegarde « ${id} » introuvable pour ${nom}."
+  [ -t 1 ] && die "Rediriger la sortie vers un fichier : … > ${nom}-${id}.tar.gz"
+  tar -C "${sauv}" -czf - base.dump fichiers.tar.gz infos.json
+}
+
 # Supprime un client en gardant une archive (base + fichiers) dans archives/.
 cmd_supprimer() {
   local nom="${1:-}" ok="${2:-}"
@@ -454,12 +677,13 @@ SQL
     info "Retrait du client dans Authentik (les comptes qui ne servent plus sont désactivés)…"
     passerelle client-supprimer "${nom}" >/dev/null || echo "⚠️  Authentik : client « ${nom} » non retiré. À refaire : docker exec recipelog-passerelle node cli.mjs client-supprimer ${nom}" >&2
   fi
+  if [ -d "$(dossier_sauv "${nom}")" ]; then mv "$(dossier_sauv "${nom}")" "${arch}/sauvegardes"; fi
   rm -rf "${INSTANCES:?}/${nom}"
-  info "✅ ${nom} supprimé. Archive : ${arch}"
+  info "✅ ${nom} supprimé. Archive (avec ses sauvegardes) : ${arch}"
 }
 
 [ "$(id -u)" -eq 0 ] || die "À lancer en root."
-mkdir -p "${INSTANCES}" "${ARCHIVES}"
+mkdir -p "${INSTANCES}" "${ARCHIVES}" "${SAUVEGARDES}"
 action="${1:-}"; shift || true
 case "${action}" in
   creer) cmd_creer "$@" ;;
@@ -477,5 +701,10 @@ case "${action}" in
   redemarrer) cmd_redemarrer "$@" ;;
   journaux) cmd_journaux "$@" ;;
   supprimer) cmd_supprimer "$@" ;;
-  *) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  sauvegarder) cmd_sauvegarder "$@" ;;
+  sauvegardes) cmd_sauvegardes "$@" ;;
+  restaurer) cmd_restaurer "$@" ;;
+  tester-sauvegarde) cmd_tester_sauvegarde "$@" ;;
+  exporter) cmd_exporter "$@" ;;
+  *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
