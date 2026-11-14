@@ -9,7 +9,10 @@ import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
 import { headers } from "next/headers";
 import Script from "next/script";
 import { getViewer, viewerCan, viewerPermissions } from "@/lib/auth/viewer";
-import { PATH_HEADER } from "@/lib/auth/path";
+import { PATH_HEADER, SEARCH_HEADER } from "@/lib/auth/path";
+import { authMode } from "@/lib/auth/config";
+import { safeReturnPath } from "@/lib/auth/oidc";
+import { redirect } from "next/navigation";
 import { ALL_PERMISSIONS } from "@/lib/auth/permissions";
 import { PermissionsProvider } from "@/components/auth/Permissions";
 import { AccessGate } from "@/components/auth/AccessGate";
@@ -96,7 +99,8 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const path = (await headers()).get(PATH_HEADER) ?? "";
+  const h = await headers();
+  const path = h.get(PATH_HEADER) ?? "";
   const viewer = await getViewer();
   // Partage public : pas de compte demandé (le middleware le garde en lecture seule).
   const gated = !path.startsWith("/share") && !viewerCan(viewer, "read");
@@ -112,13 +116,19 @@ export default async function RootLayout({
   );
   const encreJs = <Script src="/encre/encre.js" strategy="afterInteractive" />;
 
+  // Plateforme (connexion par Authentik) : pas encore connecté → page de connexion, puis retour ici.
+  if (gated && viewer.kind === "anonymous" && authMode() === "oidc") {
+    const search = h.get(SEARCH_HEADER) ?? "";
+    redirect(`/auth/connexion?retour=${encodeURIComponent(safeReturnPath(`${path || "/"}${search}`))}`);
+  }
+
   // Comptes activés et visiteur sans accès : page de demande, d'attente, de refus ou de blocage.
   if (gated) {
     return (
       <EncreHtml>
         {fonts}
         <body>
-          <AccessGate viewer={viewer} />
+          <AccessGate viewer={viewer} logout={authMode() === "oidc"} />
           {encreJs}
         </body>
       </EncreHtml>

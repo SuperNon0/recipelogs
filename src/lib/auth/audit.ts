@@ -31,4 +31,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   enable: "a activé les comptes",
   disable: "a désactivé les comptes",
   cloudflare: "a modifié les réglages Cloudflare",
+  responsable: "s'est connecté pour la première fois et devient administrateur (responsable du site)",
+  responsable_active: "s'est connecté et devient administrateur (responsable du site)",
+  invite: "a invité",
+  invite_again: "a renvoyé l'invitation à",
 };

@@ -1,0 +1,299 @@
+# Réglages d'Authentik pour RecipeLog, appliqués tout seuls par Authentik au
+# démarrage (dossier monté dans /blueprints/custom). Voir ../../connexion.md.
+#
+# - nom affiché « RecipeLog » ;
+# - connexion par email (et non par nom d'utilisateur) ;
+# - « Mot de passe oublié ? » : un email avec un lien pour choisir un nouveau
+#   mot de passe. Le même email sert d'invitation (lien valable 3 jours) ;
+# - groupe « super-admins » : administrateurs d'Authentik, autorisés sur tous
+#   les clients (la passerelle les ajoute à chaque application).
+version: 1
+metadata:
+  name: RecipeLog - Réglages
+  labels:
+    blueprints.goauthentik.io/description: Connexion RecipeLog (email, récupération, super-admins)
+entries:
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Brand
+      required: false
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Authentication flow
+      required: false
+
+  # ------------------------------------------------ super-admins
+  - model: authentik_core.group
+    identifiers:
+      name: super-admins
+    attrs:
+      is_superuser: true
+      attributes:
+        recipelog_role: super-admins
+
+  # ------------------------------------------------ récupération / invitation
+  - model: authentik_flows.flow
+    id: recuperation
+    identifiers:
+      slug: recipelog-recuperation
+    attrs:
+      name: RecipeLog - choisir son mot de passe
+      title: Choisis ton mot de passe
+      designation: recovery
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_prompt.prompt
+    id: champ-mdp
+    identifiers:
+      name: recipelog-recuperation-mdp
+    attrs:
+      field_key: password
+      label: Nouveau mot de passe
+      type: password
+      required: true
+      placeholder: Nouveau mot de passe
+      order: 0
+      placeholder_expression: false
+
+  - model: authentik_stages_prompt.prompt
+    id: champ-mdp-repete
+    identifiers:
+      name: recipelog-recuperation-mdp-repete
+    attrs:
+      field_key: password_repeat
+      label: Encore une fois
+      type: password
+      required: true
+      placeholder: Le même mot de passe
+      order: 1
+      placeholder_expression: false
+
+  - model: authentik_policies_password.passwordpolicy
+    id: politique-mdp
+    identifiers:
+      name: recipelog-mot-de-passe
+    attrs:
+      password_field: password
+      length_min: 10
+      amount_digits: 0
+      amount_lowercase: 0
+      amount_uppercase: 0
+      amount_symbols: 0
+      check_static_rules: true
+      check_have_i_been_pwned: false
+      check_zxcvbn: false
+      error_message: "Le mot de passe doit faire au moins 10 caractères."
+
+  - model: authentik_policies_expression.expressionpolicy
+    id: deja-identifie
+    identifiers:
+      name: recipelog-recuperation-deja-identifie
+    attrs:
+      expression: |
+        return bool(request.context.get('is_restored', True))
+
+  - model: authentik_stages_identification.identificationstage
+    id: recup-identification
+    identifiers:
+      name: recipelog-recuperation-identification
+    attrs:
+      user_fields: [email]
+
+  - model: authentik_stages_email.emailstage
+    id: recup-email
+    identifiers:
+      name: recipelog-recuperation-email
+    attrs:
+      use_global_settings: true
+      token_expiry: days=3
+      subject: "RecipeLog : choisis ton mot de passe"
+      template: recipelog-mot-de-passe.html
+      activate_user_on_success: true
+      recovery_max_attempts: 5
+      recovery_cache_timeout: minutes=5
+
+  - model: authentik_stages_prompt.promptstage
+    id: recup-mdp
+    identifiers:
+      name: recipelog-recuperation-mdp
+    attrs:
+      fields:
+        - !KeyOf champ-mdp
+        - !KeyOf champ-mdp-repete
+      validation_policies:
+        - !KeyOf politique-mdp
+
+  - model: authentik_stages_user_write.userwritestage
+    id: recup-ecriture
+    identifiers:
+      name: recipelog-recuperation-ecriture
+    attrs:
+      user_creation_mode: never_create
+
+  - model: authentik_stages_user_login.userloginstage
+    id: recup-connexion
+    identifiers:
+      name: recipelog-recuperation-connexion
+
+  - model: authentik_flows.flowstagebinding
+    id: lien-identification
+    identifiers:
+      target: !KeyOf recuperation
+      stage: !KeyOf recup-identification
+      order: 10
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf recuperation
+      stage: !KeyOf recup-email
+      order: 20
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf recuperation
+      stage: !KeyOf recup-mdp
+      order: 30
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf recuperation
+      stage: !KeyOf recup-ecriture
+      order: 40
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf recuperation
+      stage: !KeyOf recup-connexion
+      order: 100
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+  # Lien reçu par email : on saute l'étape « ton adresse ? ».
+  - model: authentik_policies.policybinding
+    identifiers:
+      policy: !KeyOf deja-identifie
+      target: !KeyOf lien-identification
+      order: 0
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30
+
+  # ------------------------------------------------ déconnexion
+  # « Se déconnecter » dans RecipeLog ferme aussi la session Authentik (sinon,
+  # sur une tablette partagée, la personne suivante serait reconnectée seule),
+  # puis renvoie sur le RecipeLog du client, qui affiche la page de connexion.
+  - model: authentik_flows.flow
+    id: deconnexion
+    identifiers:
+      slug: recipelog-deconnexion
+    attrs:
+      name: RecipeLog - déconnexion
+      title: Déconnexion
+      designation: invalidation
+      authentication: none
+
+  - model: authentik_stages_user_logout.userlogoutstage
+    id: etape-deconnexion
+    identifiers:
+      name: recipelog-deconnexion
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf deconnexion
+      stage: !KeyOf etape-deconnexion
+      order: 0
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+
+  - model: authentik_stages_redirect.redirectstage
+    id: etape-retour-appli
+    identifiers:
+      name: recipelog-deconnexion-retour
+    attrs:
+      mode: static
+      target_static: /
+      keep_context: false
+
+  - model: authentik_policies_expression.expressionpolicy
+    id: retour-appli
+    identifiers:
+      name: recipelog-deconnexion-retour-appli
+    attrs:
+      expression: |
+        plan = request.context.get("flow_plan")
+        app = plan.context.get("application") if plan else None
+        url = app.meta_launch_url if app else ""
+        if url:
+            plan.context["redirect_stage_target"] = url
+        return True
+
+  - model: authentik_flows.flowstagebinding
+    id: lien-retour-appli
+    identifiers:
+      target: !KeyOf deconnexion
+      stage: !KeyOf etape-retour-appli
+      order: 10
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+      policy_engine_mode: any
+      invalid_response_action: retry
+
+  - model: authentik_policies.policybinding
+    identifiers:
+      policy: !KeyOf retour-appli
+      target: !KeyOf lien-retour-appli
+      order: 0
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30
+
+  # ------------------------------------------------ connexion
+  # Connexion par adresse email, avec le lien « Mot de passe oublié ? » et,
+  # une fois branché (node cli.mjs google …), le bouton « Google ».
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authentication-flow
+    attrs:
+      title: Connexion à RecipeLog
+
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      user_fields: [email]
+      recovery_flow: !KeyOf recuperation
+      show_source_labels: true
+
+  # ------------------------------------------------ nom affiché
+  - model: authentik_brands.brand
+    identifiers:
+      domain: authentik-default
+    attrs:
+      branding_title: RecipeLog
+      flow_recovery: !KeyOf recuperation

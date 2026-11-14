@@ -2,7 +2,10 @@
 # Plateforme RecipeLog : tout tourne sur une seule machine avec Docker.
 #
 #   Cloudflare ──tunnel──> cloudflared ──> Traefik ──> un conteneur par client
-#                                                 └──> (plus tard) panel, Authentik, vitrine, démo
+#                                                 ├──> Authentik (auth.<domaine>) : comptes de tous les clients
+#                                                 └──> (plus tard) panel, vitrine, démo
+#   passerelle : seule à détenir la clé d'Authentik ; les clients lui demandent
+#                d'inviter ou de retirer leurs collaborateurs (connexion.md).
 #   PostgreSQL : un seul serveur, une base par client.
 #
 # Lancé par install.sh avec :
@@ -92,4 +95,77 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    networks: [recipelog]
+
+  # Comptes de tous les clients : email + mot de passe, mot de passe oublié,
+  # Google, double authentification. Voir connexion.md.
+  authentik:
+    image: authentik/server:${AUTHENTIK_VERSION:-2025.10.2}
+    container_name: recipelog-authentik
+    restart: unless-stopped
+    command: server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?AUTHENTIK_SECRET_KEY manquant dans /srv/recipelog/.env}
+      AUTHENTIK_POSTGRESQL__HOST: recipelog-postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:?AUTHENTIK_DB_PASSWORD manquant}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:-}
+      AUTHENTIK_EMAIL__HOST: ${SMTP_HOTE:-localhost}
+      AUTHENTIK_EMAIL__PORT: ${SMTP_PORT:-587}
+      AUTHENTIK_EMAIL__USERNAME: ${SMTP_UTILISATEUR:-}
+      AUTHENTIK_EMAIL__PASSWORD: ${SMTP_MOT_DE_PASSE:-}
+      AUTHENTIK_EMAIL__USE_TLS: ${SMTP_TLS:-true}
+      AUTHENTIK_EMAIL__FROM: ${SMTP_EXPEDITEUR:-RecipeLog <noreply@recipelog.cc>}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+      AUTHENTIK_DEFAULT_USER_CHANGE_USERNAME: "false"
+    volumes:
+      - ${DONNEES:-/srv/recipelog}/authentik/media:/media
+      - ./authentik/blueprints:/blueprints/custom:ro
+      - ./authentik/templates:/templates:ro
+    networks: [recipelog]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.authentik.rule: Host(`auth.${DOMAINE:-recipelog.cc}`)
+      traefik.http.routers.authentik.entrypoints: web
+      traefik.http.routers.authentik.middlewares: securite@file,limite@file
+      traefik.http.services.authentik.loadbalancer.server.port: "9000"
+
+  authentik-worker:
+    image: authentik/server:${AUTHENTIK_VERSION:-2025.10.2}
+    container_name: recipelog-authentik-worker
+    restart: unless-stopped
+    command: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *authentik-env
+    volumes:
+      - ${DONNEES:-/srv/recipelog}/authentik/media:/media
+      - ./authentik/blueprints:/blueprints/custom:ro
+      - ./authentik/templates:/templates:ro
+    networks: [recipelog]
+
+  # Seule à détenir la clé d'Authentik. Les clients l'appellent sur le réseau
+  # Docker (jamais publiée par Traefik), chacun avec sa propre clé.
+  passerelle:
+    build: ./passerelle
+    image: recipelog-passerelle:local
+    container_name: recipelog-passerelle
+    restart: unless-stopped
+    depends_on: [authentik]
+    environment:
+      AUTHENTIK_URL: http://recipelog-authentik:9000
+      AUTHENTIK_PUBLIC: https://auth.${DOMAINE:-recipelog.cc}
+      AUTHENTIK_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:?AUTHENTIK_BOOTSTRAP_TOKEN manquant}
+      DOMAINE: ${DOMAINE:-recipelog.cc}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    read_only: true
     networks: [recipelog]

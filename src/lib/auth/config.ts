@@ -15,11 +15,25 @@ export type AuthSettings = { enabled: boolean; team: string; aud: string };
 
 const KEY = "auth";
 
+/**
+ * Comment les visiteurs prouvent qui ils sont :
+ * - cloudflare (installations LXC) : jeton de Cloudflare Access ;
+ * - oidc (plateforme, RECIPELOG_AUTH_MODE=oidc) : connexion par Authentik,
+ *   puis cookie de session signé (plateforme/connexion.md).
+ */
+export type AuthMode = "cloudflare" | "oidc";
+
+export function authMode(): AuthMode {
+  return process.env.RECIPELOG_AUTH_MODE?.trim().toLowerCase() === "oidc" ? "oidc" : "cloudflare";
+}
+
 export async function getAuthSettings(): Promise<AuthSettings> {
   const row = await prisma.setting.findUnique({ where: { key: KEY } });
   const v = (row?.value ?? {}) as Partial<AuthSettings>;
+  // Plateforme : les comptes sont toujours activés (Authentik filtre l'entrée).
+  const on = authMode() === "oidc" || v.enabled === true;
   return {
-    enabled: v.enabled === true && process.env.RECIPELOG_AUTH_OFF !== "1" && !isDemo(),
+    enabled: on && process.env.RECIPELOG_AUTH_OFF !== "1" && !isDemo(),
     team: typeof v.team === "string" ? v.team : "",
     aud: typeof v.aud === "string" ? v.aud : "",
   };

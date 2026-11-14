@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AccessGate } from "@/components/auth/AccessGate";
 import { getViewer, viewerCan } from "@/lib/auth/viewer";
 import { isPermission, type Access } from "@/lib/auth/permissions";
+import { authMode } from "@/lib/auth/config";
 
 export const dynamic = "force-dynamic";
 
@@ -15,5 +16,5 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   const need: Access = isPermission(besoin) ? besoin : "read";
   const viewer = await getViewer();
   if (viewerCan(viewer, need)) redirect("/");
-  return <AccessGate viewer={viewer} need={need} />;
+  return <AccessGate viewer={viewer} need={need} logout={authMode() === "oidc"} />;
 }

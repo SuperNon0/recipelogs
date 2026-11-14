@@ -3,7 +3,10 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import type { Account, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getAuthSettings } from "./config";
+import { authMode, getAuthSettings } from "./config";
+import { SESSION_COOKIE, sessionSecret, verifySession } from "./session";
+import { audit } from "./audit";
+import { isResponsableEmail } from "./responsable";
 import { currentService } from "./service";
 import { tokenFromRequest, verifyCloudflareJwt } from "./cloudflare";
 import { rolePermissions, type Access, type Permission } from "./permissions";
@@ -67,9 +70,22 @@ async function readViewAs(raw: string | undefined, adminId: number): Promise<num
 
 /** E-mail vérifié de la requête en cours (null si pas de jeton valable). */
 export async function verifiedEmail(): Promise<{ email: string } | { error: string }> {
+  const c = await cookies();
+  // Plateforme : cookie de session posé par /auth/retour après la connexion par Authentik.
+  if (authMode() === "oidc") {
+    const secret = sessionSecret();
+    if (!secret) return { error: "Connexion mal réglée sur le serveur (RECIPELOG_SESSION_SECRET manquant)." };
+    const check = verifySession(c.get(SESSION_COOKIE)?.value, secret);
+    if (check.ok) return { email: check.session.email };
+    return {
+      error:
+        check.reason === "absent"
+          ? "Tu n'es pas connecté."
+          : "Ta session a expiré ou n'est plus valable : reconnecte-toi.",
+    };
+  }
   const settings = await getAuthSettings();
   const h = await headers();
-  const c = await cookies();
   const token = tokenFromRequest(h.get("cf-access-jwt-assertion"), c.get("CF_Authorization")?.value);
   if (!token) return { error: "Aucun jeton Cloudflare reçu : le site n'a pas été ouvert par son adresse Cloudflare." };
   const check = await verifyCloudflareJwt(token, settings);
@@ -89,6 +105,15 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   // Compte de maintenance (.env du serveur) : toujours administrateur actif.
   if (isMaintenanceEmail(who.email) && (!account || account.status !== "active" || !account.role?.isAdmin)) {
     account = await ensureMaintenanceAccount(who.email);
+  }
+  // Plateforme : le responsable du client devient administrateur à sa première connexion.
+  if (
+    authMode() === "oidc" &&
+    isResponsableEmail(who.email) &&
+    !isMaintenanceEmail(who.email) &&
+    (!account || account.status === "pending")
+  ) {
+    account = await ensureResponsableAccount(who.email);
   }
   if (!account) return { kind: "unknown", email: who.email };
 
@@ -120,6 +145,26 @@ async function ensureMaintenanceAccount(email: string): Promise<AccountWithRole>
     create: { email, roleId: role.id, status: "active", approvedAt: new Date() },
     include: { role: true },
   });
+}
+
+/**
+ * Compte du responsable (RECIPELOG_RESPONSABLE_EMAIL) : actif, Administrateur,
+ * visible dans la liste des comptes, une ligne au journal à sa création.
+ * Ensuite il se gère comme les autres (le dernier administrateur reste protégé).
+ */
+async function ensureResponsableAccount(email: string): Promise<AccountWithRole> {
+  const role =
+    (await prisma.role.findFirst({ where: { isAdmin: true }, orderBy: { id: "asc" } })) ??
+    (await prisma.role.create({ data: { name: "Administrateur", isAdmin: true } }));
+  const existed = await prisma.account.findUnique({ where: { email }, select: { id: true } });
+  const account = await prisma.account.upsert({
+    where: { email },
+    update: { roleId: role.id, status: "active", approvedAt: new Date() },
+    create: { email, roleId: role.id, status: "active", approvedAt: new Date() },
+    include: { role: true },
+  });
+  await audit(email, existed ? "responsable_active" : "responsable");
+  return account;
 }
 
 /** « Voir comme » : seulement un compte actif, avec un rôle, qui n'est pas administrateur. */

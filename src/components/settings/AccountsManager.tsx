@@ -2,13 +2,15 @@
 
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Check, Eye, History, KeyRound, Pencil, Plus, Power, Shield, Trash2, UserCheck, Users, X } from "lucide-react";
+import { Ban, Check, Eye, History, KeyRound, Mail, Pencil, Plus, Power, Shield, Trash2, UserCheck, UserPlus, Users, X } from "lucide-react";
 import {
   approveAccount,
   deleteAccount,
   deleteRole,
   disableAccounts,
   enableAccounts,
+  inviteMember,
+  resendInvitation,
   refuseAccount,
   saveCloudflareSettings,
   saveRole,
@@ -41,12 +43,15 @@ export type AccountInfo = {
   isMe: boolean;
 };
 export type AuditInfo = { id: number; at: string; text: string; detail: string | null };
+/** Plateforme (connexion par Authentik) : places de l'offre, lues auprès de la passerelle. */
+export type TeamInfo = { used: number | null; max: number | null; error: string | null };
 
 const DAY = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone: "Europe/Paris" });
 const DAY_TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" });
 
 /** Réglages → Comptes : connexion Cloudflare, demandes, comptes, rôles et journal. */
 export function AccountsManager({
+  platform,
   enabled,
   forcedOff,
   team,
@@ -56,6 +61,8 @@ export function AccountsManager({
   accounts,
   log,
 }: {
+  /** null : installation classique (Cloudflare). */
+  platform: TeamInfo | null;
   enabled: boolean;
   forcedOff: boolean;
   team: string;
@@ -68,16 +75,19 @@ export function AccountsManager({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<RoleInfo | "new" | null>(null);
 
   /** Lance une action, affiche son erreur éventuelle et recharge la page. */
-  const run = (fn: () => Promise<ActionResult>, confirmText?: string) => {
+  const run = (fn: () => Promise<ActionResult & { notice?: string }>, confirmText?: string) => {
     if (confirmText && !confirm(confirmText)) return;
     setError(null);
+    setNotice(null);
     start(async () => {
       try {
         const r = await fn();
         if (!r.ok) setError(r.error);
+        else if (r.notice) setNotice(r.notice);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -93,16 +103,25 @@ export function AccountsManager({
 
   return (
     <>
-      <Connection enabled={enabled} forcedOff={forcedOff} team={team} aud={aud} run={run} pending={pending} />
+      {platform ? (
+        <Team info={platform} enabled={enabled} roles={roles} defaultRoleId={defaultRole?.id} run={run} pending={pending} />
+      ) : (
+        <Connection enabled={enabled} forcedOff={forcedOff} team={team} aud={aud} run={run} pending={pending} />
+      )}
 
       {error && <p className="acct-msg err" role="alert">{error}</p>}
+      {notice && <p className="acct-msg ok" role="status">{notice}</p>}
 
       <div className="sect-title">
         <h2>Demandes en attente</h2>
         <span className="acct-count">{requests.length}</span>
       </div>
       {requests.length === 0 ? (
-        <p className="set-note">Aucune demande. Une personne autorisée dans Cloudflare qui arrive sur le site pour la première fois apparaît ici.</p>
+        <p className="set-note">
+          {platform
+            ? "Aucune demande. Les personnes que tu invites ont leur compte tout de suite : elles n'apparaissent pas ici."
+            : "Aucune demande. Une personne autorisée dans Cloudflare qui arrive sur le site pour la première fois apparaît ici."}
+        </p>
       ) : (
         <div className="fl-list">
           {requests.map((a) => (
@@ -114,6 +133,14 @@ export function AccountsManager({
       <div className="sect-title">
         <h2>Comptes</h2>
         <span className="acct-count">{members.length}</span>
+        {platform && (
+          <Help title="Comptes de l'équipe">
+            « Renvoyer l&apos;invitation » envoie de nouveau à la personne l&apos;e-mail « Choisis ton mot de passe »
+            (s&apos;il est perdu, arrivé dans les indésirables, ou trop ancien). Supprimer un compte retire aussi la
+            personne de l&apos;équipe : elle ne peut plus se connecter et sa place se libère. Bloquer la garde dans
+            l&apos;équipe (sa place reste prise) mais l&apos;empêche d&apos;entrer.
+          </Help>
+        )}
       </div>
       {members.length === 0 ? (
         <p className="set-note">Aucun compte pour l&apos;instant : le tien est créé quand tu actives les comptes.</p>
@@ -180,6 +207,22 @@ export function AccountsManager({
                       {a.status === "blocked" ? <UserCheck size={14} /> : <Ban size={14} />}
                       {a.status === "blocked" ? "Débloquer" : "Bloquer"}
                     </button>
+                    {platform && (
+                      <button
+                        type="button"
+                        className="fl-btn fl-btn-secondary"
+                        disabled={pending}
+                        title="Renvoyer l'e-mail « Choisis ton mot de passe »"
+                        onClick={() =>
+                          run(async () => {
+                            const r = await resendInvitation(a.id);
+                            return r.ok ? { ok: true, notice: `Invitation renvoyée à ${a.email}.` } : r;
+                          })
+                        }
+                      >
+                        <Mail size={14} /> Renvoyer l&apos;invitation
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="fl-btn fl-btn-danger fl-btn-icon"
@@ -189,7 +232,9 @@ export function AccountsManager({
                       onClick={() =>
                         run(
                           () => deleteAccount(a.id),
-                          `Supprimer le compte de ${a.email} ? S'il revient, il devra redemander un accès.`,
+                          platform
+                            ? `Supprimer le compte de ${a.email} ? Il est aussi retiré de l'équipe : il ne pourra plus se connecter, et sa place se libère.`
+                            : `Supprimer le compte de ${a.email} ? S'il revient, il devra redemander un accès.`,
                         )
                       }
                     >
@@ -351,6 +396,125 @@ function RequestRow({
         )}
       </span>
     </div>
+  );
+}
+
+/** Plateforme : connexion par RecipeLog en ligne, places de l'offre et « Inviter un collaborateur ». */
+function Team({
+  info,
+  enabled,
+  roles,
+  defaultRoleId,
+  run,
+  pending,
+}: {
+  info: TeamInfo;
+  enabled: boolean;
+  roles: RoleInfo[];
+  defaultRoleId: number | undefined;
+  run: (fn: () => Promise<ActionResult & { notice?: string }>, confirmText?: string) => void;
+  pending: boolean;
+}) {
+  const [email, setEmail] = useState("");
+  const [roleId, setRoleId] = useState<number | undefined>(defaultRoleId);
+  const full = info.max !== null && info.used !== null && info.used >= info.max;
+
+  return (
+    <>
+      <div className="sect-title" style={{ marginTop: 0 }}>
+        <h2>Équipe</h2>
+      </div>
+      <div className="acct-card">
+        <p className="acct-msg" style={{ color: enabled ? "var(--accent-2)" : "var(--soft)" }}>
+          <Users size={14} style={{ display: "inline", marginRight: 6 }} />
+          {enabled
+            ? "Chaque personne se connecte avec son e-mail et son mot de passe, et ne fait que ce que son rôle permet."
+            : "Comptes coupés par le serveur (RECIPELOG_AUTH_OFF=1) : tout le monde a tous les droits."}
+        </p>
+        <p className="acct-msg">
+          <b>Places utilisées : </b>
+          {info.error
+            ? "inconnues pour l'instant"
+            : `${info.used} / ${info.max === null ? "sans limite" : `${info.max} utilisateurs`}`}{" "}
+          <Help title="Places utilisées">
+            Le nombre de personnes de ton équipe qui peuvent se connecter, sur le nombre de places compris dans ton
+            offre. Une place se libère quand tu supprimes un compte. Il te faut plus de places ? Demande-les à
+            RecipeLog.
+          </Help>
+        </p>
+        {info.error && <p className="acct-msg err">{info.error}</p>}
+        {full && (
+          <p className="acct-msg err">
+            Toutes les places sont prises : retire quelqu&apos;un de l&apos;équipe, ou demande plus de places à RecipeLog.
+          </p>
+        )}
+        <form
+          className="acct-invite"
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const value = email.trim();
+            if (!value || roleId === undefined) return;
+            run(async () => {
+              const r = await inviteMember(value, roleId);
+              if (r.ok) setEmail("");
+              return r.ok ? { ok: true, notice: r.notice ?? `Invitation envoyée à ${value.toLowerCase()}.` } : r;
+            });
+          }}
+        >
+          <label>
+            <span>
+              E-mail du collaborateur{" "}
+              <Help title="E-mail du collaborateur">
+                L&apos;adresse de la personne à inviter. Elle reçoit un e-mail « Choisis ton mot de passe » de
+                auth.recipelog.cc, puis se connecte au site avec cette adresse et ce mot de passe.
+              </Help>
+            </span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="prenom@exemple.fr"
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          </label>
+          <label>
+            <span>
+              Rôle{" "}
+              <Help title="Rôle du collaborateur">
+                Ce que la personne pourra faire sur le site (voir la liste des rôles plus bas). Tu peux le changer plus
+                tard dans la liste des comptes.
+              </Help>
+            </span>
+            <select
+              className="acct-select"
+              aria-label="Rôle du collaborateur"
+              value={roleId ?? ""}
+              onChange={(e) => setRoleId(Number(e.target.value))}
+            >
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="acct-actions">
+            <button type="submit" className="fl-btn fl-btn-primary" disabled={pending || !enabled || !email.trim() || roleId === undefined || full}>
+              <UserPlus size={14} /> {pending ? "Envoi…" : "Inviter un collaborateur"}
+            </button>
+            <Help title="Inviter un collaborateur">
+              Crée le compte de connexion de la personne, la met dans ton équipe (elle prend une place) et lui envoie
+              l&apos;e-mail pour choisir son mot de passe. Son compte est actif tout de suite, avec le rôle choisi. Si
+              elle oublie son mot de passe, elle clique sur « Mot de passe oublié » sur la page de connexion.
+            </Help>
+          </div>
+        </form>
+      </div>
+    </>
   );
 }
 

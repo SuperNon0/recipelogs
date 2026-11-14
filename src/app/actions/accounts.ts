@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/actionResult";
 import { audit } from "@/lib/auth/audit";
-import { getAuthSettings, saveAuthSettings } from "@/lib/auth/config";
+import { authMode, getAuthSettings, saveAuthSettings } from "@/lib/auth/config";
+import { inviterMembre, renvoyerInvitation, retirerMembre } from "@/lib/auth/passerelle";
 import { normalizeTeam, verifyCloudflareJwt, tokenFromRequest } from "@/lib/auth/cloudflare";
 import { requireAccess } from "@/lib/auth/guard";
 import { cleanPermissions } from "@/lib/auth/permissions";
@@ -129,6 +130,11 @@ export async function deleteAccount(id: number): Promise<ActionResult> {
   if (acc.role?.isAdmin && (await otherAdminsCount(acc.id)) === 0) {
     return { ok: false, error: "C'est le dernier administrateur : impossible de le supprimer." };
   }
+  // Plateforme : la personne est aussi retirée de l'équipe chez Authentik (sinon elle garderait sa place).
+  if (authMode() === "oidc") {
+    const r = await retirerMembre(acc.email);
+    if (!r.ok) return { ok: false, error: `Compte gardé : ${r.message}` };
+  }
   await prisma.account.delete({ where: { id } });
   await audit(me.email, "delete", acc.email);
   refresh();
@@ -149,6 +155,55 @@ export async function setAccountRole(id: number, roleId: number): Promise<Action
   await prisma.account.update({ where: { id }, data: { roleId: role.id } });
   await audit(me.email, "role", acc.email, `${acc.role?.name ?? "aucun"} → ${role.name}`);
   refresh();
+  return { ok: true };
+}
+
+// ── Équipe (plateforme, connexion par Authentik) ────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * « Inviter un collaborateur » : la passerelle crée son compte de connexion
+ * et lui envoie l'e-mail « Choisis ton mot de passe » ; ici, son compte est
+ * prêt (actif, avec le rôle choisi) pour sa première visite.
+ */
+export async function inviteMember(emailInput: string, roleId: number): Promise<ActionResult & { notice?: string }> {
+  await requireAccess("accounts.manage");
+  if (authMode() !== "oidc") return { ok: false, error: "Les invitations n'existent qu'avec la connexion RecipeLog en ligne." };
+  const me = await actingAdmin();
+  const email = emailInput.trim().toLowerCase();
+  if (!EMAIL_RE.test(email) || email.length > 254) return { ok: false, error: "Cette adresse e-mail n'est pas valable." };
+  if (isMaintenanceEmail(email)) return { ok: false, error: "Cette adresse ne peut pas être invitée depuis le site." };
+  const role = await findRole(roleId);
+  const existing = await prisma.account.findUnique({ where: { email } });
+  if (existing?.status === "active") return { ok: false, error: "Cette personne a déjà un compte actif sur le site." };
+
+  const r = await inviterMembre(email);
+  let notice: string | undefined;
+  if (!r.ok) {
+    // Déjà dans l'équipe chez Authentik mais pas encore de compte ici : on le prépare quand même.
+    if (r.code !== "deja_membre") return { ok: false, error: r.message };
+    notice = "Cette personne faisait déjà partie de l'équipe : son compte est prêt, elle se connecte avec son mot de passe habituel.";
+  }
+  await prisma.account.upsert({
+    where: { email },
+    update: { status: "active", roleId: role.id, approvedAt: new Date() },
+    create: { email, status: "active", roleId: role.id, approvedAt: new Date() },
+  });
+  await audit(me.email, "invite", email, role.name);
+  refresh();
+  return { ok: true, notice };
+}
+
+/** « Renvoyer l'invitation » : nouvel e-mail « Choisis ton mot de passe ». */
+export async function resendInvitation(id: number): Promise<ActionResult> {
+  await requireAccess("accounts.manage");
+  if (authMode() !== "oidc") return { ok: false, error: "Les invitations n'existent qu'avec la connexion RecipeLog en ligne." };
+  const me = await actingAdmin();
+  const acc = await target(id);
+  const r = await renvoyerInvitation(acc.email);
+  if (!r.ok) return { ok: false, error: r.message };
+  await audit(me.email, "invite_again", acc.email);
   return { ok: true };
 }
 
@@ -245,6 +300,9 @@ export async function stopViewAs(): Promise<ActionResult> {
 
 // ── Réglages Cloudflare et activation ───────────────────────
 
+/** Plateforme : la connexion passe par Authentik, les réglages Cloudflare ne servent pas. */
+const CLOUDFLARE_OFF = "Ce site se connecte par RecipeLog en ligne : les réglages Cloudflare ne servent pas ici.";
+
 export type CloudflareTest =
   | { ok: true; email: string }
   | { ok: false; error: string };
@@ -252,6 +310,7 @@ export type CloudflareTest =
 /** Teste l'équipe et l'AUD avec le jeton de la requête en cours, sans rien enregistrer. */
 export async function testCloudflare(team: string, aud: string): Promise<CloudflareTest> {
   await requireAccess("accounts.manage");
+  if (authMode() === "oidc") return { ok: false, error: CLOUDFLARE_OFF };
   const h = await headers();
   const c = await cookies();
   const token = tokenFromRequest(h.get("cf-access-jwt-assertion"), c.get("CF_Authorization")?.value);
@@ -267,6 +326,7 @@ export async function testCloudflare(team: string, aud: string): Promise<Cloudfl
 
 export async function saveCloudflareSettings(team: string, aud: string): Promise<ActionResult> {
   await requireAccess("accounts.manage");
+  if (authMode() === "oidc") return { ok: false, error: CLOUDFLARE_OFF };
   const me = await actingAdmin();
   const current = await getAuthSettings();
   if (!normalizeTeam(team) || !aud.trim()) return { ok: false, error: "Renseigne l'équipe et l'AUD." };
@@ -288,6 +348,7 @@ export async function saveCloudflareSettings(team: string, aud: string): Promise
  */
 export async function enableAccounts(): Promise<ActionResult> {
   await requireAccess("accounts.manage");
+  if (authMode() === "oidc") return { ok: false, error: CLOUDFLARE_OFF };
   const settings = await getAuthSettings();
   if (settings.enabled) return { ok: true };
   if (!settings.team || !settings.aud) return { ok: false, error: "Enregistre d'abord l'équipe et l'AUD Cloudflare." };
@@ -307,6 +368,7 @@ export async function enableAccounts(): Promise<ActionResult> {
 
 export async function disableAccounts(): Promise<ActionResult> {
   await requireAccess("accounts.manage");
+  if (authMode() === "oidc") return { ok: false, error: CLOUDFLARE_OFF };
   const me = await actingAdmin();
   const settings = await getAuthSettings();
   await saveAuthSettings({ ...settings, enabled: false });

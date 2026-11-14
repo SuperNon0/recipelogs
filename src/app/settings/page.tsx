@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LogOut, Users, Euro, Receipt, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -10,7 +10,8 @@ import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { requirePage } from "@/lib/auth/guard";
 import { viewerCan } from "@/lib/auth/viewer";
 import type { Permission } from "@/lib/auth/permissions";
-import { getAuthSettings } from "@/lib/auth/config";
+import { authMode, getAuthSettings } from "@/lib/auth/config";
+import { realAccountOf } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,17 @@ export default async function SettingsPage() {
   ]);
   const auth = can("accounts.manage") ? await getAuthSettings() : null;
   const accountsWaiting = auth?.enabled ? await prisma.account.count({ where: { status: "pending" } }) : 0;
+
+  // Plateforme (connexion par Authentik) : « Se déconnecter ».
+  const oidc = authMode() === "oidc";
+  const email = realAccountOf(viewer)?.email ?? null;
+  // Page « Mon compte » d'Authentik : mot de passe et double authentification.
+  let compteAuthentik: string | null = null;
+  try {
+    if (oidc && process.env.OIDC_ISSUER) compteAuthentik = `${new URL(process.env.OIDC_ISSUER).origin}/if/user/#/settings`;
+  } catch {
+    compteAuthentik = null;
+  }
 
   const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
 
@@ -197,6 +209,43 @@ export default async function SettingsPage() {
         <h2>Site</h2>
       </div>
       <SiteSettings siteUrl={siteUrl} canUpdate={can("site.update")} />
+
+      {oidc && (
+        <>
+          <div className="sect-title">
+            <h2>Mon compte</h2>
+          </div>
+          <div className="fl-list">
+            {compteAuthentik && (
+              <a href={compteAuthentik} className="fl-row" target="_blank" rel="noopener noreferrer">
+                <span className="ic">
+                  <KeyRound size={17} />
+                </span>
+                <span className="set-tx">
+                  <b>
+                    <span>Mot de passe et sécurité</span>
+                  </b>
+                  <small>Changer ton mot de passe, activer la double authentification (code sur ton téléphone)</small>
+                </span>
+                <ChevronRight size={16} className="set-chev" />
+              </a>
+            )}
+            {/* Simple lien (pas next/link) : un préchargement ne doit jamais déconnecter. */}
+            <a href="/auth/deconnexion" className="fl-row">
+              <span className="ic">
+                <LogOut size={17} />
+              </span>
+              <span className="set-tx">
+                <b>
+                  <span>Se déconnecter</span>
+                </b>
+                <small>{email ? `Connecté avec ${email}` : "Quitter RecipeLog sur cet appareil"}</small>
+              </span>
+              <ChevronRight size={16} className="set-chev" />
+            </a>
+          </div>
+        </>
+      )}
     </div>
   );
 }

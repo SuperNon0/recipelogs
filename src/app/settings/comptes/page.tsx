@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requirePage } from "@/lib/auth/guard";
-import { authForcedOff, getAuthSettings } from "@/lib/auth/config";
+import { authForcedOff, authMode, getAuthSettings } from "@/lib/auth/config";
+import { getEquipe } from "@/lib/auth/passerelle";
+import type { TeamInfo } from "@/components/settings/AccountsManager";
 import { realAccountOf } from "@/lib/auth/viewer";
 import { AUDIT_LABEL } from "@/lib/auth/audit";
 import { AccountsManager, type AccountInfo, type AuditInfo, type RoleInfo } from "@/components/settings/AccountsManager";
@@ -21,6 +23,13 @@ export default async function AccountsSettingsPage() {
     prisma.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
   ]);
   const me = realAccountOf(viewer);
+
+  // Plateforme : places de l'offre, lues auprès de la passerelle.
+  let platform: TeamInfo | null = null;
+  if (authMode() === "oidc") {
+    const r = await getEquipe();
+    platform = r.ok ? { used: r.equipe.membres.length, max: r.equipe.max, error: null } : { used: null, max: null, error: r.message };
+  }
 
   // Le compte de maintenance (.env du serveur) n'est jamais affiché.
   const visible = accounts.filter((a) => !isMaintenanceEmail(a.email));
@@ -60,6 +69,7 @@ export default async function AccountsSettingsPage() {
         <p className="sub">Qui peut entrer sur RecipeLog, et ce que chacun peut y faire</p>
       </div>
       <AccountsManager
+        platform={platform}
         enabled={settings.enabled}
         forcedOff={authForcedOff()}
         team={settings.team}

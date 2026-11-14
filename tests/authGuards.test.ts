@@ -48,8 +48,16 @@ describe("gardes des droits", () => {
     expect(missing).toEqual([]);
   });
 
-  it("chaque route vérifie le visiteur (sauf MCP, protégé par sa clé, et l'état de santé)", () => {
-    const routes = walk(APP).filter((f) => f.endsWith("route.ts") && !f.includes(join("api", "mcp")) && !f.includes(join("api", "health")));
+  it("chaque route vérifie le visiteur (sauf MCP, protégé par sa clé, l'état de santé et la connexion)", () => {
+    const routes = walk(APP).filter(
+      (f) =>
+        f.endsWith("route.ts") &&
+        !f.includes(join("api", "mcp")) &&
+        !f.includes(join("api", "health")) &&
+        // /auth/connexion, /auth/retour, /auth/deconnexion : connexion par Authentik,
+        // ouvertes sans session comme /acces (c'est par elles qu'on en obtient une).
+        !f.includes(join("app", "auth")),
+    );
     const missing: string[] = [];
     for (const f of routes) {
       for (const { name, body } of exportedBodies(readFileSync(f, "utf8"), /^export async function (GET|POST|PUT|PATCH|DELETE)/gm)) {
