@@ -129,6 +129,24 @@ pre.sortie { background: var(--creux); border: 1px solid var(--line); border-rad
 .rond { width: 18px; height: 18px; border: 2px solid var(--line2); border-top-color: var(--accent); border-radius: 50%; animation: tourne .8s linear infinite; }
 @keyframes tourne { to { transform: rotate(360deg); } }
 
+/* ---------------------------------------------------------------- vitrine */
+.carte-vitrine { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; }
+.ligne-vitrine { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.ligne-vitrine > div { flex: 1; min-width: 160px; }
+.ligne-vitrine small, .demande small { display: block; color: var(--muted); }
+.carte-vitrine .champ { margin: 0; }
+.titre-demandes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 16px; margin: 18px 0 10px; }
+.lien { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px; }
+.demandes { display: grid; gap: 8px; }
+.demande { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; }
+.demande > div:first-child { min-width: 0; }
+.demande p { margin: 6px 0 0; color: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.demande.traitee { opacity: .65; }
+.demande .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.carte-vitrine .erreur:empty { display: none; }
+.carte-vitrine .erreur { margin: 6px 0 0; }
+.pied-gauche { justify-content: flex-start; margin: 0 0 18px; }
+
 /* ---------------------------------------------------------------- téléphone */
 @media (max-width: 860px) {
   .chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -138,8 +156,13 @@ pre.sortie { background: var(--creux); border: 1px solid var(--line); border-rad
   .recherche { margin-left: 0; width: 100%; }
   .ligne { grid-template-columns: 1fr auto; }
   .ligne .qui { display: none; }
+  .ligne time { grid-column: 1; grid-row: 1; }
+  .ligne button { grid-column: 2; grid-row: 1; }
+  .ligne > span:not(.qui) { grid-column: 1 / -1; }
   .membre { flex-wrap: wrap; }
   .membre div { flex-basis: 100%; }
+  .demande { flex-direction: column; }
+  .demande .actions { justify-content: flex-start; }
   .haut { padding: 10px 16px; }
   main.panel { padding: 16px 16px 50px; }
 }

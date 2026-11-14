@@ -187,11 +187,85 @@ Backup Server vers OVH qui s'en charge, rien d'autre à installer.
 
 ---
 
+## E. Déménager ton site, la démo et la vitrine (lot 4, ≈ 1 h)
+
+À faire **après** A, B, C et D, à un moment calme (le soir) : ce qui est ajouté sur l'ancien
+site après l'étape E1 ne suivra pas. Les anciens conteneurs ne sont **jamais modifiés** : si
+quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout revient comme avant.
+
+### ☐ E1. Ton site (sur l'hôte Proxmox, puis dans la VM)
+
+1. Dans le **Shell** de ton nœud Proxmox (remplace `120` par le numéro du conteneur de ton
+   RecipeLog actuel) :
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/exporter-ancien.sh | bash -s -- 120 /root/monsite.tar.gz
+   ```
+2. L'envoyer dans la VM (adresse IP notée en B1) :
+   ```bash
+   scp /root/monsite.tar.gz recipelog@<adresse IP de la VM>:/tmp/
+   ```
+3. Dans la VM (`ssh recipelog@<IP>` puis `sudo -i`). Choisis le nom de ton site : il devient
+   `<nom>.recipelog.cc` (ici `chanka`). `--canal beta` : ton site suit `main`, comme aujourd'hui.
+   ```bash
+   recipelog-instance creer chanka --canal beta
+   recipelog-instance importer chanka /tmp/monsite.tar.gz --oui
+   ```
+4. Ouvre **https://chanka.recipelog.cc** avec ton compte : tes recettes, factures et photos sont là.
+5. Pour envoyer à ton équipe l'email « Choisis ton mot de passe » (leurs rôles sont gardés) :
+   ```bash
+   recipelog-instance inviter-comptes chanka
+   ```
+6. Connecteur Claude (MCP) : dans claude.ai, remplace l'adresse du connecteur RecipeLog par
+   `https://chanka.recipelog.cc/api/mcp` (même clé qu'avant), puis reconnecte-le.
+
+### ☐ E2. La démo
+
+1. Sur l'hôte Proxmox (`115` = ton conteneur vitrine + démo) : l'option prend l'état « figé »
+   de la démo, pas les essais des visiteurs.
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/exporter-ancien.sh | bash -s -- 115 --reference-demo /root/demo.tar.gz
+   scp /root/demo.tar.gz recipelog@<adresse IP de la VM>:/tmp/
+   ```
+2. Dans la VM :
+   ```bash
+   recipelog-instance creer demo --demo --sans-authentik --canal stable
+   recipelog-instance importer demo /tmp/demo.tar.gz --oui
+   recipelog-instance demo-figer demo
+   ```
+
+### ☐ E3. La vitrine (déjà là)
+
+Elle a été installée avec la plateforme. Dans le panel, partie **Site vitrine** :
+**Mettre à jour la vitrine**, puis, si tu veux, un **bandeau** (« Offre de lancement… »).
+Le formulaire « Nous écrire » arrive à ton adresse par Brevo (étape A3) : plus besoin du Gmail
+du site. Pour garder les anciens messages (facultatif), sur l'hôte Proxmox :
+```bash
+pct exec 115 -- cat /var/lib/recipelog-vitrine/messages.jsonl | ssh recipelog@<IP> "sudo tee -a /srv/recipelog/vitrine/messages/messages.jsonl >/dev/null"
+```
+
+### ☐ E4. Basculer les adresses dans Cloudflare (5 min)
+
+**one.dash.cloudflare.com → Networks → Tunnels** :
+1. Ton **ancien tunnel** (celui du conteneur `cloudflare-tunnel`) → **Public Hostname** :
+   supprimer `recipelog.cc`, `www.recipelog.cc` et `demo.recipelog.cc`.
+2. Le tunnel **recipelog-plateforme** → **Public Hostname → Add** : Subdomain **vide**,
+   Domain `recipelog.cc`, Service `HTTP` `traefik:80` → **Save**. (`www` et `demo` passent
+   déjà par `*`.)
+3. Vérifier **https://recipelog.cc**, **https://demo.recipelog.cc** et le formulaire.
+
+### ☐ E5. Une semaine plus tard
+
+Si tout va bien : **arrêter** (pas supprimer) les anciens conteneurs RecipeLog et vitrine
+dans Proxmox. Garde-les un mois avant de les supprimer. En cas de souci avant : remettre les
+adresses de E4 sur l'ancien tunnel suffit à tout remettre comme avant.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3) sans
+sauvegardes au lot 3, la vitrine au lot 4) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash

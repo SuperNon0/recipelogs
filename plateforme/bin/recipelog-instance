@@ -25,6 +25,10 @@
 #   recipelog-instance restaurer <nom> <sauvegarde> --oui
 #   recipelog-instance tester-sauvegarde <nom>|--tous
 #   recipelog-instance exporter <nom> <sauvegarde> > fichier.tar.gz   (sans mots de passe)
+#   recipelog-instance importer <nom> <archive.tar.gz> --oui    (déménagement : voir exporter-ancien.sh)
+#   recipelog-instance inviter-comptes <nom>     (invite les comptes actifs après un import)
+#   recipelog-instance demo-figer <nom> | demo-remettre <nom>|--toutes
+#   recipelog-instance vitrine maj | bandeau "texte" | demandes [--json] | traitee <clé>
 #
 # Réglages lus dans /srv/recipelog/.env (écrit par install.sh).
 # Chaque client a son dossier /srv/recipelog/instances/<nom>/ :
@@ -186,7 +190,7 @@ cmd_creer() {
     esac
   done
   [ -n "${nom}" ] || die "Usage : recipelog-instance creer <nom> [--canal …] [--responsable email] [--max N] [--admin email] [--demo] [--sans-authentik]"
-  nom_valide "${nom}"
+  if [ "${nom}" = demo ] && [ "${demo}" = 1 ]; then :; else nom_valide "${nom}"; fi
   [ -z "${resp}" ] || verifier_email "${resp}"
   verifier_max "${max}"
   [[ "${essai}" =~ ^[0-9]+$ ]] || die "Durée d'essai invalide : ${essai} (en jours)."
@@ -215,6 +219,7 @@ CANAL=${canal}
 CREE_LE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 CONNEXION=cloudflare
 MCP=${mcp}
+$([ "${demo}" = 1 ] && echo "DEMO=1")
 $([ "${essai}" -gt 0 ] && echo "ESSAI_FIN=$(date -u -d "+${essai} days" +%Y-%m-%d)")
 CONF
   {
@@ -235,6 +240,9 @@ CONF
     info "✅ ${nom} est prêt : https://${nom}.${DOMAINE}"
     if [ "${authentik}" = 1 ]; then
       inviter_responsable "${nom}" "${resp}"
+    elif [ "${demo}" = 1 ]; then
+      echo "   Démo ouverte à tous. Prépare-la, puis : recipelog-instance demo-figer ${nom}"
+      [ -d "${DONNEES}/vitrine/reglages" ] && vitrine_reglages
     else
       echo "   Sans Authentik : protège cette adresse dans Cloudflare Access."
     fi
@@ -298,11 +306,12 @@ cmd_liste() {
       [ "${premier}" = 1 ] || printf ','
       premier=0
       # Valeurs contrôlées (noms, dates, mots-clés) : pas de guillemets à échapper.
-      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","mcp":%s}' \
+      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","mcp":%s,"demo":%s}' \
         "${nom}" "$(conf_lire "${nom}" CANAL)" "$(conf_lire "${nom}" CONNEXION)" "$(etat_conteneur "${nom}")" \
         "${nom}" "${DOMAINE}" "$(conf_lire "${nom}" CREE_LE)" \
         "$(suspendu "${nom}" && echo true || echo false)" "$(conf_lire "${nom}" ESSAI_FIN)" \
-        "$([ "$(conf_lire "${nom}" MCP)" = non ] && echo false || echo true)"
+        "$([ "$(conf_lire "${nom}" MCP)" = non ] && echo false || echo true)" \
+        "$([ "$(conf_lire "${nom}" DEMO)" = 1 ] && echo true || echo false)"
     done
     printf ']\n'
     return
@@ -518,6 +527,7 @@ cmd_sauvegarder() {
     for d in "${INSTANCES}"/*/; do
       [ -d "${d}" ] || continue
       n="$(basename "${d}")"
+      [ "$(conf_lire "${n}" DEMO)" = 1 ] && continue # la démo a sa référence (demo-figer)
       if id="$(sauvegarder_un "${n}" "${etiquette}")"; then info "${n} : sauvegarde ${id}"; else echecs=$((echecs + 1)); fi
     done
     [ "${echecs}" -eq 0 ] || die "${echecs} client(s) non sauvegardé(s)."
@@ -570,36 +580,49 @@ SQL
   docker exec -i "${PG}" pg_restore -U postgres -d "${db}" --no-owner --role="${role}" --exit-on-error < "${dump}"
 }
 
+# remettre_fichiers <nom> <dossier de sauvegarde> : remplace uploads/ par celui de la sauvegarde.
+remettre_fichiers() {
+  local dir="${INSTANCES}/$1" sauv="$2" neuf
+  neuf="${dir}/uploads.neuf"
+  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.neuf' -exec rm -rf {} +
+  mkdir -p "${neuf}"
+  tar -C "${neuf}" -xzf "${sauv}/fichiers.tar.gz" uploads 2>/dev/null || mkdir -p "${neuf}/uploads"
+  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.avant' -exec rm -rf {} +
+  mv "${dir}/uploads" "${dir}/uploads.avant"
+  mv "${neuf}/uploads" "${dir}/uploads"
+  find "${dir}" -mindepth 1 -maxdepth 1 \( -name 'uploads.neuf' -o -name 'uploads.avant' \) -exec rm -rf {} +
+  chown -R 1000:1000 "${dir}/uploads"
+}
+
+# appliquer <nom> <dossier de sauvegarde> : arrête le client, remet base + fichiers.
+# Code 1 si la base n'a pas pu être rechargée (le client reste arrêté).
+appliquer() {
+  local nom="$1" sauv="$2" db
+  db="$(base "${nom}")"
+  info "Arrêt de ${nom}…"
+  docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
+  info "Remise de la base…"
+  charger_base "${db}" "${db}" "${sauv}/base.dump" || return 1
+  info "Remise des photos et factures…"
+  remettre_fichiers "${nom}" "${sauv}"
+}
+
 cmd_restaurer() {
-  local nom="${1:-}" id="${2:-}" ok="${3:-}" dir sauv db secu
+  local nom="${1:-}" id="${2:-}" ok="${3:-}" sauv secu
   [ -n "${nom}" ] && [ -n "${id}" ] || die "Usage : recipelog-instance restaurer <nom> <sauvegarde> --oui"
   existe "${nom}" || die "Client « ${nom} » inconnu."
   id_valide "${id}"
   sauv="$(dossier_sauv "${nom}")/${id}"
   [ -r "${sauv}/base.dump" ] || die "Sauvegarde « ${id} » introuvable pour ${nom}."
   [ "${ok}" = "--oui" ] || die "Ajoute --oui : les données actuelles de ${nom} seront remplacées."
-  dir="${INSTANCES}/${nom}"; db="$(base "${nom}")"
   info "Sauvegarde de sécurité de l'état actuel…"
   secu="$(sauvegarder_un "${nom}" avant-restauration --sans-rotation)" || die "Sauvegarde de sécurité ratée : rien n'a été changé."
-  info "Arrêt de ${nom}…"
-  docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
-  info "Remise de la base (${id})…"
-  if ! charger_base "${db}" "${db}" "${sauv}/base.dump"; then
+  if ! appliquer "${nom}" "${sauv}"; then
     echo "❌ La base n'a pas pu être remise. Retour à l'état d'avant (${secu})…" >&2
-    charger_base "${db}" "${db}" "$(dossier_sauv "${nom}")/${secu}/base.dump" || true
+    charger_base "$(base "${nom}")" "$(base "${nom}")" "$(dossier_sauv "${nom}")/${secu}/base.dump" || true
     suspendu "${nom}" || lancer "${nom}"
     die "Restauration annulée."
   fi
-  info "Remise des photos et factures…"
-  local neuf="${dir}/uploads.neuf"
-  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.neuf' -exec rm -rf {} +
-  mkdir -p "${neuf}"
-  tar -C "${neuf}" -xzf "${sauv}/fichiers.tar.gz" uploads
-  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.avant' -exec rm -rf {} +
-  mv "${dir}/uploads" "${dir}/uploads.avant"
-  mv "${neuf}/uploads" "${dir}/uploads"
-  find "${dir}" -mindepth 1 -maxdepth 1 \( -name 'uploads.neuf' -o -name 'uploads.avant' \) -exec rm -rf {} +
-  chown -R 1000:1000 "${dir}/uploads"
   if suspendu "${nom}"; then
     info "✅ ${nom} restauré (${id}). Il reste en pause."
   else
@@ -635,6 +658,7 @@ cmd_tester_sauvegarde() {
     local d echecs=0
     for d in "${INSTANCES}"/*/; do
       [ -d "${d}" ] || continue
+      [ "$(conf_lire "$(basename "${d}")" DEMO)" = 1 ] && continue
       tester_un "$(basename "${d}")" || echecs=$((echecs + 1))
     done
     [ "${echecs}" -eq 0 ] || die "${echecs} sauvegarde(s) en échec."
@@ -653,6 +677,225 @@ cmd_exporter() {
   [ -r "${sauv}/base.dump" ] || die "Sauvegarde « ${id} » introuvable pour ${nom}."
   [ -t 1 ] && die "Rediriger la sortie vers un fichier : … > ${nom}-${id}.tar.gz"
   tar -C "${sauv}" -czf - base.dump fichiers.tar.gz infos.json
+}
+
+# ------------------------------------------------------------ déménagement (lot 4)
+# importer <nom> <archive.tar.gz> --oui : remplace les données d'un client (déjà créé)
+# par une archive qui contient base.dump (pg_dump -Fc) et fichiers.tar.gz (uploads/).
+# C'est le format de « exporter » et de exporter-ancien.sh (ancien site en LXC).
+cmd_importer() {
+  local nom="${1:-}" fichier="${2:-}" ok="${3:-}" racine id tmp db
+  [ -n "${nom}" ] && [ -n "${fichier}" ] || die "Usage : recipelog-instance importer <nom> <archive.tar.gz> --oui"
+  existe "${nom}" || die "Crée d'abord le client : recipelog-instance creer ${nom} …"
+  [ -r "${fichier}" ] || die "Archive ${fichier} introuvable."
+  [ "${ok}" = "--oui" ] || die "Ajoute --oui : les données actuelles de ${nom} seront remplacées par l'archive."
+  racine="$(dossier_sauv "${nom}")"
+  mkdir -p "${racine}"; chmod 700 "${SAUVEGARDES}" "${racine}"
+  id="$(date -u +%Y%m%d-%H%M%S)"
+  while [ -e "${racine}/${id}" ]; do sleep 1; id="$(date -u +%Y%m%d-%H%M%S)"; done
+  tmp="${racine}/${id}.partiel"
+  mkdir -m 700 "${tmp}"
+  tar -C "${tmp}" --no-same-owner -xzf "${fichier}" base.dump fichiers.tar.gz \
+    || die "Archive illisible : il faut base.dump et fichiers.tar.gz dedans (voir exporter-ancien.sh)."
+  docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1 || die "base.dump n'est pas une sauvegarde PostgreSQL (pg_dump -Fc)."
+  tar -tzf "${tmp}/fichiers.tar.gz" >/dev/null 2>&1 || die "fichiers.tar.gz est abîmé."
+  printf '{"id":"%s","date":"%s","etiquette":"importee","version":"","base":%s,"fichiers":%s}\n' \
+    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(stat -c %s "${tmp}/base.dump")" "$(stat -c %s "${tmp}/fichiers.tar.gz")" > "${tmp}/infos.json"
+  chmod 600 "${tmp}"/*
+  mv "${tmp}" "${racine}/${id}"
+  info "Archive rangée comme sauvegarde ${id} (« importée »)."
+  cmd_restaurer "${nom}" "${id}" --oui
+  db="$(base "${nom}")"
+  local comptes
+  comptes="$(comptes_actifs "${nom}")"
+  if [ -n "${comptes}" ]; then
+    echo
+    echo "Comptes actifs de l'ancien site (rôles gardés) :"
+    printf '  %s\n' ${comptes}
+    if [ "$(conf_lire "${nom}" CONNEXION)" = authentik ]; then
+      echo "Pour envoyer à chacun l'email « Choisis ton mot de passe » :"
+      echo "  recipelog-instance inviter-comptes ${nom}"
+    fi
+  fi
+}
+
+# comptes_actifs <nom> : emails des comptes actifs de l'appli, sans les administrateurs
+# cachés (super-admins, déjà partout).
+comptes_actifs() {
+  local admins
+  admins="$(sed -n 's/^RECIPELOG_ADMIN_EMAILS=//p' "${INSTANCES}/$1/instance.env" | tr ',;' '\n\n' | tr -d ' ' | tr '[:upper:]' '[:lower:]' | grep . || true)"
+  docker exec "${PG}" psql -U postgres -d "$(base "$1")" -tAc "SELECT lower(email) FROM accounts WHERE status = 'active' ORDER BY 1" 2>/dev/null \
+    | { if [ -n "${admins}" ]; then grep -vxF -f <(printf '%s\n' "${admins}"); else cat; fi; } || true
+}
+
+# Invite dans Authentik chaque compte actif de l'appli (après un import).
+cmd_inviter_comptes() {
+  local nom="${1:-}" db email n=0 echecs=0
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance inviter-comptes <nom existant>"
+  [ "$(conf_lire "${nom}" CONNEXION)" = authentik ] || die "${nom} n'utilise pas Authentik."
+  db="$(base "${nom}")"
+  for email in $(comptes_actifs "${nom}"); do
+    if passerelle inviter "${nom}" "${email}" >/dev/null 2>&1; then
+      info "Invitation envoyée à ${email}."; n=$((n + 1))
+    else
+      echo "⚠️  ${email} : invitation impossible (déjà dans l'équipe, ou plus de place ?)." >&2; echecs=$((echecs + 1))
+    fi
+  done
+  info "✅ ${n} invitation(s) envoyée(s)$([ "${echecs}" -gt 0 ] && echo ", ${echecs} à revoir")."
+}
+
+# ------------------------------------------------------------ démo
+# demo-figer <nom> : l'état actuel devient la référence ; demo-remettre la recharge
+# (chaque nuit à 4 h 30 par le moteur, ou en 1 clic dans le panel).
+demo_ref() { echo "$(dossier_sauv "$1")/reference"; }
+
+cmd_demo_figer() {
+  local nom="${1:-}" id ref
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance demo-figer <nom>"
+  [ "$(conf_lire "${nom}" DEMO)" = 1 ] || die "${nom} n'est pas une démo (créée avec --demo)."
+  id="$(sauvegarder_un "${nom}" reference --sans-rotation)" || die "Sauvegarde ratée."
+  ref="$(demo_ref "${nom}")"
+  find "$(dossier_sauv "${nom}")" -mindepth 1 -maxdepth 1 -name 'reference' -exec rm -rf {} +
+  mv "$(dossier_sauv "${nom}")/${id}" "${ref}"
+  info "✅ État actuel de ${nom} gardé comme référence de la démo."
+}
+
+cmd_demo_remettre() {
+  local nom="${1:-}" ref
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance demo-remettre <nom>|--toutes"
+  ref="$(demo_ref "${nom}")"
+  [ -r "${ref}/base.dump" ] || die "Pas encore de référence pour ${nom} : recipelog-instance demo-figer ${nom}"
+  appliquer "${nom}" "${ref}" || { suspendu "${nom}" || lancer "${nom}"; die "La référence de ${nom} ne se recharge pas."; }
+  suspendu "${nom}" && { info "${nom} remis à zéro (reste en pause)."; return 0; }
+  lancer "${nom}"
+  attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom}"
+  info "✅ Démo ${nom} remise à zéro."
+}
+
+cmd_demos_remettre() {
+  local d n
+  for d in "${INSTANCES}"/*/; do
+    [ -d "${d}" ] || continue
+    n="$(basename "${d}")"
+    [ "$(conf_lire "${n}" DEMO)" = 1 ] && [ -r "$(demo_ref "${n}")/base.dump" ] || continue
+    cmd_demo_remettre "${n}" || true
+  done
+}
+
+# ------------------------------------------------------------ vitrine
+# La vitrine (branche site-vitrine, jamais modifiée ici) est servie par les
+# conteneurs recipelog-vitrine (nginx) et recipelog-vitrine-contact (formulaire).
+#   vitrine maj                  télécharge la dernière version de la branche
+#   vitrine bandeau "texte"      bandeau en haut du site ("" pour l'enlever)
+#   vitrine demandes [--json]    messages reçus par le formulaire
+#   vitrine traitee <clé>        marque une demande comme traitée
+VITRINE="${DONNEES}/vitrine"
+VITRINE_BRANCHE="${VITRINE_BRANCHE:-site-vitrine}"
+VITRINE_DEPOT="${VITRINE_DEPOT:-SuperNon0/recipelogs}"
+
+telecharger() { # telecharger <url> <fichier>
+  if command -v curl >/dev/null; then curl -fsSL --retry 2 -o "$2" "$1"; else wget -q -O "$2" "$1"; fi
+}
+
+vitrine_reglages() {
+  local r="${VITRINE}/reglages" contact demo="" de
+  mkdir -p "${r}" "${VITRINE}/messages"
+  chown 1000:1000 "${VITRINE}/messages"
+  contact="${VITRINE_CONTACT:-${ADMIN_EMAILS%%,*}}"
+  existe demo && demo="https://demo.${DOMAINE}"
+  printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s" };\n' "${demo}" "${contact}" > "${r}/config.js"
+  printf '%s' "${contact}" > "${r}/contact"
+  # Formulaire « Nous écrire » : même compte d'envoi que la plateforme (Brevo).
+  de="$(printf '%s' "${SMTP_EXPEDITEUR:-}" | sed -n 's/.*<\([^>]*\)>.*/\1/p')"
+  umask 077
+  printf 'SMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_USER=%s\nSMTP_PASS=%s\nSMTP_FROM=%s\nMAIL_TO=%s\n' \
+    "${SMTP_HOTE:-}" "${SMTP_PORT:-587}" "${SMTP_UTILISATEUR:-}" "${SMTP_MOT_DE_PASSE:-}" "${de:-${SMTP_EXPEDITEUR:-}}" "${contact}" > "${r}/smtp"
+  umask 022
+  chown 1000:1000 "${r}/smtp"
+  [ -f "${r}/bandeau.js" ] || printf '/* pas de bandeau */\n' > "${r}/bandeau.js"
+}
+
+vitrine_maj() {
+  local tmp archive racine v
+  mkdir -p "${VITRINE}"
+  tmp="$(mktemp -d "${VITRINE}/.maj.XXXXXX")"
+  archive="${tmp}/code.tar.gz"
+  info "Téléchargement de la vitrine (branche ${VITRINE_BRANCHE})…"
+  telecharger "https://codeload.github.com/${VITRINE_DEPOT}/tar.gz/refs/heads/${VITRINE_BRANCHE}" "${archive}" \
+    || { find "${tmp}" -delete 2>/dev/null; die "Téléchargement de la vitrine impossible."; }
+  mkdir -p "${tmp}/code"
+  tar -C "${tmp}/code" --strip-components 1 --no-same-owner -xzf "${archive}"
+  [ -f "${tmp}/code/site/index.html" ] || { find "${tmp}" -delete; die "La branche ${VITRINE_BRANCHE} n'a pas de site/index.html."; }
+  # Version dans les liens du style et du script : les navigateurs reprennent les nouveaux fichiers.
+  v="$(cat "${tmp}/code/site/"*.js "${tmp}/code/site/"*.css | sha256sum | cut -c1-8)"
+  sed -i -E "s#(href=\"style\.css|src=\"app\.js)(\?v=[0-9a-f]+)?\"#\1?v=${v}\"#g" "${tmp}/code/site/index.html"
+  printf '%s\n' "${v}" > "${tmp}/code/.version"
+  racine="${VITRINE}/code"
+  find "${VITRINE}" -mindepth 1 -maxdepth 1 -name 'code.ancien' -exec rm -rf {} +
+  [ -d "${racine}" ] && mv "${racine}" "${VITRINE}/code.ancien"
+  mv "${tmp}/code" "${racine}"
+  find "${VITRINE}" -mindepth 1 -maxdepth 1 \( -name 'code.ancien' -o -name '.maj.*' \) -exec rm -rf {} +
+  vitrine_reglages
+  docker restart recipelog-vitrine recipelog-vitrine-contact >/dev/null 2>&1 || true
+  info "✅ Vitrine à jour (${v}) : https://${DOMAINE}"
+}
+
+vitrine_bandeau() {
+  local texte="${1:-}" r="${VITRINE}/reglages" json
+  mkdir -p "${r}"
+  [ "${#texte}" -le 300 ] || die "Bandeau trop long (300 caractères au plus)."
+  if [ -z "${texte}" ]; then
+    printf '/* pas de bandeau */\n' > "${r}/bandeau.js"
+    : > "${r}/bandeau.txt"
+    info "Bandeau retiré."; return 0
+  fi
+  # Texte passé en JSON (échappé), affiché avec textContent : pas de HTML possible.
+  json="$(printf '%s' "${texte}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/</\\u003c/g' | tr -d '\r\n')"
+  cat > "${r}/bandeau.js" <<JS
+// Bandeau du site vitrine (recipelog-instance vitrine bandeau).
+(function () {
+  var b = document.createElement("div");
+  b.textContent = "${json}";
+  b.setAttribute("role", "status");
+  b.style.cssText = "position:relative;z-index:9999;padding:10px 16px;text-align:center;font:600 14px/1.4 system-ui,sans-serif;background:#1f1b16;color:#f7efe2;";
+  document.body.insertBefore(b, document.body.firstChild);
+})();
+JS
+  printf '%s' "${texte}" > "${r}/bandeau.txt"
+  info "Bandeau affiché : ${texte}"
+}
+
+vitrine_demandes() {
+  local f="${VITRINE}/messages/messages.jsonl" t="${VITRINE}/traitees.txt"
+  if [ "${1:-}" = "--json" ]; then
+    printf '{"demandes":['
+    [ -s "${f}" ] && tail -n 200 "${f}" | paste -sd, -
+    printf '],"traitees":['
+    [ -s "${t}" ] && sed 's/.*/"&"/' "${t}" | paste -sd, -
+    printf ']}\n'
+    return
+  fi
+  [ -s "${f}" ] || { echo "Aucune demande reçue pour l'instant."; return 0; }
+  tail -n 20 "${f}"
+}
+
+vitrine_traitee() {
+  local cle="${1:-}"
+  [[ "${cle}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}\|[^[:space:]\"]+@[^[:space:]\"]+$ ]] || die "Clé de demande invalide."
+  grep -qxF "${cle}" "${VITRINE}/traitees.txt" 2>/dev/null || printf '%s\n' "${cle}" >> "${VITRINE}/traitees.txt"
+  info "Demande marquée comme traitée."
+}
+
+cmd_vitrine() {
+  local sous="${1:-}"; shift || true
+  case "${sous}" in
+    maj) vitrine_maj ;;
+    reglages) vitrine_reglages; info "Réglages de la vitrine réécrits." ;;
+    bandeau) vitrine_bandeau "${1:-}" ;;
+    demandes) vitrine_demandes "${1:-}" ;;
+    traitee) vitrine_traitee "${1:-}" ;;
+    *) die "Usage : recipelog-instance vitrine maj | reglages | bandeau \"texte\" | demandes [--json] | traitee <clé>" ;;
+  esac
 }
 
 # Supprime un client en gardant une archive (base + fichiers) dans archives/.
@@ -706,5 +949,10 @@ case "${action}" in
   restaurer) cmd_restaurer "$@" ;;
   tester-sauvegarde) cmd_tester_sauvegarde "$@" ;;
   exporter) cmd_exporter "$@" ;;
-  *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  importer) cmd_importer "$@" ;;
+  inviter-comptes) cmd_inviter_comptes "$@" ;;
+  demo-figer) cmd_demo_figer "$@" ;;
+  demo-remettre) if [ "${1:-}" = "--toutes" ]; then cmd_demos_remettre; else cmd_demo_remettre "$@"; fi ;;
+  vitrine) cmd_vitrine "$@" ;;
+  *) sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

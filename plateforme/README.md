@@ -134,6 +134,23 @@ pause affiche « Ce RecipeLog est en pause » ; ses données restent là.
   la VM entière, sauvegardes comprises. Rien d'autre à installer ; il faut juste que la VM
   soit dans ta tâche de sauvegarde PBS (voir [A-FAIRE.md](A-FAIRE.md), étape D1).
 
+## Déménagement, démo et vitrine (lot 4)
+
+- **Ton site actuel** passe sur la plateforme sans rien perdre : `exporter-ancien.sh` (sur
+  l'hôte Proxmox) lit la base et les photos de l'ancien conteneur sans le modifier, puis
+  `recipelog-instance importer` les met dans un client. Recettes, factures, fournisseurs,
+  réglages, rôles et clé MCP suivent. `inviter-comptes` envoie ensuite à chaque compte actif
+  l'email « Choisis ton mot de passe ». Pas à pas : [A-FAIRE.md](A-FAIRE.md), étape E.
+- **La démo** est un client comme les autres, créé avec `--demo` (ouvert à tous, sans
+  connexion). `demo-figer` garde son état comme référence ; elle y revient chaque nuit à
+  4 h 30, ou en 1 clic dans le panel (bouton **Démo**).
+- **La vitrine** (branche `site-vitrine`, jamais modifiée par ce chantier) tourne dans les
+  conteneurs `recipelog-vitrine` (nginx) et `recipelog-vitrine-contact` (formulaire). Dans
+  le panel, partie **Site vitrine** : mise à jour en 1 clic, bandeau en haut du site, et les
+  **demandes reçues** par le formulaire, avec « Créer le client » (prérempli : son email en
+  responsable, 14 jours d'essai). Le formulaire envoie ses emails par le même compte Brevo
+  que la plateforme, vers ton adresse.
+
 Le panel n'a aucun accès à Docker : il passe par le **moteur**, joignable seulement sur le
 réseau interne avec une clé. Le moteur lance `recipelog-instance`, comme en ligne de commande.
 
@@ -164,6 +181,15 @@ recipelog-instance restaurer chanka 20261114-030000 --oui
 recipelog-instance tester-sauvegarde chanka # recharge la dernière dans une base à part pour la vérifier
 recipelog-instance exporter chanka 20261114-030000 > chanka.tar.gz
                                             # archive base + fichiers, sans mot de passe
+recipelog-instance importer chanka /tmp/ancien.tar.gz --oui
+                                            # remplace les données de chanka par l'archive
+recipelog-instance inviter-comptes chanka   # invite les comptes actifs (après un import)
+recipelog-instance creer demo --demo --sans-authentik   # la démo publique
+recipelog-instance demo-figer demo          # son état actuel devient la référence
+recipelog-instance demo-remettre demo       # retour à la référence (--toutes : toutes les démos)
+recipelog-instance vitrine maj              # dernière version de la vitrine
+recipelog-instance vitrine bandeau "Offre de lancement"   # "" pour l'enlever
+recipelog-instance vitrine demandes         # messages reçus par le formulaire
 recipelog-plateforme ps                     # état de Traefik, PostgreSQL, tunnel, Authentik, passerelle
 ```
 
@@ -176,7 +202,9 @@ Tout est dans `/srv/recipelog` :
 - `.env` : réglages et mots de passe (lisible seulement par root) ;
 - `postgres/` : toutes les bases ;
 - `instances/<nom>/` : réglages, mot de passe et fichiers envoyés de chaque client ;
-- `sauvegardes/<nom>/` : les sauvegardes de chaque client (voir plus haut) ;
+- `sauvegardes/<nom>/` : les sauvegardes de chaque client (voir plus haut), et
+  `reference/` pour une démo ;
+- `vitrine/` : le code de la vitrine, ses réglages et les messages reçus ;
 - `archives/` : clients supprimés, avec leurs sauvegardes.
 
 La VM entière est copiée ailleurs par ta sauvegarde Proxmox Backup Server → OVH.
@@ -201,6 +229,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-14 | 4. Déménagement | Outils pour passer ton site, la démo et la vitrine sur la plateforme : `exporter-ancien.sh` (lit l'ancien conteneur sans le toucher), `importer` (testé : recettes, photos, comptes et rôles gardés), `inviter-comptes`. Démo publique avec référence et remise à zéro chaque nuit ou en 1 clic. Vitrine servie par la plateforme (branche `site-vitrine` inchangée) : mise à jour en 1 clic, bandeau, demandes du formulaire transformées en client en 1 clic. Testé dans un vrai navigateur, captures dans la PR. | Le déménagement lui-même, quand tu veux : [A-FAIRE.md](A-FAIRE.md), étape E. |
 | 2026-11-14 | 3. Sauvegardes | Chaque nuit à 3 h, sauvegarde de chaque client (base, photos et factures, réglages à part), gardée 7 jours, 4 semaines et 6 mois. Dans le panel, bouton « Sauvegardes » : sauvegarder maintenant, télécharger (sans mot de passe), restaurer en 1 clic (avec sauvegarde de l'état d'avant et retour automatique si ça rate), test de restauration chaque dimanche dans une base à part. Dernière sauvegarde affichée pour chaque client. Le moteur suit maintenant tout seul les mises à jour de `recipelog-instance`. Testé dans un vrai navigateur, captures dans la PR. | Vérifier que ta sauvegarde PBS → OVH inclut la nouvelle VM : [A-FAIRE.md](A-FAIRE.md), étape D1. |
 | 2026-11-14 | 2. Panel | Panel admin sur `admin.recipelog.cc` (super-admins seulement, connexion Authentik) dans le thème encre : tableau des clients, création en 1 clic avec invitation du responsable, équipe, places, essais (pause automatique à la fin), accès MCP par client, mise à jour d'un client ou de tous, pause / réactivation, suppression avec archive, journal de tes actions. Page « Ce RecipeLog est en pause ». Le moteur (seul à piloter Docker) reste interne. Testé dans un vrai navigateur, captures dans la PR. | Rien de nouveau à créer : voir [A-FAIRE.md](A-FAIRE.md), étape C4. |
 | 2026-11-14 | 1. Connexion | Authentik sur `auth.recipelog.cc` (connexion par email, mot de passe oublié, Google en option, double authentification), réglé tout seul et en français. La passerelle crée chaque client dans Authentik, invite par email (lien valable 3 jours) et compte les places. Dans l'appli : connexion et retour sur la page demandée, « Se déconnecter » (qui déconnecte vraiment, même sur une tablette partagée), Réglages → Comptes → « Inviter un collaborateur » et « Places utilisées », responsable administrateur à sa première connexion. `recipelog-instance creer --responsable … --max …`. Testé dans un vrai navigateur : invitation, choix du mot de passe, connexion, invitation depuis l'appli, plafond, refus d'un membre sur un autre client, super-admin caché, déconnexion. | Tout est dans [A-FAIRE.md](A-FAIRE.md) : compte Brevo pour les emails, Google si tu veux, puis installation et vérifications. |

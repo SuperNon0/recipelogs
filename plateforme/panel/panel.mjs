@@ -282,7 +282,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();
