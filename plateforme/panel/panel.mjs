@@ -259,6 +259,22 @@ createServer(async (req, res) => {
       return res.end(page);
     }
 
+    // Téléchargement d'une sauvegarde (lien simple : pas d'en-tête X-Panel, donc GET seulement).
+    const tele = url.pathname.match(/^\/telecharger\/([a-z0-9-]+)\/([0-9]{8}-[0-9]{6})$/);
+    if (tele && req.method === "GET") {
+      const r = await fetch(`${MOTEUR}/clients/${tele[1]}/sauvegardes/${tele[2]}/export`, {
+        headers: { Authorization: `Bearer ${MOTEUR_CLE}`, "X-Qui": session.email },
+      });
+      if (!r.ok || !r.body) return pageErreur(res, 404, "Sauvegarde introuvable", "Cette sauvegarde n'existe plus.");
+      res.writeHead(200, {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": r.headers.get("content-disposition") ?? "attachment",
+        "Cache-Control": "no-store",
+      });
+      for await (const morceau of r.body) res.write(morceau);
+      return res.end();
+    }
+
     if (url.pathname.startsWith("/api/")) {
       // Une page d'un autre site ne peut pas envoyer cet en-tête sans y être autorisée.
       if (req.method !== "GET" && req.headers["x-panel"] !== "1") {

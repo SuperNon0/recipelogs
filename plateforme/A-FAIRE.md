@@ -161,10 +161,37 @@ depuis **Réglages → Comptes**. 0 compte = pas de limite.
 
 ---
 
+---
+
+## D. Les sauvegardes (lot 3)
+
+Les sauvegardes de chaque client se font toutes seules chaque nuit, dans la VM. Ce qui manque :
+une copie **hors de la VM**, pour le jour où le disque lâche. C'est ta sauvegarde Proxmox
+Backup Server vers OVH qui s'en charge, rien d'autre à installer.
+
+### ☐ D1. Mettre la VM dans ta sauvegarde PBS (5 min)
+
+1. Dans Proxmox : **Centre de données → Sauvegarde**.
+2. Ouvrir ta tâche qui envoie vers Proxmox Backup Server (celle qui part ensuite chez OVH).
+3. Vérifier que la VM **recipelog-plateforme** est cochée (ou que la tâche prend « Toutes »).
+   Sinon, la cocher et **OK**. Mode conseillé : **Snapshot**.
+4. Idéalement, la tâche passe **après 3 h 30** du matin : elle emporte alors les sauvegardes
+   de la nuit.
+
+### ☐ D2. Essayer une restauration (5 min, quand tu veux)
+
+1. Sur **https://admin.recipelog.cc**, client `test` → **Sauvegardes** → **Sauvegarder maintenant**.
+2. Dans RecipeLog de `test`, supprimer une recette.
+3. Retour dans **Sauvegardes** → **Restaurer** sur celle de l'étape 1, taper `test`, valider.
+4. La recette est revenue.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
-Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2) sans
+Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
+sauvegardes au lot 3) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
@@ -185,3 +212,4 @@ Puis faire B2, B3 et C (si pas déjà faits), et retirer la protection Cloudflar
 | Tous les autres secrets | `/srv/recipelog/.env` dans la VM (lisible seulement par root) |
 | Résumé de l'installation | `/root/recipelog-plateforme.txt` dans la VM |
 | Le panel admin | https://admin.recipelog.cc (ton compte super-admin) |
+| Les sauvegardes des clients | dans la VM : `/srv/recipelog/sauvegardes/`, et dans ta sauvegarde PBS → OVH |

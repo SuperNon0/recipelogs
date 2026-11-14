@@ -233,9 +233,15 @@ services:
     environment:
       DONNEES: ${DONNEES:-/srv/recipelog}
       MOTEUR_CLE: ${MOTEUR_CLE:?MOTEUR_CLE manquant dans /srv/recipelog/.env}
+      # Sauvegardes : chaque nuit à SAUVEGARDE_HEURE (heure de Paris), test le dimanche.
+      TZ: ${TZ:-Europe/Paris}
+      SAUVEGARDE_HEURE: ${SAUVEGARDE_HEURE:-3}
+      SAUVEGARDE_JOUR_TEST: ${SAUVEGARDE_JOUR_TEST:-0}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Même chemin que sur la machine : recipelog-instance donne ces chemins à Docker.
       - ${DONNEES:-/srv/recipelog}:${DONNEES:-/srv/recipelog}
-      - ./bin/recipelog-instance:/usr/local/bin/recipelog-instance:ro
+      # Le dossier (pas le fichier seul) : une mise à jour du dépôt remplace le
+      # fichier, et un fichier monté seul resterait sur l'ancienne version.
+      - ./bin:/opt/recipelog/bin:ro
     networks: [recipelog]

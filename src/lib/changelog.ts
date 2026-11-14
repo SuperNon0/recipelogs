@@ -30,6 +30,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → Comptes → « Inviter un collaborateur » : son e-mail et son rôle, et il reçoit un e-mail pour choisir son mot de passe. Son compte est prêt tout de suite. « Renvoyer l'invitation » si l'e-mail s'est perdu ; supprimer un compte retire aussi la personne de l'équipe",
       "Le compteur « Places utilisées » montre combien de personnes de l'équipe peuvent se connecter sur le nombre compris dans l'offre. Toutes les places sont prises ? Le site propose d'en demander plus",
       "Le responsable du site devient administrateur tout seul à sa première connexion",
+      "RecipeLog en ligne : les recettes, photos et factures de chaque client sont sauvegardées chaque nuit, et peuvent être remises à une date précédente en cas d'erreur",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },
