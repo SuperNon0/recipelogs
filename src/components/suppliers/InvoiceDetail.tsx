@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Paperclip, Trash2, X } from "lucide-react";
+import { FileText, Paperclip, Pencil, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { deleteInvoice, removeInvoiceAttachment, uploadInvoiceFile } from "@/app/actions/suppliers";
 import { formatEuro } from "@/lib/cost";
 import type { loadPurchaseOrder } from "@/lib/purchaseOrders";
+import { Help } from "@/components/ui/Help";
+import { InvoiceFormModal, PriceFormModal, type EditablePrice } from "./ManageForms";
 
 type Order = NonNullable<Awaited<ReturnType<typeof loadPurchaseOrder>>>;
 
@@ -20,6 +22,9 @@ export function InvoiceDetail({ order }: { order: Order }) {
   const input = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [line, setLine] = useState<{ name: string; unit: string; price: EditablePrice } | null>(null);
+  const editable = can("costs.edit");
   const fileUrl = `/api/factures/${order.id}/fichier`;
   const linesTotal = order.lines.reduce((s, l) => s + (l.amount ?? 0), 0);
 
@@ -39,10 +44,14 @@ export function InvoiceDetail({ order }: { order: Order }) {
         <h1>
           <Link href={`/fournisseurs/${order.supplier.id}`}>{order.supplier.name}</Link>
         </h1>
-        {can("costs.edit") && (
+        {editable && (
+          <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="fl-btn fl-btn-secondary" disabled={pending} onClick={() => setEditing(true)}>
+            <Pencil size={15} /> Modifier
+          </button>
           <button
             type="button"
-            className="fl-btn fl-btn-secondary"
+            className="fl-btn fl-btn-danger"
             disabled={pending}
             onClick={() => {
               if (!confirm("Supprimer cette facture ?\n\nSes prix sortent de l'historique ; les produits qui ne sont sur aucune autre facture sont retirés.")) return;
@@ -55,13 +64,24 @@ export function InvoiceDetail({ order }: { order: Order }) {
           >
             <Trash2 size={15} /> Supprimer
           </button>
+          </span>
         )}
         <p className="sub">
-          Facture du {new Date(order.date).toLocaleDateString("fr-FR")}
+          {order.manual ? "Prix tapé à la main le" : "Facture du"} {new Date(order.date).toLocaleDateString("fr-FR")}
           {order.number ? ` · n° ${order.number}` : ""} · {order.lines.length} ligne{order.lines.length > 1 ? "s" : ""}
         </p>
       </div>
 
+      {editable && order.lines.length > 0 && (
+        <p className="sub" style={{ color: "var(--muted)", fontSize: 13, display: "flex", gap: 6, alignItems: "center", margin: "0 0 8px" }}>
+          Un prix mal lu ? Touche le crayon de la ligne.
+          <Help title="Corriger une ligne">
+            Le crayon d&apos;une ligne corrige son prix (au kg, au L ou à la pièce) et la quantité achetée, ou supprime la ligne. Le prix du
+            colis et le montant sont recalculés, et l&apos;historique du produit suit. « Modifier » en haut change la date, le numéro, le
+            total ou la remarque de la facture.
+          </Help>
+        </p>
+      )}
       <div className="fl-list">
         {order.lines.map((l) => (
           <div key={l.id} className="inv-line">
@@ -85,6 +105,22 @@ export function InvoiceDetail({ order }: { order: Order }) {
                 {formatEuro(l.unitPrice)} /{l.unit}
               </small>
             </span>
+            {editable && (
+              <button
+                type="button"
+                className="fl-btn fl-btn-ghost fl-btn-icon"
+                aria-label={`Corriger ${l.product}`}
+                onClick={() =>
+                  setLine({
+                    name: l.product,
+                    unit: l.unit,
+                    price: { lineId: l.id, price: l.unitPrice, date: order.date, quantity: l.quantity, manual: order.manual, invoiceNumber: order.number },
+                  })
+                }
+              >
+                <Pencil size={15} />
+              </button>
+            )}
           </div>
         ))}
         <div className="sup-total">
@@ -142,6 +178,8 @@ export function InvoiceDetail({ order }: { order: Order }) {
           <img src={fileUrl} alt="Facture" className="inv-preview" />
         )}
       </div>
+      {editing && <InvoiceFormModal order={order} onClose={() => setEditing(false)} />}
+      {line && <PriceFormModal productName={line.name} unit={line.unit} price={line.price} onClose={() => setLine(null)} />}
     </>
   );
 }

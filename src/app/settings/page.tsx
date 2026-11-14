@@ -26,7 +26,7 @@ export default async function SettingsPage() {
     getSiteUrl(),
     getMcpToken(),
     prisma.supplier.count(),
-    prisma.purchaseOrder.count(),
+    prisma.purchaseOrder.count({ where: { manual: false } }),
   ]);
   const auth = can("accounts.manage") ? await getAuthSettings() : null;
   const accountsWaiting = auth?.enabled ? await prisma.account.count({ where: { status: "pending" } }) : 0;
@@ -110,6 +110,12 @@ export default async function SettingsPage() {
                   icon={Store}
                   title="Comparer les prix des fournisseurs"
                   sub={`${plural(supplierCount, "fournisseur")} · tableau des prix payés, article par article`}
+                />
+                <Row
+                  href="/fournisseurs/liste"
+                  icon={Users}
+                  title="Mes fournisseurs"
+                  sub="créer, renommer, supprimer · ajouter ou corriger des produits et des prix"
                 />
                 <Row
                   href="/factures"

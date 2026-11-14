@@ -476,6 +476,315 @@ export async function deletePurchaseOrder(id: number): Promise<{ filePath: strin
 }
 
 // ─────────────────────────────────────────────
+// Gérer à la main (site et connecteur) : fournisseurs, produits, prix
+// ─────────────────────────────────────────────
+
+const cleanText = (v: string | null | undefined, max = 300) => (v == null ? null : v.trim().slice(0, max) || null);
+const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
+
+async function supplierNameFree(tx: Tx, name: string, exceptId?: number) {
+  const taken = await tx.supplier.findFirst({
+    where: { name: { equals: name, mode: "insensitive" }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+    select: { name: true },
+  });
+  if (taken) throw new Error(`Le fournisseur « ${taken.name} » existe déjà.`);
+}
+
+/** Nouveau fournisseur, tapé à la main. */
+export async function createSupplier(input: { name: string; note?: string | null }): Promise<{ id: number; name: string }> {
+  const name = cleanText(input.name, 120);
+  if (!name) throw new Error("Le nom du fournisseur est vide.");
+  return prisma.$transaction(async (tx) => {
+    await supplierNameFree(tx, name);
+    return tx.supplier.create({ data: { name, note: cleanText(input.note, 2000) }, select: { id: true, name: true } });
+  });
+}
+
+/** Renomme un fournisseur et / ou change sa remarque (ses produits et factures restent). */
+export async function updateSupplier(id: number, input: { name?: string; note?: string | null }) {
+  return prisma.$transaction(async (tx) => {
+    const s = await tx.supplier.findUnique({ where: { id }, select: { id: true } });
+    if (!s) throw new Error("Fournisseur introuvable.");
+    const data: Prisma.SupplierUpdateInput = {};
+    if (input.name !== undefined) {
+      const name = cleanText(input.name, 120);
+      if (!name) throw new Error("Le nom du fournisseur est vide.");
+      await supplierNameFree(tx, name, id);
+      data.name = name;
+    }
+    if (input.note !== undefined) data.note = cleanText(input.note, 2000);
+    return tx.supplier.update({ where: { id }, data, select: { id: true, name: true, note: true } });
+  });
+}
+
+/** Ce qui part avec un fournisseur : à montrer avant de confirmer la suppression. */
+export async function supplierDeletionInfo(id: number) {
+  const s = await prisma.supplier.findUnique({
+    where: { id },
+    select: {
+      name: true,
+      _count: { select: { products: true } },
+      orders: { select: { manual: true, filePath: true } },
+      products: { select: { chosenBy: { select: { name: true } } } },
+    },
+  });
+  if (!s) return null;
+  const invoices = s.orders.filter((o) => !o.manual);
+  return {
+    name: s.name,
+    products: s._count.products,
+    invoices: invoices.length,
+    files: invoices.filter((o) => o.filePath).length,
+    manualPrices: s.orders.length - invoices.length,
+    /** Ingrédients des recettes qui prenaient leur prix chez ce fournisseur : ils gardent le dernier prix. */
+    ingredients: [...new Set(s.products.flatMap((p) => p.chosenBy.map((b) => b.name)))].sort((a, b) => a.localeCompare(b, "fr")),
+  };
+}
+
+/**
+ * Supprime un fournisseur avec ses produits, ses factures et leurs prix. Les
+ * ingrédients des recettes qui suivaient un de ses produits gardent leur
+ * dernier prix (comme un prix tapé à la main). Renvoie les fichiers joints à effacer.
+ */
+export async function deleteSupplier(id: number): Promise<{ name: string; filePaths: string[] }> {
+  return prisma.$transaction(async (tx) => {
+    const s = await tx.supplier.findUnique({
+      where: { id },
+      select: { name: true, orders: { select: { filePath: true } }, products: { select: { id: true } } },
+    });
+    if (!s) throw new Error("Fournisseur introuvable.");
+    await tx.ingredientBase.updateMany({
+      where: { chosenProductId: { in: s.products.map((p) => p.id) } },
+      data: { chosenProductId: null },
+    });
+    await tx.supplier.delete({ where: { id } });
+    return { name: s.name, filePaths: s.orders.map((o) => o.filePath).filter((f): f is string => !!f) };
+  });
+}
+
+export type ProductInput = {
+  name?: string;
+  reference?: string | null;
+  article?: string | null;
+  family?: string | null;
+  /** Unité du prix : kg, L ou pièce. Ne change plus une fois qu'il y a des prix. */
+  unit?: PriceUnit;
+  /** Contenance d'un colis dans l'unité (25 pour un sac de 25 kg). */
+  packSize?: number | null;
+};
+
+async function productNameFree(tx: Tx, supplierId: number, name: string, exceptId?: number) {
+  const taken = await tx.supplierProduct.findFirst({
+    where: { supplierId, name: { equals: name, mode: "insensitive" }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+    select: { name: true },
+  });
+  if (taken) throw new Error(`Ce fournisseur a déjà un produit « ${taken.name} ».`);
+}
+
+/** Nouveau produit chez un fournisseur, avec son premier prix si on le connaît. */
+export async function createProduct(
+  supplierId: number,
+  input: ProductInput & { name: string; price?: number | null; date?: string | null },
+): Promise<{ id: number; name: string }> {
+  const name = cleanText(input.name, 300);
+  if (!name) throw new Error("Le nom du produit est vide.");
+  const unit = input.unit && isPriceUnit(input.unit) ? input.unit : "kg";
+  const product = await prisma.$transaction(async (tx) => {
+    const s = await tx.supplier.findUnique({ where: { id: supplierId }, select: { id: true } });
+    if (!s) throw new Error("Fournisseur introuvable.");
+    await productNameFree(tx, supplierId, name);
+    return tx.supplierProduct.create({
+      data: {
+        supplierId,
+        name,
+        reference: cleanText(input.reference, 100),
+        article: cleanText(input.article, 200),
+        family: cleanText(input.family, 80),
+        priceUnit: unit,
+        packSize: input.packSize != null && input.packSize > 0 ? input.packSize : null,
+      },
+      select: { id: true, name: true },
+    });
+  });
+  if (input.price != null) await addManualPrice(product.id, { price: input.price, date: input.date ?? isoDay(new Date()) });
+  return product;
+}
+
+/** Corrige le nom, la référence, l'article, la famille, la contenance (et l'unité tant qu'il n'y a pas de prix). */
+export async function updateProduct(id: number, input: ProductInput) {
+  await prisma.$transaction(async (tx) => {
+    const p = await tx.supplierProduct.findUnique({
+      where: { id },
+      select: { id: true, supplierId: true, priceUnit: true, _count: { select: { lines: true } } },
+    });
+    if (!p) throw new Error("Produit introuvable.");
+    const data: Prisma.SupplierProductUpdateInput = {};
+    if (input.name !== undefined) {
+      const name = cleanText(input.name, 300);
+      if (!name) throw new Error("Le nom du produit est vide.");
+      await productNameFree(tx, p.supplierId, name, id);
+      data.name = name;
+    }
+    if (input.reference !== undefined) data.reference = cleanText(input.reference, 100);
+    if (input.article !== undefined) data.article = cleanText(input.article, 200);
+    if (input.family !== undefined) data.family = cleanText(input.family, 80);
+    if (input.packSize !== undefined) data.packSize = input.packSize != null && input.packSize > 0 ? input.packSize : null;
+    if (input.unit !== undefined && input.unit !== p.priceUnit) {
+      if (!isPriceUnit(input.unit)) throw new Error("Unité inconnue (kg, L ou pièce).");
+      if (p._count.lines > 0) throw new Error("L'unité ne change plus : ce produit a déjà des prix. Supprime ses prix d'abord.");
+      data.priceUnit = input.unit;
+    }
+    await tx.supplierProduct.update({ where: { id }, data });
+    // Un nouvel article peut regrouper ce produit avec d'autres variantes.
+    if (input.article !== undefined) await followArticles(tx, p.supplierId, [id]);
+  });
+}
+
+/**
+ * Supprime un produit et tous ses prix. Il disparaît aussi des factures où il
+ * était (leur total écrit ne change pas). L'ingrédient qui le suivait garde son dernier prix.
+ */
+export async function deleteProduct(id: number): Promise<{ name: string; invoices: number }> {
+  return prisma.$transaction(async (tx) => {
+    const p = await tx.supplierProduct.findUnique({
+      where: { id },
+      select: { name: true, lines: { select: { orderId: true, order: { select: { manual: true } } } } },
+    });
+    if (!p) throw new Error("Produit introuvable.");
+    await tx.ingredientBase.updateMany({ where: { chosenProductId: id }, data: { chosenProductId: null } });
+    await tx.supplierProduct.delete({ where: { id } });
+    const manualOrders = [...new Set(p.lines.filter((l) => l.order.manual).map((l) => l.orderId))];
+    if (manualOrders.length) await tx.purchaseOrder.deleteMany({ where: { id: { in: manualOrders }, lines: { none: {} } } });
+    return { name: p.name, invoices: new Set(p.lines.filter((l) => !l.order.manual).map((l) => l.orderId)).size };
+  });
+}
+
+/**
+ * Ajoute un prix tapé à la main (sans facture) à une date : il entre dans
+ * l'historique comme un prix de facture, et devient le prix actuel s'il est le plus récent.
+ */
+export async function addManualPrice(productId: number, input: { price: number; date: string; quantity?: number | null }) {
+  const date = parseDay(input.date);
+  if (!(input.price >= 0) || input.price > 10_000_000) throw new Error("Prix invalide.");
+  return prisma.$transaction(async (tx) => {
+    const p = await tx.supplierProduct.findUnique({
+      where: { id: productId },
+      select: { id: true, supplierId: true, priceUnit: true, packSize: true },
+    });
+    if (!p) throw new Error("Produit introuvable.");
+    const packSize = num(p.packSize);
+    const order = await tx.purchaseOrder.create({
+      data: {
+        supplierId: p.supplierId,
+        date,
+        manual: true,
+        lines: {
+          create: {
+            productId,
+            quantity: input.quantity ?? null,
+            packSize: packSize ?? 1,
+            packPrice: packSize != null ? round4(input.price * packSize) : null,
+            unitPrice: input.price,
+            priceUnit: p.priceUnit,
+          },
+        },
+      },
+      select: { id: true },
+    });
+    await refreshProducts(tx, [productId]);
+    await followArticles(tx, p.supplierId, [productId]);
+    return order;
+  });
+}
+
+/**
+ * Corrige un prix de l'historique (ligne de facture ou prix tapé à la main).
+ * La date ne change que pour un prix tapé à la main : celle d'une facture se
+ * corrige sur la facture. Le prix du colis et le montant sont recalculés.
+ */
+export async function updatePriceLine(lineId: number, input: { price?: number; quantity?: number | null; date?: string }) {
+  return prisma.$transaction(async (tx) => {
+    const l = await tx.purchaseOrderLine.findUnique({
+      where: { id: lineId },
+      select: { id: true, productId: true, packSize: true, orderId: true, order: { select: { manual: true, supplierId: true } } },
+    });
+    if (!l) throw new Error("Prix introuvable.");
+    const data: Prisma.PurchaseOrderLineUpdateInput = {};
+    if (input.price !== undefined) {
+      if (!(input.price >= 0) || input.price > 10_000_000) throw new Error("Prix invalide.");
+      const packSize = num(l.packSize);
+      data.unitPrice = input.price;
+      data.packPrice = packSize != null ? round4(input.price * packSize) : null;
+      data.lineTotal = null;
+    }
+    if (input.quantity !== undefined) {
+      data.quantity = input.quantity != null && input.quantity > 0 ? input.quantity : null;
+      data.lineTotal = null;
+    }
+    await tx.purchaseOrderLine.update({ where: { id: lineId }, data });
+    if (input.date !== undefined) {
+      if (!l.order.manual) throw new Error("La date d'un prix de facture se change sur la facture.");
+      await tx.purchaseOrder.update({ where: { id: l.orderId }, data: { date: parseDay(input.date) } });
+    }
+    await refreshProducts(tx, [l.productId]);
+    await followArticles(tx, l.order.supplierId, [l.productId]);
+  });
+}
+
+/** Retire un prix de l'historique. Le produit reste (avec ses autres prix). */
+export async function deletePriceLine(lineId: number) {
+  return prisma.$transaction(async (tx) => {
+    const l = await tx.purchaseOrderLine.findUnique({
+      where: { id: lineId },
+      select: { productId: true, orderId: true, order: { select: { manual: true, supplierId: true } } },
+    });
+    if (!l) throw new Error("Prix introuvable.");
+    await tx.purchaseOrderLine.delete({ where: { id: lineId } });
+    if (l.order.manual) await tx.purchaseOrder.deleteMany({ where: { id: l.orderId, lines: { none: {} } } });
+    await refreshProducts(tx, [l.productId]);
+    await followArticles(tx, l.order.supplierId, [l.productId]);
+  });
+}
+
+/** Corrige la date, le numéro, le total ou la remarque d'une facture. */
+export async function updatePurchaseOrder(
+  id: number,
+  input: { date?: string; number?: string | null; total?: number | null; note?: string | null },
+) {
+  return prisma.$transaction(async (tx) => {
+    const o = await tx.purchaseOrder.findUnique({
+      where: { id },
+      select: { id: true, supplierId: true, lines: { select: { productId: true } } },
+    });
+    if (!o) throw new Error("Facture introuvable.");
+    const data: Prisma.PurchaseOrderUpdateInput = {};
+    if (input.date !== undefined) data.date = parseDay(input.date);
+    if (input.number !== undefined) {
+      const number = cleanText(input.number, 100);
+      if (number) {
+        const dup = await tx.purchaseOrder.findFirst({
+          where: { supplierId: o.supplierId, number: { equals: number, mode: "insensitive" }, NOT: { id } },
+          select: { id: true },
+        });
+        if (dup) throw new Error(`Une autre facture de ce fournisseur a déjà le n° ${number}.`);
+      }
+      data.number = number;
+    }
+    if (input.total !== undefined) {
+      if (input.total != null && (!(input.total >= 0) || input.total > 10_000_000)) throw new Error("Total invalide.");
+      data.total = input.total;
+    }
+    if (input.note !== undefined) data.note = cleanText(input.note, 2000);
+    await tx.purchaseOrder.update({ where: { id }, data });
+    if (input.date !== undefined) {
+      const ids = [...new Set(o.lines.map((l) => l.productId))];
+      await refreshProducts(tx, ids);
+      await followArticles(tx, o.supplierId, ids);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
 // Lecture
 // ─────────────────────────────────────────────
 
@@ -494,10 +803,11 @@ const productSelect = {
   base: { select: { id: true, name: true, chosenProductId: true } },
   lines: {
     select: {
+      id: true,
       unitPrice: true,
       priceUnit: true,
       quantity: true,
-      order: { select: { id: true, date: true, number: true } },
+      order: { select: { id: true, date: true, number: true, manual: true } },
     },
     orderBy: [{ order: { date: "desc" } }, { id: "desc" }],
   },
@@ -505,7 +815,18 @@ const productSelect = {
 
 type ProductRow = Prisma.SupplierProductGetPayload<{ select: typeof productSelect }>;
 
-export type PriceHistoryEntry = { date: string; price: number; unit: string; orderId: number; number: string | null; quantity: number | null };
+export type PriceHistoryEntry = {
+  date: string;
+  price: number;
+  unit: string;
+  orderId: number;
+  /** Ligne de facture (ou prix tapé à la main) : pour corriger ou supprimer ce prix. */
+  lineId: number;
+  /** true : prix tapé à la main sur le site, pas sur une facture. */
+  manual: boolean;
+  number: string | null;
+  quantity: number | null;
+};
 
 function toComparisonProduct(p: ProductRow) {
   const history: PriceHistoryEntry[] = p.lines.map((l) => ({
@@ -513,6 +834,8 @@ function toComparisonProduct(p: ProductRow) {
     price: Number(l.unitPrice),
     unit: l.priceUnit,
     orderId: l.order.id,
+    lineId: l.id,
+    manual: l.order.manual,
     number: l.order.number,
     quantity: num(l.quantity),
   }));
@@ -530,6 +853,7 @@ function toComparisonProduct(p: ProductRow) {
   return {
     ...product,
     reference: p.reference,
+    packSize: num(p.packSize),
     base: p.base ? { id: p.base.id, name: p.base.name, chosen: p.base.chosenProductId === p.id } : null,
     history,
   };
@@ -542,7 +866,7 @@ export async function loadAllProducts() {
   const [suppliers, products] = await Promise.all([
     prisma.supplier.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, _count: { select: { products: true, orders: true } } },
+      select: { id: true, name: true, _count: { select: { products: true, orders: { where: { manual: false } } } } },
     }),
     prisma.supplierProduct.findMany({ select: productSelect, orderBy: { name: "asc" } }),
   ]);
@@ -561,6 +885,7 @@ export async function loadSupplier(id: number) {
       note: true,
       products: { select: productSelect, orderBy: { name: "asc" } },
       orders: {
+        where: { manual: false },
         orderBy: [{ date: "desc" }, { id: "desc" }],
         select: { id: true, date: true, number: true, total: true, filePath: true, _count: { select: { lines: true } } },
       },
@@ -588,6 +913,7 @@ export async function loadSupplier(id: number) {
 /** Factures, de la plus récente à la plus ancienne, filtrables par période et fournisseur. */
 export async function listPurchaseOrders(filter: { from?: string | null; to?: string | null; supplierId?: number | null } = {}) {
   const where: Prisma.PurchaseOrderWhereInput = {
+    manual: false,
     ...(filter.supplierId ? { supplierId: filter.supplierId } : {}),
     ...(filter.from || filter.to
       ? {
@@ -635,6 +961,7 @@ export async function loadPurchaseOrder(id: number) {
       total: true,
       note: true,
       filePath: true,
+      manual: true,
       createdAt: true,
       supplier: { select: { id: true, name: true } },
       lines: {
@@ -659,6 +986,7 @@ export async function loadPurchaseOrder(id: number) {
     number: o.number,
     total: num(o.total),
     note: o.note,
+    manual: o.manual,
     file: o.filePath ? { type: o.filePath.toLowerCase().endsWith(".pdf") ? "pdf" : "image" } : null,
     supplier: o.supplier,
     lines: o.lines.map((l) => {

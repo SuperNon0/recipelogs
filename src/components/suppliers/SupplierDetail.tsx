@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Pencil } from "lucide-react";
-import { ModalOverlay } from "@/components/ModalOverlay";
+import { Package, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
-import { renameSupplier } from "@/app/actions/suppliers";
+import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
 import { groupByArticle } from "@/lib/suppliers";
 import type { loadSupplier } from "@/lib/purchaseOrders";
 import { Change } from "./PriceComparison";
 import { ProductHistoryModal } from "./ProductHistoryModal";
 import { InvoiceList } from "./InvoiceList";
+import { DeleteSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
 
 type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 
@@ -19,8 +19,9 @@ type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases: { id: number; name: string }[] }) {
   const can = useCan();
   const router = useRouter();
+  const editable = can("costs.edit");
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState(false);
+  const [modal, setModal] = useState<"edit" | "delete" | "product" | null>(null);
   // Les variantes d'un même article (« Fraise France », « Fraise Espagne ») tiennent sur une ligne.
   const groups = useMemo(() => groupByArticle(supplier.products), [supplier.products]);
   const open = groups.find((g) => g.key === openKey);
@@ -30,22 +31,42 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
     <>
       <div className="page-head">
         <h1>{supplier.name}</h1>
-        {can("costs.edit") && (
-          <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setRenaming(true)}>
-            <Pencil size={15} /> Renommer
-          </button>
+        {editable && (
+          <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("edit")}>
+              <Pencil size={15} /> Modifier
+            </button>
+            <button type="button" className="fl-btn fl-btn-danger" onClick={() => setModal("delete")}>
+              <Trash2 size={15} /> Supprimer
+            </button>
+          </span>
         )}
         <p className="sub">
           {groups.length} article{groups.length > 1 ? "s" : ""} · {supplier.orders.length} facture
           {supplier.orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} au total` : ""}
         </p>
+        {supplier.note && <p className="sub" style={{ whiteSpace: "pre-line" }}>{supplier.note}</p>}
       </div>
 
-      <div className="sect-title">
+      <div className="sect-title" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <h2>Produits</h2>
+        <Help title="Gérer les produits" example="Touche « Farine T45 », puis « Ajouter un prix » : 0,92 € le kg au 14/11.">
+          Touche un produit pour voir tous ses prix. Là, tu peux ajouter un prix, corriger ou supprimer un prix, modifier le produit
+          (nom, contenance, nom pour comparer) ou le supprimer. « Ajouter un produit » crée un produit à la main, sans facture.
+        </Help>
+        {editable && (
+          <button type="button" className="fl-btn fl-btn-secondary" style={{ marginLeft: "auto" }} onClick={() => setModal("product")}>
+            <Plus size={15} /> Ajouter un produit
+          </button>
+        )}
       </div>
       <div className="fl-list">
+        {groups.length === 0 && (
+          <div className="fl-row" style={{ color: "var(--muted)" }}>
+            Aucun produit pour l&apos;instant.{editable ? " Touche « Ajouter un produit »." : ""}
+          </div>
+        )}
         {groups.map((g) => {
           const p = g.products[0];
           const several = g.products.length > 1;
@@ -63,7 +84,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
                   {[
                     several ? `${g.products.length} variantes : ${g.products.map((x) => x.name).join(", ")}` : p.packLabel,
                     base ? `ingrédient « ${base.name} »${base.chosen ? " ✓" : ""}` : null,
-                    g.stats ? `moyenne ${formatEuro(g.stats.average)}` : null,
+                    g.stats ? `moyenne ${formatEuro(g.stats.average)}` : "pas encore de prix",
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -88,44 +109,13 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
       <InvoiceList orders={supplier.orders} showSupplier={false} />
 
       {open && <ProductHistoryModal products={open.products} supplier={supplier.name} bases={bases} onClose={() => setOpenKey(null)} />}
-      {renaming && (
-        <RenameModal
-          name={supplier.name}
-          onClose={() => setRenaming(false)}
-          onSave={async (name) => {
-            const r = await renameSupplier(supplier.id, name);
-            if (!r.ok) return r.error;
-            setRenaming(false);
-            router.refresh();
-            return null;
-          }}
-        />
+      {modal === "edit" && (
+        <SupplierFormModal supplier={{ id: supplier.id, name: supplier.name, note: supplier.note }} onClose={() => setModal(null)} />
       )}
+      {modal === "delete" && (
+        <DeleteSupplierModal id={supplier.id} onClose={() => setModal(null)} onDeleted={() => router.push("/fournisseurs/liste")} />
+      )}
+      {modal === "product" && <ProductFormModal supplierId={supplier.id} onClose={() => setModal(null)} />}
     </>
-  );
-}
-
-function RenameModal({ name, onClose, onSave }: { name: string; onClose: () => void; onSave: (n: string) => Promise<string | null> }) {
-  const [value, setValue] = useState(name);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  return (
-    <ModalOverlay onClose={onClose} title="Renommer le fournisseur">
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError(await onSave(value));
-          setBusy(false);
-        }}
-        style={{ display: "grid", gap: 10 }}
-      >
-        <input className="fl-input" value={value} onChange={(e) => setValue(e.target.value)} autoFocus aria-label="Nom" />
-        {error && <span className="ing-fact-msg" data-err="true">{error}</span>}
-        <button type="submit" className="fl-btn fl-btn-primary" disabled={busy}>
-          Enregistrer
-        </button>
-      </form>
-    </ModalOverlay>
   );
 }

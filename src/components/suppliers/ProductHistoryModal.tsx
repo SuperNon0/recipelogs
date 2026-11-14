@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, Receipt } from "lucide-react";
+import { Check, ChevronRight, Hand, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { chooseIngredientProduct, linkProduct, updateProductInfo } from "@/app/actions/suppliers";
 import { SUPPLIER_FAMILIES, groupByArticle } from "@/lib/suppliers";
@@ -12,6 +12,46 @@ import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
 import type { ProductDetail } from "@/lib/purchaseOrders";
 import { Change } from "./PriceComparison";
+import { DeleteProductModal, PriceFormModal, ProductFormModal, type EditablePrice } from "./ManageForms";
+
+type Dialog =
+  | { kind: "addPrice"; product: ProductDetail }
+  | { kind: "editPrice"; product: { name: string; unit: string }; price: EditablePrice }
+  | { kind: "editProduct"; product: ProductDetail }
+  | { kind: "deleteProduct"; product: ProductDetail };
+
+const editableOf = (p: ProductDetail) => ({
+  id: p.id,
+  name: p.name,
+  reference: p.reference,
+  article: p.article,
+  family: p.family,
+  unit: p.unit,
+  packSize: p.packSize,
+  hasPrices: p.history.length > 0,
+});
+
+/** Ajouter un prix, modifier, supprimer : les boutons d'un produit. */
+function ProductActions({ product, onDialog }: { product: ProductDetail; onDialog: (d: Dialog) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+      <button type="button" className="fl-btn fl-btn-primary" onClick={() => onDialog({ kind: "addPrice", product })}>
+        <Plus size={15} /> Ajouter un prix
+      </button>
+      <button type="button" className="fl-btn fl-btn-secondary" onClick={() => onDialog({ kind: "editProduct", product })}>
+        <Pencil size={15} /> Modifier
+      </button>
+      <button type="button" className="fl-btn fl-btn-danger" onClick={() => onDialog({ kind: "deleteProduct", product })}>
+        <Trash2 size={15} /> Supprimer
+      </button>
+      <Help title="Gérer ce produit" example="Le prix de la facture a été mal lu : touche le crayon à côté du prix et corrige-le.">
+        « Ajouter un prix » garde un nouveau prix à la date que tu choisis, sans facture (prix annoncé au téléphone, tarif…).
+        « Modifier » change le nom, la contenance ou le nom pour comparer. Le crayon à côté d&apos;un prix le corrige ou le supprime.
+        « Supprimer » enlève le produit et tous ses prix.
+      </Help>
+    </div>
+  );
+}
 
 const fr = (d: string) => new Date(d).toLocaleDateString("fr-FR");
 
@@ -34,6 +74,8 @@ export function ProductHistoryModal({
   onClose: () => void;
 }) {
   const can = useCan();
+  const editable = can("costs.edit");
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const group = useMemo(() => groupByArticle(products)[0], [products]);
@@ -43,6 +85,7 @@ export function ProductHistoryModal({
     [group, from, to],
   );
   if (!group) return null;
+  const byId = new Map(products.map((p) => [p.id, p]));
   const single = products[0];
   const stats = group.stats;
   const unit = stats?.unit ?? group.unit;
@@ -75,7 +118,8 @@ export function ProductHistoryModal({
           </div>
         </div>
       )}
-      {bases && can("costs.edit") && !several && <ProductSettings product={single} bases={bases} />}
+      {editable && !several && <ProductActions product={single} onDialog={setDialog} />}
+      {bases && editable && !several && <ProductSettings product={single} bases={bases} />}
       <div className="sup-range">
         <span className="sup-dates">
         <span>Du</span>
@@ -91,28 +135,54 @@ export function ProductHistoryModal({
       </div>
       <div className="fl-list">
         {list.length === 0 && <div className="fl-row" style={{ color: "var(--muted)" }}>Aucun prix sur cette période.</div>}
-        {list.map((h, i) => (
-          <Link key={`${h.orderId}-${h.productId}-${i}`} href={`/factures/${h.orderId}`} className="fl-row">
-            <span className="ic">
-              <Receipt size={16} />
-            </span>
-            <span className="set-tx">
+        {list.map((h, i) => {
+          const label = (
+            <>
               <b>
                 <span>{fr(h.date)}</span>
               </b>
               <small>
                 {several ? `${h.productName} · ` : ""}
-                Facture{h.number ? ` n° ${h.number}` : ""}
+                {h.manual ? "Prix tapé à la main" : `Facture${h.number ? ` n° ${h.number}` : ""}`}
                 {h.quantity != null ? ` · ${h.quantity.toLocaleString("fr-FR")} acheté${h.quantity > 1 ? "s" : ""}` : ""}
               </small>
-            </span>
-            <span className="sup-num strong">
-              {formatEuro(h.price)}
-              <span className="sup-unit"> /{h.unit}</span>
-            </span>
-            <ChevronRight size={16} className="set-chev" />
-          </Link>
-        ))}
+            </>
+          );
+          return (
+            <div key={`${h.lineId}-${i}`} className="fl-row">
+              <span className="ic">{h.manual ? <Hand size={16} /> : <Receipt size={16} />}</span>
+              {h.manual ? (
+                <span className="set-tx">{label}</span>
+              ) : (
+                <Link href={`/factures/${h.orderId}`} className="set-tx" style={{ color: "inherit" }}>
+                  {label}
+                </Link>
+              )}
+              <span className="sup-num strong">
+                {formatEuro(h.price)}
+                <span className="sup-unit"> /{h.unit}</span>
+              </span>
+              {editable ? (
+                <button
+                  type="button"
+                  className="fl-btn fl-btn-ghost fl-btn-icon"
+                  aria-label="Corriger ou supprimer ce prix"
+                  onClick={() =>
+                    setDialog({
+                      kind: "editPrice",
+                      product: { name: h.productName, unit: h.unit },
+                      price: { lineId: h.lineId, price: h.price, date: h.date, quantity: h.quantity, manual: h.manual, invoiceNumber: h.number },
+                    })
+                  }
+                >
+                  <Pencil size={15} />
+                </button>
+              ) : (
+                !h.manual && <ChevronRight size={16} className="set-chev" />
+              )}
+            </div>
+          );
+        })}
       </div>
       {several && (
         <p className="sub" style={{ color: "var(--muted)", fontSize: 13, margin: "16px 0 10px", display: "flex", gap: 6, alignItems: "center" }}>
@@ -124,7 +194,7 @@ export function ProductHistoryModal({
           </Help>
         </p>
       )}
-      {several && bases && can("costs.edit") && (
+      {several && editable && (
           <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
             {products.map((p) => (
               <details key={p.id} className="fl-card" style={{ padding: "8px 12px" }}>
@@ -133,11 +203,37 @@ export function ProductHistoryModal({
                   {p.stats ? ` · ${formatEuro(p.stats.current)} /${p.stats.unit}` : ""}
                 </summary>
                 <div style={{ marginTop: 10 }}>
-                  <ProductSettings product={p} bases={bases} />
+                  <ProductActions product={p} onDialog={setDialog} />
+                  {bases && <ProductSettings product={p} bases={bases} />}
                 </div>
               </details>
             ))}
           </div>
+      )}
+      {dialog?.kind === "addPrice" && (
+        <PriceFormModal productId={dialog.product.id} productName={dialog.product.name} unit={dialog.product.unit} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind === "editPrice" && (
+        <PriceFormModal productName={dialog.product.name} unit={dialog.product.unit} price={dialog.price} onClose={() => setDialog(null)} />
+      )}
+      {dialog?.kind === "editProduct" && (
+        <ProductFormModal
+          product={editableOf(byId.get(dialog.product.id) ?? dialog.product)}
+          onClose={() => setDialog(null)}
+          onDelete={() => setDialog({ kind: "deleteProduct", product: dialog.product })}
+        />
+      )}
+      {dialog?.kind === "deleteProduct" && (
+        <DeleteProductModal
+          product={{
+            id: dialog.product.id,
+            name: dialog.product.name,
+            prices: dialog.product.history.length,
+            invoices: new Set(dialog.product.history.filter((h) => !h.manual).map((h) => h.orderId)).size,
+          }}
+          onClose={() => setDialog(null)}
+          onDeleted={() => products.length === 1 && onClose()}
+        />
       )}
     </ModalOverlay>
   );

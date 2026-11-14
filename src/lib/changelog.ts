@@ -11,6 +11,22 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.17",
+    date: "2026-11-14",
+    title: "Fournisseurs et prix gérés à la main",
+    summary:
+      "Tout ce que Claude fait sur les fournisseurs, tu peux maintenant le faire toi-même sur le site : créer, renommer ou supprimer un fournisseur, lui ajouter des produits, ajouter, corriger ou supprimer un prix, et corriger une facture.",
+    features: [
+      "Prix fournisseurs → « Mes fournisseurs » (aussi dans Réglages) : la liste de tous les fournisseurs, même sans facture, avec « Nouveau fournisseur »",
+      "Fiche d'un fournisseur : « Modifier » (nom et remarque), « Supprimer » (la fenêtre dit d'abord combien de produits, de prix et de factures partent avec lui, et quels ingrédients gardent leur dernier prix) et « Ajouter un produit » (nom, nom pour comparer, famille, prix au kg / L / pièce, contenance, référence et premier prix)",
+      "En touchant un produit : « Ajouter un prix » à la date de ton choix, sans facture (tarif annoncé, prix au téléphone), « Modifier » le produit et « Supprimer ». Un crayon à côté de chaque prix le corrige ou le supprime. Les prix tapés à la main sont marqués d'une petite main dans l'historique",
+      "Facture : « Modifier » change la date, le numéro, le total et la remarque ; le crayon d'une ligne corrige son prix et sa quantité, ou la supprime. Le prix actuel et le coût des recettes suivent tout seuls",
+      "Chaque champ a son « ? », et chaque suppression demande confirmation dans une fenêtre qui ne se ferme que par la croix",
+      "Claude (connecteur RecipeLog) sait aussi créer, renommer et supprimer un fournisseur, ajouter, modifier ou supprimer un produit, ajouter, corriger ou supprimer un prix, et modifier une facture. Reconnecte le connecteur pour voir ces nouveaux outils",
+    ],
+    migrations: ["Les prix tapés à la main sont rangés à part : ils comptent dans l'historique mais n'apparaissent pas dans la liste des factures"],
+  },
+  {
     version: "V2.16",
     date: "2026-11-13",
     title: "Démo remplie d'exemples",

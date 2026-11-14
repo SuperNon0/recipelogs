@@ -188,6 +188,8 @@ model PurchaseOrder {
   note       String?
   /** Photo ou PDF de la facture, dans le dossier d'upload (factures/…). */
   filePath   String?  @map("file_path")
+  /** Prix tapé à la main sur le site (pas une vraie facture : absent de la liste des factures). */
+  manual     Boolean  @default(false)
   createdAt  DateTime @default(now()) @map("created_at")
 
   supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
