@@ -13,6 +13,7 @@ let SANTE = null;
 let SUPPORT = [];
 let ANNONCES = null;
 let IA = null;
+let VENTE = null;
 
 // ------------------------------------------------------------ API
 async function api(methode, chemin, corps) {
@@ -200,6 +201,7 @@ const NOMS_ACTIONS = {
   "maintenance-finie": "a terminé la maintenance :",
   "maintenance-annulee": "a annulé la maintenance :",
   "ia-quota": "a changé les lectures par IA de",
+  vente: "a changé les tarifs et textes légaux de la",
   preavis: "a envoyé le préavis de maintenance :",
   bandeau: "a mis un bandeau :",
   message: "a écrit à",
@@ -228,8 +230,9 @@ $("#journal").addEventListener("click", (ev) => {
 });
 
 async function charger() {
-  const [c, j, v, sa, su, an, ia] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia")]);
+  const [c, j, v, sa, su, an, ia, ve] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente")]);
   IA = ia.usage ? ia : null;
+  VENTE = ve.offres ? ve : null;
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
   SANTE = sa.machine ? sa : null;
@@ -242,6 +245,7 @@ async function charger() {
   if (c.clients) afficher();
   afficherAnnonces();
   afficherIA();
+  afficherVente();
   afficherSante();
   afficherJournal();
 }
@@ -1082,4 +1086,126 @@ function fenetreQuotaIA(client, actuel) {
     envoyer(Number(v));
   });
   if (!tous) $("#ia-reset").addEventListener("click", () => envoyer(null));
+}
+
+// ------------------------------------------------------------ vente (lot 8)
+const PAGES_VENTE = { tarifs: "Tarifs", "mentions-legales": "Mentions légales", cgv: "CGV", confidentialite: "Confidentialité", "sous-traitance": "Sous-traitance (RGPD)" };
+const euros = (n) => (n == null ? "sur devis" : `${Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} € / mois`);
+
+function afficherVente() {
+  const zone = $("#vente");
+  if (!VENTE) {
+    zone.innerHTML = `<div class="vide">Indisponible (le moteur ne répond pas).</div>`;
+    return;
+  }
+  const v = VENTE;
+  const liens = Object.entries(PAGES_VENTE)
+    .map(([k, t]) => `<a href="https://${e(DOMAINE)}/${k}" target="_blank" rel="noopener">${e(t)} ↗</a>`)
+    .join("");
+  const offres = v.offres.map((o) => `<li><b>${e(o.nom)}</b> · ${e(euros(o.prix))}${o.utilisateurs ? ` · ${o.utilisateurs} utilisateurs` : ""}${o.lectures ? ` · ${o.lectures} lectures IA` : ""}${o.mcp ? " · MCP" : ""}</li>`).join("");
+  zone.innerHTML = `<div class="carte-vente">
+    <div class="barre serree">
+      <span class="etiquette ${v.publie ? "ok" : "pause"}">${v.publie ? "Publié" : "Brouillon (pages marquées « brouillon », non indexées)"}</span>
+      <button class="btn principal" type="button" id="vente-modifier">Modifier</button>
+      <button class="aide" type="button" data-aide="vente-a" aria-label="Aide">?</button></div>
+    <p class="texte-aide" id="vente-a">Ces réglages remplissent la page Tarifs et les textes légaux du site vitrine (mentions légales, CGV, confidentialité, sous-traitance). Tout est facultatif : un champ vide s'affiche « à compléter ». Les prix de départ sont des exemples. Le dossier juridique (ce que la loi demande, et pourquoi) est dans A-FAIRE.md, étape H. Fais relire les textes avant le premier client payant.</p>
+    ${v.manques.length ? `<p class="sub">Il manque encore : ${e(v.manques.join(", "))}.</p>` : `<p class="sub">Toutes les informations obligatoires sont remplies.</p>`}
+    <ul class="liste-offres">${offres || "<li>Aucune offre.</li>"}</ul>
+    <p class="liens-vente">${liens}</p></div>`;
+  $("#vente-modifier").addEventListener("click", fenetreVente);
+}
+
+const CHAMPS_VENTE = [
+  ["nom", "Nom ou raison sociale", "Ton nom et prénom (entreprise individuelle) ou le nom de ta société, tel qu'il est inscrit au registre. Ex. : Noé Martin, ou RecipeLog SAS.", "text"],
+  ["statut", "Statut", "Ex. : entrepreneur individuel (micro-entreprise), SASU au capital de 1 000 €. Écrit dans les mentions légales.", "text"],
+  ["siren", "SIREN", "Les 9 chiffres de ton entreprise (sur l'avis de situation INSEE ou l'extrait du registre). Obligatoire dans les mentions légales.", "text"],
+  ["rcs", "RCS ou RNE (facultatif)", "Ex. : RCS Nîmes 123 456 789. Laisse vide si tu n'es pas inscrit au registre du commerce.", "text"],
+  ["adresse", "Adresse", "L'adresse du siège. Si tu ne veux pas montrer ton adresse personnelle, une domiciliation d'entreprise marche.", "text"],
+  ["email", "E-mail de contact", "Affiché dans les mentions légales et la politique de confidentialité, pour les clients et les demandes sur les données.", "email"],
+  ["telephone", "Téléphone", "La loi demande le téléphone de l'hébergeur. Le serveur est chez toi, donc c'est le tien (un numéro pro suffit).", "text"],
+  ["directeur", "Directeur de la publication", "La personne responsable du contenu du site. En principe toi. Vide : ton nom ci-dessus.", "text"],
+  ["ville", "Ville du tribunal", "En cas de litige avec un client pro, le tribunal de cette ville (en principe celle de ton siège).", "text"],
+  ["emailsService", "Service d'envoi d'e-mails", "Le service qui envoie les e-mails (Brevo, Gmail…). Il apparaît dans la liste des sous-traitants.", "text"],
+  ["sauvegardesExternes", "Sauvegardes externes (facultatif)", "Si tu copies les sauvegardes hors de chez toi : le nom et l'adresse du service (ex. OVH SAS, 2 rue Kellermann, 59100 Roubaix). Vide = pas de copie externe.", "text"],
+];
+
+function ligneOffre(o, i) {
+  return `<fieldset class="offre-champ" data-offre="${i}"><legend>Offre ${i + 1}</legend>
+    <div class="deux">
+      <div class="champ"><label>Nom</label><input type="text" data-k="nom" maxlength="40" value="${e(o.nom)}"></div>
+      <div class="champ"><label>Prix par mois ${aide(`vo-p${i}`, "En euros. Vide = « Sur devis ».")}<div class="suffixe"><input type="number" data-k="prix" min="0" step="0.01" value="${o.prix ?? ""}" placeholder="sur devis"><span>€</span></div></div>
+      <div class="champ"><label>Utilisateurs ${aide(`vo-u${i}`, "Nombre de comptes compris. 0 = selon le besoin.")}<input type="number" data-k="utilisateurs" min="0" value="${o.utilisateurs ?? 0}"></div>
+      <div class="champ"><label>Lectures IA par mois ${aide(`vo-l${i}`, "Lectures de factures par IA comprises avec ta clé. 0 = le client met sa propre clé. Ce chiffre est affiché ; le vrai quota se règle dans « Lecture des factures par IA ».")}<input type="number" data-k="lectures" min="0" value="${o.lectures ?? 0}"></div>
+    </div>
+    <div class="champ"><label>Description</label><input type="text" data-k="texte" maxlength="200" value="${e(o.texte ?? "")}"></div>
+    <div class="champ"><label class="case"><input type="checkbox" data-k="mcp" ${o.mcp ? "checked" : ""}> Accès MCP (Claude) compris</label></div>
+    <button class="btn petit" type="button" data-retirer="${i}">Retirer cette offre</button></fieldset>`;
+}
+
+function fenetreVente() {
+  const v = VENTE;
+  let offres = v.offres.map((o) => ({ ...o }));
+  const champs = CHAMPS_VENTE.map(([k, t, a, type]) => `<div class="champ"><label for="ve-${k}">${e(t)} ${aide(`va-${k}`, e(a))}<input id="ve-${k}" type="${type}" value="${e(v.identite[k])}" autocomplete="off"></div>`).join("");
+  ouvrir(
+    "Tarifs et textes légaux",
+    `<form id="f-vente" novalidate>
+      <p class="sub">Tout est facultatif et modifiable plus tard. Un champ vide s'affiche « à compléter » sur les pages.</p>
+      <h4>Ton entreprise</h4>${champs}
+      <div class="champ"><label for="ve-tva">TVA ${aide("va-tva", "Franchise en base : tu ne factures pas la TVA tant que ton chiffre d'affaires reste sous le seuil (37 500 € par an pour les services en 2026). Les pages affichent alors « TVA non applicable, article 293 B du CGI ».")}
+        <select id="ve-tva"><option value="franchise" ${v.tva === "franchise" ? "selected" : ""}>Franchise en base (pas de TVA)</option><option value="assujetti" ${v.tva === "assujetti" ? "selected" : ""}>Je facture la TVA</option></select></div>
+      <div class="champ" id="ve-numtva-champ"><label for="ve-numeroTva">Numéro de TVA ${aide("va-ntva", "Ton numéro de TVA intracommunautaire (FR + 11 chiffres).")}<input id="ve-numeroTva" type="text" value="${e(v.identite.numeroTva)}"></div>
+      <h4>Offres</h4>
+      <div class="deux">
+        <div class="champ"><label for="ve-essai">Essai gratuit ${aide("va-essai", "Affiché sur la page Tarifs et dans les CGV. 0 = pas d'essai. Le vrai essai se règle quand tu crées un client.")}<div class="suffixe"><input id="ve-essai" type="number" min="0" max="365" value="${v.essai}"><span>jours</span></div></div>
+        <div class="champ"><label for="ve-annuel">Mois offerts à l'année ${aide("va-annuel", "Ex. 2 : payer à l'année revient à 10 mois. 0 = pas d'offre annuelle affichée.")}<input id="ve-annuel" type="number" min="0" max="6" value="${v.annuel}"></div>
+      </div>
+      <div id="ve-offres"></div>
+      <button class="btn" type="button" id="ve-ajouter">+ Ajouter une offre</button>
+      <h4>Publication</h4>
+      <div class="champ"><label for="ve-date">En vigueur au ${aide("va-date", "La date écrite en haut des CGV et de la politique de confidentialité. Change-la quand tu modifies les textes.")}<input id="ve-date" type="date" value="${e(v.enVigueur)}"></div>
+      <div class="champ"><label class="case"><input id="ve-publie" type="checkbox" ${v.publie ? "checked" : ""}> Publier (retire le bandeau « brouillon ») ${aide("va-pub", "Coche quand tes informations sont complètes et que les textes ont été relus. Avant, les pages restent visibles mais marquées « brouillon » et cachées des moteurs de recherche.")}</div>
+      <p class="erreur" id="ve-erreur"></p>
+      <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
+    </form>`,
+    charger,
+  );
+  const lireOffres = () =>
+    [...document.querySelectorAll("[data-offre]")].map((f) => {
+      const val = (k) => f.querySelector(`[data-k="${k}"]`);
+      return { nom: val("nom").value.trim(), prix: val("prix").value === "" ? null : Number(val("prix").value), utilisateurs: Number(val("utilisateurs").value || 0), lectures: Number(val("lectures").value || 0), texte: val("texte").value.trim(), mcp: val("mcp").checked };
+    });
+  const dessiner = () => {
+    $("#ve-offres").innerHTML = offres.map(ligneOffre).join("");
+    $("#ve-ajouter").disabled = offres.length >= 6;
+  };
+  dessiner();
+  const tva = () => ($("#ve-numtva-champ").hidden = $("#ve-tva").value !== "assujetti");
+  tva();
+  $("#ve-tva").addEventListener("change", tva);
+  $("#ve-ajouter").addEventListener("click", () => {
+    offres = [...lireOffres(), { nom: "", prix: null, utilisateurs: 0, lectures: 0, mcp: false, texte: "" }];
+    dessiner();
+  });
+  $("#ve-offres").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-retirer]");
+    if (!b) return;
+    offres = lireOffres().filter((_, i) => i !== Number(b.dataset.retirer));
+    dessiner();
+  });
+  $("#f-vente").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const corps = {
+      identite: Object.fromEntries([...CHAMPS_VENTE.map(([k]) => [k, $(`#ve-${k}`).value.trim()]), ["numeroTva", $("#ve-numeroTva").value.trim()]]),
+      tva: $("#ve-tva").value,
+      essai: Number($("#ve-essai").value || 0),
+      annuel: Number($("#ve-annuel").value || 0),
+      offres: lireOffres(),
+      enVigueur: $("#ve-date").value,
+      publie: $("#ve-publie").checked,
+    };
+    const r = await api("POST", "/vente", corps);
+    if (!r.offres) return ($("#ve-erreur").textContent = r.message || "Échec.");
+    VENTE = r;
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Enregistré</p><p class="sub">Les pages du site sont à jour (une minute au plus).${r.manques.length ? ` Il manque encore : ${e(r.manques.join(", "))}.` : ""}</p>`;
+  });
 }

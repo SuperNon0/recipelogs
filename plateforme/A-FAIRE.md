@@ -321,11 +321,49 @@ Le panel affiche alors « Clé Claude de la plateforme réglée » dans **Lectur
 
 ---
 
+## H. Tarifs et textes légaux (lot 8, quand tu veux vendre)
+
+Rien ne presse : tant que tu n'as pas publié, les pages existent mais sont marquées
+« Brouillon ». Le détail de chaque obligation est dans le
+[Dossier juridique RecipeLog](https://claude.ai/artifact/TCnM5CzR7Dh61uEESpwo4w) (onglet « Ce que tu dois avoir »).
+
+### ☐ H1. Rassembler tes informations (15 min)
+Ton statut (micro-entreprise, SASU…), ton **SIREN**, une **adresse** (une domiciliation
+marche si tu ne veux pas montrer la tienne), un **e-mail** de contact, un **téléphone**
+(obligatoire : tu es l'hébergeur, puisque le serveur est chez toi), la ville du tribunal,
+et ta situation **TVA** (franchise ou pas).
+
+### ☐ H2. Les mettre dans le panel et choisir tes prix (10 min)
+Panel → **Vente : tarifs et textes légaux** → **Modifier**. Remplace les prix d'exemple
+(29 €, 59 €, sur devis). Ouvre chaque page avec les liens sous la liste des offres.
+
+### ☐ H3. Faire relire, puis publier
+1. Fais relire les CGV, la politique de confidentialité et l'accord de sous-traitance
+   (expert-comptable, avocat, ou le service juridique de ta CCI ou de ta banque).
+2. Dans tes comptes **Cloudflare** et **Anthropic**, accepte leur accord de traitement des
+   données (DPA), et garde-en une copie.
+3. Coche **Publier** et mets la date du jour dans « En vigueur au ».
+
+### ☐ H4. À garder pour toi
+- Le **registre des traitements** (onglet du dossier juridique) : complète-le, garde-le à
+  jour, montre-le seulement si la CNIL le demande.
+- **Factures électroniques** : tu dois pouvoir en **recevoir** depuis le 1er septembre 2026
+  (choisis une plateforme agréée, ta banque ou ton logiciel de compta en proposent), et en
+  **émettre** à partir du 1er septembre 2027.
+- Conseillé : une assurance responsabilité civile professionnelle qui couvre la perte de
+  données d'un client.
+
+### ☐ H5. (Si tu veux) Des liens depuis la vitrine
+La vitrine ne montre pas encore ces pages : la branche `site-vitrine` n'a pas été touchée.
+Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » en bas de page.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7) sans
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7, les pages de vente au lot 8) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
