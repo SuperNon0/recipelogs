@@ -39,6 +39,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Factures → « Lire une facture avec l'IA » : prends la facture en photo ou choisis son PDF, l'IA recopie chaque ligne (produit, contenance, prix du colis, prix au kg). Tu vérifies et corriges tout avant d'enregistrer, et le fichier est joint à la facture",
       "Fiche d'un fournisseur → « Importer une mercuriale » : sa liste de prix en Excel ou CSV (lue sans IA, colonnes devinées) ou en PDF (lue par l'IA). Les prix entrent dans l'historique à la date choisie",
       "Réglages → « Lecture des factures par IA » : l'IA fournie par RecipeLog (un nombre de lectures par mois), ou ta propre clé Claude, ChatGPT ou Gemini",
+      "RecipeLog en ligne : Réglages → « Conditions et données personnelles » ouvre les conditions générales, la politique de confidentialité, l'accord de sous-traitance des données et les mentions légales. Le site présente aussi une page Tarifs",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
   },

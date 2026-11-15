@@ -224,6 +224,12 @@ services:
       traefik.http.routers.statut.entrypoints: web
       traefik.http.routers.statut.middlewares: securite@file,limite@file
       traefik.http.routers.statut.service: panel
+      # Tarifs et textes légaux (lot 8) : ces adresses du site vitrine sont servies par le panel.
+      traefik.http.routers.vente.rule: (Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)) && (Path(`/tarifs`) || Path(`/mentions-legales`) || Path(`/cgv`) || Path(`/confidentialite`) || Path(`/sous-traitance`))
+      traefik.http.routers.vente.priority: "200"
+      traefik.http.routers.vente.entrypoints: web
+      traefik.http.routers.vente.middlewares: securite@file,limite@file
+      traefik.http.routers.vente.service: panel
       traefik.http.routers.pause.rule: HostRegexp(`^[a-z0-9-]+\.${DOMAINE_REGEX:-recipelog\.cc}$`)
       traefik.http.routers.pause.priority: "1"
       traefik.http.routers.pause.entrypoints: web

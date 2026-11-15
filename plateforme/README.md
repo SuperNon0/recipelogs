@@ -221,6 +221,29 @@ D'où vient l'IA (Réglages → **Lecture des factures par IA**, réservé à l'
 Une lecture tourne en arrière-plan (20 s à 2 min) : pas de coupure Cloudflare au bout de
 100 s. Fichiers : `/srv/recipelog/ia/` (réglages écrits par le panel, compteurs par la passerelle).
 
+## Vente : tarifs et textes légaux (lot 8)
+
+Le site vitrine gagne cinq pages, servies par le panel (le site vitrine lui-même n'est pas
+touché) : **recipelog.cc/tarifs**, **/mentions-legales**, **/cgv**, **/confidentialite** et
+**/sous-traitance** (l'accord RGPD avec tes clients). Elles se remplissent depuis le panel,
+partie **Vente : tarifs et textes légaux** → **Modifier** :
+
+- ton entreprise (nom, statut, SIREN, adresse, e-mail, téléphone, ville du tribunal, TVA) ;
+- les offres (nom, prix par mois ou « sur devis », utilisateurs, lectures IA, MCP), l'essai
+  gratuit et les mois offerts à l'année. Au départ : **prix d'exemple** (29 €, 59 €, sur
+  devis), à changer quand tu auras décidé ;
+- la date d'entrée en vigueur et la case **Publier**.
+
+Tout est facultatif : un champ vide s'affiche « à compléter ». Tant que « Publier » n'est pas
+coché, les pages portent un bandeau « Brouillon » et les moteurs de recherche ne les
+indexent pas. Le panel liste ce qui manque encore. Dans l'appli des clients, Réglages →
+**Conditions et données personnelles** ouvre ces pages. Fichier : `/srv/recipelog/vente/vente.json`.
+
+Le **dossier juridique** (ce que la loi française demande pour vendre en ligne à des pros,
+les sanctions, les infos à rassembler, le registre des traitements à garder pour toi) est
+dans le document [Dossier juridique RecipeLog](https://claude.ai/artifact/TCnM5CzR7Dh61uEESpwo4w).
+Ce sont des brouillons sérieux, pas un avis d'avocat : à faire relire avant le premier client payant.
+
 ## Au quotidien (dans la VM, en root)
 
 ```bash
@@ -296,6 +319,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-15 | 8. Vente | Pages publiques Tarifs, Mentions légales, CGV, Politique de confidentialité et Accord de sous-traitance (RGPD), remplies depuis le panel (partie « Vente ») : ton identité, les offres avec des prix d'exemple, l'essai, la TVA. Champs vides affichés « à compléter », bandeau « Brouillon » et pas d'indexation tant que tu ne publies pas. Lien « Conditions et données personnelles » dans les Réglages de l'appli. Dossier juridique (obligations, sanctions, sous-traitants, registre des traitements) dans un document à part. Testé dans un vrai navigateur, captures dans la PR. | Remplir tes infos et choisir tes prix dans le panel, faire relire les textes, puis publier : [A-FAIRE.md](A-FAIRE.md), étape H. |
 | 2026-11-14 | 7. IA et prix | Lecture des factures par IA (photo ou PDF) avec vérification ligne par ligne avant d'enregistrer, fichier joint à la facture. Import des mercuriales : Excel et CSV lus sans IA (colonnes devinées puis corrigeables), PDF et photo par l'IA. Réglages de l'appli : IA de RecipeLog (ta clé, avec un nombre de lectures par mois) ou clé du client (Claude, ChatGPT ou Gemini). Panel : lectures et coût estimé de chaque client, quotas réglables. Testé dans un vrai navigateur avec une fausse API Claude (pas de vraie clé dans le bac à sable) ; ChatGPT et Gemini ne sont pas testés pour de vrai. Captures dans la PR. | Créer ta clé Anthropic et l'ajouter : [A-FAIRE.md](A-FAIRE.md), étape G. Puis lire une vraie facture Ribera pour vérifier. |
 | 2026-11-14 | 6. Maintenance et messages | Maintenances programmées (tout le parc, un client ou la vitrine) avec bandeau et email de préavis, page « Petite pause technique » pendant la plage (les super-admins entrent quand même), réouverture automatique, affichage sur la page de statut. Emails aux équipes des clients avec modèles (incident, résolu, nouveautés), option bandeau, journal des envois. Bandeaux dans l'appli, fermables. Testé dans un vrai navigateur : préavis reçu par email, bandeaux, maintenance immédiate (chef bloqué, super-admin entre), fin et réouverture, vitrine en maintenance. Captures dans la PR. | Rien. |
 | 2026-11-14 | 5. Surveillance et support | Vérification de chaque site et service chaque minute, alertes par email (et Telegram ou Discord si réglés) en cas de panne, de retour, de disque plein ou de nouvelle demande. Page de statut publique `status.recipelog.cc` (90 jours). Panel : partie Santé (machine et usage de chaque client), bouton Journaux en direct, partie Support (répondre, noter, fermer). Appli : Réglages → « Signaler un problème » avec la conversation et les réponses. Testé dans un vrai navigateur : demande envoyée, réponse reçue par email et dans l'appli, panne simulée détectée en 2 minutes puis retour, alerte d'essai. Captures dans la PR. | Facultatif : alertes sur ton téléphone par Telegram ou Discord, [A-FAIRE.md](A-FAIRE.md), étape F. |

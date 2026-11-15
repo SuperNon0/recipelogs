@@ -9,6 +9,7 @@ import { createHash, createHmac, createPublicKey, randomBytes, timingSafeEqual, 
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { PAGES as PAGES_VENTE, PAR_DEFAUT as VENTE_DEFAUT, page as pageVente } from "./vente.mjs";
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const DOMAINE = process.env.DOMAINE || "recipelog.cc";
@@ -206,6 +207,19 @@ async function pageStatut(res) {
 ${maintenances}${corps}<p class="petit">Mis à jour ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} · vérifié chaque minute</p></main></body></html>`);
 }
 
+// Tarifs et textes légaux (lot 8), sur <domaine>/tarifs, /cgv… (routeur Traefik « vente »).
+async function pageLegale(res, nom) {
+  let v = VENTE_DEFAUT;
+  try {
+    const r = await moteur("GET", "/vente", "page-vente");
+    if (r.statut === 200) v = JSON.parse(r.corps);
+  } catch {
+    v = VENTE_DEFAUT;
+  }
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60" });
+  res.end(pageVente(nom, v, { domaine: DOMAINE, cssUrl: `https://${HOTE_PANEL}/panel.css` }));
+}
+
 function pageErreur(res, statut, titre, texte) {
   res.writeHead(statut, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -231,6 +245,7 @@ createServer(async (req, res) => {
     if (url.pathname === "/sante") return res.end("ok");
 
     if (hote === `status.${DOMAINE}` && req.method === "GET" && url.pathname === "/") return pageStatut(res);
+    if ((hote === DOMAINE || hote === `www.${DOMAINE}`) && req.method === "GET" && PAGES_VENTE[url.pathname.slice(1)]) return pageLegale(res, url.pathname.slice(1));
     if (hote !== HOTE_PANEL) return pagePause(res, hote);
     if (!pret) return pageErreur(res, 503, "Panel pas encore réglé", "Relance install.sh sur la machine : il crée l'accès du panel dans Authentik.");
 
@@ -330,7 +345,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|alertes\/essai)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|vente|alertes\/essai)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();

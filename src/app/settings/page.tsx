@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Users, Euro, Receipt, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Scale, Users, Euro, Receipt, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -42,6 +42,13 @@ export default async function SettingsPage() {
     if (oidc && process.env.OIDC_ISSUER) compteAuthentik = `${new URL(process.env.OIDC_ISSUER).origin}/if/user/#/settings`;
   } catch {
     compteAuthentik = null;
+  }
+  // Textes légaux de la plateforme (lot 8) : sur le site vitrine, ex. https://recipelog.cc/cgv.
+  let siteLegal: string | null = null;
+  try {
+    if (oidc && process.env.RECIPELOG_URL) siteLegal = `https://${new URL(process.env.RECIPELOG_URL).hostname.split(".").slice(1).join(".")}`;
+  } catch {
+    siteLegal = null;
   }
 
   const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
@@ -251,6 +258,20 @@ export default async function SettingsPage() {
               </span>
               <ChevronRight size={16} className="set-chev" />
             </Link>
+            {siteLegal && (
+              <a href={`${siteLegal}/cgv`} className="fl-row" target="_blank" rel="noopener noreferrer">
+                <span className="ic">
+                  <Scale size={17} />
+                </span>
+                <span className="set-tx">
+                  <b>
+                    <span>Conditions et données personnelles</span>
+                  </b>
+                  <small>Conditions générales, confidentialité, sous-traitance des données et mentions légales de RecipeLog</small>
+                </span>
+                <ChevronRight size={16} className="set-chev" />
+              </a>
+            )}
             {/* Simple lien (pas next/link) : un préchargement ne doit jamais déconnecter. */}
             <a href="/auth/deconnexion" className="fl-row">
               <span className="ic">
