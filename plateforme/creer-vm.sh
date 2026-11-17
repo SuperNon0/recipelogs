@@ -124,16 +124,18 @@ qm start "${VMID}"
 info "VM démarrée. Installation de la plateforme dans la VM (5 à 15 minutes)…"
 echo "    Ce qui se passe s'affiche ici au fur et à mesure. Tu peux laisser tourner."
 # Texte renvoyé par une commande lancée dans la VM (qm guest exec répond en JSON).
-dans_vm() { qm guest exec "${VMID}" -- "$@" 2>/dev/null | sed -n 's/^ *"out-data" : "\(.*\)",\{0,1\}$/\1/p' | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g'; }
+# Tant que la VM démarre, son agent ne répond pas : qm guest exec échoue. Ce n'est pas une
+# erreur (avec set -e et pipefail, le script s'arrêtait là) : on renvoie juste du vide.
+dans_vm() { { qm guest exec "${VMID}" -- "$@" 2>/dev/null || true; } | sed -n 's/^ *"out-data" : "\(.*\)",\{0,1\}$/\1/p' | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g'; }
 FINI=0
 DERNIERE=""
 for _ in $(seq 1 180); do
   sleep 10
-  if qm guest exec "${VMID}" -- test -f /root/recipelog-plateforme.txt 2>/dev/null | grep -Eq '"exitcode" *: *0'; then
+  if { qm guest exec "${VMID}" -- test -f /root/recipelog-plateforme.txt 2>/dev/null || true; } | grep -Eq '"exitcode" *: *0'; then
     FINI=1; break
   fi
   # La dernière étape écrite par install.sh (« ==> … »), affichée quand elle change.
-  LIGNE="$(dans_vm sh -c "grep -a '^==>\|^⚠️\|^❌' /root/install-plateforme.log 2>/dev/null | tail -n 1" | tail -n 1)"
+  LIGNE="$(dans_vm sh -c "grep -a '^==>\|^⚠️\|^❌' /root/install-plateforme.log 2>/dev/null | tail -n 1" | grep -v "^$" | tail -n 1 || true)"
   if [ -n "${LIGNE}" ] && [ "${LIGNE}" != "${DERNIERE}" ]; then
     echo "    ${LIGNE}"
     DERNIERE="${LIGNE}"
