@@ -2,7 +2,7 @@
 // L'appli d'un client appelle Claude avec le SDK officiel, en prenant la
 // passerelle comme adresse de l'API : ici on vérifie la demande, on compte
 // une lecture dans le quota du mois du client, on remplace sa clé de
-// passerelle par la clé Anthropic de RecipeLog (IA_ANTHROPIC_CLE) et on
+// passerelle par la clé Anthropic de RecipeLog et on
 // renvoie la réponse telle quelle. La clé Anthropic ne quitte jamais la
 // passerelle : un client ne la voit pas.
 //
@@ -10,12 +10,15 @@
 //   reglages.json        écrit par le panel : { defaut: 30, clients: { maison: 100 },
 //                        factures: { defaut: { attente: 30, pages: 10 }, clients: { maison: { attente: 50, pages: 10 } } } }
 //   usage/<client>.json  écrit ici : { "2026-11": { lectures, entree, sortie } }
-//   etat.json            écrit ici au démarrage : la clé est-elle réglée ? (le panel l'affiche)
+//   etat.json            écrit ici au démarrage : la clé d'installation est-elle réglée ? (le panel l'affiche)
+//   cle.json             écrit par le panel (Factures par IA → « Clé Claude ») : { cle, depuis }.
+//                        Lisible par la passerelle seule (droits 600). Elle passe avant
+//                        IA_ANTHROPIC_CLE (la clé mise à l'installation, gardée en secours).
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 
 const RACINE = process.env.IA_DIR || "/ia";
-const CLE = (process.env.IA_ANTHROPIC_CLE || "").trim();
+const CLE_INSTALLATION = (process.env.IA_ANTHROPIC_CLE || "").trim();
 const AMONT = (process.env.IA_ANTHROPIC_URL || "https://api.anthropic.com").replace(/\/+$/, "");
 const MODELES = new Set((process.env.IA_MODELES || "claude-opus-5-5").split(",").map((m) => m.trim()).filter(Boolean));
 const QUOTA_DEFAUT = Number.isFinite(Number(process.env.IA_QUOTA_DEFAUT)) ? Number(process.env.IA_QUOTA_DEFAUT) : 30;
@@ -51,9 +54,16 @@ async function ecrireJson(fichier, valeur) {
   await rename(tmp, fichier);
 }
 
+/** La clé à utiliser : celle réglée dans le panel, sinon celle de l'installation. Relue à chaque lecture : un changement dans le panel compte tout de suite. */
+export async function cleActuelle() {
+  const f = await lireJson(`${RACINE}/cle.json`, null);
+  const c = typeof f?.cle === "string" ? f.cle.trim() : "";
+  return c || CLE_INSTALLATION;
+}
+
 export async function noterEtat() {
   try {
-    await ecrireJson(`${RACINE}/etat.json`, { cle: !!CLE, modeles: [...MODELES], depuis: new Date().toISOString() });
+    await ecrireJson(`${RACINE}/etat.json`, { cle: !!CLE_INSTALLATION, modeles: [...MODELES], depuis: new Date().toISOString() });
   } catch (e) {
     console.error(`IA : impossible d'écrire ${RACINE}/etat.json (${e.message})`);
   }
@@ -86,9 +96,9 @@ async function usage(client) {
 
 /** GET /v1/ia/quota */
 export async function quota(client) {
-  const [l, u, factures] = await Promise.all([limite(client), usage(client), limitesFactures(client)]);
+  const [l, u, factures, cle] = await Promise.all([limite(client), usage(client), limitesFactures(client), cleActuelle()]);
   const m = mois();
-  return { disponible: !!CLE && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m, factures };
+  return { disponible: !!cle && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m, factures };
 }
 
 function compter(client, entree, sortie) {
@@ -147,6 +157,7 @@ export function controler(corps, betas) {
 
 /** POST /v1/ia/anthropic/v1/messages : relais vers l'API Anthropic. */
 export async function relayer(client, req, res, query) {
+  const CLE = await cleActuelle();
   if (!CLE) return refuser(res, 503, "ia_indisponible", "La lecture par IA n'est pas encore ouverte sur la plateforme.");
   const brut = await lireCorps(req);
   if (!brut) return refuser(res, 413, "trop_gros", "Fichier trop gros pour la lecture par IA (10 Mo au plus).");

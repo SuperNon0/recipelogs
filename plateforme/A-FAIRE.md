@@ -368,12 +368,15 @@ Sans cette étape, tes clients peuvent déjà lire leurs factures avec **leur pr
    Mets une **limite de dépense mensuelle** (Limits) pour ne jamais avoir de surprise.
 2. **API keys → Create key** (nom : « RecipeLog plateforme ») et copie la clé (`sk-ant-…`).
 
-### ☐ G2. L'ajouter dans la VM (en root)
-```bash
-nano /srv/recipelog/.env        # ajoute : IA_ANTHROPIC_CLE=sk-ant-…
-recipelog-plateforme appliquer
-```
-Le panel affiche alors « Clé Claude de la plateforme réglée » dans **Lecture des factures par IA**.
+### ☐ G2. La mettre dans le panel
+Panel → **Factures par IA** → **Mettre une clé Claude**, colle la clé, puis **Essayer et
+enregistrer**. Le panel l'essaie chez Anthropic avant de la garder, et l'étiquette devient
+« Clé Claude de la plateforme réglée (sk-ant-…abcd) ». Pris en compte tout de suite, sans
+redémarrer. **Changer la clé** pour en mettre une autre, ou la retirer.
+
+(Ancienne façon, toujours possible en secours : `IA_ANTHROPIC_CLE=sk-ant-…` dans
+`/srv/recipelog/.env` puis `recipelog-plateforme appliquer`. Une clé mise dans le panel passe
+avant elle.)
 
 ### ☐ G3. Régler et essayer
 1. Dans le panel, **Changer le défaut** si 30 lectures par mois et par client ne te vont pas,
