@@ -103,6 +103,13 @@ Les étapes de l'installation s'affichent au fur et à mesure (5 à 15 minutes).
 résumé donne l'adresse IP de la VM : **note-la**. Si tu as donné Brevo, l'email « Choisis ton
 mot de passe » part tout seul à la fin.
 
+> **Si le script est revenu tout de suite à `root@…#`** juste après « VM démarrée » (bug corrigé
+> le 2026-11-17) : l'installation continue quand même dans la VM. Suis-la avec
+> `qm guest exec <numéro de la VM> -- tail -n 30 /root/install-plateforme.log`, et quand
+> `qm guest exec <numéro> -- cat /root/recipelog-plateforme.txt` affiche le résumé, efface le
+> fichier qui contient ta clé SMTP : `qm set <numéro> --delete cicustom` puis
+> `rm -f /var/lib/vz/snippets/recipelog-plateforme-<numéro>.yaml`.
+
 > **Pour entrer dans la VM**, c'est toujours depuis le **Shell de ton nœud Proxmox** (la clé
 > SSH est là, pas sur ton ordinateur) : `ssh recipelog@<adresse IP de la VM>` puis `sudo -i`.
 > Sans SSH : dans Proxmox, la VM → **Console (xterm.js)**.
