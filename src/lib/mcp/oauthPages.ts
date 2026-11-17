@@ -31,7 +31,12 @@ cursor:pointer;text-decoration:none;border:1px solid var(--line);background:tran
 button.ok{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 small{display:block;font-size:12px;color:var(--soft);margin-top:16px;text-align:center}`;
 
-function page(title: string, body: string, status = 200): NextResponse {
+/**
+ * formAction : origines où le formulaire peut mener. Chrome applique aussi
+ * form-action à la redirection qui suit l'envoi : sans l'origine de Claude,
+ * « Autoriser » semblait ne rien faire (retour vers claude.ai bloqué).
+ */
+function page(title: string, body: string, status = 200, formAction: string[] = []): NextResponse {
   const html = `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex"><title>${escapeHtml(title)} · RecipeLog</title><style>${STYLE}</style></head>
@@ -42,7 +47,7 @@ function page(title: string, body: string, status = 200): NextResponse {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "frame-ancestors 'none'; form-action 'self'; default-src 'none'; style-src 'unsafe-inline'",
+      "Content-Security-Policy": `frame-ancestors 'none'; form-action 'self'${formAction.map((o) => ` ${o}`).join("")}; default-src 'none'; style-src 'unsafe-inline'`,
       "Referrer-Policy": "no-referrer",
     },
   });
@@ -54,7 +59,7 @@ export function oauthErrorPage(title: string, text: string, status = 400, logout
   return page(title, `<h1>${escapeHtml(title)}</h1><p><!--email_off-->${escapeHtml(text)}<!--/email_off--></p>${extra}`, status);
 }
 
-export function consentPage(p: { clientName: string; redirectHost: string; email: string; ticket: string; action: string }): NextResponse {
+export function consentPage(p: { clientName: string; redirectHost: string; redirectOrigin: string; email: string; ticket: string; action: string }): NextResponse {
   const name = escapeHtml(p.clientName);
   return page(
     `Autoriser ${p.clientName}`,
@@ -69,5 +74,7 @@ export function consentPage(p: { clientName: string; redirectHost: string; email
 <div class="row"><button type="submit" name="choix" value="refuser">Refuser</button><button class="ok" type="submit" name="choix" value="autoriser">Autoriser</button></div>
 </form>
 <small>N'autorise que si tu viens de lancer la connexion toi-même depuis Claude.</small>`,
+    200,
+    [p.redirectOrigin],
   );
 }
