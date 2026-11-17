@@ -14,9 +14,10 @@ let SUPPORT = [];
 let ANNONCES = null;
 let IA = null;
 let VENTE = null;
+let CANAL = "plateforme"; // version donnée par défaut aux nouveaux clients (dit par le moteur)
 
 // ------------------------------------------------------------ API
-async function api(methode, chemin, corps) {
+async function appel(methode, chemin, corps) {
   const r = await fetch(`/api${chemin}`, {
     method: methode,
     headers: { "Content-Type": "application/json", "X-Panel": "1" },
@@ -33,6 +34,38 @@ async function api(methode, chemin, corps) {
     throw new Error("Session expirée.");
   }
   return { ok: r.ok && j.ok !== false, statut: r.status, ...j };
+}
+const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
+// Où en est l'action longue affichée dans la fenêtre (rempli par executer).
+let suivi = null;
+// Les actions qui modifient un client ne font pas attendre la page : le moteur rend un
+// numéro de tâche, et on lui redemande où elle en est jusqu'à la fin. L'action continue
+// même si la page est fermée (le résultat est alors dans le journal).
+async function api(methode, chemin, corps) {
+  const r = await appel(methode, chemin, corps);
+  if (r.statut !== 202 || !r.tache) return r;
+  let rates = 0;
+  for (let i = 0; ; i += 1) {
+    await pause(i < 3 ? 600 : i < 10 ? 1500 : 3000);
+    let t;
+    try {
+      t = await appel("GET", `/taches/${r.tache}`);
+    } catch (err) {
+      // Coupure de réseau passagère : on réessaie quelques fois avant d'abandonner.
+      rates += 1;
+      if (rates > 10) return { ok: false, sortie: "Le panel ne répond plus. L'action continue peut-être : regarde le journal dans quelques minutes." };
+      continue;
+    }
+    if (t.statut === 404) return { ok: false, sortie: t.message || "Action introuvable : regarde le journal." };
+    if (t.statut >= 500 && !t.etat) {
+      rates += 1;
+      if (rates > 10) return { ok: false, sortie: "Le moteur ne répond plus. L'action continue peut-être : regarde le journal dans quelques minutes." };
+      continue;
+    }
+    rates = 0;
+    if (t.etat === "fini") return { ...t, ok: t.ok === true, statut: t.ok ? 200 : 500 };
+    if (suivi) suivi(t.etat === "attente" ? `En attente : une autre action est en cours${t.attend ? ` (${t.attend})` : ""}. La tienne démarre juste après.` : t.etape || "");
+  }
 }
 
 // ------------------------------------------------------------ aide « ? »
@@ -67,14 +100,20 @@ $("#croix").addEventListener("click", () => {
 
 // Action longue : attente, puis ce que l'outil a répondu.
 async function executer(titre, requete) {
-  ouvrir(titre, `<p class="attente"><span class="rond"></span>En cours… (une création ou une mise à jour prend 1 à 3 minutes)</p>`);
+  ouvrir(titre, `<p class="attente"><span class="rond"></span>En cours… (une création ou une mise à jour prend 1 à 3 minutes)</p><p class="sub" id="ex-etape"></p>
+    <p class="texte-aide visible discret">Tu peux laisser cette fenêtre ouverte. Si tu fermes la page, l'action continue quand même : son résultat sera dans le journal, en bas du panel.</p>`);
   $("#croix").disabled = true;
+  suivi = (texte) => {
+    const z = $("#ex-etape");
+    if (z) z.textContent = texte;
+  };
   let r;
   try {
     r = await requete();
   } catch (err) {
     r = { ok: false, sortie: String(err.message ?? err) };
   }
+  suivi = null;
   $("#croix").disabled = false;
   const texte = r.sortie || r.message || (r.ok ? "Fait." : "Échec.");
   $("#fenetre-corps").innerHTML = `<p class="etiquette ${r.ok ? "ok" : "ko"}">${r.ok ? "Réussi" : "Échec"}</p><pre class="sortie">${e(texte)}</pre>`;
@@ -85,6 +124,7 @@ async function executer(titre, requete) {
 // ------------------------------------------------------------ affichage
 function etat(c) {
   if (c.suspendu) return `<span class="etiquette pause">En pause</span>`;
+  if (c.occupe && c.etat !== "healthy") return `<span class="etiquette prog" title="Une action est en cours ou vient de finir sur ce client">Redémarre</span>`;
   const s = SANTE?.services?.[`client:${c.nom}`];
   if (s && !s.ok) return `<span class="etiquette ko" title="Ne répond plus depuis le ${e(heureFr(s.depuis))}">En panne</span>`;
   if (c.etat === "healthy") return `<span class="etiquette ok">En ligne</span>`;
@@ -150,7 +190,7 @@ function afficher() {
       <div class="nom"><b>${e(c.nom)}</b><a href="${e(c.adresse)}" target="_blank" rel="noopener">${e(c.adresse.replace("https://", ""))} ↗</a></div>
       <div class="info"><span class="lbl">État</span>${etat(c)}${dispo(`client:${c.nom}`)}</div>
       <div class="info"><span class="lbl">Places</span>${places(c)}</div>
-      <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small></div>
+      <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small>${c.versionBloquee ? ` <span class="etiquette pause" title="La dernière mise à jour a échoué chez ce client : il a été remis sur sa version d'avant et la garde. « Mettre à jour » réessaie.">version gardée</span>` : ""}</div>
       <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}${c.demo ? ` <span class="etiquette prog">démo</span>` : ""}</div>
       <div class="info"><span class="lbl">Sauvegarde</span>${sauvegarde(c)}</div>
       <div class="actions">
@@ -187,6 +227,9 @@ const NOMS_ACTIONS = {
   "tester-sauvegarde": "a testé la sauvegarde de",
   telecharger: "a téléchargé une sauvegarde de",
   "sauvegardes-nuit": "a sauvegardé (nuit)",
+  "sauvegardes-controle": "a vérifié les sauvegardes :",
+  "alerte-essai": "a essayé les alertes",
+  annulation: "a prévenu de l'annulation :",
   "test-sauvegardes": "a testé les sauvegardes (semaine)",
   "demo-figer": "a figé la démo",
   "demo-remettre": "a remis à zéro",
@@ -239,6 +282,7 @@ async function charger() {
   SUPPORT = su.demandes ?? null;
   afficherSupport();
   ANNONCES = an.maintenances ? an : null;
+  if (c.canal) CANAL = c.canal;
   if (c.clients) CLIENTS = c.clients.sort((a, b) => a.nom.localeCompare(b.nom));
   else $("#clients").innerHTML = `<div class="vide">Liste indisponible : ${e(c.message ?? "le moteur ne répond pas")}</div>`;
   JOURNAL = j.journal ?? [];
@@ -267,8 +311,8 @@ function fenetreNouveau(pre = {}, apres = null) {
         <input id="n-max" type="number" min="0" max="10000" value="10"></div>
       <div class="champ"><label for="n-essai">Essai gratuit ${aide("a-essai", "Nombre de jours d'essai. À la fin, le site se met en pause tout seul (les données sont gardées) jusqu'à ce que tu le réactives. 0 = pas d'essai.")}
         <div class="suffixe"><input id="n-essai" type="number" min="0" max="3650" value="${e(pre.essai ?? 0)}"><span>jours</span></div></div>
-      <div class="champ"><label for="n-canal">Version ${aide("a-canal", "Stable : la version des clients, testée. Bêta : suit ton site (main). Plateforme : suit le chantier en cours, pour tes essais.")}
-        <select id="n-canal"><option value="stable">Stable (conseillé)</option><option value="beta">Bêta</option><option value="plateforme">Plateforme (essais)</option></select></div>
+      <div class="champ"><label for="n-canal">Version ${aide("a-canal", "Plateforme : la seule version qui existe pour l'instant, celle du chantier de la plateforme. Stable et Bêta arriveront quand la plateforme sera fusionnée dans le site principal : d'ici là, les choisir fait échouer la création (sans rien abîmer).")}
+        <select id="n-canal">${[["plateforme", "Plateforme"], ["stable", "Stable (pas encore disponible)"], ["beta", "Bêta (pas encore disponible)"]].map(([v, t]) => `<option value="${v}"${v === CANAL ? " selected" : ""}>${t}${v === CANAL ? " (conseillé)" : ""}</option>`).join("")}</select></div>
       <div class="champ"><label class="case"><input id="n-mcp" type="checkbox" checked> Accès MCP (Claude) ${aide("a-mcp", "Permet au client de brancher Claude sur son RecipeLog (Réglages → Accès MCP). Décoché : le menu disparaît chez lui et l'adresse MCP est fermée.")}</div>
       <p class="erreur" id="n-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Créer le client</button></div>
@@ -292,9 +336,15 @@ function fenetreNouveau(pre = {}, apres = null) {
   });
 }
 
-$("#tout-maj").addEventListener("click", () =>
-  executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour")),
-);
+$("#tout-maj").addEventListener("click", () => {
+  ouvrir(
+    "Mettre à jour tous les clients ?",
+    `<p class="sub">Chaque client est mis à jour l'un après l'autre : sauvegarde, nouvelle version, redémarrage (son site est coupé environ une minute). Compte 2 à 3 minutes par client.</p>
+    <p class="texte-aide visible">Si la nouvelle version ne démarre pas chez un client, il est remis tout seul sur sa version et sa base d'avant, et la mise à jour s'arrête là : les clients suivants gardent leur version. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
+    <div class="pied"><button class="btn principal" id="ok-tout-maj" type="button">Tout mettre à jour</button></div>`,
+  );
+  $("#ok-tout-maj").addEventListener("click", () => executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour")));
+});
 
 // ------------------------------------------------------------ actions d'un client
 $("#clients").addEventListener("click", (ev) => {
@@ -303,7 +353,10 @@ $("#clients").addEventListener("click", (ev) => {
   const c = CLIENTS.find((x) => x.nom === b.closest("[data-nom]").dataset.nom);
   const act = b.dataset.act;
   if (act === "mettre-a-jour") executer(`Mise à jour de ${c.nom}`, () => api("POST", `/clients/${c.nom}/mettre-a-jour`));
-  if (act === "reactiver") executer(`Réactivation de ${c.nom}`, () => api("POST", `/clients/${c.nom}/reactiver`));
+  if (act === "reactiver") {
+    if (c.essaiFini) fenetreReactiver(c);
+    else executer(`Réactivation de ${c.nom}`, () => api("POST", `/clients/${c.nom}/reactiver`));
+  }
   if (act === "suspendre") fenetrePause(c);
   if (act === "supprimer") fenetreSuppression(c);
   if (act === "reglages") fenetreReglages(c);
@@ -362,6 +415,26 @@ function fenetreRestaurer(c, id) {
   });
 }
 
+// Essai terminé : réactiver sans rien choisir le remettrait en pause dans l'heure.
+function fenetreReactiver(c) {
+  ouvrir(
+    `Réactiver ${c.nom}`,
+    `<p class="sub">L'essai de ${e(c.nom)} est terminé depuis le ${e(dateFr(c.essaiFin))}. Choisis la suite :</p>
+    <div class="champ"><label for="ra-jours">Prolonger l'essai ${aide("ra-a", "Le site rouvre et l'essai repart pour ce nombre de jours à partir d'aujourd'hui. À la fin, il se remettra en pause tout seul.")}
+      <div class="suffixe"><input id="ra-jours" type="number" min="1" max="3650" value="14"><span>jours</span></div></div>
+    <div class="pied pied-gauche"><button class="btn" id="ra-prolonger" type="button">Réactiver et prolonger l'essai</button></div>
+    <div class="champ"><label>Ou en faire un client normal ${aide("ra-a2", "Le site rouvre et ce n'est plus un essai : plus de pause automatique.")}</div>
+    <div class="pied pied-gauche"><button class="btn principal" id="ra-client" type="button">Réactiver comme client</button></div>
+    <p class="erreur" id="ra-erreur"></p>`,
+  );
+  $("#ra-prolonger").addEventListener("click", () => {
+    const jours = Number($("#ra-jours").value);
+    if (!Number.isInteger(jours) || jours < 1 || jours > 3650) return ($("#ra-erreur").textContent = "Nombre de jours invalide.");
+    executer(`Réactivation de ${c.nom}`, () => api("POST", `/clients/${c.nom}/reactiver`, { essai: jours }));
+  });
+  $("#ra-client").addEventListener("click", () => executer(`Réactivation de ${c.nom}`, () => api("POST", `/clients/${c.nom}/reactiver`, {})));
+}
+
 function fenetrePause(c) {
   ouvrir(
     `Mettre ${c.nom} en pause ?`,
@@ -407,7 +480,8 @@ function fenetreReglages(c) {
     const nJours = Number($("#r-essai").value || 0);
     const nMcp = $("#r-mcp").checked;
     if ($("#r-max") && nMax !== max) etapes.push(["Places", () => api("POST", `/clients/${c.nom}/quota`, { max: nMax })]);
-    if (nJours !== jours) etapes.push(["Essai", () => api("POST", `/clients/${c.nom}/essai`, { jours: nJours })]);
+    // Essai déjà fini (0 jour restant) : mettre 0 le retire pour de bon, c'est bien un changement.
+    if (nJours !== jours || (c.essaiFin && nJours === 0)) etapes.push(["Essai", () => api("POST", `/clients/${c.nom}/essai`, { jours: nJours })]);
     if (nMcp !== c.mcp) etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, { mcp: nMcp })]);
     if (!etapes.length) return ($("#r-erreur").textContent = "Rien n'a changé.");
     await executer(`Réglages de ${c.nom}`, async () => {
@@ -506,6 +580,8 @@ let voirTraitees = false;
 
 function afficherVitrine() {
   const zone = $("#vitrine");
+  // Pas de réaffichage pendant qu'on écrit le bandeau (le rafraîchissement effaçait la saisie).
+  if (document.activeElement?.id === "v-bandeau") return;
   if (!VITRINE) {
     zone.innerHTML = `<div class="vide">Vitrine indisponible.</div>`;
     return;
@@ -548,7 +624,10 @@ function afficherVitrine() {
     $("#v-erreur").textContent = "Enregistrement…";
     const r = await api("POST", "/vitrine/bandeau", { texte });
     $("#v-erreur").textContent = r.ok ? "" : (r.message || r.sortie || "Échec").replace(/^❌\s*/, "");
-    if (r.ok) charger();
+    if (r.ok) {
+      $("#v-bandeau").blur();
+      charger();
+    }
   });
   zone.querySelectorAll("[data-v]").forEach((b) =>
     b.addEventListener("click", async () => {
@@ -643,7 +722,9 @@ function afficherSante() {
     $("#sa-erreur").textContent = "Envoi…";
     const r = await api("POST", "/alertes/essai");
     ev.target.disabled = false;
-    $("#sa-erreur").textContent = r.ok ? "" : r.sortie || r.message || "Échec.";
+    // Résultat canal par canal (Telegram, Discord, email) : on voit lequel ne marche pas.
+    $("#sa-erreur").textContent = r.sortie || r.message || (r.ok ? "" : "Échec.");
+    $("#sa-erreur").style.whiteSpace = "pre-line";
     if (r.ok) ev.target.textContent = "Envoyée ✓";
   });
 }

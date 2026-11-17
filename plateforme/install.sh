@@ -9,7 +9,8 @@
 #
 # Ce que ça fait :
 #   1. installe Docker (dépôt officiel) ;
-#   2. pare-feu : AUCUN port entrant, sauf SSH depuis le réseau local ;
+#   2. pare-feu : AUCUN port entrant, sauf SSH depuis le réseau local ; heure de Paris,
+#      4 Go d'échange (swap) et mises à jour de sécurité de Debian automatiques ;
 #   3. récupère la plateforme dans /opt/recipelog-plateforme ;
 #   4. génère /srv/recipelog/.env (mot de passe PostgreSQL, jeton du tunnel…) ;
 #   5. démarre Traefik, PostgreSQL, l'accès Docker limité, le tunnel,
@@ -28,6 +29,7 @@
 #                      serveur d'envoi des emails (invitations, mot de passe
 #                      oublié). Par exemple Brevo : smtp-relay.brevo.com, 587.
 # Relancer le script est sans danger : il garde le .env et les clients existants.
+# Après avoir changé un réglage dans /srv/recipelog/.env : recipelog-plateforme appliquer
 # ============================================================
 set -euo pipefail
 
@@ -62,8 +64,29 @@ ask() { # ask <variable> <question> <défaut>
 info "Paquets de base…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git openssl nftables qemu-guest-agent >/dev/null
+apt-get install -y -qq ca-certificates curl git openssl nftables qemu-guest-agent rsync unattended-upgrades >/dev/null
 systemctl enable --now qemu-guest-agent >/dev/null 2>&1 || true
+
+# Heure de Paris : les journaux et les sauvegardes de la nuit sont à la même heure que toi.
+timedatectl set-timezone "${TZ:-Europe/Paris}" 2>/dev/null || true
+# Mises à jour de sécurité de Debian, toutes seules chaque jour (Docker n'est pas touché).
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'APT'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT
+# Mémoire d'échange : un pic de mémoire (mise à jour de plusieurs clients, Authentik qui
+# démarre) ralentit la machine au lieu de tuer un conteneur au hasard.
+if [ -z "$(swapon --noheadings 2>/dev/null)" ] && [ ! -e /swapfile ]; then
+  info "Mémoire d'échange (4 Go)…"
+  if fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile; then
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    echo 'vm.swappiness=10' > /etc/sysctl.d/90-recipelog.conf
+    sysctl -q -p /etc/sysctl.d/90-recipelog.conf || true
+  else
+    rm -f /swapfile
+    echo "⚠️  Mémoire d'échange non créée (pas grave, la plateforme marche sans)."
+  fi
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   info "Installation de Docker…"
@@ -85,8 +108,9 @@ fi
 systemctl enable --now docker >/dev/null
 
 # ------------------------------------------------------------ 2. Pare-feu
-# Entrées : rien, sauf SSH depuis le réseau local et les réponses aux
-# connexions sortantes. Docker gère seul ses propres règles (réseau interne
+# Entrées : rien, sauf SSH depuis le réseau local (192.168.x.x ou 10.x.x.x ; PAS
+# 172.16-31.x.x, qui sont les adresses des conteneurs Docker : un site piraté ne doit
+# pas pouvoir tenter le SSH de la machine) et les réponses aux connexions sortantes. Docker gère seul ses propres règles (réseau interne
 # des conteneurs) ; Traefik n'écoute que sur 127.0.0.1.
 info "Pare-feu (aucun port entrant sauf SSH local)…"
 cat > /etc/nftables.conf <<'NFT'
@@ -101,7 +125,7 @@ table inet recipelog_filtre {
     ct state established,related accept
     ct state invalid drop
     meta l4proto { icmp, ipv6-icmp } accept
-    ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 22 accept
+    ip saddr { 10.0.0.0/8, 192.168.0.0/16 } tcp dport 22 accept
   }
 }
 NFT
@@ -119,9 +143,26 @@ else
 fi
 ln -sf "${APP_DIR}/plateforme/bin/recipelog-instance" /usr/local/sbin/recipelog-instance
 cat > /usr/local/sbin/recipelog-plateforme <<EOF
-#!/bin/sh
+#!/bin/bash
 # Raccourci : recipelog-plateforme ps | logs traefik | up -d | pull …
-exec docker compose --project-directory ${APP_DIR}/plateforme --env-file ${DONNEES}/.env "\$@"
+#   recipelog-plateforme appliquer   après avoir changé un réglage dans ${DONNEES}/.env
+#     (emails, tunnel, alertes…) : relance ce qu'il faut, remet les réglages de la
+#     vitrine et renvoie ton invitation si tu ne t'es encore jamais connecté.
+compose() { docker compose --project-directory ${APP_DIR}/plateforme --env-file ${DONNEES}/.env "\$@"; }
+if [ "\${1:-}" = appliquer ]; then
+  set -a; . ${DONNEES}/.env; set +a
+  echo "==> Redémarrage des services dont les réglages ont changé…"
+  compose up -d --build --wait --wait-timeout 600 || echo "⚠️  Un service met du temps à démarrer : recipelog-plateforme ps"
+  echo "==> Attente de la connexion (Authentik)…"
+  docker exec recipelog-passerelle node cli.mjs attendre >/dev/null || { echo "❌ Authentik ne répond pas : recipelog-plateforme logs authentik" >&2; exit 1; }
+  recipelog-instance vitrine reglages >/dev/null || true
+  if [ -n "\${ADMIN_EMAILS:-}" ]; then
+    docker exec recipelog-passerelle node cli.mjs initialiser "\${ADMIN_EMAILS}" || echo "⚠️  Compte super-admin non vérifié."
+  fi
+  echo "✅ Réglages appliqués."
+  exit 0
+fi
+compose "\$@"
 EOF
 chmod 755 /usr/local/sbin/recipelog-plateforme
 
@@ -132,22 +173,36 @@ if [ ! -f "${DONNEES}/.env" ]; then
   ask DOMAINE "Nom de domaine" "recipelog.cc"
   ask ADMIN_EMAILS "Ton adresse email (administrateur caché des clients)" ""
   ask CF_TUNNEL_TOKEN "Jeton du tunnel Cloudflare de la plateforme (Entrée = plus tard)" ""
+  [[ "${DOMAINE}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || die "Nom de domaine invalide : ${DOMAINE}"
+  case "${ADMIN_EMAILS}${CF_TUNNEL_TOKEN}" in
+    *[\'\"\$\`\\]*) die "L'adresse email ou le jeton du tunnel contient un caractère interdit (guillemet, apostrophe, dollar ou barre oblique inversée)." ;;
+  esac
+  CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN//[[:space:]]/}" # un copier-coller ajoute souvent un espace ou un retour à la ligne
   umask 077
+  # Valeurs entre apostrophes : lues telles quelles par bash et par docker compose.
   cat > "${DONNEES}/.env" <<EOF
 # Réglages de la plateforme RecipeLog (écrit par install.sh le $(date +%F)).
-DOMAINE=${DOMAINE}
-DONNEES=${DONNEES}
-IMAGE=ghcr.io/supernon0/recipelog
-CANAL_DEFAUT=stable
-ADMIN_EMAILS=${ADMIN_EMAILS}
-POSTGRES_PASSWORD=$(openssl rand -hex 32)
-CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
-COMPOSE_PROFILES=$([ -n "${CF_TUNNEL_TOKEN}" ] && echo tunnel)
+# Après un changement ici : recipelog-plateforme appliquer
+DOMAINE='${DOMAINE}'
+DONNEES='${DONNEES}'
+IMAGE='ghcr.io/supernon0/recipelog'
+# Version donnée aux nouveaux clients. Seule « plateforme » existe pour l'instant.
+CANAL_DEFAUT='plateforme'
+ADMIN_EMAILS='${ADMIN_EMAILS}'
+POSTGRES_PASSWORD='$(openssl rand -hex 32)'
+CF_TUNNEL_TOKEN='${CF_TUNNEL_TOKEN}'
+COMPOSE_PROFILES='$([ -n "${CF_TUNNEL_TOKEN}" ] && echo tunnel)'
 EOF
   umask 022
   info "Réglages écrits dans ${DONNEES}/.env"
 else
   info "Réglages existants gardés (${DONNEES}/.env)."
+  # Les versions « stable » et « beta » n'existent pas encore : une plateforme installée
+  # avant cette correction créait des clients qui ne démarraient pas.
+  if grep -qE "^CANAL_DEFAUT='?stable'?$" "${DONNEES}/.env"; then
+    sed -i -E "s/^CANAL_DEFAUT='?stable'?$/CANAL_DEFAUT='plateforme'/" "${DONNEES}/.env"
+    info "Version par défaut des nouveaux clients : « plateforme » (« stable » n'existe pas encore)."
+  fi
 fi
 # shellcheck disable=SC1091
 set -a; . "${DONNEES}/.env"; set +a
@@ -156,8 +211,11 @@ set -a; . "${DONNEES}/.env"; set +a
 # sur une plateforme déjà installée. Les valeurs déjà présentes ne bougent pas.
 ajouter() { # ajouter <CLE> <valeur>
   grep -q "^$1=" "${DONNEES}/.env" && return 0
-  # Entre apostrophes : lu tel quel par bash et par docker compose.
-  umask 077; printf "%s='%s'\n" "$1" "${2//\'/}" >> "${DONNEES}/.env"; umask 022
+  # Entre apostrophes : lu tel quel par bash et par docker compose. Une apostrophe dans
+  # la valeur casserait le fichier : on refuse clairement au lieu de l'enlever en silence
+  # (un mot de passe d'emails amputé d'un caractère ne marcherait jamais).
+  case "$2" in *\'*) die "La valeur de $1 contient une apostrophe ('), ce qui n'est pas possible ici. Choisis une autre clé ou un autre mot de passe." ;; esac
+  umask 077; printf "%s='%s'\n" "$1" "$2" >> "${DONNEES}/.env"; umask 022
   printf -v "$1" '%s' "$2"; export "${1?}"
 }
 if ! grep -q '^AUTHENTIK_SECRET_KEY=' "${DONNEES}/.env"; then
@@ -212,17 +270,20 @@ mkdir -p "${DONNEES}/annonces" # maintenance et bandeaux (lot 6), écrits par le
 mkdir -p "${DONNEES}/ia/usage"
 chown -R 1000:1000 "${DONNEES}/ia" # lectures par IA (lot 7) : compteurs écrits par la passerelle
 
-# Dossiers de la vitrine (lot 4) avant son démarrage : réglages et messages reçus.
-recipelog-instance vitrine reglages >/dev/null
+# La vitrine (lot 4) avant son démarrage : son code, ses réglages et ses messages reçus.
+# Sans le code, son conteneur ne passait jamais « en forme » et l'installation s'arrêtait.
+info "Site vitrine (branche site-vitrine)…"
+( recipelog-instance vitrine maj ) || { recipelog-instance vitrine reglages >/dev/null; echo "⚠️  Vitrine non téléchargée. À relancer : recipelog-instance vitrine maj"; }
 
 info "Démarrage de Traefik, du tunnel, d'Authentik et de la passerelle…"
-recipelog-plateforme up -d --build --wait
+# Un service lent ou en retard n'arrête pas l'installation : Authentik est attendu juste après.
+recipelog-plateforme up -d --build --wait --wait-timeout 600 || echo "⚠️  Un service met du temps à démarrer (voir : recipelog-plateforme ps). L'installation continue."
 info "Attente d'Authentik (2 à 5 minutes au premier démarrage)…"
 docker exec recipelog-passerelle node cli.mjs attendre >/dev/null || die "Authentik ne démarre pas : recipelog-plateforme logs authentik"
 if [ -n "${ADMIN_EMAILS}" ]; then
   info "Ton compte super-admin dans Authentik…"
   docker exec recipelog-passerelle node cli.mjs initialiser "${ADMIN_EMAILS}" >/dev/null \
-    || echo "⚠️  Compte super-admin non créé. À relancer : docker exec recipelog-passerelle node cli.mjs initialiser"
+    || echo "⚠️  Compte super-admin non créé. À relancer : recipelog-plateforme appliquer"
 fi
 info "Accès du panel admin (admin.${DOMAINE}) dans Authentik…"
 if PANEL="$(docker exec recipelog-passerelle node cli.mjs panel-creer "https://admin.${DOMAINE}" --env)"; then
@@ -234,9 +295,6 @@ if PANEL="$(docker exec recipelog-passerelle node cli.mjs panel-creer "https://a
 else
   echo "⚠️  Panel non branché sur Authentik. À relancer : bash install.sh"
 fi
-
-info "Site vitrine (branche site-vitrine)…"
-recipelog-instance vitrine maj || echo "⚠️  Vitrine non téléchargée. À relancer : recipelog-instance vitrine maj"
 
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"
@@ -252,13 +310,13 @@ Plateforme RecipeLog installée le $(date '+%F %H:%M').
 Machine            : ${IP}
 Fichiers           : ${APP_DIR} (dépôt, branche ${RECIPELOG_BRANCH})
 Données et réglages: ${DONNEES}  (.env, postgres/, instances/, archives/)
-Tunnel Cloudflare  : $([ -n "${CF_TUNNEL_TOKEN}" ] && echo "branché" || echo "PAS ENCORE : ajouter CF_TUNNEL_TOKEN et COMPOSE_PROFILES=tunnel dans ${DONNEES}/.env, puis recipelog-plateforme up -d")
+Tunnel Cloudflare  : $([ -n "${CF_TUNNEL_TOKEN}" ] && echo "branché" || echo "PAS ENCORE : remplir CF_TUNNEL_TOKEN='…' et COMPOSE_PROFILES='tunnel' dans ${DONNEES}/.env, puis recipelog-plateforme appliquer")
 Panel admin        : https://admin.${DOMAINE} (super-admins seulement)
 Vitrine            : https://${DOMAINE} (si l'adresse pointe sur ce tunnel : A-FAIRE.md, étape E)
 Connexion          : https://auth.${DOMAINE} (Authentik)
-  Ton compte       : ${ADMIN_EMAILS:-aucun} (email « Choisis ton mot de passe » envoyé)
+  Ton compte       : ${ADMIN_EMAILS:-aucun} $([ -n "${SMTP_HOTE}" ] && echo "(email « Choisis ton mot de passe » envoyé : regarde aussi les indésirables)" || echo "(AUCUN email envoyé : les emails ne sont pas réglés. Règle-les, puis recipelog-plateforme appliquer : l'email partira)")
   Compte de secours: akadmin, mot de passe AUTHENTIK_BOOTSTRAP_PASSWORD dans ${DONNEES}/.env
-Emails             : $([ -n "${SMTP_HOTE}" ] && echo "${SMTP_HOTE}" || echo "PAS ENCORE : remplir SMTP_* dans ${DONNEES}/.env, puis recipelog-plateforme up -d (sans ça : ni invitation, ni mot de passe oublié)")
+Emails             : $([ -n "${SMTP_HOTE}" ] && echo "${SMTP_HOTE}" || echo "PAS ENCORE : remplir SMTP_* dans ${DONNEES}/.env, puis recipelog-plateforme appliquer (sans ça : ni invitation, ni mot de passe oublié)")
 
 Commandes :
   recipelog-instance liste                 les clients
@@ -267,6 +325,7 @@ Commandes :
   recipelog-instance equipe <nom>          les comptes d'un client
   recipelog-instance mettre-a-jour --tous  tous les clients, l'un après l'autre
   recipelog-plateforme ps                  état de Traefik, PostgreSQL, tunnel
+  recipelog-plateforme appliquer           après un changement dans ${DONNEES}/.env
   curl -H 'Host: test.${DOMAINE}' http://127.0.0.1:8080/api/health   test local
 EOF
 echo

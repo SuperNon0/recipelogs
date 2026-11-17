@@ -27,6 +27,8 @@
     </div>
     <p class="texte-aide" id="aide-maj">Télécharge la dernière version de chaque client, l'un après l'autre (2 à 3 minutes chacun). Un client qui ne redémarre pas revient tout seul à sa version d'avant, et la suite s'arrête. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
 
+    <p class="aide-ligne"><button class="aide" type="button" data-aide="a-boutons" aria-label="Aide sur les boutons">?</button> <span class="sub">À quoi servent les boutons d'un client</span></p>
+    <p class="texte-aide" id="a-boutons"><b>Ouvrir</b> : son site. <b>Équipe</b> : inviter ou retirer des comptes. <b>Réglages</b> : nombre de comptes, essai, accès MCP. <b>Sauvegardes</b> : sauvegarder, tester, télécharger, restaurer. <b>Journaux</b> : ce que son site a écrit (pour comprendre une panne). <b>Mettre à jour</b> : sauvegarde, puis dernière version ; si elle ne démarre pas, retour tout seul à la version et à la base d'avant. <b>Pause</b> : son site affiche « en pause », rien n'est effacé. <b>Supprimer</b> : arrête le site et range ses données dans une archive. Une seule action tourne à la fois : les autres attendent leur tour.</p>
     <section class="clients" id="clients" aria-live="polite"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></section>
 
     <h2>Maintenance et messages</h2>
@@ -47,7 +49,8 @@
     <h2>Site vitrine</h2>
     <section class="vitrine" id="vitrine"><div class="vide">Chargement…</div></section>
 
-    <h2>Journal de tes actions</h2>
+    <h2>Journal de tes actions <button class="aide" type="button" data-aide="a-journal" aria-label="Aide sur le journal">?</button></h2>
+    <p class="texte-aide" id="a-journal">Tout ce qui a été fait sur la plateforme, par toi ou tout seul (sauvegardes de la nuit, pannes vues, fins d'essai). « Détails » montre ce que la machine a répondu : c'est là qu'on lit pourquoi une action a échoué. Une action lancée puis une page fermée finit quand même et apparaît ici.</p>
     <section class="journal" id="journal"></section>
   </main>
 

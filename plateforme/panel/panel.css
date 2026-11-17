@@ -306,3 +306,4 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .liens-legal { display: flex; flex-wrap: wrap; gap: 6px 18px; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 16px; font-size: 14px; }
 .liens-legal b { color: var(--text); }
 @media (max-width: 600px) { .page-legal table { font-size: 13px; } .page-legal th, .page-legal td { padding-right: 6px; } }
+.aide-ligne { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
