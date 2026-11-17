@@ -5,11 +5,12 @@
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
 #   recipelog-instance creer <nom> [--canal instance|beta-instance|…] [--responsable email]
-#                                  [--max N] [--essai jours] [--sans-mcp] [--admin email]
+#                                  [--max N] [--essai jours] [--sans-mcp] [--mcp-cle] [--admin email]
 #                                  [--demo --sans-authentik]   (sans Authentik : démo seulement)
 #   recipelog-instance liste [--json]
 #   recipelog-instance suspendre <nom> | reactiver <nom> [--essai jours]
-#   recipelog-instance options <nom> --mcp oui|non
+#   recipelog-instance options <nom> [--mcp oui|non] [--mcp-cle oui|non]
+#     (--mcp-cle : clé secrète MCP ; sans elle, Claude se connecte seulement avec un compte)
 #   recipelog-instance essai <nom> <jours|0>     (0 = plus d'essai : client normal)
 #   recipelog-instance verifier-essais           (met en pause les essais terminés)
 #   recipelog-instance equipe <nom>
@@ -237,7 +238,7 @@ defaire_creation() {
 }
 
 cmd_creer() {
-  local nom="" canal="${CANAL_DEFAUT}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1 essai=0 mcp=oui
+  local nom="" canal="${CANAL_DEFAUT}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1 essai=0 mcp=oui mcpcle=non
   while [ $# -gt 0 ]; do
     case "$1" in
       --canal) canal="${2:-}"; shift 2 ;;
@@ -247,6 +248,7 @@ cmd_creer() {
       --sans-authentik) authentik=0; shift ;;
       --essai) essai="${2:-}"; shift 2 ;;
       --sans-mcp) mcp=non; shift ;;
+      --mcp-cle) mcpcle=oui; shift ;;
       --demo) demo=1; shift ;;
       -*) die "Option inconnue : $1" ;;
       *) [ -z "${nom}" ] || die "Un seul nom à la fois."; nom="$1"; shift ;;
@@ -293,6 +295,7 @@ CANAL=${canal}
 CREE_LE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 CONNEXION=cloudflare
 MCP=${mcp}
+MCP_CLE=${mcpcle}
 $([ "${demo}" = 1 ] && echo "DEMO=1")
 $([ "${essai}" -gt 0 ] && echo "ESSAI_FIN=$(date -u -d "+${essai} days" +%Y-%m-%d)")
 CONF
@@ -304,6 +307,8 @@ CONF
     echo "RECIPELOG_ADMIN_EMAILS=${admin}"
     if [ "${demo}" = 1 ]; then echo "RECIPELOG_DEMO=1"; fi
     if [ "${mcp}" = non ]; then echo "RECIPELOG_MCP=0"; fi
+    # Nouveaux clients : Claude se connecte avec un compte, pas de clé secrète (sauf --mcp-cle).
+    if [ "${mcpcle}" = non ]; then echo "RECIPELOG_MCP_CLE=0"; fi
   } > "${dir}/instance.env"
   umask 022
   if [ "${authentik}" = 1 ]; then
@@ -389,12 +394,13 @@ cmd_liste() {
       [ "${premier}" = 1 ] || printf ','
       premier=0
       fin="$(conf_lire "${nom}" ESSAI_FIN)"
-      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","essaiFini":%s,"mcp":%s,"demo":%s,"versionBloquee":%s}' \
+      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","essaiFini":%s,"mcp":%s,"mcpCle":%s,"demo":%s,"versionBloquee":%s}' \
         "$(j "${nom}")" "$(j "$(conf_lire "${nom}" CANAL)")" "$(j "$(conf_lire "${nom}" CONNEXION)")" "$(j "$(etat_conteneur "${nom}")")" \
         "$(j "${nom}")" "$(j "${DOMAINE}")" "$(j "$(conf_lire "${nom}" CREE_LE)")" \
         "$(suspendu "${nom}" && echo true || echo false)" "$(j "${fin}")" \
         "$([ -n "${fin}" ] && [[ "${fin}" < "${aujourdhui}" ]] && echo true || echo false)" \
         "$([ "$(conf_lire "${nom}" MCP)" = non ] && echo false || echo true)" \
+        "$([ "$(conf_lire "${nom}" MCP_CLE)" = non ] && echo false || echo true)" \
         "$([ "$(conf_lire "${nom}" DEMO)" = 1 ] && echo true || echo false)" \
         "$([ -n "$(conf_lire "${nom}" IMAGE_FIXE)" ] && echo true || echo false)"
     done
@@ -460,24 +466,35 @@ cmd_reactiver() {
 }
 
 cmd_options() {
-  local nom="${1:-}" mcp=""
+  local nom="${1:-}" mcp="" mcpcle=""
   shift || true
   while [ $# -gt 0 ]; do
     case "$1" in
       --mcp) mcp="${2:-}"; shift 2 ;;
+      --mcp-cle) mcpcle="${2:-}"; shift 2 ;;
       *) die "Option inconnue : $1" ;;
     esac
   done
-  [ -n "${nom}" ] && existe "${nom}" && [[ "${mcp}" =~ ^(oui|non)$ ]] || die "Usage : recipelog-instance options <nom existant> --mcp oui|non"
+  [ -n "${nom}" ] && existe "${nom}" && { [ -n "${mcp}" ] || [ -n "${mcpcle}" ]; } \
+    && [[ "${mcp}" =~ ^(oui|non|)$ ]] && [[ "${mcpcle}" =~ ^(oui|non|)$ ]] \
+    || die "Usage : recipelog-instance options <nom existant> [--mcp oui|non] [--mcp-cle oui|non]"
   local f="${INSTANCES}/${nom}/instance.env"
-  sed -i '/^RECIPELOG_MCP=/d' "${f}"
-  [ "${mcp}" = non ] && echo "RECIPELOG_MCP=0" >> "${f}"
-  conf_ecrire "${nom}" MCP "${mcp}"
+  if [ -n "${mcp}" ]; then
+    sed -i '/^RECIPELOG_MCP=/d' "${f}"
+    [ "${mcp}" = non ] && echo "RECIPELOG_MCP=0" >> "${f}"
+    conf_ecrire "${nom}" MCP "${mcp}"
+  fi
+  if [ -n "${mcpcle}" ]; then
+    sed -i '/^RECIPELOG_MCP_CLE=/d' "${f}"
+    [ "${mcpcle}" = non ] && echo "RECIPELOG_MCP_CLE=0" >> "${f}"
+    conf_ecrire "${nom}" MCP_CLE "${mcpcle}"
+  fi
   if ! suspendu "${nom}"; then
     lancer "${nom}"
     attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom}"
   fi
-  info "✅ ${nom} : accès MCP $([ "${mcp}" = oui ] && echo permis || echo coupé)."
+  [ -z "${mcp}" ] || info "✅ ${nom} : accès MCP $([ "${mcp}" = oui ] && echo permis || echo coupé)."
+  [ -z "${mcpcle}" ] || info "✅ ${nom} : clé secrète MCP $([ "${mcpcle}" = oui ] && echo permise || echo coupée)."
 }
 
 cmd_essai() {
