@@ -10,7 +10,8 @@ import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJ
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
 import { RefusIA, reglerQuota, resume as resumeIA } from "./ia.mjs";
 import { RefusVente, lire as lireVente, manques as manquesVente, regler as reglerVente } from "./vente.mjs";
-import { demarrer as demarrerPlateforme, etat as etatPlateforme } from "./plateforme.mjs";
+import { demarrer as demarrerPlateforme, etat as etatPlateforme, oublierNouveautes } from "./plateforme.mjs";
+import { regler as reglerNouveautes, resume as resumeNouveautes, verifier as verifierNouveautes } from "./nouveautes.mjs";
 import { RefusAnnonce, action as actionAnnonce, pourStatut, resume as resumeAnnonces, tour as tourAnnonces } from "./annonces.mjs";
 
 const CLE = process.env.MOTEUR_CLE || "";
@@ -182,20 +183,23 @@ async function clientsBruts() {
 }
 
 // État de tous les conteneurs en un seul appel à Docker : { nom: healthy | unhealthy |
-// starting | running | exited… } et une clé qui change quand le conteneur est recréé ou relancé.
+// starting | running | exited… }, une clé qui change quand le conteneur est recréé ou relancé,
+// et le commit de son image (étiquette mise par GitHub Actions) : sa version exacte.
 async function conteneurs() {
-  const format = "{{.Name}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.Image}}|{{.State.StartedAt}}";
+  const format = "{{.Name}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.Image}}|{{.State.StartedAt}}|{{index .Config.Labels \"org.opencontainers.image.revision\"}}";
   const r = await lancer("sh", ["-c", `ids=$(docker ps -aq) || exit 1; [ -z "$ids" ] || docker inspect --format '${format}' $ids`], 20000);
   const etats = {};
   const cles = {};
+  const revisions = {};
   for (const l of r.stdout.split("\n")) {
-    const [n, statut, sante, image, debut] = l.split("|");
+    const [n, statut, sante, image, debut, revision] = l.split("|");
     if (!n || !statut) continue;
     const nom = n.replace(/^\//, "");
     etats[nom] = statut !== "running" ? statut : sante || "running";
     cles[nom] = `${image}|${debut}`;
+    if (/^[0-9a-f]{40}$/.test(revision ?? "")) revisions[nom] = revision;
   }
-  return { ok: r.ok || Object.keys(etats).length > 0, etats, cles };
+  return { ok: r.ok || Object.keys(etats).length > 0, etats, cles, revisions };
 }
 
 // Le moteur n'est pas sur le réseau des clients : il demande la version dans le conteneur
@@ -230,8 +234,37 @@ async function clients() {
     c.places = places[c.nom] ?? null;
     c.sauvegarde = await resumeSauvegardes(c.nom);
     c.occupe = occupe(c.nom);
+    c.revision = cont.revisions[`rl-${c.nom}`] ?? null;
   });
+  // Nouvelle version disponible pour chacun (calculé avec ce que GitHub a dit à la dernière vérification).
+  try {
+    const n = await resumeNouveautes({ clients: tous, vitrine: null, plateforme: null });
+    for (const c of tous) c.maj = n.parClient[c.nom] ?? null;
+  } catch (e) {
+    console.error("Nouveautés :", e.message);
+  }
   return tous;
+}
+
+// ------------------------------------------------------------ nouvelles versions (nouveautes.mjs)
+async function entreeNouveautes() {
+  const [bruts, cont, vi, pf] = await Promise.all([
+    clientsBruts().catch(() => []),
+    conteneurs(),
+    readFile(`${DONNEES}/vitrine/code/.commit`, "utf8").catch(() => ""),
+    etatPlateforme().catch(() => null),
+  ]);
+  return { clients: bruts.map((c) => ({ ...c, revision: cont.revisions[`rl-${c.nom}`] ?? null })), vitrine: vi.trim() || null, plateforme: pf };
+}
+async function nouveautes() {
+  const e = await entreeNouveautes();
+  const r = await resumeNouveautes(e);
+  return { ...r, plateforme: e.plateforme?.nouveautes ? { enRetard: e.plateforme.nouveautes.enRetard } : null };
+}
+let verificationEnCours = null;
+function verifierMaintenant() {
+  verificationEnCours ??= verifierNouveautes(entreeNouveautes, alerter).finally(() => (verificationEnCours = null));
+  return verificationEnCours;
 }
 
 // Dernière sauvegarde et dernier test, lus directement sur le disque.
@@ -271,6 +304,7 @@ async function vitrine() {
   const traitees = new Set(donnees.traitees);
   return {
     version: (await lire("code/.version")) || null,
+    commit: (await lire("code/.commit")) || null,
     bandeau: await lire("reglages/bandeau.txt"),
     demandes: donnees.demandes.reverse().map((d) => ({ ...d, cle: `${d.date}|${d.email}`, traitee: traitees.has(`${d.date}|${d.email}`) })),
   };
@@ -799,6 +833,20 @@ createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/tous/mettre-a-jour") return rendre(toutMettreAJour(qui));
     // Mise à jour de la plateforme elle-même (plateforme.mjs) : lancée sur la machine, hors de Docker.
     if (req.method === "GET" && url.pathname === "/plateforme") return repondre(res, 200, await etatPlateforme());
+    // Nouvelles versions disponibles (clients par canal, vitrine) : réservé au panel.
+    if (req.method === "GET" && url.pathname === "/nouveautes") return repondre(res, 200, await nouveautes());
+    if (req.method === "POST" && url.pathname === "/nouveautes/verifier") {
+      oublierNouveautes();
+      const r = await verifierMaintenant();
+      return repondre(res, 200, { ok: true, erreur: r.erreur, prevenu: r.prevenu });
+    }
+    if (req.method === "POST" && url.pathname === "/nouveautes/reglages") {
+      const corps = await lireCorps(req);
+      exiger(typeof corps?.alerte === "boolean", "Réglage inconnu.");
+      const r = await reglerNouveautes(corps);
+      await noter(qui, "nouveautes-alerte", "plateforme", { ok: true, sortie: "" }, { alerte: r.alerte });
+      return repondre(res, 200, { ok: true, ...r });
+    }
     if (req.method === "POST" && url.pathname === "/plateforme/maj") {
       const r = await demarrerPlateforme(lancer);
       await noter(qui, "plateforme-maj", "plateforme", r);
@@ -822,6 +870,16 @@ async function essais() {
 }
 setTimeout(() => essais().catch((e) => console.error("Essais :", e.message)), 60 * 1000);
 setInterval(() => essais().catch((e) => console.error("Essais :", e.message)), 60 * 60 * 1000);
+
+// Toutes les heures (MAJ_VERIFICATION_MINUTES) : y a-t-il une nouvelle version pour les clients,
+// la plateforme ou la vitrine ? On prévient Noë une fois par version. Rien n'est installé.
+const MINUTES_MAJ = Math.max(15, Number(process.env.MAJ_VERIFICATION_MINUTES ?? 60) || 60);
+const tourNouveautes = () =>
+  verifierMaintenant()
+    .then((r) => r.erreur && console.error("Nouveautés :", r.erreur))
+    .catch((e) => console.error("Nouveautés :", e.message));
+setTimeout(tourNouveautes, 3 * 60 * 1000);
+setInterval(tourNouveautes, MINUTES_MAJ * 60 * 1000);
 
 // Chaque nuit à HEURE_SAUVEGARDE : sauvegarde de chaque client, puis de la plateforme
 // (comptes et réglages). Une fois par semaine (JOUR_TEST), une heure après : test de restauration.

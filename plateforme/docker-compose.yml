@@ -305,6 +305,10 @@ services:
       ALERTE_TELEGRAM_CHAT: ${ALERTE_TELEGRAM_CHAT:-}
       ALERTE_DISCORD_URL: ${ALERTE_DISCORD_URL:-}
       ALERTE_EMAIL: ${ALERTE_EMAIL:-oui}
+      # Nouvelles versions (clients, plateforme, vitrine) : vérifiées toutes les MAJ_VERIFICATION_MINUTES.
+      # GITHUB_JETON (facultatif, lecture seule) : si GitHub limite les demandes sans jeton.
+      MAJ_VERIFICATION_MINUTES: ${MAJ_VERIFICATION_MINUTES:-60}
+      GITHUB_JETON: ${GITHUB_JETON:-}
       # Avec un tunnel Cloudflare : vérifie aussi chaque minute que les sites répondent
       # depuis internet (https://status.<domaine>/sante). « non » pour couper ce contrôle.
       SURVEILLANCE_PUBLIQUE: ${SURVEILLANCE_PUBLIQUE:-${CF_TUNNEL_TOKEN:+oui}}

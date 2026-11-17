@@ -1209,12 +1209,19 @@ vitrine_reglages() {
 }
 
 vitrine_maj() {
-  local tmp archive racine v
+  local tmp archive racine v commit="" ref
   mkdir -p "${VITRINE}"
   tmp="$(mktemp -d "${VITRINE}/.maj.XXXXXX")"
   archive="${tmp}/code.tar.gz"
-  info "Téléchargement de la vitrine (branche ${VITRINE_BRANCHE})…"
-  telecharger "https://codeload.github.com/${VITRINE_DEPOT}/tar.gz/refs/heads/${VITRINE_BRANCHE}" "${archive}" \
+  # Le commit exact d'abord : le panel compare ensuite la version installée à celle de GitHub
+  # (« Mise à jour disponible »). Si GitHub ne le donne pas, on prend la branche comme avant.
+  if command -v curl >/dev/null; then
+    commit="$(curl -fsSL --retry 2 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/${VITRINE_DEPOT}/commits/${VITRINE_BRANCHE}" 2>/dev/null || true)"
+  fi
+  [[ "${commit}" =~ ^[0-9a-f]{40}$ ]] || commit=""
+  ref="${commit:-refs/heads/${VITRINE_BRANCHE}}"
+  info "Téléchargement de la vitrine (branche ${VITRINE_BRANCHE}${commit:+, ${commit:0:7}})…"
+  telecharger "https://codeload.github.com/${VITRINE_DEPOT}/tar.gz/${ref}" "${archive}" \
     || { find "${tmp}" -delete 2>/dev/null; die "Téléchargement de la vitrine impossible."; }
   mkdir -p "${tmp}/code"
   tar -C "${tmp}/code" --strip-components 1 --no-same-owner -xzf "${archive}"
@@ -1223,6 +1230,7 @@ vitrine_maj() {
   v="$(cat "${tmp}/code/site/"*.js "${tmp}/code/site/"*.css | sha256sum | cut -c1-8)"
   sed -i -E "s#(href=\"style\.css|src=\"app\.js)(\?v=[0-9a-f]+)?\"#\1?v=${v}\"#g" "${tmp}/code/site/index.html"
   printf '%s\n' "${v}" > "${tmp}/code/.version"
+  [ -z "${commit}" ] || printf '%s\n' "${commit}" > "${tmp}/code/.commit"
   racine="${VITRINE}/code"
   find "${VITRINE}" -mindepth 1 -maxdepth 1 -name 'code.ancien' -exec rm -rf {} +
   [ -d "${racine}" ] && mv "${racine}" "${VITRINE}/code.ancien"
