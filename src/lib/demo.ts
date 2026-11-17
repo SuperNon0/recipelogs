@@ -4,7 +4,7 @@ import type { Permission } from "@/lib/auth/permissions";
  * Mode démo : RECIPELOG_DEMO=1 dans le .env du serveur.
  * Pour un site ouvert à tous (la démo liée au site vitrine) : tout le monde
  * peut essayer les recettes, mais personne ne peut activer les comptes, créer
- * une clé Claude (MCP) ni lancer la mise à jour du site depuis la page.
+ * une clé Claude (MCP) ni changer les réglages du site.
  * La base est remise à zéro chaque nuit par le serveur (recipelog-demo-reset).
  */
 export function isDemo(): boolean {

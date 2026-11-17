@@ -202,7 +202,7 @@ Serveur MCP intégré à l'appli : `POST /api/mcp` (JSON-RPC sans état, écrit 
 | Variantes, moules, production et recherche (V2.5) | `voir_variantes`, `creer_variante`, `relier_variante`, `gerer_variante` (renommer, principale, détacher), `comparer_recettes`, `adapter_au_moule`, `voir_fiche_production`, `ajouter_a_production`, `modifier_production`, `retirer_de_production`, `recherche_complete` |
 | Vidéos et liens | `lire_video` (TikTok, Instagram, YouTube, page web ; yt-dlp + ffmpeg sur le serveur) |
 | Dossiers et catégories, Listes de courses, Cahiers | création, rangement, couleurs, articles, recettes… |
-| Site | `infos_recipelog`, `lancer_mise_a_jour`, `etat_du_site` |
+| Site | `infos_recipelog`, `etat_du_site` |
 
 ---
 

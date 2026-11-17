@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ChevronRight, Link2, RefreshCw, Sparkles, Wrench } from "lucide-react";
+import { Check, ChevronRight, Link2, Sparkles, Wrench } from "lucide-react";
 import { saveSiteUrl } from "@/app/actions/settings";
 import { CHANGELOG } from "@/lib/changelog";
 import { getMergedPrs } from "@/lib/pr-log";
 import { fullVersion } from "@/lib/version";
-import { DeployButton } from "@/components/DeployButton";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 
-/** Section « Site » des réglages : lien du logo, mise à jour, version. */
+/**
+ * Section « Site » des réglages : lien du logo, version.
+ * Pas de bouton de mise à jour ici : les sites sont mis à jour depuis le
+ * panel d'administration de la plateforme.
+ */
 export function SiteSettings({ siteUrl, canUpdate = true }: { siteUrl: string | null; canUpdate?: boolean }) {
   const [editingUrl, setEditingUrl] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -41,24 +44,6 @@ export function SiteSettings({ siteUrl, canUpdate = true }: { siteUrl: string | 
           </button>
         </div>
 
-        <div className="fl-row">
-          <span className="ic">
-            <RefreshCw size={17} />
-          </span>
-          <span className="set-tx">
-            <b>
-              <span>Mise à jour du site</span>
-              <Help title="Mise à jour du site">
-                Récupère la dernière version de RecipeLog sur GitHub, la prépare sur le serveur puis
-                redémarre le site. Compte quelques minutes ; le site reste utilisable pendant la
-                préparation, puis est coupé une dizaine de secondes au redémarrage. En cas de
-                problème, l&apos;ancienne version est conservée.
-              </Help>
-            </b>
-            <small>Installe les dernières évolutions</small>
-          </span>
-          <DeployButton />
-        </div>
 
           </>
         )}

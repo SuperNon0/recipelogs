@@ -73,7 +73,7 @@ function run(cmd: string, args: string[], timeoutMs: number): Promise<{ stdout: 
     execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         const e = err as NodeJS.ErrnoException & { killed?: boolean };
-        if (e.code === "ENOENT") reject(new Error(`${cmd} n'est pas installé sur le serveur (lancer « Mettre à jour le site »)`));
+        if (e.code === "ENOENT") reject(new Error(`${cmd} n'est pas installé sur le serveur (signale-le à l'équipe RecipeLog)`));
         else if (e.killed) reject(new Error(`${cmd} a mis trop de temps`));
         else reject(new Error(lastErrorLine(stderr) || e.message));
       } else resolve({ stdout, stderr });

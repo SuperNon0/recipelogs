@@ -71,7 +71,7 @@ export async function handleMcpMessage(msg: unknown, tools: McpTool[]): Promise<
         instructions:
           "Accès à RecipeLog, l'application de recettes de pâtisserie. Réponds en français. " +
           "Les quantités sont en grammes sauf unité contraire. Avant de modifier une recette, relis-la avec lire_recette. " +
-          "Demande toujours confirmation avant une suppression ou une mise à jour du site. " +
+          "Demande toujours confirmation avant une suppression. " +
           "Quand on te partage un lien TikTok, Instagram, YouTube ou une page de recette, lis-le avec lire_video, " +
           "puis crée la recette avec creer_recette dans le dossier indiqué, avec l'étiquette « à vérifier » et le lien en source.",
       });

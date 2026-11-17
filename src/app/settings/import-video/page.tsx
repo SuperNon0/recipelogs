@@ -62,12 +62,12 @@ export default async function ImportVideoSettingsPage() {
         {status(
           !!ytDlp,
           "Lecteur de vidéos (yt-dlp)",
-          ytDlp ? `Installé, version ${ytDlp}` : "Pas encore installé : lance « Mettre à jour le site », il s'installe tout seul",
+          ytDlp ? `Installé, version ${ytDlp}` : "Pas installé sur le serveur : signale-le à l'équipe RecipeLog",
         )}
         {status(
           !!ffmpeg,
           "Extraction d'images (ffmpeg)",
-          ffmpeg ? `Installé, version ${ffmpeg}` : "Pas encore installé : lance « Mettre à jour le site », il s'installe tout seul",
+          ffmpeg ? `Installé, version ${ffmpeg}` : "Pas installé sur le serveur : signale-le à l'équipe RecipeLog",
         )}
         <div className="fl-row">
           <span className="ic">
