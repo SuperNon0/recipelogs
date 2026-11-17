@@ -258,9 +258,9 @@ quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout r
    rm /tmp/monsite.tar.gz
    ```
    L'import affiche « Importé : N recette(s), N photo(s) et facture(s) » : compare avec le
-   nombre noté à l'étape 1. (Le client prend la version « Clients », branche `instance`.
-   Pour ton propre site, passe-le ensuite sur la bêta : sa fiche dans le panel → **Version de
-   l'appli** → **Changer…** → **Bêta**.)
+   nombre noté à l'étape 1. (Le client prend la version « Standard », branche `instance`.
+   Pour ton propre site, passe-le ensuite en bêta : sa fiche dans le panel → **Version de
+   l'appli** → **Passer en bêta**.)
 4. Ouvre **https://chanka.recipelog.cc** avec ton compte : tes recettes, factures et photos sont là.
 5. Pour envoyer à ton équipe l'email « Choisis ton mot de passe » (leurs rôles sont gardés) :
    ```bash
@@ -434,28 +434,29 @@ Trois choses se mettent à jour séparément. Dans l'ordre :
 - `beta-instance` : l'appli des clients en cours de développement (recettes, factures, etc.).
   Tous les changements de l'appli se font ici. GitHub en construit la version **Bêta**, que tu
   mets sur ta propre instance pour l'essayer.
-- `instance` : la version **Clients**. Quand la bêta te plaît, tu dis « passe la bêta en
+- `instance` : la version **Standard**. Quand la bêta te plaît, tu dis « passe la bêta en
   instance » : tout ce qui est sur `beta-instance` passe sur `instance`, GitHub construit la
-  nouvelle version Clients, puis tu mets à jour chaque client (I2).
+  nouvelle version Standard, puis tu mets à jour chaque client (I2).
 - `plateforme` : la machine elle-même (panel, connexion, sauvegardes, PDF, scripts), installée
   par I1. Elle ne touche pas à l'appli des clients.
 - `site-vitrine` : la vitrine (I3).
 
 `main` et `stable` restent l'appli de tes sites LXC classiques (sans la plateforme).
 
-Chaque client a sa **version** (fiche du client → **Version de l'appli**) : « Clients » ou
-« Bêta ». **Changer…** le sauvegarde, le passe sur l'autre version et le redémarre ; si elle ne
-démarre pas, il revient tout seul sur celle d'avant. En ligne de commande :
+Chaque client a sa **version**, choisie par toi seul dans le panel (le client ne voit pas ce
+choix) : « Standard » ou « Bêta ». Tu la choisis en créant le client, puis sur sa fiche →
+**Version de l'appli** → **Passer en bêta** / **Repasser en standard** : il est sauvegardé, passé
+sur l'autre version et redémarré ; si elle ne démarre pas, il revient tout seul sur celle d'avant. En ligne de commande :
 `recipelog-instance canal <nom> beta-instance` (ou `instance`).
 
 ### ☐ I0. Une seule fois : passer sur les branches instance / beta-instance (17/11/2026)
 Les clients créés avant ce jour suivent encore l'ancienne version « plateforme ».
-1. Fais I1 (mettre à jour la plateforme) : le panel apprend les versions « Clients » et « Bêta »,
-   et les nouveaux clients prennent « Clients ».
+1. Fais I1 (mettre à jour la plateforme) : le panel apprend les versions « Standard » et « Bêta »,
+   et les nouveaux clients prennent « Standard » sauf si tu choisis « Bêta » à la création.
 2. Vérifie dans **Actions** que l'action **Image Docker** est verte pour les branches `instance`
    et `beta-instance`.
-3. Pour chaque client, sa fiche → **Version de l'appli** → **Changer…** : **Clients** pour tes
-   clients, **Bêta** pour ton propre site (et `test` si tu veux). Ou dans la VM, en root :
+3. Pour chaque client, sa fiche → **Version de l'appli** → **Passer en standard** pour tes
+   clients, **Passer en bêta** pour ton propre site (et `test` si tu veux). Ou dans la VM, en root :
    ```bash
    recipelog-instance canal test beta-instance
    recipelog-instance canal chanka beta-instance

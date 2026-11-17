@@ -18,9 +18,9 @@ let PLATEFORME = null; // version installée, nouveautés sur GitHub, dernière 
 let CANAL = "instance"; // version donnée par défaut aux nouveaux clients (dit par le moteur)
 // Versions de l'appli (canaux) proposées dans le panel. « plateforme » : l'ancien canal,
 // montré seulement pour les clients qui y sont encore.
-const NOMS_CANAUX = { instance: "Clients", "beta-instance": "Bêta", plateforme: "Ancienne (plateforme)", beta: "Bêta des sites LXC", stable: "Stable des sites LXC" };
+const NOMS_CANAUX = { instance: "Standard", "beta-instance": "Bêta", plateforme: "Ancienne (plateforme)", beta: "Bêta des sites LXC", stable: "Stable des sites LXC" };
 const nomCanal = (k) => NOMS_CANAUX[k] ?? k ?? "—";
-const AIDE_CANAL = "<b>Clients</b> (branche instance) : la version de tous tes clients. <b>Bêta</b> (branche beta-instance) : la version en cours de développement, à mettre sur ta propre instance pour l'essayer. Quand la bêta te plaît, elle est passée dans « Clients », puis tu mets à jour chaque client avec son bouton.";
+const AIDE_CANAL = "Réglé ici seulement : le client ne voit pas ce choix et ne peut pas le changer. <b>Standard</b> (branche instance) : la version de tous tes clients. <b>Bêta</b> (branche beta-instance) : la version en cours de développement, à mettre sur ta propre instance pour l'essayer. Quand la bêta te plaît, elle passe en Standard, puis tu mets à jour chaque client avec son bouton.";
 
 // ------------------------------------------------------------ API
 async function appel(methode, chemin, corps) {
@@ -534,7 +534,7 @@ $("#fiche").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-fiche-act]");
   if (!b) return;
   const c = CLIENTS.find((x) => x.nom === location.hash.split("/")[1]);
-  if (c) action(c, b.dataset.ficheAct);
+  if (c) action(c, b.dataset.ficheAct, b.dataset.canal);
 });
 
 function ongletResume(c, z) {
@@ -565,8 +565,8 @@ function ongletResume(c, z) {
     ${tickets.length ? `<h2>Demandes de support</h2><div class="demandes">${tickets.map((t) => `<article class="demande"><div><span class="etiquette ${(STATUTS[t.statut] ?? [, "acc"])[1]}">${e((STATUTS[t.statut] ?? [t.statut])[0])}</span> ${e(t.email)}<small>${e(heureFr(t.maj))}</small><p>${e(t.messages.at(-1).texte.slice(0, 200))}</p></div><div class="actions"><button class="btn petit principal" type="button" data-ticket-ouvrir="${e(t.id)}">Ouvrir</button></div></article>`).join("")}</div>` : ""}
     <h2>Dernières actions</h2><div class="boite"><div class="evts">${evts(journal)}</div></div>
     <h2>Version de l'appli ${cnAide}</h2>${cnTexte}
-    <div class="ligne-zs"><div><b>${e(nomCanal(c.canal))}</b><small>${c.canal === "beta-instance" ? "Reçoit la bêta : les nouveautés pas encore données aux clients." : c.canal === "instance" ? "La version des clients." : "Ancien canal : passe-le sur « Clients » ou « Bêta »."}</small></div>
-      <button class="btn" type="button" data-fiche-act="canal">Changer…</button></div>
+    <div class="ligne-zs"><div><b>${e(nomCanal(c.canal))}</b><small>${c.canal === "beta-instance" ? "Reçoit la bêta : les nouveautés pas encore données aux autres clients." : c.canal === "instance" ? "La version de tous les clients." : "Ancienne version : passe-le en standard ou en bêta."}</small></div>
+      <div class="actions">${c.canal !== "beta-instance" ? `<button class="btn" type="button" data-fiche-act="canal" data-canal="beta-instance">Passer en bêta</button>` : ""}${c.canal !== "instance" ? `<button class="btn" type="button" data-fiche-act="canal" data-canal="instance">${c.canal === "beta-instance" ? "Repasser en standard" : "Passer en standard"}</button>` : ""}</div></div>
     <section class="zone-sensible"><h2 class="sec-t">Zone sensible ${zsAide}</h2>${zsTexte}
       <div class="ligne-zs"><div><b>${c.suspendu ? "Réactiver" : "Mettre en pause"}</b><small>${c.suspendu ? "Remet son site en ligne en une minute." : "Son site affiche « en pause ». Rien n'est effacé."}</small></div>
         <button class="btn" type="button" data-fiche-act="${c.suspendu ? "reactiver" : "suspendre"}">${c.suspendu ? "Réactiver" : "Mettre en pause"}</button></div>
@@ -813,7 +813,7 @@ $("#tout-maj").addEventListener("click", () => {
 
 // ------------------------------------------------------------ actions d'un client
 // Elles partent de sa fiche (#client/<nom>) ou de l'accueil.
-function action(c, act) {
+function action(c, act, canal) {
   if (act === "mettre-a-jour") executer(`Mise à jour de ${c.nom}`, () => api("POST", `/clients/${c.nom}/mettre-a-jour`));
   if (act === "reactiver") {
     if (c.essaiFini) fenetreReactiver(c);
@@ -821,25 +821,20 @@ function action(c, act) {
   }
   if (act === "suspendre") fenetrePause(c);
   if (act === "supprimer") fenetreSuppression(c);
-  if (act === "canal") fenetreCanal(c);
+  if (act === "canal") fenetreCanal(c, canal);
   if (act === "sauvegarder") executer(`Sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/sauvegarder`));
 }
 
 // Changer la version (canal) d'un client : sauvegarde, nouvelle version, retour arrière si ça rate.
-function fenetreCanal(c) {
-  const choix = ["instance", "beta-instance"].filter((v) => v !== c.canal);
+function fenetreCanal(c, canal) {
+  if (!NOMS_CANAUX[canal]) return;
   ouvrir(
-    `Version de ${c.nom}`,
-    `<p class="sub">Aujourd'hui : <b>${e(nomCanal(c.canal))}</b>.</p>
-    <div class="champ"><label for="cn-canal">Passer sur ${aide("cn-a", AIDE_CANAL)}
-      <select id="cn-canal">${choix.map((v) => `<option value="${v}">${nomCanal(v)}</option>`).join("")}</select></div>
-    <p class="texte-aide visible">Le site de ${e(c.nom)} est sauvegardé, puis redémarre sur cette version (environ une minute). Si elle ne démarre pas, il revient tout seul sur sa version d'avant.</p>
-    <div class="pied"><button class="btn principal" id="ok-canal" type="button">Changer et mettre à jour</button></div>`,
+    canal === "beta-instance" ? `Passer ${c.nom} en bêta ?` : `Passer ${c.nom} en standard ?`,
+    `<p class="sub">${canal === "beta-instance" ? `${e(c.nom)} recevra la bêta : les nouveautés en cours, avant les autres clients.` : `${e(c.nom)} reprend la version standard, celle de tous les clients.`}</p>
+    <p class="texte-aide visible">Son site est sauvegardé, puis redémarre sur cette version (environ une minute). Si elle ne démarre pas, il revient tout seul sur sa version d'avant.</p>
+    <div class="pied"><button class="btn principal" id="ok-canal" type="button">${canal === "beta-instance" ? "Passer en bêta" : "Passer en standard"}</button></div>`,
   );
-  $("#ok-canal").addEventListener("click", () => {
-    const canal = $("#cn-canal").value;
-    executer(`${c.nom} passe sur « ${nomCanal(canal)} »`, () => api("POST", `/clients/${c.nom}/canal`, { canal }));
-  });
+  $("#ok-canal").addEventListener("click", () => executer(`${c.nom} passe en ${nomCanal(canal).toLowerCase()}`, () => api("POST", `/clients/${c.nom}/canal`, { canal })));
 }
 
 const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
