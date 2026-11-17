@@ -42,6 +42,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "RecipeLog en ligne : Réglages → « Conditions et données personnelles » ouvre les conditions générales, la politique de confidentialité, l'accord de sous-traitance des données et les mentions légales. Le site présente aussi une page Tarifs",
       "Lecture d'une facture ou d'une mercuriale : chaque ligne a maintenant un champ « Article » (le nom commun qui regroupe les produits semblables), avec la liste des articles déjà utilisés. Un badge « Nouvel article » prévient avant de créer un presque-doublon, et l'article d'un produit déjà connu n'est plus jamais changé tout seul",
       "RecipeLog en ligne : la connexion se prolonge toute seule tant que l'appli est ouverte. Si elle est quand même finie, un message clair propose de se reconnecter",
+      "RecipeLog en ligne : les PDF (recettes, cahiers, listes de courses) sont fabriqués par un service commun de la plateforme. Rien ne change à l'écran, et chaque site garde plus de mémoire pour le reste",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
     fixes: [

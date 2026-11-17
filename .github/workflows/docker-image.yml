@@ -45,7 +45,9 @@ jobs:
       - name: Scripts de la plateforme (syntaxe)
         run: |
           for f in plateforme/bin/recipelog-instance plateforme/install.sh plateforme/creer-vm.sh plateforme/exporter-ancien.sh; do bash -n "$f"; done
-          for f in plateforme/panel/*.mjs plateforme/passerelle/*.mjs; do node --check "$f"; done
+          for f in plateforme/panel/*.mjs plateforme/passerelle/*.mjs plateforme/pdf/*.mjs; do node --check "$f"; done
+      - name: Service PDF de la plateforme (l'image se construit)
+        run: docker build -q -t recipelog-pdf:verif plateforme/pdf
 
   image:
     needs: verifier

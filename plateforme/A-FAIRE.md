@@ -424,7 +424,9 @@ clients restent en ligne pendant ce temps.
 1. Vérifie que l'action **Image Docker** de la branche `plateforme` est verte
    (github.com/SuperNon0/recipelogs → **Actions**).
 2. Essaie d'abord sur un seul : client `test` → **Mettre à jour**. Ouvre-le.
-3. Puis **Tout mettre à jour**. Chaque client est sauvegardé juste avant. Si la nouvelle
+3. Puis **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce
+   moment qu'un client prend les nouveaux réglages de la plateforme, par exemple le service
+   PDF commun.) Si la nouvelle
    version ne démarre pas chez l'un d'eux, il est remis tout seul sur sa version et sa base
    d'avant (badge « version gardée »), et les suivants ne sont pas touchés.
 
@@ -437,7 +439,7 @@ Partie **Site vitrine** → **Mettre à jour la vitrine**.
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7, les pages de vente au lot 8,
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7, les pages de vente au lot 8, le service PDF commun,
 et depuis les corrections des relectures : 4 Go de mémoire de secours, les mises à jour de sécurité
 automatiques de Debian, l'heure de Paris, la sauvegarde nocturne des comptes) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
