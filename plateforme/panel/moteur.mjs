@@ -557,9 +557,17 @@ async function action(qui, nom, act, corps) {
       args = ["quota", nom, String(corps.max)];
       break;
     case "options":
-      exiger(typeof corps.mcp === "boolean", "Option MCP manquante.");
-      details = { mcp: corps.mcp };
-      args = ["options", nom, "--mcp", corps.mcp ? "oui" : "non"];
+      exiger(typeof corps.mcp === "boolean" || typeof corps.mcpCle === "boolean", "Option MCP manquante.");
+      details = {};
+      args = ["options", nom];
+      if (typeof corps.mcp === "boolean") {
+        details.mcp = corps.mcp;
+        args.push("--mcp", corps.mcp ? "oui" : "non");
+      }
+      if (typeof corps.mcpCle === "boolean") {
+        details.mcpCle = corps.mcpCle;
+        args.push("--mcp-cle", corps.mcpCle ? "oui" : "non");
+      }
       break;
     case "canal":
       exiger(CANAUX.includes(corps.canal), "Canal inconnu.");
@@ -615,9 +623,10 @@ function creer(qui, c) {
   if (c.responsable) args.push("--responsable", c.responsable.trim().toLowerCase());
   if (c.essai) args.push("--essai", String(c.essai));
   if (c.mcp === false) args.push("--sans-mcp");
+  if (c.mcpCle === true) args.push("--mcp-cle");
   return enTache("creer", c.nom, async (suivi) => {
     const r = await outilLong(args, suivi);
-    await noter(qui, "creer", c.nom, r, { responsable: c.responsable || null, max: c.max || null, essai: c.essai || null, canal, mcp: c.mcp !== false });
+    await noter(qui, "creer", c.nom, r, { responsable: c.responsable || null, max: c.max || null, essai: c.essai || null, canal, mcp: c.mcp !== false, mcpCle: c.mcpCle === true });
     return r;
   });
 }

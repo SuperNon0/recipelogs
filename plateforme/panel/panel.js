@@ -691,7 +691,7 @@ function ongletResume(c, z) {
     ["Sauvegarde", s ? e(dateSauv(s.id).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "aucune", sv === "test" ? "test de restauration raté" : c.sauvegarde?.test ? `testée le ${dateFr(c.sauvegarde.test.date)}` : "pas encore testée"],
     ["Offre", c.essaiFin ? (joursRestants(c.essaiFin) >= 0 ? `Essai : ${joursRestants(c.essaiFin)} j` : "Essai fini") : "Client", c.essaiFin ? `jusqu'au ${dateFr(c.essaiFin)}` : `depuis le ${dateFr(c.creeLe)}`],
     ["Lectures IA", lim === null ? "—" : lim === 0 ? "coupées" : `${u} / ${lim}`, "ce mois-ci"],
-    ["Accès MCP", c.mcp ? "permis" : "coupé", "réglable dans Réglages"],
+    ["Accès MCP", c.mcp ? "permis" : "coupé", c.mcp ? (c.mcpCle === false ? "connexion par compte seulement" : "compte ou clé secrète") : "réglable dans Réglages"],
     ["Disponibilité", SANTE ? pct(SANTE.disponibilite?.[`client:${c.nom}`] ?? 100) : "—", "sur 30 jours"],
     ["Comptes actifs", SANTE?.clients?.[c.nom]?.usage ? e(SANTE.clients[c.nom].usage.comptes) : "—", SANTE?.clients?.[c.nom]?.usage ? `dernière visite ${depuisFr(SANTE.clients[c.nom].usage.derniereActivite)}` : ""],
   ];
@@ -863,7 +863,7 @@ function afficherJournal() {
   $("#journal").innerHTML = JOURNAL.slice(0, 40)
     .map((l, i) => {
       const d = l.details ?? {};
-      const plus = d.texte !== undefined ? ` (${d.texte ? `« ${e(d.texte)} »` : "retiré"})` : d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined ? ` (MCP ${d.mcp ? "permis" : "coupé"})` : "";
+      const plus = d.texte !== undefined ? ` (${d.texte ? `« ${e(d.texte)} »` : "retiré"})` : d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined || d.mcpCle !== undefined ? ` (${[d.mcp !== undefined ? `MCP ${d.mcp ? "permis" : "coupé"}` : "", d.mcpCle !== undefined ? `clé secrète ${d.mcpCle ? "permise" : "coupée"}` : ""].filter(Boolean).join(", ")})` : "";
       return `<div class="ligne"><time>${heureFr(l.date)}</time><span class="qui">${e(l.qui)}</span>
         <span>${e(NOMS_ACTIONS[l.action] ?? l.action)} <b>${e(l.client)}</b>${plus} ${l.ok ? "" : `<span class="etiquette ko">échec</span>`}</span>
         <button type="button" data-journal="${i}">Détails</button></div>`;
@@ -923,6 +923,7 @@ function fenetreNouveau(pre = {}, apres = null) {
       <div class="champ"><label for="n-canal">Version ${aide("a-canal", AIDE_CANAL)}
         <select id="n-canal">${["instance", "beta-instance"].map((v) => `<option value="${v}"${v === CANAL ? " selected" : ""}>${nomCanal(v)}${v === CANAL ? " (conseillé)" : ""}</option>`).join("")}</select></div>
       <div class="champ"><label class="case"><input id="n-mcp" type="checkbox" checked> Accès MCP (Claude) ${aide("a-mcp", "Permet au client de brancher Claude sur son RecipeLog (Réglages → Accès MCP). Décoché : le menu disparaît chez lui et l'adresse MCP est fermée.")}</div>
+      <div class="champ"><label class="case"><input id="n-mcp-cle" type="checkbox"> Clé secrète MCP ${aide("a-mcp-cle", "Ancienne façon de brancher Claude : une clé à copier dans claude.ai (utile pour Claude Code). Décoché : la section Clé secrète disparaît chez le client et une ancienne clé ne marche plus ; Claude se branche seulement avec un compte du client (« Se connecter » dans claude.ai). Conseillé : décoché.")}</div>
       <p class="erreur" id="n-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Créer le client</button></div>
     </form>`,
@@ -936,6 +937,7 @@ function fenetreNouveau(pre = {}, apres = null) {
       essai: Number($("#n-essai").value || 0),
       canal: $("#n-canal").value,
       mcp: $("#n-mcp").checked,
+      mcpCle: $("#n-mcp-cle").checked,
     };
     if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/.test(corps.nom)) return ($("#n-erreur").textContent = "Nom : 2 à 32 caractères, minuscules, chiffres et tirets.");
     if (CLIENTS.some((c) => c.nom === corps.nom)) return ($("#n-erreur").textContent = "Ce client existe déjà.");
@@ -1085,6 +1087,7 @@ function ongletReglages(c, z) {
       <div class="champ"><label for="r-essai">Essai : jours restants ${aide("r-a-essai", "Change la fin de l'essai à partir d'aujourd'hui. 0 = ce n'est plus un essai (client normal, plus de pause automatique). Un client mis en pause par la fin d'essai se rouvre avec « Réactiver ».")}
         <div class="suffixe"><input id="r-essai" type="number" min="0" max="3650" value="${jours}"><span>${c.essaiFin ? `jusqu'au ${e(dateFr(c.essaiFin))}` : "pas d'essai"}</span></div></div>
       <div class="champ"><label class="case"><input id="r-mcp" type="checkbox" ${c.mcp ? "checked" : ""}> Accès MCP (Claude) ${aide("r-a-mcp", "Permet au client de brancher Claude sur son RecipeLog. Changer cette case redémarre son site (environ une minute).")}</div>
+      <div class="champ"><label class="case"><input id="r-mcp-cle" type="checkbox" ${c.mcpCle !== false ? "checked" : ""}> Clé secrète MCP ${aide("r-a-mcp-cle", "Ancienne façon de brancher Claude : une clé à copier dans claude.ai (utile pour Claude Code). Décoché : la section Clé secrète disparaît chez le client et une ancienne clé ne marche plus ; Claude se branche seulement avec un compte du client (« Se connecter » dans claude.ai). Changer cette case redémarre son site (environ une minute).")}</div>
       <p class="erreur" id="r-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
     </form>`;
@@ -1094,10 +1097,17 @@ function ongletReglages(c, z) {
     const nMax = $("#r-max") ? Number($("#r-max").value || 0) : max;
     const nJours = Number($("#r-essai").value || 0);
     const nMcp = $("#r-mcp").checked;
+    const nMcpCle = $("#r-mcp-cle").checked;
     if ($("#r-max") && nMax !== max) etapes.push(["Places", () => api("POST", `/clients/${c.nom}/quota`, { max: nMax })]);
     // Essai déjà fini (0 jour restant) : mettre 0 le retire pour de bon, c'est bien un changement.
     if (nJours !== jours || (c.essaiFin && nJours === 0)) etapes.push(["Essai", () => api("POST", `/clients/${c.nom}/essai`, { jours: nJours })]);
-    if (nMcp !== c.mcp) etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, { mcp: nMcp })]);
+    const mcpCle = c.mcpCle !== false;
+    if (nMcp !== c.mcp || nMcpCle !== mcpCle) {
+      const corps = {};
+      if (nMcp !== c.mcp) corps.mcp = nMcp;
+      if (nMcpCle !== mcpCle) corps.mcpCle = nMcpCle;
+      etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, corps)]);
+    }
     if (!etapes.length) return ($("#r-erreur").textContent = "Rien n'a changé.");
     await executer(`Réglages de ${c.nom}`, async () => {
       const sorties = [];
