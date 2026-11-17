@@ -11,6 +11,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.21",
+    date: "2026-11-17",
+    title: "Clé secrète MCP selon l'offre",
+    summary:
+      "RecipeLog en ligne : la clé secrète de l'accès MCP peut être proposée ou non à chaque site. Quand elle ne l'est pas, Claude se branche seulement avec ton compte (« Se connecter » dans claude.ai).",
+    features: [
+      "Réglages → Accès MCP : sans clé secrète, la section « Clé secrète » disparaît et une ancienne clé ne marche plus. La connexion avec ton compte, elle, ne change pas",
+    ],
+    fixes: [
+      "Page « Autoriser Claude ? » : ton adresse e-mail s'affiche en entier au lieu de « [email protected] »",
+      "Page « Autoriser Claude ? » : le retour vers Claude après « Autoriser » n'est plus bloqué par le navigateur",
+    ],
+  },
+  {
     version: "V2.20",
     date: "2026-11-17",
     title: "Ajouter une facture depuis le téléphone",

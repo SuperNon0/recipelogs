@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { getSiteUrl } from "@/app/actions/settings";
 import { getMcpToken } from "@/lib/mcp/token";
-import { mcpAllowed } from "@/lib/mcp/allowed";
+import { mcpAllowed, mcpKeyAllowed } from "@/lib/mcp/allowed";
+import { oauthSetup } from "@/lib/mcp/oauth";
 import { SiteSettings } from "@/components/settings/SiteSettings";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { requirePage } from "@/lib/auth/guard";
@@ -206,7 +207,7 @@ export default async function SettingsPage() {
                 href="/settings/mcp"
                 icon={Plug}
                 title="Accès MCP"
-                sub={mcpToken ? "Activé · Claude peut se connecter à RecipeLog" : "Coupé · permet à Claude de consulter et gérer RecipeLog"}
+                sub={(mcpToken && mcpKeyAllowed()) || oauthSetup() ? "Activé · Claude peut se connecter à RecipeLog" : "Coupé · permet à Claude de consulter et gérer RecipeLog"}
               />
             )}
             {can("recipes.edit") && (

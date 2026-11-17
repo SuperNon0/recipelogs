@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
   return consentPage({
     clientName: client.name,
     redirectHost: new URL(redirectUri).host,
+    redirectOrigin: new URL(redirectUri).origin,
     email,
     ticket: signConsent(request, email, client.name, setup.key),
     action: req.nextUrl.pathname,

@@ -37,7 +37,20 @@ const KIND: Record<ToolInfo["kind"], { icon: LucideIcon; label: string; color: s
 const GROUP_COLORS = ["var(--accent)", "var(--accent-2)", "var(--pending)", "var(--accent-3)", "#e48fc1", "#7cc4f0"];
 
 /** Réglages → Accès MCP : activer, copier l'adresse et la clé, changer la clé, couper. */
-export function McpAccess({ token, groups, oauth = null }: { token: string | null; groups: ToolGroupInfo[]; oauth?: OauthInfo | null }) {
+export function McpAccess({
+  token: storedToken,
+  groups,
+  oauth = null,
+  keyAllowed = true,
+}: {
+  token: string | null;
+  groups: ToolGroupInfo[];
+  oauth?: OauthInfo | null;
+  /** false : clé secrète coupée depuis le panel (RecipeLog en ligne), section masquée. */
+  keyAllowed?: boolean;
+}) {
+  const token = keyAllowed ? storedToken : null;
+  const showKey = keyAllowed || !oauth;
   const [pending, startTransition] = useTransition();
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -166,16 +179,20 @@ export function McpAccess({ token, groups, oauth = null }: { token: string | nul
               )}
             </div>
           </div>
-          <div className="sect-title">
-            <h2>Clé secrète</h2>
-            <Help title="Clé secrète">
-              L&apos;ancienne méthode, toujours possible : utile pour Claude Code ou un outil qui ne sait pas se
-              connecter avec un compte. Inutile si Claude est connecté avec ton compte.
-            </Help>
-          </div>
         </>
       )}
 
+      {oauth && showKey && (
+        <div className="sect-title">
+          <h2>Clé secrète</h2>
+          <Help title="Clé secrète">
+            L&apos;ancienne méthode, toujours possible : utile pour Claude Code ou un outil qui ne sait pas se
+            connecter avec un compte. Inutile si Claude est connecté avec ton compte.
+          </Help>
+        </div>
+      )}
+
+      {showKey && (
       <div className="fl-list">
         {!token ? (
           <div className="fl-row">
@@ -254,6 +271,7 @@ export function McpAccess({ token, groups, oauth = null }: { token: string | nul
           </>
         )}
       </div>
+      )}
 
       <div className="sect-title">
         <h2>Outils de Claude</h2>
