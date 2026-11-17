@@ -86,12 +86,15 @@ let apresFermeture = null;
 function ouvrir(titre, html, fermeture = null) {
   $("#fenetre-titre").textContent = titre;
   $("#fenetre-corps").innerHTML = html;
+  $("#fenetre-corps").onclick = null;
   apresFermeture = fermeture;
   voile.classList.add("ouvert");
+  document.body.classList.add("couche-ouverte");
   document.body.style.overflow = "hidden";
 }
 $("#croix").addEventListener("click", () => {
   voile.classList.remove("ouvert");
+  document.body.classList.remove("couche-ouverte");
   document.body.style.overflow = "";
   const f = apresFermeture;
   apresFermeture = null;
@@ -163,6 +166,41 @@ function sauvegarde(c) {
   return vieille ? `<span class="etiquette pause" title="Plus de 36 heures">${e(texte)}</span>` : e(texte);
 }
 
+const ic = (nom, cl = "s18") => `<svg class="ic ${cl}" aria-hidden="true"><use href="/icones.svg#i-${nom}"/></svg>`;
+// Bouton « ? » et son texte (le texte se place juste après, hors d'un <label>).
+const aideB = (id, texte) => [`<button class="aide" type="button" data-aide="${id}" aria-label="Aide">?</button>`, `<p class="texte-aide" id="${id}">${texte}</p>`];
+
+// ------------------------------------------------------------ liste des clients
+// Sauvegarde à regarder : aucune, plus de 36 h, ou test de restauration raté.
+function sauvegardeKo(c) {
+  const s = c.sauvegarde;
+  if (c.demo) return null;
+  if (!s?.derniere) return "aucune";
+  if (s.test && !s.test.ok) return "test";
+  if (Date.now() - dateSauv(s.derniere.id).getTime() > 36 * 3600 * 1000) return "vieille";
+  return null;
+}
+function enPanne(c) {
+  if (c.suspendu || c.occupe) return false;
+  const s = SANTE?.services?.[`client:${c.nom}`];
+  return (s && !s.ok) || (c.etat !== "healthy" && c.etat !== "starting");
+}
+const aRegarder = (c) => enPanne(c) || Boolean(sauvegardeKo(c)) || c.versionBloquee || (c.essaiFin && !c.suspendu && joursRestants(c.essaiFin) <= 7);
+
+const FILTRES = [
+  ["tous", "Tous", () => true],
+  ["essai", "En essai", (c) => Boolean(c.essaiFin) && !c.suspendu],
+  ["pause", "En pause", (c) => c.suspendu],
+  ["regarder", "À regarder", aRegarder],
+];
+let filtreClients = "tous";
+$("#filtres").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-filtre]");
+  if (!b) return;
+  filtreClients = b.dataset.filtre;
+  afficher();
+});
+
 function afficher() {
   const n = CLIENTS.length;
   const enLigne = CLIENTS.filter((c) => !c.suspendu && c.etat === "healthy").length;
@@ -170,43 +208,327 @@ function afficher() {
   const essais = CLIENTS.filter((c) => c.essaiFin && !c.suspendu).length;
   const comptes = CLIENTS.reduce((s, c) => s + (c.places?.membres ?? 0), 0);
   $("#chiffres").innerHTML = [
-    [n, n > 1 ? "clients" : "client"],
-    [enLigne, "en ligne"],
-    [`${essais} · ${pause}`, "en essai · en pause"],
-    [comptes, "comptes au total"],
+    [n, n > 1 ? "clients" : "client", `${comptes} compte${comptes > 1 ? "s" : ""} au total`, "#clients"],
+    [enLigne, "en ligne", n - enLigne - pause > 0 ? `${n - enLigne - pause} hors ligne` : "tous ceux qui doivent l'être", "#clients"],
+    [essais, "en essai", `${pause} en pause`, "#clients"],
+    [SANTE?.machine?.disque ? `${Math.round(SANTE.machine.disque.pourcent)} %` : "—", "disque utilisé", SANTE?.machine?.disque ? `${taille(SANTE.machine.disque.libre)} libres` : "mesure indisponible", "#sante"],
   ]
-    .map(([v, l]) => `<div class="chiffre"><b>${e(v)}</b><span>${e(l)}</span></div>`)
+    .map(([v, l, s, h]) => `<a class="chiffre" href="${h}"><b>${e(v)}</b><span>${e(l)}</span><small>${e(s)}</small></a>`)
     .join("");
 
+  $("#filtres").innerHTML = FILTRES.map(([k, t, f]) => {
+    const nb = CLIENTS.filter(f).length;
+    return `<button class="puce${filtreClients === k ? " on" : ""}" type="button" data-filtre="${k}" aria-pressed="${filtreClients === k}">${e(t)} <span class="canal">${nb}</span></button>`;
+  }).join("");
+
   const filtre = $("#recherche").value.trim().toLowerCase();
-  const liste = CLIENTS.filter((c) => !filtre || c.nom.includes(filtre));
+  const test = FILTRES.find(([k]) => k === filtreClients)[2];
+  const liste = CLIENTS.filter((c) => (!filtre || c.nom.includes(filtre)) && test(c));
   if (!liste.length) {
     $("#clients").innerHTML = `<div class="vide">${n ? "Aucun client ne correspond." : "Pas encore de client. Crée le premier avec « Nouveau client »."}</div>`;
     return;
   }
-  $("#clients").innerHTML = liste
-    .map(
-      (c) => `<article class="client" data-nom="${e(c.nom)}">
-      <div class="nom"><b>${e(c.nom)}</b><a href="${e(c.adresse)}" target="_blank" rel="noopener">${e(c.adresse.replace("https://", ""))} ↗</a></div>
-      <div class="info"><span class="lbl">État</span>${etat(c)}${dispo(`client:${c.nom}`)}</div>
-      <div class="info"><span class="lbl">Places</span>${places(c)}</div>
-      <div class="info"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small>${c.versionBloquee ? ` <span class="etiquette pause" title="La dernière mise à jour a échoué chez ce client : il a été remis sur sa version d'avant et la garde. « Mettre à jour » réessaie.">version gardée</span>` : ""}</div>
-      <div class="info"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}${c.demo ? ` <span class="etiquette prog">démo</span>` : ""}</div>
-      <div class="info"><span class="lbl">Sauvegarde</span>${sauvegarde(c)}</div>
-      <div class="actions">
-        <a class="btn petit" href="${e(c.adresse)}" target="_blank" rel="noopener">Ouvrir</a>
-        ${c.connexion === "authentik" ? `<button class="btn petit" data-act="equipe">Équipe</button>` : ""}
-        <button class="btn petit" data-act="reglages">Réglages</button>
-        <button class="btn petit" data-act="sauvegardes">Sauvegardes</button>
-        <button class="btn petit" data-act="journaux">Journaux</button>
-        ${c.demo ? `<button class="btn petit" data-act="demo">Démo</button>` : ""}
-        ${c.suspendu ? `<button class="btn petit" data-act="reactiver">Réactiver</button>` : `<button class="btn petit" data-act="mettre-a-jour">Mettre à jour</button><button class="btn petit" data-act="suspendre">Pause</button>`}
-        <button class="btn petit danger" data-act="supprimer">Supprimer</button>
-      </div>
-    </article>`,
-    )
-    .join("");
+  $("#clients").innerHTML =
+    `<div class="lc tete"><span>Client</span><span>État</span><span>Places</span><span>Version</span><span>Offre</span><span>Sauvegarde</span><span></span></div>` +
+    liste
+      .map(
+        (c) => `<div class="lc" data-fiche="${e(c.nom)}">
+      <div class="nom"><a href="#client/${e(c.nom)}">${e(c.nom)}</a><small>${e(c.adresse.replace("https://", ""))}</small></div>
+      <div class="etat">${etat(c)}</div>
+      <div class="cell"><span class="lbl">Places</span>${places(c)}</div>
+      <div class="cell"><span class="lbl">Version</span>${e(c.version ?? "—")} <small class="canal">${e(c.canal)}</small>${c.versionBloquee ? ` <span class="etiquette pause">version gardée</span>` : ""}</div>
+      <div class="cell"><span class="lbl">Offre</span>${offre(c)}${c.mcp ? "" : ` <span class="etiquette ko" title="Accès MCP coupé">sans MCP</span>`}${c.demo ? ` <span class="etiquette prog">démo</span>` : ""}</div>
+      <div class="cell"><span class="lbl">Sauvegarde</span>${sauvegarde(c)}</div>
+      <div class="fin"><a class="btn petit" href="${e(c.adresse)}" target="_blank" rel="noopener">Ouvrir ${ic("external", "s16")}</a></div>
+    </div>`,
+      )
+      .join("");
 }
+// Toute la ligne ouvre la fiche (sauf le bouton « Ouvrir », qui ouvre son site).
+$("#clients").addEventListener("click", (ev) => {
+  const l = ev.target.closest("[data-fiche]");
+  if (!l || ev.target.closest("a")) return;
+  location.hash = `#client/${l.dataset.fiche}`;
+});
+
+// ------------------------------------------------------------ à faire (accueil)
+const depuis = (iso) => {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  return m < 60 ? `depuis ${m} min` : m < 1440 ? `depuis ${Math.round(m / 60)} h` : `depuis ${Math.round(m / 1440)} j`;
+};
+// Une ligne : niveau (ko, pause, acc), icône, titre, détail, client concerné, bouton.
+function calculerAFaire() {
+  const l = [];
+  for (const t of SUPPORT ?? []) {
+    if (t.statut !== "ouvert") continue;
+    const dernier = t.messages.at(-1);
+    l.push({ niveau: "ko", icone: "chat", client: t.client, titre: `${t.client} attend une réponse`, texte: `${depuis(t.maj)} · « ${dernier.texte.length > 90 ? `${dernier.texte.slice(0, 90)}…` : dernier.texte} »`, bouton: ["Répondre", () => fenetreTicket(t.client, t.id)], principal: true });
+  }
+  for (const c of CLIENTS) {
+    if (enPanne(c)) l.push({ niveau: "ko", icone: "alert", client: c.nom, titre: `${c.nom} ne répond plus`, texte: "Son site est en panne. Regarde ses journaux.", bouton: ["Voir les journaux", `#client/${c.nom}/journaux`] });
+    const sv = sauvegardeKo(c);
+    if (sv === "test") l.push({ niveau: "ko", icone: "download", client: c.nom, titre: `Le test de sauvegarde de ${c.nom} a raté`, texte: c.sauvegarde.test.raison || "La dernière sauvegarde ne se relit pas.", bouton: ["Voir les sauvegardes", `#client/${c.nom}/sauvegardes`] });
+    if (sv === "aucune" && !c.suspendu) l.push({ niveau: "pause", icone: "download", client: c.nom, titre: `${c.nom} n'a encore aucune sauvegarde`, texte: `Client créé le ${dateFr(c.creeLe)}. La sauvegarde de la nuit se fait vers 3 h.`, bouton: ["Sauvegarder", () => action(c, "sauvegarder")] });
+    if (sv === "vieille" && !c.suspendu) l.push({ niveau: "pause", icone: "download", client: c.nom, titre: `Dernière sauvegarde de ${c.nom} trop vieille`, texte: `Plus de 36 heures : la sauvegarde de la nuit n'a pas marché.`, bouton: ["Voir les sauvegardes", `#client/${c.nom}/sauvegardes`] });
+    if (c.versionBloquee) l.push({ niveau: "pause", icone: "refresh", client: c.nom, titre: `La mise à jour de ${c.nom} a échoué`, texte: "Il a été remis sur sa version d'avant et la garde. « Mettre à jour » réessaie.", bouton: ["Voir le client", `#client/${c.nom}`] });
+    if (c.essaiFin && c.suspendu && c.essaiFini) l.push({ niveau: "pause", icone: "hourglass", client: c.nom, titre: `Essai fini : ${c.nom} est en pause`, texte: `Depuis le ${dateFr(c.essaiFin)}. Réactive-le en client, ou prolonge l'essai.`, bouton: ["Réactiver", () => fenetreReactiver(c)] });
+    else if (c.essaiFin && !c.suspendu) {
+      const j = joursRestants(c.essaiFin);
+      if (j <= 7) l.push({ niveau: "acc", icone: "hourglass", client: c.nom, titre: j <= 0 ? `L'essai de ${c.nom} finit aujourd'hui` : `Fin d'essai dans ${j} jour${j > 1 ? "s" : ""} : ${c.nom}`, texte: `${c.places?.membres ?? 0} compte${(c.places?.membres ?? 0) > 1 ? "s" : ""} utilisé${(c.places?.membres ?? 0) > 1 ? "s" : ""}. À la fin, son site se met en pause tout seul.`, bouton: ["Voir le client", `#client/${c.nom}`] });
+    }
+  }
+  const demandes = (VITRINE?.demandes ?? []).filter((d) => !d.traitee);
+  if (demandes.length) l.push({ niveau: "acc", icone: "mail", titre: `${demandes.length} demande${demandes.length > 1 ? "s" : ""} reçue${demandes.length > 1 ? "s" : ""} sur la vitrine`, texte: demandes.slice(0, 3).map((d) => d.etab || d.nom).join(", "), bouton: ["Voir", "#vitrine"] });
+  for (const m of ANNONCES?.maintenances ?? []) if (m.etat === "en-cours") l.push({ niveau: "pause", icone: "wrench", titre: "Maintenance en cours", texte: `${nomsCibles(m.cibles)} · ${m.fin ? `jusqu'au ${quandFr(m.fin)}` : "jusqu'à ce que tu cliques « Terminer »"}`, bouton: ["Voir", "#maintenance"] });
+  if (SANTE) {
+    const d = SANTE.machine.disque;
+    if (d && d.pourcent >= 85) l.push({ niveau: d.pourcent >= 90 ? "ko" : "pause", icone: "alert", titre: `Disque rempli à ${Math.round(d.pourcent)} %`, texte: `Il reste ${taille(d.libre)}. Les sauvegardes de la nuit prennent de la place.`, bouton: ["Voir la santé", "#sante"] });
+    for (const [id, nom] of [["service:connexion", "La connexion"], ["service:passerelle", "La passerelle"], ["service:vitrine", "La vitrine"]]) {
+      const s = SANTE.services[id];
+      if (s && !s.ok) l.push({ niveau: "ko", icone: "alert", titre: `${nom} ne répond plus`, texte: `Depuis le ${heureFr(s.depuis)}.`, bouton: ["Voir la santé", "#sante"] });
+    }
+  }
+  if (IA) {
+    for (const c of CLIENTS) {
+      const lim = typeof IA.clients[c.nom] === "number" ? IA.clients[c.nom] : IA.defaut ?? 30;
+      const u = IA.usage[c.nom]?.mois?.lectures ?? 0;
+      if (lim > 0 && u >= lim) l.push({ niveau: "acc", icone: "sparkle", client: c.nom, titre: `${c.nom} a utilisé toutes ses lectures IA du mois`, texte: `${u} sur ${lim}. Elles reviennent le 1er du mois.`, bouton: ["Régler", "#ia"] });
+    }
+  }
+  const rang = { ko: 0, pause: 1, acc: 2 };
+  return l.sort((a, b) => rang[a.niveau] - rang[b.niveau]);
+}
+
+function ligneAFaire(x, i) {
+  const [texte, cible] = x.bouton;
+  const bouton = typeof cible === "string" ? `<a class="btn petit${x.principal ? " principal" : ""}" href="${e(cible)}">${e(texte)}</a>` : `<button class="btn petit${x.principal ? " principal" : ""}" type="button" data-afaire="${i}">${e(texte)}</button>`;
+  return `<div class="af ${x.niveau}"><span class="pastille">${ic(x.icone)}</span><div class="t"><b>${e(x.titre)}</b><span>${e(x.texte)}</span></div>${bouton}</div>`;
+}
+let AFAIRE = [];
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-afaire]");
+  if (b) AFAIRE[Number(b.dataset.afaire)]?.bouton[1]();
+});
+
+const evts = (lignes) =>
+  lignes.length
+    ? lignes.map(([l, i]) => `<div class="evt"><time>${heureFr(l.date)}</time><span>${e(NOMS_ACTIONS[l.action] ?? l.action)} <b>${e(l.client)}</b>${l.ok ? "" : ` <span class="etiquette ko">échec</span>`}<small class="canal"> · ${e(l.qui)}</small></span><button type="button" data-journal="${i}">Détails</button></div>`).join("")
+    : `<p class="sub">Rien pour l'instant.</p>`;
+
+function afficherAccueil() {
+  AFAIRE = calculerAFaire();
+  $("#afaire").innerHTML = AFAIRE.length
+    ? AFAIRE.map(ligneAFaire).join("")
+    : `<div class="tout-va-bien">${ic("check", "s22")}Rien à faire : tout va bien.</div>`;
+  $("#accueil-journal").innerHTML = evts(JOURNAL.slice(0, 7).map((l, i) => [l, i]));
+  if (!SANTE) {
+    $("#accueil-machine").innerHTML = `<p class="sub">Mesures indisponibles (le moteur ne répond pas).</p>`;
+    return;
+  }
+  const m = SANTE.machine;
+  const memUtil = m.memoire.total - m.memoire.libre;
+  const mesure = (nom, part, texte) => `<div class="mesure"><div><span>${nom}</span><span>${texte}</span></div>${jauge(part, "").replace("<small></small>", "")}</div>`;
+  $("#accueil-machine").innerHTML =
+    mesure("Processeur", (m.charge[0] / m.coeurs) * 100, `${e(Math.round((m.charge[0] / m.coeurs) * 100))} %`) +
+    mesure("Mémoire", (memUtil / m.memoire.total) * 100, `${e(taille(memUtil))} / ${e(taille(m.memoire.total))}`) +
+    (m.disque ? mesure("Disque", m.disque.pourcent, `${e(taille(m.disque.libre))} libres`) : "") +
+    `<a href="#sante">Détail par client</a>`;
+}
+
+// Pastilles du menu : à faire (urgent), support à répondre, demandes de la vitrine.
+function afficherBadges() {
+  const urgent = AFAIRE.filter((x) => x.niveau !== "acc").length;
+  const support = (SUPPORT ?? []).filter((t) => t.statut === "ouvert").length;
+  const vitrine = (VITRINE?.demandes ?? []).filter((d) => !d.traitee).length;
+  const valeurs = { accueil: urgent, afaire: AFAIRE.length, support, vitrine, plus: vitrine };
+  document.querySelectorAll("[data-badge]").forEach((b) => {
+    const v = valeurs[b.dataset.badge] ?? 0;
+    b.textContent = v ? String(v) : "";
+    b.dataset.v = String(v);
+  });
+}
+
+// ------------------------------------------------------------ fiche d'un client (#client/<nom>/<onglet>)
+let jetonVue = 0;
+// Chaque nouvel affichage d'un onglet reçoit un numéro : une réponse arrivée trop tard
+// (ou les journaux qui se rafraîchissent) ne remplit pas un onglet qu'on a quitté.
+const vue = () => ++jetonVue;
+const ONGLETS = [
+  ["resume", "Résumé"],
+  ["equipe", "Équipe"],
+  ["sauvegardes", "Sauvegardes"],
+  ["journaux", "Journaux"],
+  ["reglages", "Réglages"],
+  ["demo", "Démo"],
+];
+
+function ficheClient(nom, onglet, auto) {
+  const z = $("#fiche");
+  const c = CLIENTS.find((x) => x.nom === nom);
+  if (!c) {
+    vue();
+    z.innerHTML = `<p class="fil-ariane"><a href="#clients">Clients</a> › ${e(nom)}</p><div class="vide">${CHARGE ? `Le client « ${e(nom)} » n'existe pas (ou plus).` : "Chargement…"} <a href="#clients">Retour aux clients</a></div>`;
+    return;
+  }
+  const onglets = ONGLETS.filter(([k]) => (k !== "equipe" || c.connexion === "authentik") && (k !== "demo" || c.demo));
+  if (!onglets.some(([k]) => k === onglet)) onglet = "resume";
+  const tete = `<p class="fil-ariane"><a href="#clients">Clients</a> › ${e(c.nom)}</p>
+    <div class="tete-page"><h1>${e(c.nom)}</h1>${etat(c)}
+      <div class="droite"><a class="btn" href="${e(c.adresse)}" target="_blank" rel="noopener">Ouvrir son site ${ic("external", "s16")}</a>
+      ${c.suspendu ? `<button class="btn principal" type="button" data-fiche-act="reactiver">Réactiver</button>` : `<button class="btn" type="button" data-fiche-act="mettre-a-jour">${ic("refresh", "s16")}Mettre à jour</button>`}
+      <button class="aide" type="button" data-aide="f-a-maj" aria-label="Aide">?</button></div></div>
+    <p class="texte-aide" id="f-a-maj"><b>Mettre à jour</b> : sauvegarde, puis dernière version ; si elle ne démarre pas, retour tout seul à la version et à la base d'avant. Son site est coupé environ une minute. <b>Réactiver</b> remet en ligne un client en pause.</p>
+    <nav class="onglets" aria-label="Onglets du client">${onglets.map(([k, t]) => `<a href="#client/${e(c.nom)}/${k}" class="${k === onglet ? "on" : ""}"${k === onglet ? ' aria-current="page"' : ""}>${e(t)}${k === "equipe" && c.places ? ` <span class="n">${c.places.membres}</span>` : ""}</a>`).join("")}</nav>
+    <div id="fiche-corps"></div>`;
+  // Rafraîchissement automatique : on ne redessine pas un onglet en cours d'utilisation
+  // (saisie, liste chargée, journaux qui défilent) ; seul le résumé suit les nouvelles données.
+  const corps = $("#fiche-corps");
+  const memeOnglet = z.dataset.vue === `${nom}/${onglet}` && corps;
+  const saisie = document.activeElement && z.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (auto && memeOnglet && (onglet !== "resume" || saisie)) return;
+  z.dataset.vue = `${nom}/${onglet}`;
+  z.innerHTML = tete;
+  const zc = $("#fiche-corps");
+  if (onglet === "resume") ongletResume(c, zc);
+  if (onglet === "equipe") ongletEquipe(c, zc);
+  if (onglet === "sauvegardes") ongletSauvegardes(c, zc);
+  if (onglet === "journaux") ongletJournaux(c, zc);
+  if (onglet === "reglages") ongletReglages(c, zc);
+  if (onglet === "demo") ongletDemo(c, zc);
+}
+$("#fiche").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-fiche-act]");
+  if (!b) return;
+  const c = CLIENTS.find((x) => x.nom === location.hash.split("/")[1]);
+  if (c) action(c, b.dataset.ficheAct);
+});
+
+function ongletResume(c, z) {
+  vue();
+  const s = c.sauvegarde?.derniere;
+  const sv = sauvegardeKo(c);
+  const u = IA?.usage?.[c.nom]?.mois?.lectures ?? 0;
+  const lim = IA ? (typeof IA.clients[c.nom] === "number" ? IA.clients[c.nom] : IA.defaut ?? 30) : null;
+  const plein = c.places?.max && c.places.membres >= c.places.max;
+  const tuiles = [
+    ["Places", places(c), c.connexion !== "authentik" ? "connexion par Cloudflare" : plein ? "complet" : c.places?.max ? `${c.places.max - c.places.membres} de libre${c.places.max - c.places.membres > 1 ? "s" : ""}` : "pas de limite"],
+    ["Version", `${e(c.version ?? "—")} <span class="canal">${e(c.canal)}</span>`, c.versionBloquee ? "dernière mise à jour ratée" : "version installée"],
+    ["Sauvegarde", s ? e(dateSauv(s.id).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "aucune", sv === "test" ? "test de restauration raté" : c.sauvegarde?.test ? `testée le ${dateFr(c.sauvegarde.test.date)}` : "pas encore testée"],
+    ["Offre", c.essaiFin ? (joursRestants(c.essaiFin) >= 0 ? `Essai : ${joursRestants(c.essaiFin)} j` : "Essai fini") : "Client", c.essaiFin ? `jusqu'au ${dateFr(c.essaiFin)}` : `depuis le ${dateFr(c.creeLe)}`],
+    ["Lectures IA", lim === null ? "—" : lim === 0 ? "coupées" : `${u} / ${lim}`, "ce mois-ci"],
+    ["Accès MCP", c.mcp ? "permis" : "coupé", "réglable dans Réglages"],
+    ["Disponibilité", SANTE ? pct(SANTE.disponibilite?.[`client:${c.nom}`] ?? 100) : "—", "sur 30 jours"],
+    ["Comptes actifs", SANTE?.clients?.[c.nom]?.usage ? e(SANTE.clients[c.nom].usage.comptes) : "—", SANTE?.clients?.[c.nom]?.usage ? `dernière visite ${depuisFr(SANTE.clients[c.nom].usage.derniereActivite)}` : ""],
+  ];
+  // Les demandes de support ont leur propre liste juste en dessous.
+  const aFaire = AFAIRE.map((x, i) => [x, i]).filter(([x]) => x.client === c.nom && x.icone !== "chat");
+  const tickets = (SUPPORT ?? []).filter((t) => t.client === c.nom && t.statut !== "ferme");
+  const journal = JOURNAL.map((l, i) => [l, i]).filter(([l]) => l.client === c.nom).slice(0, 8);
+  const [zsAide, zsTexte] = aideB("f-a-zs", "Rien ne part sans confirmation. <b>Pause</b> : son site affiche « en pause », rien n'est effacé, « Réactiver » le remet en ligne. <b>Supprimer</b> : son site s'arrête et ses données partent dans une archive sur la machine (/srv/recipelog/archives) ; il faut taper son nom pour confirmer.");
+  z.innerHTML = `<div class="kv">${tuiles.map(([l, v, s]) => `<div><span class="lbl-mono">${e(l)}</span><b>${v}</b><small>${e(s)}</small></div>`).join("")}</div>
+    ${aFaire.length ? `<h2>À regarder</h2><div class="afaire">${aFaire.map(([x, i]) => ligneAFaire(x, i)).join("")}</div>` : ""}
+    ${tickets.length ? `<h2>Demandes de support</h2><div class="demandes">${tickets.map((t) => `<article class="demande"><div><span class="etiquette ${(STATUTS[t.statut] ?? [, "acc"])[1]}">${e((STATUTS[t.statut] ?? [t.statut])[0])}</span> ${e(t.email)}<small>${e(heureFr(t.maj))}</small><p>${e(t.messages.at(-1).texte.slice(0, 200))}</p></div><div class="actions"><button class="btn petit principal" type="button" data-ticket-ouvrir="${e(t.id)}">Ouvrir</button></div></article>`).join("")}</div>` : ""}
+    <h2>Dernières actions</h2><div class="boite"><div class="evts">${evts(journal)}</div></div>
+    <section class="zone-sensible"><h2 class="sec-t">Zone sensible ${zsAide}</h2>${zsTexte}
+      <div class="ligne-zs"><div><b>${c.suspendu ? "Réactiver" : "Mettre en pause"}</b><small>${c.suspendu ? "Remet son site en ligne en une minute." : "Son site affiche « en pause ». Rien n'est effacé."}</small></div>
+        <button class="btn" type="button" data-fiche-act="${c.suspendu ? "reactiver" : "suspendre"}">${c.suspendu ? "Réactiver" : "Mettre en pause"}</button></div>
+      <div class="ligne-zs"><div><b>Supprimer ce client</b><small>Arrête son site, archive ses données et retire ses accès.</small></div>
+        <button class="btn danger" type="button" data-fiche-act="supprimer">${ic("trash", "s16")}Supprimer…</button></div>
+    </section>`;
+  z.querySelectorAll("[data-ticket-ouvrir]").forEach((b) => b.addEventListener("click", () => fenetreTicket(c.nom, b.dataset.ticketOuvrir)));
+}
+
+// ------------------------------------------------------------ navigation (adresse après #)
+const TITRES = { accueil: "Accueil", clients: "Clients", client: "Client", support: "Support", maintenance: "Maintenance et messages", vitrine: "Site vitrine", vente: "Tarifs et textes légaux", ia: "Factures par IA", sante: "Santé de la machine", journal: "Journal" };
+let CHARGE = false;
+let pageAvant = "";
+function rendre(auto = false) {
+  const [p0, nom, onglet] = decodeURIComponent(location.hash.slice(1)).split("/");
+  const page = Object.hasOwn(TITRES, p0) ? p0 : "accueil";
+  document.querySelectorAll(".page").forEach((s) => s.classList.toggle("on", s.dataset.page === page));
+  const actif = page === "client" ? "clients" : page;
+  document.querySelectorAll("[data-nav]").forEach((a) => {
+    const on = a.dataset.nav === actif || (a.dataset.nav === "plus" && !["accueil", "clients", "support"].includes(actif));
+    a.classList.toggle("on", on);
+    if (a.tagName === "A") a.toggleAttribute("aria-current", on);
+  });
+  document.title = `${page === "client" && nom ? nom : TITRES[page]} · Panel RecipeLog`;
+  if (CHARGE) {
+    afficherAccueil();
+    afficherBadges();
+  }
+  if (page === "client") ficheClient(nom ?? "", onglet ?? "resume", auto);
+  const cle = `${page}/${nom ?? ""}/${onglet ?? ""}`;
+  if (cle !== pageAvant && !auto) window.scrollTo(0, 0);
+  pageAvant = cle;
+}
+window.addEventListener("hashchange", () => rendre());
+
+// ------------------------------------------------------------ « Plus » (téléphone) et apparence
+$("#bouton-plus").addEventListener("click", () => {
+  const n = (VITRINE?.demandes ?? []).filter((d) => !d.traitee).length;
+  ouvrir(
+    "Plus",
+    `<div class="plus-tuiles">
+      <a href="#maintenance">${ic("wrench", "s22")}Maintenance et messages</a>
+      <a href="#vitrine">${ic("compass", "s22")}Site vitrine${n ? `<span class="n">${n}</span>` : ""}</a>
+      <a href="#vente">${ic("ticket", "s22")}Tarifs et textes légaux</a>
+      <a href="#ia">${ic("sparkle", "s22")}Factures par IA</a>
+      <a href="#sante">${ic("signal", "s22")}Santé de la machine</a>
+      <a href="#journal">${ic("list", "s22")}Journal</a>
+      <a href="https://status.${e(DOMAINE)}" target="_blank" rel="noopener">${ic("external", "s22")}Page de statut</a>
+      <button type="button" data-apparence>${ic("palette", "s22")}Apparence</button>
+      <a href="/auth/deconnexion">${ic("logout", "s22")}Se déconnecter</a>
+    </div>`,
+  );
+  // Choisir une page ferme la feuille (c'est la seule exception à « la croix seulement » : on part ailleurs).
+  $("#fenetre-corps").querySelectorAll("a[href^='#']").forEach((a) => a.addEventListener("click", () => $("#croix").click()));
+});
+
+const ACCENTS = [["lavande", "Lavande"], ["or", "Or"], ["ambre", "Ambre"], ["corail", "Corail"], ["menthe", "Menthe"]];
+function lirePrefs() {
+  try {
+    return JSON.parse(localStorage.getItem("encre-apparence") || "{}");
+  } catch {
+    return {};
+  }
+}
+function appliquerPrefs(p) {
+  const h = document.documentElement;
+  if (p.accent) h.dataset.accent = p.accent;
+  else delete h.dataset.accent;
+  if (p.theme === "sombre") h.dataset.theme = "dark";
+  else if (p.theme === "clair") h.dataset.theme = "light";
+  else delete h.dataset.theme;
+  try {
+    localStorage.setItem("encre-apparence", JSON.stringify(p));
+  } catch {
+    /* navigation privée : le choix vaut pour cette visite */
+  }
+}
+function fenetreApparence() {
+  const dessiner = () => {
+    const q = lirePrefs();
+    $("#fenetre-corps").innerHTML = `<p class="sub">Gardé sur cet appareil seulement.</p>
+      <div class="champ"><label>Thème</label><div class="seg" role="group" aria-label="Thème">${[["auto", "Automatique"], ["clair", "Clair"], ["sombre", "Sombre"]].map(([k, t]) => `<button type="button" data-theme-choix="${k}" class="${(q.theme ?? "auto") === k ? "on" : ""}" aria-pressed="${(q.theme ?? "auto") === k}">${t}</button>`).join("")}</div></div>
+      <div class="champ"><label>Couleur d'accent</label><div class="pastilles">${ACCENTS.map(([k, t]) => `<button type="button" class="past${(q.accent ?? "lavande") === k ? " on" : ""}" data-v="${k}" aria-pressed="${(q.accent ?? "lavande") === k}"><i></i>${t}</button>`).join("")}</div></div>`;
+  };
+  ouvrir("Apparence", "");
+  dessiner();
+  $("#fenetre-corps").onclick = (ev) => {
+    const t = ev.target.closest("[data-theme-choix]");
+    const a = ev.target.closest(".past");
+    if (!t && !a) return;
+    const q = { ...lirePrefs() };
+    if (t) q.theme = t.dataset.themeChoix === "auto" ? undefined : t.dataset.themeChoix;
+    if (a) q.accent = a.dataset.v === "lavande" ? undefined : a.dataset.v;
+    appliquerPrefs(q);
+    dessiner();
+  };
+}
+document.addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-apparence]")) fenetreApparence();
+});
 
 const NOMS_ACTIONS = {
   creer: "a créé",
@@ -265,14 +587,14 @@ function afficherJournal() {
     })
     .join("");
 }
-$("#journal").addEventListener("click", (ev) => {
+document.addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-journal]");
   if (!b) return;
   const l = JOURNAL[Number(b.dataset.journal)];
   ouvrir(`Détails : ${l.client}`, `<p class="sub">${e(heureFr(l.date))} · ${e(l.qui)}</p><pre class="sortie">${e(l.sortie || "(rien à afficher)")}</pre>`);
 });
 
-async function charger() {
+async function charger(options = {}) {
   const [c, j, v, sa, su, an, ia, ve] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente")]);
   IA = ia.usage ? ia : null;
   VENTE = ve.offres ? ve : null;
@@ -292,6 +614,8 @@ async function charger() {
   afficherVente();
   afficherSante();
   afficherJournal();
+  CHARGE = true;
+  rendre(Boolean(options.auto));
 }
 $("#recherche").addEventListener("input", afficher);
 
@@ -347,11 +671,8 @@ $("#tout-maj").addEventListener("click", () => {
 });
 
 // ------------------------------------------------------------ actions d'un client
-$("#clients").addEventListener("click", (ev) => {
-  const b = ev.target.closest("[data-act]");
-  if (!b) return;
-  const c = CLIENTS.find((x) => x.nom === b.closest("[data-nom]").dataset.nom);
-  const act = b.dataset.act;
+// Elles partent de sa fiche (#client/<nom>) ou de l'accueil.
+function action(c, act) {
   if (act === "mettre-a-jour") executer(`Mise à jour de ${c.nom}`, () => api("POST", `/clients/${c.nom}/mettre-a-jour`));
   if (act === "reactiver") {
     if (c.essaiFini) fenetreReactiver(c);
@@ -359,19 +680,17 @@ $("#clients").addEventListener("click", (ev) => {
   }
   if (act === "suspendre") fenetrePause(c);
   if (act === "supprimer") fenetreSuppression(c);
-  if (act === "reglages") fenetreReglages(c);
-  if (act === "equipe") fenetreEquipe(c);
-  if (act === "sauvegardes") fenetreSauvegardes(c);
-  if (act === "demo") fenetreDemo(c);
-  if (act === "journaux") fenetreJournaux(c);
-});
+  if (act === "sauvegarder") executer(`Sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/sauvegarder`));
+}
 
 const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
-async function fenetreSauvegardes(c) {
-  ouvrir(`Sauvegardes de ${c.nom}`, `<p class="attente"><span class="rond"></span>Chargement…</p>`, charger);
+async function ongletSauvegardes(c, z) {
+  const moi = vue();
+  z.innerHTML = `<p class="attente"><span class="rond"></span>Chargement…</p>`;
   const r = await api("GET", `/clients/${c.nom}/sauvegardes`);
+  if (moi !== jetonVue) return;
   if (!r.sauvegardes) {
-    $("#fenetre-corps").innerHTML = `<p class="erreur">${e(r.message ?? "Sauvegardes indisponibles.")}</p>`;
+    z.innerHTML = `<p class="erreur">${e(r.message ?? "Sauvegardes indisponibles.")}</p>`;
     return;
   }
   const t = r.test;
@@ -386,15 +705,15 @@ async function fenetreSauvegardes(c) {
         )
         .join("")
     : `<p class="sub">Aucune sauvegarde pour l'instant. La première se fera cette nuit, ou maintenant avec le bouton ci-dessous.</p>`;
-  $("#fenetre-corps").innerHTML = `<p class="sub">Chaque nuit vers 3 h, la base, les photos et les factures de ${e(c.nom)} sont sauvegardées sur la machine. On garde les 7 derniers jours, puis une par semaine pendant 4 semaines et une par mois pendant 6 mois. ${aide("sv-a", "Ces sauvegardes sont sur le disque de la VM. La copie hors de la machine, c'est ta sauvegarde Proxmox Backup Server vers OVH : elle emporte toute la VM, sauvegardes comprises.")}</p>
+  z.innerHTML = `<p class="sub">Chaque nuit vers 3 h, la base, les photos et les factures de ${e(c.nom)} sont sauvegardées sur la machine. On garde les 7 derniers jours, puis une par semaine pendant 4 semaines et une par mois pendant 6 mois. ${aide("sv-a", "Ces sauvegardes sont sur le disque de la VM. La copie hors de la machine, c'est ta sauvegarde Proxmox Backup Server vers OVH : elle emporte toute la VM, sauvegardes comprises.")}</p>
     ${test}
     <div class="barre serree"><button class="btn principal" type="button" id="sv-maintenant">Sauvegarder maintenant</button><button class="btn" type="button" id="sv-tester">Tester la dernière</button>
     <button class="aide" type="button" data-aide="sv-a2" aria-label="Aide">?</button></div>
     <p class="texte-aide" id="sv-a2"><b>Tester</b> recharge la dernière sauvegarde dans une base à part, compte ses recettes et vérifie les fichiers, sans toucher au site du client. <b>Télécharger</b> donne une archive avec la base et les fichiers, sans aucun mot de passe : à garder ou à remettre au client.</p>
     <div class="membres">${lignes}</div>`;
-  $("#sv-maintenant").addEventListener("click", () => executer(`Sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/sauvegarder`)).then(() => (apresFermeture = () => fenetreSauvegardes(c))));
-  $("#sv-tester").addEventListener("click", () => executer(`Test de la sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/tester-sauvegarde`)).then(() => (apresFermeture = () => fenetreSauvegardes(c))));
-  $("#fenetre-corps").querySelectorAll("[data-s=restaurer]").forEach((b) =>
+  $("#sv-maintenant").addEventListener("click", () => executer(`Sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/sauvegarder`)));
+  $("#sv-tester").addEventListener("click", () => executer(`Test de la sauvegarde de ${c.nom}`, () => api("POST", `/clients/${c.nom}/tester-sauvegarde`)));
+  z.querySelectorAll("[data-s=restaurer]").forEach((b) =>
     b.addEventListener("click", () => fenetreRestaurer(c, b.closest("[data-id]").dataset.id)),
   );
 }
@@ -458,12 +777,11 @@ function fenetreSuppression(c) {
   });
 }
 
-function fenetreReglages(c) {
+function ongletReglages(c, z) {
+  vue();
   const max = c.places?.max ?? 0;
   const jours = c.essaiFin ? Math.max(joursRestants(c.essaiFin), 0) : 0;
-  ouvrir(
-    `Réglages de ${c.nom}`,
-    `<form id="f-reglages" novalidate>
+  z.innerHTML = `<form id="f-reglages" class="formulaire" novalidate>
       ${c.connexion === "authentik" ? `<div class="champ"><label for="r-max">Nombre de comptes ${aide("r-a-max", "Combien de personnes de son équipe peuvent se connecter. 0 = pas de limite. Baisser sous le nombre actuel ne retire personne : il ne pourra juste plus inviter.")}
         <input id="r-max" type="number" min="0" max="10000" value="${max}"></div>` : ""}
       <div class="champ"><label for="r-essai">Essai : jours restants ${aide("r-a-essai", "Change la fin de l'essai à partir d'aujourd'hui. 0 = ce n'est plus un essai (client normal, plus de pause automatique). Un client mis en pause par la fin d'essai se rouvre avec « Réactiver ».")}
@@ -471,8 +789,7 @@ function fenetreReglages(c) {
       <div class="champ"><label class="case"><input id="r-mcp" type="checkbox" ${c.mcp ? "checked" : ""}> Accès MCP (Claude) ${aide("r-a-mcp", "Permet au client de brancher Claude sur son RecipeLog. Changer cette case redémarre son site (environ une minute).")}</div>
       <p class="erreur" id="r-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
-    </form>`,
-  );
+    </form>`;
   $("#f-reglages").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const etapes = [];
@@ -497,11 +814,13 @@ function fenetreReglages(c) {
   });
 }
 
-async function fenetreEquipe(c) {
-  ouvrir(`Équipe de ${c.nom}`, `<p class="attente"><span class="rond"></span>Chargement…</p>`, charger);
+async function ongletEquipe(c, z) {
+  const moi = vue();
+  if (!z.firstElementChild) z.innerHTML = `<p class="attente"><span class="rond"></span>Chargement…</p>`;
   const r = await api("GET", `/clients/${c.nom}/equipe`);
+  if (moi !== jetonVue) return;
   if (!r.membres) {
-    $("#fenetre-corps").innerHTML = `<p class="erreur">${e(r.message ?? "Équipe indisponible.")}</p>`;
+    z.innerHTML = `<p class="erreur">${e(r.message ?? "Équipe indisponible.")}</p>`;
     return;
   }
   const lignes = r.membres.length
@@ -512,9 +831,9 @@ async function fenetreEquipe(c) {
         )
         .join("")
     : `<p class="sub">Personne pour l'instant.</p>`;
-  $("#fenetre-corps").innerHTML = `<p class="sub">${r.membres.length} / ${r.max ?? "∞"} places. Le responsable gère aussi son équipe lui-même, dans Réglages → Comptes.</p>
+  z.innerHTML = `<p class="sub">${r.membres.length} / ${r.max ?? "∞"} places. Le responsable gère aussi son équipe lui-même, dans Réglages → Comptes.</p>
     <div class="membres">${lignes}</div>
-    <form id="f-inviter" novalidate><div class="champ"><label for="i-email">Inviter quelqu'un ${aide("i-a", "Crée son compte et lui envoie l'email « Choisis ton mot de passe ». À sa première connexion, il demande l'accès et le responsable l'accepte dans Réglages → Comptes. Pour lui donner un rôle tout de suite, mieux vaut que le responsable l'invite depuis son RecipeLog.")}
+    <form id="f-inviter" class="formulaire" novalidate><div class="champ"><label for="i-email">Inviter quelqu'un ${aide("i-a", "Crée son compte et lui envoie l'email « Choisis ton mot de passe ». À sa première connexion, il demande l'accès et le responsable l'accepte dans Réglages → Comptes. Pour lui donner un rôle tout de suite, mieux vaut que le responsable l'invite depuis son RecipeLog.")}
       <div class="suffixe"><input id="i-email" type="email" autocapitalize="none" placeholder="prenom@exemple.fr"><button class="btn principal" type="submit">Inviter</button></div></div>
       <p class="erreur" id="i-erreur"></p></form>`;
   $("#f-inviter").addEventListener("submit", async (ev) => {
@@ -524,9 +843,9 @@ async function fenetreEquipe(c) {
     $("#i-erreur").textContent = "Envoi…";
     const x = await api("POST", `/clients/${c.nom}/inviter`, { email });
     if (!x.ok) return ($("#i-erreur").textContent = (x.sortie || x.message || "Échec").replace(/^❌\s*/, ""));
-    fenetreEquipe(c);
+    ongletEquipe(c, z);
   });
-  $("#fenetre-corps").querySelectorAll("[data-m]").forEach((b) =>
+  z.querySelectorAll("[data-m]").forEach((b) =>
     b.addEventListener("click", async () => {
       const email = b.closest("[data-email]").dataset.email;
       if (b.dataset.m === "retirer" && b.dataset.confirme !== "1") {
@@ -539,7 +858,7 @@ async function fenetreEquipe(c) {
       if (b.dataset.m === "renvoyer") {
         b.textContent = x.ok ? "Envoyé ✓" : "Échec";
       } else {
-        fenetreEquipe(c);
+        ongletEquipe(c, z);
       }
     }),
   );
@@ -547,19 +866,17 @@ async function fenetreEquipe(c) {
 
 charger();
 setInterval(() => {
-  if (!voile.classList.contains("ouvert")) charger();
+  if (!voile.classList.contains("ouvert") && !document.hidden) charger({ auto: true });
 }, 30000);
 
 // ------------------------------------------------------------ démo
-function fenetreDemo(c) {
-  ouvrir(
-    `Démo ${c.nom}`,
-    `<p class="sub">Les visiteurs peuvent tout essayer sur la démo ; chaque nuit vers 4 h 30, elle revient toute seule à son état de référence.</p>
+function ongletDemo(c, z) {
+  vue();
+  z.innerHTML = `<div class="formulaire"><p class="sub">Les visiteurs peuvent tout essayer sur la démo ; chaque nuit vers 4 h 30, elle revient toute seule à son état de référence.</p>
     <div class="champ"><label>Remettre à zéro maintenant ${aide("d-a1", "Recharge l'état de référence tout de suite : tout ce que les visiteurs ont changé depuis disparaît. Le site est coupé une minute.")}</div>
     <div class="pied pied-gauche"><button class="btn" id="d-remettre" type="button">Remettre à zéro</button></div>
     <div class="champ"><label>Garder l'état actuel comme référence ${aide("d-a2", "Prépare d'abord la démo comme tu veux la montrer (recettes, fournisseurs, photos), puis clique ici : c'est cet état qui reviendra chaque nuit.")}</div>
-    <div class="pied pied-gauche"><button class="btn principal" id="d-figer" type="button">Figer comme référence</button></div>`,
-  );
+    <div class="pied pied-gauche"><button class="btn principal" id="d-figer" type="button">Figer comme référence</button></div></div>`;
   $("#d-remettre").addEventListener("click", () => executer(`Remise à zéro de ${c.nom}`, () => api("POST", `/clients/${c.nom}/demo-remettre`)));
   $("#d-figer").addEventListener("click", () => executer(`Référence de ${c.nom}`, () => api("POST", `/clients/${c.nom}/demo-figer`)));
 }
@@ -730,23 +1047,18 @@ function afficherSante() {
 }
 
 // ------------------------------------------------------------ journaux d'un client
-function fenetreJournaux(c) {
+function ongletJournaux(c, z) {
   let suivre = true;
-  let jeton = {};
-  const moi = jeton;
-  ouvrir(
-    `Journaux de ${c.nom}`,
-    `<p class="sub">Les 300 dernières lignes écrites par son RecipeLog (démarrage, erreurs, connexions). Rafraîchi toutes les 3 secondes. ${aide("jx-a", "Utile quand un client signale un problème : cherche les lignes « Error » au moment où il a eu le souci. Les heures sont en UTC (une heure de moins qu'en France l'hiver, deux l'été).")}</p>
+  const moi = vue();
+  z.innerHTML = `<p class="sub">Les 300 dernières lignes écrites par son RecipeLog (démarrage, erreurs, connexions). Rafraîchi toutes les 3 secondes. ${aide("jx-a", "Utile quand un client signale un problème : cherche les lignes « Error » au moment où il a eu le souci. Les heures sont en UTC (une heure de moins qu'en France l'hiver, deux l'été).")}</p>
     <div class="barre serree"><label class="case"><input type="checkbox" id="jx-suivre" checked> Suivre en direct</label></div>
-    <pre class="sortie journaux" id="jx-sortie">Chargement…</pre>`,
-    () => (jeton = null),
-  );
+    <pre class="sortie journaux" id="jx-sortie">Chargement…</pre>`;
   $("#jx-suivre").addEventListener("change", (ev) => (suivre = ev.target.checked));
   const tour = async () => {
-    if (jeton !== moi) return;
+    if (jetonVue !== moi) return;
     if (suivre) {
       const r = await api("GET", `/clients/${c.nom}/journaux`).catch(() => ({ lignes: "Le moteur ne répond pas." }));
-      if (jeton !== moi) return;
+      if (jetonVue !== moi) return;
       const pre = $("#jx-sortie");
       if (!pre) return;
       const enBas = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;

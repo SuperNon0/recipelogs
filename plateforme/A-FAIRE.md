@@ -440,15 +440,16 @@ clients restent en ligne pendant ce temps.
 ### ☐ I2. Les sites des clients, dans le panel
 1. Vérifie que l'action **Image Docker** de la branche `plateforme` est verte
    (github.com/SuperNon0/recipelogs → **Actions**).
-2. Essaie d'abord sur un seul : client `test` → **Mettre à jour**. Ouvre-le.
-3. Puis **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce
+2. Essaie d'abord sur un seul : page **Clients** → clique sur `test` → **Mettre à jour** (en haut
+   de sa fiche). Ouvre-le.
+3. Puis, page **Clients**, **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce
    moment qu'un client prend les nouveaux réglages de la plateforme, par exemple le service
    PDF commun.) Si la nouvelle
    version ne démarre pas chez l'un d'eux, il est remis tout seul sur sa version et sa base
    d'avant (badge « version gardée »), et les suivants ne sont pas touchés.
 
 ### ☐ I3. La vitrine, dans le panel
-Partie **Site vitrine** → **Mettre à jour la vitrine**.
+Page **Site vitrine** (menu de gauche, ou « Plus » sur téléphone) → **Mettre à jour la vitrine**.
 
 ---
 

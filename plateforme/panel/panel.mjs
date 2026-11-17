@@ -139,6 +139,8 @@ async function moteur(methode, chemin, qui, corps) {
 const fichiers = {
   "/panel.css": ["text/css; charset=utf-8", "panel.css"],
   "/panel.js": ["text/javascript; charset=utf-8", "panel.js"],
+  "/theme.js": ["text/javascript; charset=utf-8", "theme.js"],
+  "/icones.svg": ["image/svg+xml; charset=utf-8", "icones.svg"],
 };
 const polices = /^\/polices\/[a-z0-9-]+\.woff2$/;
 const PREFIXE_PUBLIC = "/_plateforme";
