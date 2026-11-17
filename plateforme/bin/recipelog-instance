@@ -181,6 +181,7 @@ lancer() {
     --pids-limit "${PIDS}" \
     --shm-size 256m \
     --env-file "${dir}/instance.env" \
+    -e RECIPELOG_PDF_URL=http://recipelog-pdf:3000 \
     -v "${dir}/uploads:/data/uploads" \
     --label "recipelog.instance=${nom}" \
     --label "recipelog.canal=${canal}" \

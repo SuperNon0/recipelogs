@@ -1,0 +1,9 @@
+{
+  "name": "recipelog-pdf",
+  "private": true,
+  "type": "module",
+  "description": "Service PDF partagé de la plateforme RecipeLog (un seul Chromium pour tous les clients)",
+  "dependencies": {
+    "puppeteer-core": "24.41.0"
+  }
+}

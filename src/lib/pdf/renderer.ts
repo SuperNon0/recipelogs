@@ -106,11 +106,76 @@ function bandHtml(zones: Record<Align, string[]>, sideMm: number): string {
     ">${cell("left")}${cell("center")}${cell("right")}</div>`;
 }
 
-export function renderHtmlToPdf(
+/** En-tête et pied de page prêts pour Chromium (displayHeaderFooter). */
+function bands(options: RenderOptions): { show: boolean; headerHtml: string; footerHtml: string } {
+  const sideMm = options.sideMarginMm ?? 12;
+  const footerText = (options.footer ?? "").trim();
+  const headerText = (options.header ?? "").trim();
+  const hasFooter = footerText.length > 0 || !!options.showPageNumber;
+  const hasHeader = headerText.length > 0;
+
+  // Pied de page : le texte et le numéro vont chacun dans leur zone
+  // (sur la même zone, ils sont séparés par un point médian).
+  const footerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
+  if (footerText) footerZones[options.footerAlign ?? "left"].push(escapeHtml(footerText));
+  if (options.showPageNumber) footerZones[options.pageNumberAlign ?? "center"].push(`<span class="pageNumber"></span>`);
+  const headerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
+  if (headerText) headerZones[options.headerAlign ?? "left"].push(escapeHtml(headerText));
+
+  const empty = '<span style="display:none"></span>';
+  return {
+    show: hasFooter || hasHeader,
+    footerHtml: hasFooter ? bandHtml(footerZones, sideMm) : empty,
+    headerHtml: hasHeader ? bandHtml(headerZones, sideMm) : empty,
+  };
+}
+
+/**
+ * Plateforme : un seul Chromium pour tous les clients, dans le service PDF
+ * (plateforme/pdf). L'appli lui envoie la page déjà prête (polices intégrées)
+ * et reçoit le PDF. S'il ne répond pas, l'appli fait le PDF elle-même comme
+ * avant : un panel plus ancien sans ce service continue de marcher.
+ */
+const PDF_SERVICE = (process.env.RECIPELOG_PDF_URL ?? "").trim().replace(/\/+$/, "");
+const SERVICE_DELAI_MS = 5 * 60_000; // file d'attente du service comprise
+
+async function renderWithService(html: string, format: "A4" | "A5", options: RenderOptions): Promise<Uint8Array | null> {
+  const b = bands(options);
+  let client = "";
+  try {
+    client = new URL(process.env.RECIPELOG_URL ?? "").hostname.split(".")[0] ?? "";
+  } catch {
+    client = "";
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${PDF_SERVICE}/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-RecipeLog-Client": client },
+      body: JSON.stringify({ html: await inlineGoogleFonts(html), format, bandeaux: b.show, enTete: b.headerHtml, piedDePage: b.footerHtml }),
+      signal: AbortSignal.timeout(SERVICE_DELAI_MS),
+    });
+  } catch (e) {
+    console.error(`PDF : service partagé injoignable (${e instanceof Error ? e.message : e}), PDF fait sur place.`);
+    return null;
+  }
+  if (res.ok) return new Uint8Array(await res.arrayBuffer());
+  const raison = await res.json().then((j: { error?: string }) => j.error ?? "", () => "");
+  // Page refusée (trop lourde, illisible) : refaire sur place donnerait la même chose.
+  if (res.status === 400 || res.status === 413) throw new Error(raison || "Le PDF n'a pas pu être fabriqué.");
+  console.error(`PDF : le service partagé a répondu ${res.status} (${raison}), PDF fait sur place.`);
+  return null;
+}
+
+export async function renderHtmlToPdf(
   html: string,
   format: "A4" | "A5" = "A4",
   options: RenderOptions = {},
 ): Promise<Uint8Array> {
+  if (PDF_SERVICE) {
+    const pdf = await renderWithService(html, format, options);
+    if (pdf) return pdf;
+  }
   return runExclusive(() => renderHtmlToPdfNow(html, format, options));
 }
 
@@ -132,31 +197,14 @@ async function renderHtmlToPdfNow(
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.waitForNetworkIdle({ idleTime: 150, timeout: 10_000 }).catch(() => undefined);
 
-    const sideMm = options.sideMarginMm ?? 12;
-    const footerText = (options.footer ?? "").trim();
-    const headerText = (options.header ?? "").trim();
-    const hasFooter = footerText.length > 0 || !!options.showPageNumber;
-    const hasHeader = headerText.length > 0;
-
-    // Pied de page : le texte et le numéro vont chacun dans leur zone
-    // (sur la même zone, ils sont séparés par un point médian).
-    const footerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
-    if (footerText) footerZones[options.footerAlign ?? "left"].push(escapeHtml(footerText));
-    if (options.showPageNumber) footerZones[options.pageNumberAlign ?? "center"].push(`<span class="pageNumber"></span>`);
-    const headerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
-    if (headerText) headerZones[options.headerAlign ?? "left"].push(escapeHtml(headerText));
-
-    const empty = '<span style="display:none"></span>';
-    const footerHtml = hasFooter ? bandHtml(footerZones, sideMm) : empty;
-    const headerHtml = hasHeader ? bandHtml(headerZones, sideMm) : empty;
-
+    const b = bands(options);
     const pdf = await page.pdf({
       format,
       printBackground: true,
       preferCSSPageSize: true,
-      displayHeaderFooter: hasFooter || hasHeader,
-      headerTemplate: headerHtml,
-      footerTemplate: footerHtml,
+      displayHeaderFooter: b.show,
+      headerTemplate: b.headerHtml,
+      footerTemplate: b.footerHtml,
     });
 
     return new Uint8Array(pdf.buffer, pdf.byteOffset, pdf.byteLength);

@@ -316,6 +316,25 @@ services:
     # Pas sur le réseau des clients : seulement joignable par le panel.
     networks: [moteur]
 
+  # Service PDF partagé : un seul Chromium pour tous les clients (plateforme/pdf).
+  # Les sites lui envoient leur page prête et reçoivent le PDF (RECIPELOG_PDF_URL,
+  # mis par recipelog-instance). Les pages ne peuvent rien charger sur le réseau.
+  # Pas de port ouvert, pas d'adresse publique : seuls les sites des clients l'appellent.
+  pdf:
+    build: ./pdf
+    image: recipelog-pdf:local
+    container_name: recipelog-pdf
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:size=512m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: ${PDF_MEMOIRE:-1536m}
+    pids_limit: 512
+    environment:
+      PDF_EN_MEME_TEMPS: ${PDF_EN_MEME_TEMPS:-2}
+    networks: [recipelog]
+
   # Site vitrine (lot 4) sur <domaine> et www.<domaine>. Le code vient de la
   # branche site-vitrine : recipelog-instance vitrine maj (ou le panel).
   vitrine:

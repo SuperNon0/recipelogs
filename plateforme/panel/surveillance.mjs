@@ -69,6 +69,7 @@ const SERVICES = [
   ["vitrine", "Site vitrine", "recipelog-vitrine"],
   ["base", "Base de données", "recipelog-postgres"],
   ["aiguilleur", "Aiguilleur (Traefik)", "recipelog-traefik"],
+  ["pdf", "Fabrication des PDF", "recipelog-pdf"],
 ];
 // Vu de l'extérieur : Cloudflare → tunnel → Traefik → panel. Sans ce contrôle, un tunnel
 // tombé coupe tous les sites sans qu'aucune alerte ne parte.
