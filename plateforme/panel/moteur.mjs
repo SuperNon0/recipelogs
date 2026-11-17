@@ -4,7 +4,7 @@
 // ligne de commande) et la passerelle, puis note chaque action dans le journal.
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { appendFile, chown, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { appendFile, chown, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { timingSafeEqual, randomBytes } from "node:crypto";
 import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
@@ -248,13 +248,20 @@ async function clients() {
 
 // ------------------------------------------------------------ nouvelles versions (nouveautes.mjs)
 async function entreeNouveautes() {
-  const [bruts, cont, vi, pf] = await Promise.all([
+  const [bruts, cont, vi, pf, vd] = await Promise.all([
     clientsBruts().catch(() => []),
     conteneurs(),
     readFile(`${DONNEES}/vitrine/code/.commit`, "utf8").catch(() => ""),
     etatPlateforme().catch(() => null),
+    stat(`${DONNEES}/vitrine/code/.version`).catch(() => null),
   ]);
-  return { clients: bruts.map((c) => ({ ...c, revision: cont.revisions[`rl-${c.nom}`] ?? null })), vitrine: vi.trim() || null, plateforme: pf };
+  return {
+    clients: bruts.map((c) => ({ ...c, revision: cont.revisions[`rl-${c.nom}`] ?? null })),
+    vitrine: vi.trim() || null,
+    // Date du dernier téléchargement : sert quand le commit n'est pas noté (vitrine d'avant #174).
+    vitrineDate: vd ? vd.mtime.toISOString() : null,
+    plateforme: pf,
+  };
 }
 async function nouveautes() {
   const e = await entreeNouveautes();
