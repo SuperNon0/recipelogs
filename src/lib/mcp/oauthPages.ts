@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 /**
  * Pages de la connexion de Claude par OAuth (accord, erreurs). Hors de la mise
  * en page du site, aux couleurs de l'appli (encre, ambre), claires ou sombres.
- * Interdites dans un cadre (pas de clic détourné).
+ * Interdites dans un cadre (pas de clic détourné). Les e-mails sont entourés de
+ * <!--email_off--> : sinon Cloudflare (Email Obfuscation) les remplace par
+ * « [email protected] », et son script de décodage est bloqué par notre CSP.
  */
 
 function escapeHtml(s: string): string {
@@ -47,8 +49,9 @@ function page(title: string, body: string, status = 200): NextResponse {
 }
 
 export function oauthErrorPage(title: string, text: string, status = 400, logout = false): NextResponse {
+  // Le texte peut contenir l'e-mail du compte : <!--email_off--> évite que Cloudflare le masque.
   const extra = logout ? `<div class="row"><a class="btn" href="/auth/deconnexion">Se déconnecter</a></div>` : "";
-  return page(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p>${extra}`, status);
+  return page(title, `<h1>${escapeHtml(title)}</h1><p><!--email_off-->${escapeHtml(text)}<!--/email_off--></p>${extra}`, status);
 }
 
 export function consentPage(p: { clientName: string; redirectHost: string; email: string; ticket: string; action: string }): NextResponse {
@@ -56,7 +59,7 @@ export function consentPage(p: { clientName: string; redirectHost: string; email
   return page(
     `Autoriser ${p.clientName}`,
     `<h1>Autoriser ${name} ?</h1>
-<p><b>${name}</b> (${escapeHtml(p.redirectHost)}) demande à utiliser ton RecipeLog avec le compte <b>${escapeHtml(p.email)}</b>.</p>
+<p><b>${name}</b> (${escapeHtml(p.redirectHost)}) demande à utiliser ton RecipeLog avec le compte <b><!--email_off-->${escapeHtml(p.email)}<!--/email_off--></b>.</p>
 <ul>
 <li>Il pourra lire et modifier tes recettes, ingrédients, prix, fournisseurs, factures et cahiers, comme avec la clé de l'accès MCP.</li>
 <li>Tu peux le déconnecter à tout moment dans Réglages → Accès MCP.</li>
