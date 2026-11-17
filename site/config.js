@@ -5,4 +5,7 @@ window.VITRINE = {
   demoUrl: "",
   // Adresse e-mail de contact pour les demandes de démonstration et de devis
   contactEmail: "",
+  // Bouton « Se connecter » (en haut et en bas de page). Vide = caché. Sur la plateforme :
+  // "/connexion" (chaque client arrive sur son propre RecipeLog après sa connexion).
+  connexionUrl: "",
 };

@@ -61,6 +61,15 @@
       a.rel = "noopener";
     }
   });
+  // ── « Se connecter » : seulement là où la connexion existe (plateforme : config.js
+  //    donne "/connexion", qui envoie chaque client sur son propre RecipeLog) ──
+  var connexionUrl = (window.VITRINE && window.VITRINE.connexionUrl) || "";
+  document.querySelectorAll("[data-connexion]").forEach(function (el) {
+    if (!connexionUrl) return;
+    var a = el.tagName === "A" ? el : el.querySelector("a");
+    if (a) a.href = connexionUrl;
+    el.hidden = false;
+  });
   var missing = document.getElementById("demo-missing");
   if (missing && !demoUrl) missing.hidden = false;
 
