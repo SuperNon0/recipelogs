@@ -14,6 +14,7 @@ let SUPPORT = [];
 let ANNONCES = null;
 let IA = null;
 let VENTE = null;
+let PLATEFORME = null; // version installée, nouveautés sur GitHub, dernière mise à jour (plateforme.mjs)
 let CANAL = "plateforme"; // version donnée par défaut aux nouveaux clients (dit par le moteur)
 
 // ------------------------------------------------------------ API
@@ -295,6 +296,13 @@ function calculerAFaire() {
       if (lim > 0 && u >= lim) l.push({ niveau: "acc", icone: "sparkle", client: c.nom, titre: `${c.nom} a utilisé toutes ses lectures IA du mois`, texte: `${u} sur ${lim}. Elles reviennent le 1er du mois.`, bouton: ["Régler", "#ia"] });
     }
   }
+  if (PLATEFORME) {
+    const m = PLATEFORME.maj;
+    const n = PLATEFORME.nouveautes?.enRetard ?? 0;
+    if (m?.etat === "en-cours") l.push({ niveau: "pause", icone: "refresh", titre: "Mise à jour de la plateforme en cours", texte: `Lancée ${depuis(m.debut)}. Le panel peut se couper quelques minutes.`, bouton: ["Suivre", suivrePlateforme] });
+    else if (m?.etat === "fini" && !m.ok && Date.now() - Date.parse(m.fin ?? m.debut) < 3 * 86400000) l.push({ niveau: "ko", icone: "alert", titre: "La mise à jour de la plateforme a échoué", texte: m.interrompue ? "Elle ne s'est jamais terminée (machine redémarrée ?). Relance-la." : `Le ${heureFr(m.fin)}. Le journal dit pourquoi.`, bouton: ["Voir", fenetreMajPlateforme] });
+    else if (n > 0) l.push({ niveau: "acc", icone: "refresh", titre: `Mise à jour de la plateforme disponible`, texte: `${n} changement${n > 1 ? "s" : ""} : ${PLATEFORME.nouveautes.changements[0]?.titre ?? ""}`, bouton: ["Voir", fenetreMajPlateforme] });
+  }
   const rang = { ko: 0, pause: 1, acc: 2 };
   return l.sort((a, b) => rang[a.niveau] - rang[b.niveau]);
 }
@@ -321,6 +329,7 @@ function afficherAccueil() {
     ? AFAIRE.map(ligneAFaire).join("")
     : `<div class="tout-va-bien">${ic("check", "s22")}Rien à faire : tout va bien.</div>`;
   $("#accueil-journal").innerHTML = evts(JOURNAL.slice(0, 7).map((l, i) => [l, i]));
+  afficherPlateforme();
   if (!SANTE) {
     $("#accueil-machine").innerHTML = `<p class="sub">Mesures indisponibles (le moteur ne répond pas).</p>`;
     return;
@@ -333,6 +342,126 @@ function afficherAccueil() {
     mesure("Mémoire", (memUtil / m.memoire.total) * 100, `${e(taille(memUtil))} / ${e(taille(m.memoire.total))}`) +
     (m.disque ? mesure("Disque", m.disque.pourcent, `${e(taille(m.disque.libre))} libres`) : "") +
     `<a href="#sante">Détail par client</a>`;
+}
+
+// ------------------------------------------------------------ mise à jour de la plateforme
+// Le panel, la connexion, la passerelle et les outils (pas les sites des clients) : install.sh
+// relancé sur la machine. Le panel et le moteur redémarrent pendant ce temps.
+function afficherPlateforme() {
+  const z = $("#accueil-plateforme");
+  if (!PLATEFORME) {
+    z.innerHTML = `<p class="sub">État indisponible (le moteur ne répond pas).</p>`;
+    return;
+  }
+  const { version: v, maj: m, nouveautes: n } = PLATEFORME;
+  const ligneVersion = v
+    ? `<div class="pf-ligne"><span>Version installée</span><span class="mono">${e(v.court)} · ${e(dateFr(v.date))}</span></div>`
+    : `<div class="pf-ligne"><span>Version installée</span><span>inconnue</span></div><p class="discret">Elle s'affichera après la prochaine mise à jour.</p>`;
+  let quoi;
+  if (m?.etat === "en-cours") quoi = `<span class="etiquette prog">Mise à jour en cours</span>`;
+  else if (n && n.enRetard > 0) quoi = `<span class="etiquette acc">${n.enRetard} nouveauté${n.enRetard > 1 ? "s" : ""}</span>`;
+  else if (n) quoi = `<span class="etiquette ok">À jour</span>`;
+  else quoi = `<span class="etiquette pause">Nouveautés inconnues</span>`;
+  const echec = m?.etat === "fini" && !m.ok ? `<p class="discret">La dernière mise à jour a échoué${m.fin ? ` (${e(heureFr(m.fin))})` : ""}.</p>` : "";
+  const [bAide, tAide] = aideB(
+    "pf-a",
+    "Met à jour le panel, la connexion (Authentik), la passerelle, le service PDF et les outils, depuis GitHub. Le panel se coupe 5 à 10 minutes pendant ce temps, puis revient tout seul. Les sites des clients restent en ligne et ne changent pas de version : pour eux, c'est Clients → Tout mettre à jour.",
+  );
+  z.innerHTML =
+    `<div class="pf-ligne"><span>État</span>${quoi}</div>${ligneVersion}${echec}` +
+    `<div class="pf-bas"><button class="btn petit${n?.enRetard > 0 ? " principal" : ""}" type="button" id="pf-voir">${m?.etat === "en-cours" ? "Suivre la mise à jour" : "Mettre à jour la plateforme"}</button>${bAide}</div>${tAide}`;
+  $("#pf-voir").onclick = () => (m?.etat === "en-cours" ? suivrePlateforme() : fenetreMajPlateforme());
+}
+
+function fenetreMajPlateforme() {
+  const p = PLATEFORME ?? {};
+  const n = p.nouveautes;
+  const liste = n?.changements?.length
+    ? `<p class="sub">Ce qui a changé depuis ta version${n.enRetard > n.changements.length ? ` (les ${n.changements.length} derniers sur ${n.enRetard})` : ""} :</p><ul class="pf-liste">${n.changements.map((c) => `<li><span>${e(c.titre)}</span>${c.date ? `<time>${e(dateFr(c.date))}</time>` : ""}</li>`).join("")}</ul>`
+    : n
+      ? `<p class="sub">Aucune nouveauté sur GitHub : ta plateforme est déjà à jour. Tu peux quand même relancer l'installation (pour réparer, par exemple).</p>`
+      : `<p class="sub">Impossible de demander à GitHub ce qui a changé. La mise à jour prendra quand même la dernière version.</p>`;
+  const derniere = p.maj?.etat === "fini" ? `<p class="discret">Dernière mise à jour : ${p.maj.ok ? "réussie" : "échouée"}${p.maj.fin ? ` le ${e(heureFr(p.maj.fin))}` : ""}.${p.journal ? ` <button class="lien" type="button" id="pf-journal">Voir son journal</button>` : ""}</p><pre class="sortie journaux cache" id="pf-ancien">${e(p.journal ?? "")}</pre>` : "";
+  ouvrir(
+    "Mettre à jour la plateforme ?",
+    `${liste}
+    <p class="texte-aide visible">Le panel, la connexion et les outils redémarrent : le panel est coupé <b>5 à 10 minutes</b>, et l'écran de connexion des clients aussi pendant une ou deux minutes. Les sites des clients restent en ligne et gardent leur version (pour eux : Clients → Tout mettre à jour). La mise à jour continue même si tu fermes cette page.</p>
+    ${derniere}
+    <div class="pied"><button class="btn principal" id="ok-pf" type="button">Mettre à jour la plateforme</button></div>`,
+  );
+  const j = $("#pf-journal");
+  if (j) j.onclick = () => $("#pf-ancien").classList.toggle("cache");
+  $("#ok-pf").onclick = async () => {
+    const avant = PLATEFORME?.maj?.debut ?? null;
+    $("#ok-pf").disabled = true;
+    const r = await appel("POST", "/plateforme/maj").catch((err) => ({ ok: false, sortie: String(err.message ?? err) }));
+    if (!r.ok) {
+      $("#fenetre-corps").innerHTML = `<p class="etiquette ko">Échec</p><pre class="sortie">${e(r.sortie || r.message || "Le moteur n'a pas pu lancer la mise à jour.")}</pre>`;
+      return;
+    }
+    suivrePlateforme(avant);
+  };
+}
+
+// Suit la mise à jour : le panel et le moteur redémarrent en route, donc on tolère que
+// les appels échouent un moment. avant = date de début de la mise à jour précédente.
+let suiviPf = 0;
+async function suivrePlateforme(avant) {
+  const jeton = (suiviPf += 1);
+  if (avant === undefined) avant = PLATEFORME?.maj?.etat === "en-cours" ? null : PLATEFORME?.maj?.debut ?? null;
+  ouvrir(
+    "Mise à jour de la plateforme",
+    `<p class="attente" id="pf-etat"><span class="rond"></span>Lancement…</p>
+    <p class="texte-aide visible discret" id="pf-explication">Compte 5 à 10 minutes. Le panel va se couper puis revenir : cette fenêtre attend et reprend toute seule. Tu peux aussi la fermer, la mise à jour continue.</p>
+    <pre class="sortie journaux" id="pf-log"></pre>`,
+    () => {
+      suiviPf += 1;
+      charger();
+    },
+  );
+  const debut = Date.now();
+  let coupe = false;
+  while (jeton === suiviPf) {
+    await pause(4000);
+    if (jeton !== suiviPf) return;
+    let p = null;
+    try {
+      const r = await fetch("/api/plateforme", { headers: { "X-Panel": "1" } });
+      if (r.ok) p = await r.json();
+    } catch {
+      p = null;
+    }
+    const zEtat = $("#pf-etat");
+    if (!zEtat) return;
+    if (!p) {
+      coupe = true;
+      zEtat.innerHTML = `<span class="rond"></span>Le panel redémarre, il revient dans un instant…`;
+      continue;
+    }
+    PLATEFORME = p;
+    const m = p.maj;
+    const log = $("#pf-log");
+    if (log && p.journal) {
+      const enBas = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+      log.textContent = p.journal;
+      if (enBas) log.scrollTop = log.scrollHeight;
+    }
+    const nouvelle = m && m.debut !== avant;
+    if (nouvelle && m.etat === "fini") {
+      zEtat.outerHTML = m.ok
+        ? `<p class="etiquette ok">Réussi</p><p class="sub">La plateforme est à jour${p.version ? ` (version ${e(p.version.court)})` : ""}. Recharge la page pour avoir le nouveau panel.</p><div class="pied pied-gauche"><button class="btn principal" type="button" id="pf-recharger">Recharger la page</button></div>`
+        : `<p class="etiquette ko">Échec</p><p class="sub">${m.interrompue ? "La mise à jour ne s'est jamais terminée (machine redémarrée en route ?)." : `L'installation s'est arrêtée (code ${e(m.code)}).`} Le journal ci-dessous dit pourquoi. Les sites des clients ne sont pas touchés.</p>`;
+      $("#pf-explication")?.remove();
+      const b = $("#pf-recharger");
+      if (b) b.onclick = () => location.reload();
+      return;
+    }
+    if (!nouvelle && Date.now() - debut > 60000) {
+      zEtat.innerHTML = `<span class="rond"></span>La mise à jour n'a pas encore démarré. Si rien ne bouge, regarde le journal du panel.`;
+      continue;
+    }
+    zEtat.innerHTML = `<span class="rond"></span>${nouvelle ? `En cours ${e(depuis(m.debut))}${coupe ? " (le panel a redémarré)" : ""}…` : "Lancement…"}`;
+  }
 }
 
 // Pastilles du menu : à faire (urgent), support à répondre, demandes de la vitrine.
@@ -531,6 +660,7 @@ document.addEventListener("click", (ev) => {
 });
 
 const NOMS_ACTIONS = {
+  "plateforme-maj": "a lancé la mise à jour de la",
   creer: "a créé",
   "mettre-a-jour": "a mis à jour",
   redemarrer: "a redémarré",
@@ -595,9 +725,10 @@ document.addEventListener("click", (ev) => {
 });
 
 async function charger(options = {}) {
-  const [c, j, v, sa, su, an, ia, ve] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente")]);
+  const [c, j, v, sa, su, an, ia, ve, pf] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente"), api("GET", "/plateforme")]);
   IA = ia.usage ? ia : null;
   VENTE = ve.offres ? ve : null;
+  PLATEFORME = "maj" in pf ? pf : null;
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
   SANTE = sa.machine ? sa : null;

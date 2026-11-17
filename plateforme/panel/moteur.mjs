@@ -10,6 +10,7 @@ import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJ
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
 import { RefusIA, reglerQuota, resume as resumeIA } from "./ia.mjs";
 import { RefusVente, lire as lireVente, manques as manquesVente, regler as reglerVente } from "./vente.mjs";
+import { demarrer as demarrerPlateforme, etat as etatPlateforme } from "./plateforme.mjs";
 import { RefusAnnonce, action as actionAnnonce, pourStatut, resume as resumeAnnonces, tour as tourAnnonces } from "./annonces.mjs";
 
 const CLE = process.env.MOTEUR_CLE || "";
@@ -115,6 +116,7 @@ const NOMS_ACTIONS = {
   redemarrer: "redémarrage",
   suspendre: "mise en pause",
   reactiver: "réactivation",
+  "plateforme-maj": "mise à jour de la plateforme",
 };
 function enTache(quoi, client, f) {
   const t = { id: randomBytes(8).toString("hex"), quoi, client, etat: "attente", etape: "", resultat: null, fin: 0 };
@@ -787,6 +789,13 @@ createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/clients") return rendre(creer(qui, await lireCorps(req)));
     if (req.method === "POST" && url.pathname === "/tous/mettre-a-jour") return rendre(toutMettreAJour(qui));
+    // Mise à jour de la plateforme elle-même (plateforme.mjs) : lancée sur la machine, hors de Docker.
+    if (req.method === "GET" && url.pathname === "/plateforme") return repondre(res, 200, await etatPlateforme());
+    if (req.method === "POST" && url.pathname === "/plateforme/maj") {
+      const r = await demarrerPlateforme(lancer);
+      await noter(qui, "plateforme-maj", "plateforme", r);
+      return repondre(res, r.ok ? 200 : 500, { ok: r.ok, sortie: r.sortie });
+    }
     if (req.method === "POST" && morceaux[0] === "clients" && morceaux.length === 3) {
       return rendre(await action(qui, morceaux[1], morceaux[2], await lireCorps(req)));
     }

@@ -430,7 +430,14 @@ Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » 
 
 Trois choses se mettent à jour séparément. Dans l'ordre :
 
-### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans la VM en root
+### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans le panel
+Page **Accueil** → bloc **Plateforme** (en bas à droite) → **Mettre à jour la plateforme**. Le bloc dit
+quelle version est installée et combien de nouveautés attendent sur GitHub (une ligne apparaît
+aussi dans « À faire »). La fenêtre suit la mise à jour : le panel se coupe 5 à 10 minutes puis
+revient, et à la fin **Recharger la page** affiche le nouveau panel.
+
+La toute première fois (le bouton n'existe pas encore sur ta machine), ou si le panel ne répond
+plus, c'est la même chose à la main, dans la VM en root :
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/install.sh)"
 ```

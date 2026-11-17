@@ -298,10 +298,17 @@ fi
 
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"
+# Mise à jour lancée depuis le panel (RECIPELOG_MAJ=1) : on ne recrée pas un client « test » supprimé.
+[ "${RECIPELOG_MAJ:-0}" = 1 ] && CREER_TEST=0
 if [ "${CREER_TEST}" = 1 ] && [ ! -d "${DONNEES}/instances/test" ]; then
   info "Client de test « test »…"
   recipelog-instance creer test --canal plateforme || echo "⚠️  Le client de test n'a pas démarré ; la plateforme, elle, tourne. Voir : recipelog-instance journaux test"
 fi
+
+# Version installée, lue par le panel (Accueil → Plateforme → « Mettre à jour la plateforme »).
+mkdir -p "${DONNEES}/maj-plateforme"
+printf '{"commit":"%s","branche":"%s","depot":"%s","date":"%s"}\n' \
+  "$(git -C "${APP_DIR}" rev-parse HEAD)" "${RECIPELOG_BRANCH}" "${REPO}" "$(date -Iseconds)" > "${DONNEES}/maj-plateforme/version.json"
 
 IP="$(hostname -I | awk '{print $1}')"
 cat > "${RESUME}" <<EOF

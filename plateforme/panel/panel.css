@@ -458,3 +458,13 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .liens-legal b { color: var(--text); }
 @media (max-width: 600px) { .page-legal table { font-size: 13px; } .page-legal th, .page-legal td { padding-right: 6px; } }
 .aide-ligne { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+
+/* Accueil : bloc « Plateforme » (mise à jour de la plateforme elle-même) */
+.pf-ligne { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.pf-ligne > span:first-child { color: var(--soft); }
+.mono { font-family: var(--f-mono); font-size: 13px; }
+.pf-bas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.boite .discret { margin: 0; font-size: 13px; }
+.pf-liste { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow: auto; }
+.pf-liste li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: var(--creux); border: 1px solid var(--line); border-radius: var(--r-md); font-size: 13.5px; }
+.pf-liste time { color: var(--muted); white-space: nowrap; font-size: 12.5px; }
