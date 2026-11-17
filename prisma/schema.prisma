@@ -199,6 +199,24 @@ model PurchaseOrder {
   @@map("purchase_orders")
 }
 
+/**
+ * Facture prise en photo sur le site (bouton « Nouvelle facture »), pas encore
+ * enregistrée : elle attend d'être lue par l'IA ou remplie par Claude (MCP).
+ */
+model PendingInvoice {
+  id        Int      @id @default(autoincrement())
+  /** Pages (photos JPG/PNG/WebP, ou un seul PDF) dans le dossier d'upload : factures/a-traiter/… */
+  files     String[]
+  note      String?
+  /** Qui l'a ajoutée (nom ou e-mail du compte), pour la liste. */
+  addedBy   String?  @map("added_by")
+  /** Message de la dernière lecture par IA qui a échoué. */
+  lastError String?  @map("last_error")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("pending_invoices")
+}
+
 /** Ligne d'un bon : un produit, combien, à quel prix. */
 model PurchaseOrderLine {
   id        Int      @id @default(autoincrement())

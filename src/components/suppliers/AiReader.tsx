@@ -34,6 +34,7 @@ type Fournisseur = { id: number; name: string };
 type Connu = Awaited<ReturnType<typeof produitsConnus>>[number];
 type Etape =
   | { e: "choisir" }
+  | { e: "attente" }
   | { e: "lecture"; debut: number }
   | { e: "colonnes"; lignes: string[][]; entete: number; colonnes: Colonnes }
   | { e: "verifier"; doc: DocumentLu; modele: string | null; secours: boolean }
@@ -69,9 +70,15 @@ export function AiReaderButton({ type, fournisseur, fournisseurs = [] }: { type:
   );
 }
 
-function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: TypeLecture; fournisseur?: Fournisseur; fournisseurs: string[]; onClose: () => void }) {
+/** Facture « à traiter » déjà gardée sur le site : la lecture part toute seule, sur ses pages. */
+export type FactureATraiter = { id: number; pages: number; pdf: boolean };
+
+export function AiReaderModal({
+  type, fournisseur, fournisseurs, onClose, attente,
+}: { type: TypeLecture; fournisseur?: Fournisseur; fournisseurs: string[]; onClose: () => void; attente?: FactureATraiter }) {
   const router = useRouter();
-  const [etape, setEtape] = useState<Etape>({ e: "choisir" });
+  const [etape, setEtape] = useState<Etape>({ e: attente ? "attente" : "choisir" });
+  const depart = attente ? ({ e: "attente" } as const) : ({ e: "choisir" } as const);
   const [etat, setEtat] = useState<EtatIA | null>(null);
   const [fichier, setFichier] = useState<File | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -79,18 +86,29 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
   const annule = useRef(false);
 
   useEffect(() => {
+    annule.current = false;
     etatLectureIA().then(setEtat).catch(() => setEtat(null));
     return () => {
       annule.current = true;
     };
   }, []);
 
+  // Facture à traiter : on lance la lecture dès l'ouverture.
+  const lancee = useRef(false);
+  useEffect(() => {
+    if (attente && !lancee.current) {
+      lancee.current = true;
+      void lire();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tableur = (f: File) => /\.(xlsx|csv|txt|tsv|xls)$/i.test(f.name);
 
   async function lire() {
-    if (!fichier) return;
+    if (!fichier && !attente) return;
     setErreur(null);
-    if (type === "mercuriale" && tableur(fichier)) {
+    if (fichier && type === "mercuriale" && tableur(fichier)) {
       setOccupe(true);
       const fd = new FormData();
       fd.set("fichier", fichier);
@@ -100,13 +118,17 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
       return setEtape({ e: "colonnes", lignes: r.lignes, entete: r.entete, colonnes: r.colonnes });
     }
     const fd = new FormData();
-    fd.set("fichier", fichier);
+    if (attente) fd.set("attenteId", String(attente.id));
+    else if (fichier) fd.set("fichier", fichier);
     fd.set("type", type);
     if (fournisseur) fd.set("fournisseurId", String(fournisseur.id));
     setOccupe(true);
     const r = await lancerLecture(fd);
     setOccupe(false);
-    if (!r.ok) return setErreur(r.error);
+    if (!r.ok) {
+      setEtape(depart);
+      return setErreur(r.error);
+    }
     setEtape({ e: "lecture", debut: Date.now() });
     // La lecture tourne sur le serveur : on demande où elle en est toutes les 2 secondes.
     while (!annule.current) {
@@ -114,11 +136,11 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
       const s = await suivreLecture(r.id).catch(() => ({ etat: "en_cours" as const }));
       if (s.etat === "en_cours") continue;
       if (s.etat === "perdu") {
-        setEtape({ e: "choisir" });
+        setEtape(depart);
         return setErreur("La lecture a été interrompue (le site a peut-être redémarré). Relance-la.");
       }
       if (!s.resultat.ok) {
-        setEtape({ e: "choisir" });
+        setEtape(depart);
         return setErreur(s.resultat.message);
       }
       const doc = { ...s.resultat.document };
@@ -128,7 +150,9 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
     }
   }
 
-  const titre = type === "facture" ? "Lire une facture avec l'IA" : `Importer une mercuriale${fournisseur ? ` · ${fournisseur.name}` : ""}`;
+  const titre = attente
+    ? "Analyser la facture"
+    : type === "facture" ? "Lire une facture avec l'IA" : `Importer une mercuriale${fournisseur ? ` · ${fournisseur.name}` : ""}`;
 
   return (
     <ModalOverlay onClose={onClose} title={titre} wide={etape.e === "verifier" || etape.e === "colonnes"}>
@@ -147,7 +171,9 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
           estTableur={fichier ? tableur(fichier) : false}
         />
       )}
-      {etape.e === "lecture" && <Lecture debut={etape.debut} />}
+      {etape.e === "attente" && attente && <AttenteRelancer etat={etat} erreur={erreur} occupe={occupe} onLire={lire} onClose={onClose} />}
+      {etape.e === "lecture" && <Lecture debut={etape.debut} attente={!!attente} />}
+      {etape.e === "verifier" && attente && <PagesFacture facture={attente} />}
       {etape.e === "colonnes" && (
         <ChoixColonnes
           lignes={etape.lignes}
@@ -167,7 +193,7 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
           secours={etape.secours}
           fournisseurFixe={fournisseur}
           fournisseurs={fournisseurs}
-          onRetour={() => setEtape({ e: "choisir" })}
+          onRetour={() => setEtape(depart)}
           onEnregistrer={async (doc, remplacer, note, nouveauFournisseur) => {
             if (type === "mercuriale") {
               if (!fournisseur) return "Fournisseur inconnu.";
@@ -180,7 +206,8 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
               if (remplacer) fd.set("remplacer", "1");
               if (nouveauFournisseur) fd.set("nouveauFournisseur", "1");
               if (note) fd.set("note", note);
-              if (fichier && !tableur(fichier)) fd.set("fichier", fichier);
+              if (attente) fd.set("attenteId", String(attente.id));
+              else if (fichier && !tableur(fichier)) fd.set("fichier", fichier);
               const r = await enregistrerFactureLue(fd);
               if (!r.ok) return r.error;
               setEtape({ e: "fini", resume: r.resume, fichierJoint: r.fichierJoint });
@@ -252,7 +279,7 @@ function Choisir({
   );
 }
 
-function Lecture({ debut }: { debut: number }) {
+function Lecture({ debut, attente }: { debut: number; attente?: boolean }) {
   const [s, setS] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setS(Math.round((Date.now() - debut) / 1000)), 1000);
@@ -263,10 +290,48 @@ function Lecture({ debut }: { debut: number }) {
       <Loader2 size={30} className="ia-tourne" />
       <strong>L&apos;IA lit le document…</strong>
       <span className="sub">
-        {s} s. Compte 20 secondes à 2 minutes selon le nombre de lignes. Tu peux fermer cette fenêtre : la lecture sera perdue, mais rien
-        n&apos;est enregistré.
+        {s} s. Compte 20 secondes à 2 minutes selon le nombre de lignes.{" "}
+        {attente
+          ? "Tu peux fermer cette fenêtre : la lecture sera perdue, mais la facture reste dans « À traiter »."
+          : "Tu peux fermer cette fenêtre : la lecture sera perdue, mais rien n'est enregistré."}
       </span>
     </div>
+  );
+}
+
+/** Facture à traiter dont la lecture n'a pas marché (ou après « Recommencer ») : on peut relancer. */
+function AttenteRelancer({ etat, erreur, occupe, onLire, onClose }: { etat: EtatIA | null; erreur: string | null; occupe: boolean; onLire: () => void; onClose: () => void }) {
+  const iaPrete = etat?.prete ?? false;
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      {erreur ? <span className="ing-fact-msg" data-err="true">{erreur}</span> : occupe ? <Loader2 size={20} className="ia-tourne" /> : null}
+      <p className="sub" style={{ margin: 0 }}>
+        La facture reste dans « À traiter » : rien n&apos;est perdu. Tu peux relancer la lecture, ou la laisser pour la faire remplir plus tard par
+        Claude.
+      </p>
+      {etat && !iaPrete && <p className="ia-etat" data-ok="false">{etat.message}</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" className="fl-btn fl-btn-secondary" onClick={onClose}>Laisser à traiter</button>
+        <button type="button" className="fl-btn fl-btn-primary" disabled={occupe || !iaPrete} onClick={onLire}>
+          {occupe ? <Loader2 size={15} className="ia-tourne" /> : <Sparkles size={15} />}
+          Relancer la lecture
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Liens vers les pages de la facture à traiter, pour comparer pendant la vérification. */
+function PagesFacture({ facture }: { facture: FactureATraiter }) {
+  return (
+    <p className="sub" style={{ margin: "0 0 10px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      Comparer avec {facture.pdf ? "le PDF" : facture.pages > 1 ? "les photos" : "la photo"} :
+      {Array.from({ length: facture.pages }, (_, i) => (
+        <a key={i} className="fl-btn fl-btn-ghost" href={`/api/factures/a-traiter/${facture.id}/${i + 1}`} target="_blank" rel="noreferrer">
+          {facture.pdf ? "Ouvrir le PDF" : `Page ${i + 1}`}
+        </a>
+      ))}
+    </p>
   );
 }
 

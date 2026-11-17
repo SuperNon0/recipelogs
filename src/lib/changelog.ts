@@ -11,6 +11,21 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.20",
+    date: "2026-11-17",
+    title: "Ajouter une facture depuis le téléphone",
+    summary:
+      "Page Factures → « Nouvelle facture » : prends la facture en photo ou choisis-la dans ta galerie. Le site la garde, puis tu choisis de la faire lire tout de suite par l'IA ou de la laisser « à traiter » pour plus tard, ou pour que Claude la remplisse.",
+    features: [
+      "Bouton « Nouvelle facture » : « Prendre une photo » ouvre l'appareil photo, « Choisir dans la galerie » prend une photo ou un PDF déjà sur le téléphone. Une facture de plusieurs pages : une photo par page avec « Ajouter une page ». Ce bouton remplace « Lire une facture avec l'IA »",
+      "Les photos sont réduites avant l'envoi : l'envoi va vite même en 4G, et la facture reste bien lisible",
+      "« Enregistrer et analyser » : l'IA lit la facture tout de suite, tu vérifies chaque ligne, et les photos sont jointes à la facture (réunies en un seul PDF s'il y a plusieurs pages)",
+      "« Enregistrer seulement » : la facture attend dans « À traiter », en haut de la page Factures, avec ses boutons Analyser, Voir et Supprimer. Si une lecture rate, la raison s'affiche et rien n'est perdu",
+      "Claude (connecteur RecipeLog) : « remplis mes factures à traiter ». Il voit la liste, lit les photos et enregistre chaque facture en regroupant les produits proches sous un même article. Les photos sont jointes toutes seules",
+      "RecipeLog en ligne : le nombre de factures à traiter gardées en même temps et le nombre de pages par facture sont réglés pour chaque offre",
+    ],
+  },
+  {
     version: "V2.19",
     date: "2026-11-17",
     title: "Brancher Claude avec son compte RecipeLog",
