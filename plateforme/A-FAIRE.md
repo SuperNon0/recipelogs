@@ -110,6 +110,10 @@ mot de passe » part tout seul à la fin.
 > fichier qui contient ta clé SMTP : `qm set <numéro> --delete cicustom` puis
 > `rm -f /var/lib/vz/snippets/recipelog-plateforme-<numéro>.yaml`.
 
+> **Si le résumé ou le journal dit « Panel non branché sur Authentik »** (bug corrigé le
+> 2026-11-17) : entre dans la VM (encadré ci-dessous), puis `bash /root/install-plateforme.sh`.
+> Relancer est sans danger : il garde tes réglages et le client « test ».
+
 > **Pour entrer dans la VM**, c'est toujours depuis le **Shell de ton nœud Proxmox** (la clé
 > SSH est là, pas sur ton ordinateur) : `ssh recipelog@<adresse IP de la VM>` puis `sudo -i`.
 > Sans SSH : dans Proxmox, la VM → **Console (xterm.js)**.
