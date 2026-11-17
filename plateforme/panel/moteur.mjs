@@ -8,7 +8,7 @@ import { appendFile, chown, mkdir, readFile, readdir, rename, writeFile } from "
 import { timingSafeEqual, randomBytes } from "node:crypto";
 import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
-import { RefusIA, reglerQuota, resume as resumeIA } from "./ia.mjs";
+import { RefusIA, reglerFactures, reglerQuota, resume as resumeIA } from "./ia.mjs";
 import { RefusVente, lire as lireVente, manques as manquesVente, regler as reglerVente } from "./vente.mjs";
 import { demarrer as demarrerPlateforme, etat as etatPlateforme, oublierNouveautes } from "./plateforme.mjs";
 import { regler as reglerNouveautes, resume as resumeNouveautes, verifier as verifierNouveautes } from "./nouveautes.mjs";
@@ -768,6 +768,17 @@ createServer(async (req, res) => {
         throw e;
       }
       await noter(qui, "ia-quota", corps.client === "*" ? "tous" : corps.client, { ok: true, sortie: "" }, { limite: corps.limite });
+      return repondre(res, 200, await resumeIA(DONNEES));
+    }
+    if (req.method === "POST" && url.pathname === "/ia/factures") {
+      const corps = await lireCorps(req);
+      try {
+        await reglerFactures(DONNEES, corps);
+      } catch (e) {
+        if (e instanceof RefusIA) throw new Refus(400, e.message);
+        throw e;
+      }
+      await noter(qui, "ia-factures", corps.client === "*" ? "tous" : corps.client, { ok: true, sortie: "" }, { attente: corps.attente, pages: corps.pages });
       return repondre(res, 200, await resumeIA(DONNEES));
     }
     // Vente (lot 8) : identité de l'éditeur, offres et prix, pages publiques.

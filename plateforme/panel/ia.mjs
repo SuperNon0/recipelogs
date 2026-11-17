@@ -3,6 +3,8 @@
 // tenus par la passerelle (usage/<client>.json). Le moteur sert ces routes :
 //   GET  /ia          état de la clé, quotas, lectures du mois et du mois d'avant
 //   POST /ia/quota    { client: "maison" | "*", limite: 50 | null }  (null = revenir au défaut)
+//   POST /ia/factures { client: "maison" | "*", attente: 30 | null, pages: 10 | null }
+//                     factures prises en photo dans l'appli : combien en attente, pages par facture
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 
@@ -58,8 +60,44 @@ export async function resume(donnees) {
     mois: maintenant,
     defaut: typeof reglages.defaut === "number" ? reglages.defaut : null,
     clients: reglages.clients && typeof reglages.clients === "object" ? reglages.clients : {},
+    factures: {
+      defaut: { attente: reglages.factures?.defaut?.attente ?? null, pages: reglages.factures?.defaut?.pages ?? null },
+      clients: reglages.factures?.clients && typeof reglages.factures.clients === "object" ? reglages.factures.clients : {},
+    },
     usage,
   };
+}
+
+async function ecrireReglages(donnees, r) {
+  const d = dossier(donnees);
+  const f = `${d}/reglages.json`;
+  await mkdir(d, { recursive: true });
+  const tmp = `${f}.${randomBytes(4).toString("hex")}.tmp`;
+  await writeFile(tmp, JSON.stringify(r, null, 1), { mode: 0o644 });
+  await rename(tmp, f);
+}
+
+/** Factures prises en photo (« Nouvelle facture ») : nombre en attente et pages par facture. null = suivre le défaut. */
+export async function reglerFactures(donnees, corps) {
+  const client = corps?.client;
+  if (client !== "*" && !(typeof client === "string" && NOM_RE.test(client))) throw new RefusIA("Client inconnu.");
+  const verifier = (v, max, quoi) => {
+    if (v === null || v === undefined) return null;
+    if (!(Number.isInteger(v) && v >= 0 && v <= max)) throw new RefusIA(`${quoi} : un entier de 0 à ${max.toLocaleString("fr-FR")}.`);
+    return v;
+  };
+  const attente = verifier(corps?.attente, 10_000, "Factures en attente");
+  const pages = verifier(corps?.pages, 20, "Pages par facture");
+  if (pages === 0) throw new RefusIA("Pages par facture : 1 au moins (mets 0 en attente pour couper la fonction).");
+  if (client === "*" && (attente === null || pages === null)) throw new RefusIA("Donne les deux nombres par défaut.");
+  const r = await lire(`${dossier(donnees)}/reglages.json`, {});
+  r.factures = r.factures && typeof r.factures === "object" ? r.factures : {};
+  r.factures.clients = r.factures.clients && typeof r.factures.clients === "object" ? r.factures.clients : {};
+  if (client === "*") r.factures.defaut = { attente, pages };
+  else if (attente === null && pages === null) delete r.factures.clients[client];
+  else r.factures.clients[client] = { ...(attente === null ? {} : { attente }), ...(pages === null ? {} : { pages }) };
+  await ecrireReglages(donnees, r);
+  return r;
 }
 
 export async function reglerQuota(donnees, corps) {

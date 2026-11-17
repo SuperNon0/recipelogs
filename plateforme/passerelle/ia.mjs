@@ -7,7 +7,8 @@
 // passerelle : un client ne la voit pas.
 //
 // Fichiers (dossier /ia, partagé avec le moteur du panel) :
-//   reglages.json        écrit par le panel : { defaut: 30, clients: { maison: 100 } }
+//   reglages.json        écrit par le panel : { defaut: 30, clients: { maison: 100 },
+//                        factures: { defaut: { attente: 30, pages: 10 }, clients: { maison: { attente: 50, pages: 10 } } } }
 //   usage/<client>.json  écrit ici : { "2026-11": { lectures, entree, sortie } }
 //   etat.json            écrit ici au démarrage : la clé est-elle réglée ? (le panel l'affiche)
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -65,15 +66,29 @@ export async function limite(client) {
   return typeof r?.defaut === "number" && r.defaut >= 0 ? Math.floor(r.defaut) : QUOTA_DEFAUT;
 }
 
+// Factures prises en photo dans l'appli (« Nouvelle facture ») : combien peuvent attendre
+// d'être lues en même temps, et combien de pages (photos) par facture.
+const FACTURES_DEFAUT = { attente: 30, pages: 10 };
+const PAGES_MAX = 20;
+
+export async function limitesFactures(client) {
+  const r = await lireJson(`${RACINE}/reglages.json`, {});
+  const f = r?.factures ?? {};
+  const ok = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : null);
+  const d = { attente: ok(f.defaut?.attente, 10_000) ?? FACTURES_DEFAUT.attente, pages: ok(f.defaut?.pages, PAGES_MAX) ?? FACTURES_DEFAUT.pages };
+  const c = f.clients?.[client] ?? {};
+  return { attente: ok(c.attente, 10_000) ?? d.attente, pages: Math.max(1, ok(c.pages, PAGES_MAX) ?? d.pages) };
+}
+
 async function usage(client) {
   return lireJson(`${RACINE}/usage/${client}.json`, {});
 }
 
 /** GET /v1/ia/quota */
 export async function quota(client) {
-  const [l, u] = await Promise.all([limite(client), usage(client)]);
+  const [l, u, factures] = await Promise.all([limite(client), usage(client), limitesFactures(client)]);
   const m = mois();
-  return { disponible: !!CLE && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m };
+  return { disponible: !!CLE && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m, factures };
 }
 
 function compter(client, entree, sortie) {
