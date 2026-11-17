@@ -120,7 +120,24 @@ async function une(cleCache, chemin, params, quoi) {
   return x;
 }
 const flux = (slug) => une(`flux:${slug}`, "/flows/instances/", { slug }, `flux ${slug}`);
-const portee = (managed) => une(`portee:${managed}`, "/propertymappings/provider/scope/", { managed }, `portée ${managed}`);
+// Portées OpenID (openid, email, profile), créées par Authentik lui-même au premier démarrage.
+// Pas de filtre « managed » dans la demande : Authentik répond 400 (et non une liste vide)
+// tant que la portée n'existe pas encore. On lit toute la liste et on cherche ici.
+export const PORTEES = ["openid", "email", "profile"].map((p) => `goauthentik.io/providers/oauth2/scope-${p}`);
+async function portee(managed) {
+  const cle = `portee:${managed}`;
+  if (cache.has(cle)) return cache.get(cle);
+  const x = (await tous("/propertymappings/provider/scope/")).find((m) => m.managed === managed);
+  if (!x) throw new ErreurPasserelle(500, "configuration", `Authentik : portée ${managed} introuvable (Authentik finit-il de démarrer ?).`);
+  cache.set(cle, x);
+  return x;
+}
+// Prêt pour créer des clients : réglages RecipeLog appliqués ET objets d'Authentik présents.
+export async function pretPourClients() {
+  if (!(await groupe("super-admins"))) return false;
+  await Promise.all([...PORTEES.map(portee), flux("default-provider-authorization-implicit-consent"), certificat()]);
+  return true;
+}
 const certificat = () => une("cert", "/crypto/certificatekeypairs/", { name: "authentik Self-signed Certificate" }, "certificat");
 
 export async function groupe(nom) {

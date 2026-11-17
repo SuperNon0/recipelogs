@@ -29,12 +29,13 @@ const commandes = {
   renvoyer: () => renvoyer(args[0], args[1]),
   // resume : places de tous les clients (pour le panel)
   resume: () => resumeClients(),
-  // attendre : jusqu'à ce qu'Authentik réponde et que les réglages RecipeLog soient appliqués
+  // attendre : jusqu'à ce qu'Authentik réponde, que les réglages RecipeLog soient appliqués
+  // et que ses propres objets (portées OpenID, flux, certificat) soient créés
   attendre: async () => {
-    const { groupe } = await import("./authentik.mjs");
+    const { pretPourClients } = await import("./authentik.mjs");
     for (let i = 0; i < 90; i++) {
       try {
-        if (await groupe("super-admins")) return { ok: true };
+        if (await pretPourClients()) return { ok: true };
       } catch {}
       await new Promise((r) => setTimeout(r, 4000));
     }
