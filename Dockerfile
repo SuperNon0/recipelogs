@@ -62,7 +62,9 @@ COPY --chown=node:node deploy/docker/start.sh /usr/local/bin/recipelog-start
 USER node
 VOLUME ["/data/uploads"]
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+# Pendant le démarrage (migrations de la base), l'état est vérifié toutes les 3 secondes :
+# une mise à jour est déclarée réussie dès que le site répond, pas 30 secondes plus tard.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --start-interval=3s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["recipelog-start"]

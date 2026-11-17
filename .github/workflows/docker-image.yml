@@ -23,7 +23,32 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Rien n'est publié si le code ne passe pas les vérifications : une image publiée part
+  # chez tous les clients à la prochaine mise à jour.
+  verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v6 # version de pnpm lue dans package.json
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+      - run: pnpm exec prisma generate
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Scripts de la plateforme (syntaxe)
+        run: |
+          for f in plateforme/bin/recipelog-instance plateforme/install.sh plateforme/creer-vm.sh plateforme/exporter-ancien.sh; do bash -n "$f"; done
+          for f in plateforme/panel/*.mjs plateforme/passerelle/*.mjs; do node --check "$f"; done
+
   image:
+    needs: verifier
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:

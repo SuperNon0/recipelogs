@@ -201,6 +201,8 @@ attendre() {
       healthy) return 0 ;;
       exited|dead|absent) return 1 ;;
     esac
+    # Un conteneur qui plante et repart en boucle ne deviendra pas sain : inutile d'attendre 3 minutes.
+    [ "$(docker inspect -f '{{.RestartCount}}' "$(conteneur "$1")" 2>/dev/null | head -1)" -ge 4 ] 2>/dev/null && return 1
     sleep 2
   done
   return 1
