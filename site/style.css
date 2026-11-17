@@ -103,10 +103,15 @@ b { color: var(--text); font-weight: 600; }
 .top-nav { display: none; gap: 24px; margin-left: auto; }
 .top-nav a { text-decoration: none; color: var(--soft); font-size: 14.5px; }
 .top-nav a:hover { color: var(--text); }
-.top .btn { margin-left: auto; }
+.top-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.top-actions .btn { white-space: nowrap; }
+/* Téléphone : avec « Se connecter », la demande de démo reste juste en dessous (accueil) */
+@media (max-width: 479px) {
+  .top-actions:has([data-connexion]:not([hidden])) [data-contact] { display: none; }
+}
 @media (min-width: 900px) {
   .top-nav { display: flex; }
-  .top .btn { margin-left: 8px; }
+  .top-actions { margin-left: 8px; }
 }
 
 /* Accueil */
@@ -707,3 +712,4 @@ html:not(.js) .tab-panel + .tab-panel { margin-top: 14px; }
 .cf-ok { text-align: center; padding: 18px 0 6px; }
 .cf-ok-t { font: 400 22px var(--serif); color: var(--accent); margin: 0 0 6px; }
 .cform[hidden], .cf-direct[hidden], .cf-ok[hidden] { display: none; }
+[data-connexion][hidden] { display: none !important; }
