@@ -33,6 +33,14 @@ de la branche `plateforme` soit verte (onglet **Actions** du dépôt).
    - Service : Type `HTTP`, URL `traefik:80`
    - **Save tunnel**.
 
+5. **Vérifier la ligne DNS de l'étoile** (Cloudflare ne la crée pas toujours tout seul) :
+   - sur la page du tunnel, copier son **Tunnel ID** (une suite du genre `a1b2c3d4-…`) ;
+   - **dash.cloudflare.com → recipelog.cc → DNS → Records** : s'il n'y a pas de ligne `*`,
+     **Add record** → Type `CNAME`, Name `*`, Target `<Tunnel ID>.cfargotunnel.com`,
+     Proxy **activé** (nuage orange) → **Save**.
+
+   Sans cette ligne, `test.`, `admin.` et `auth.recipelog.cc` ne répondent pas.
+
 Tes adresses actuelles (`recipelog.cc`, `www`, `demo`) ne bougent pas : elles restent sur
 l'ancien tunnel, une adresse précise passe toujours avant `*`.
 
@@ -49,6 +57,8 @@ Sans ça, personne ne reçoit l'email « Choisis ton mot de passe ». Gratuit ju
 3. **SMTP et API → onglet SMTP** :
    - noter l'**identifiant** (ressemble à `8a1b2c001@smtp-brevo.com`) ;
    - **Générer une nouvelle clé SMTP**, la noter (elle ne s'affiche qu'une fois).
+
+L'identifiant et la clé te seront demandés pendant l'installation (B1).
 
 ### ☐ A4. (Facultatif) Le bouton « Se connecter avec Google » (10 min)
 
@@ -83,11 +93,23 @@ Le script pose des questions ; pour presque toutes, **Entrée** suffit :
 | Fichier des clés SSH autorisées | Entrée : la VM accepte les mêmes clés SSH que ton Proxmox |
 | Ton adresse email | **ton** adresse : tu deviens super-admin |
 | Jeton du tunnel | celui copié en A2 |
+| Serveur d'envoi des emails | `smtp-relay.brevo.com` (Entrée = tu le feras plus tard, en B2) |
+| Port | Entrée (`587`) |
+| Identifiant SMTP, clé SMTP | ceux notés en A3 (la clé ne s'affiche pas quand tu la colles) |
+| Expéditeur des emails | Entrée (`RecipeLog <noreply@recipelog.cc>`) |
 | Branche du dépôt | Entrée (`plateforme`) |
 
-Attendre le résumé (5 à 10 minutes). **Noter l'adresse IP** de la VM qu'il affiche.
+Les étapes de l'installation s'affichent au fur et à mesure (5 à 15 minutes). À la fin, le
+résumé donne l'adresse IP de la VM : **note-la**. Si tu as donné Brevo, l'email « Choisis ton
+mot de passe » part tout seul à la fin.
 
-### ☐ B2. Brancher les emails (dans la VM)
+> **Pour entrer dans la VM**, c'est toujours depuis le **Shell de ton nœud Proxmox** (la clé
+> SSH est là, pas sur ton ordinateur) : `ssh recipelog@<adresse IP de la VM>` puis `sudo -i`.
+> Sans SSH : dans Proxmox, la VM → **Console (xterm.js)**.
+
+### ☐ B2. Brancher les emails (seulement si tu as répondu Entrée en B1)
+
+Depuis le Shell de ton nœud Proxmox :
 
 ```bash
 ssh recipelog@<adresse IP de la VM>
@@ -95,7 +117,7 @@ sudo -i
 nano /srv/recipelog/.env
 ```
 
-Remplir ces lignes (elles existent déjà, vides) avec ce que tu as noté en A3 :
+Ajouter ces lignes avec ce que tu as noté en A3 :
 
 ```
 SMTP_HOTE='smtp-relay.brevo.com'
@@ -108,11 +130,11 @@ SMTP_EXPEDITEUR='RecipeLog <noreply@recipelog.cc>'
 Enregistrer (**Ctrl+O**, Entrée, **Ctrl+X**), puis :
 
 ```bash
-recipelog-plateforme up -d
-docker exec recipelog-passerelle node cli.mjs initialiser
+recipelog-plateforme appliquer
 ```
 
-La 2e commande t'envoie l'email « Choisis ton mot de passe ».
+Cette commande relance ce qu'il faut et t'envoie l'email « Choisis ton mot de passe ». Elle
+sert après **chaque** changement dans `/srv/recipelog/.env`.
 
 ### ☐ B3. (Si tu as fait A4) Brancher Google
 
@@ -150,6 +172,17 @@ et `recipelog-instance journaux test`. Envoie-moi ce qui s'affiche.
 
 Si la page dit « Panel pas encore réglé » : relancer `install.sh` dans la VM (voir
 « Déjà installé ? » plus bas).
+
+### ☐ C3 bis. (Conseillé) Fermer le panel avec Cloudflare Access (5 min)
+
+Le panel commande tous les clients : une deuxième porte ne fait pas de mal.
+**one.dash.cloudflare.com → Access → Applications → Add an application → Self-hosted** :
+- Application domain : `admin.recipelog.cc` ;
+- Policy : **Allow**, règle **Emails** = ton adresse ;
+- enregistrer.
+
+Tu recevras un code par email avant d'arriver sur la page de connexion du panel. Ne mets
+**pas** Access sur `auth.`, `status.` ni sur les sites des clients.
 
 ### ☐ C4. Un vrai client (quand tu veux)
 
@@ -200,16 +233,23 @@ quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout r
    ```bash
    curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/exporter-ancien.sh | bash -s -- 120 /root/monsite.tar.gz
    ```
+   Le script affiche le **nombre de photos et factures** emportées (note-le). S'il en manque
+   une seule, il s'arrête au lieu de fabriquer une archive incomplète.
 2. L'envoyer dans la VM (adresse IP notée en B1) :
    ```bash
    scp /root/monsite.tar.gz recipelog@<adresse IP de la VM>:/tmp/
    ```
-3. Dans la VM (`ssh recipelog@<IP>` puis `sudo -i`). Choisis le nom de ton site : il devient
-   `<nom>.recipelog.cc` (ici `chanka`). `--canal beta` : ton site suit `main`, comme aujourd'hui.
+3. Dans la VM (toujours depuis le Shell Proxmox : `ssh recipelog@<IP>` puis `sudo -i`). Choisis
+   le nom de ton site : il devient `<nom>.recipelog.cc` (ici `chanka`).
    ```bash
-   recipelog-instance creer chanka --canal beta
+   recipelog-instance creer chanka --responsable ton@adresse.fr
    recipelog-instance importer chanka /tmp/monsite.tar.gz --oui
+   rm /tmp/monsite.tar.gz
    ```
+   L'import affiche « Importé : N recette(s), N photo(s) et facture(s) » : compare avec le
+   nombre noté à l'étape 1. (Pour l'instant, tous les sites de la plateforme suivent la
+   branche `plateforme` : les versions « beta » et « stable » viendront quand elle sera
+   fusionnée dans `main`.)
 4. Ouvre **https://chanka.recipelog.cc** avec ton compte : tes recettes, factures et photos sont là.
 5. Pour envoyer à ton équipe l'email « Choisis ton mot de passe » (leurs rôles sont gardés) :
    ```bash
@@ -228,9 +268,10 @@ quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout r
    ```
 2. Dans la VM :
    ```bash
-   recipelog-instance creer demo --demo --sans-authentik --canal stable
+   recipelog-instance creer demo --demo --sans-authentik
    recipelog-instance importer demo /tmp/demo.tar.gz --oui
    recipelog-instance demo-figer demo
+   rm /tmp/demo.tar.gz
    ```
 
 ### ☐ E3. La vitrine (déjà là)
@@ -248,10 +289,14 @@ pct exec 115 -- cat /var/lib/recipelog-vitrine/messages.jsonl | ssh recipelog@<I
 **one.dash.cloudflare.com → Networks → Tunnels** :
 1. Ton **ancien tunnel** (celui du conteneur `cloudflare-tunnel`) → **Public Hostname** :
    supprimer `recipelog.cc`, `www.recipelog.cc` et `demo.recipelog.cc`.
-2. Le tunnel **recipelog-plateforme** → **Public Hostname → Add** : Subdomain **vide**,
+2. **dash.cloudflare.com → recipelog.cc → DNS → Records** : supprimer les trois lignes `CNAME`
+   `recipelog.cc`, `www` et `demo` qui pointent vers l'ancien tunnel (supprimer une adresse
+   dans un tunnel n'efface pas sa ligne DNS). Ne touche pas à la ligne `*` ni à celles de Brevo.
+3. Le tunnel **recipelog-plateforme** → **Public Hostname → Add** : Subdomain **vide**,
    Domain `recipelog.cc`, Service `HTTP` `traefik:80` → **Save**. (`www` et `demo` passent
-   déjà par `*`.)
-3. Vérifier **https://recipelog.cc**, **https://demo.recipelog.cc** et le formulaire.
+   maintenant par `*`.)
+4. Vérifier **https://recipelog.cc**, **https://www.recipelog.cc**, **https://demo.recipelog.cc**
+   et le formulaire. Les adresses peuvent mettre une ou deux minutes à suivre.
 
 ### ☐ E5. Une semaine plus tard
 
@@ -284,10 +329,10 @@ webhook → Copier l'URL**. Dans `/srv/recipelog/.env` : `ALERTE_DISCORD_URL=htt
 
 ### ☐ F3. Appliquer et essayer
 ```bash
-recipelog-plateforme up -d
+recipelog-plateforme appliquer
 ```
-Puis dans le panel, partie **Santé de la machine** → **Tester les alertes** : tu dois recevoir
-le message partout. (Pour couper les emails d'alerte : `ALERTE_EMAIL=non` dans le `.env`.)
+Puis dans le panel, partie **Santé de la machine** → **Tester les alertes** : le panel dit,
+pour chaque moyen (email, Telegram, Discord), si le message est parti. (Pour couper les emails d'alerte : `ALERTE_EMAIL=non` dans le `.env`.)
 
 La page de statut **https://status.recipelog.cc** marche toute seule (elle passe par `*`
 dans Cloudflare) : rien à faire.
@@ -309,7 +354,7 @@ Sans cette étape, tes clients peuvent déjà lire leurs factures avec **leur pr
 ### ☐ G2. L'ajouter dans la VM (en root)
 ```bash
 nano /srv/recipelog/.env        # ajoute : IA_ANTHROPIC_CLE=sk-ant-…
-recipelog-plateforme up -d
+recipelog-plateforme appliquer
 ```
 Le panel affiche alors « Clé Claude de la plateforme réglée » dans **Lecture des factures par IA**.
 
@@ -317,7 +362,12 @@ Le panel affiche alors « Clé Claude de la plateforme réglée » dans **Lectur
 1. Dans le panel, **Changer le défaut** si 30 lectures par mois et par client ne te vont pas,
    ou **Régler** pour un client à part (0 = coupé).
 2. Sur le RecipeLog de test : **Factures → Lire une facture avec l'IA**, avec une vraie
-   facture Ribera en photo. Vérifie les lignes, puis enregistre.
+   facture Ribera en photo. Vérifie les lignes (et le champ **Article** de chaque ligne), puis
+   enregistre.
+3. Essaie aussi une **mercuriale PDF de plusieurs pages**. Cette fonction n'a encore jamais
+   tourné avec la vraie IA : si une lecture échoue, la raison exacte est dans
+   `recipelog-plateforme logs passerelle` (lignes « IA : ») et `recipelog-instance journaux test`.
+   Envoie-moi ces lignes.
 
 ---
 
@@ -359,11 +409,37 @@ Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » 
 
 ---
 
+## I. Mettre à jour (quand une nouvelle version sort)
+
+Trois choses se mettent à jour séparément. Dans l'ordre :
+
+### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans la VM en root
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/install.sh)"
+```
+Sans danger : les clients, leurs données et tes réglages ne sont pas touchés. Les sites des
+clients restent en ligne pendant ce temps.
+
+### ☐ I2. Les sites des clients, dans le panel
+1. Vérifie que l'action **Image Docker** de la branche `plateforme` est verte
+   (github.com/SuperNon0/recipelogs → **Actions**).
+2. Essaie d'abord sur un seul : client `test` → **Mettre à jour**. Ouvre-le.
+3. Puis **Tout mettre à jour**. Chaque client est sauvegardé juste avant. Si la nouvelle
+   version ne démarre pas chez l'un d'eux, il est remis tout seul sur sa version et sa base
+   d'avant (badge « version gardée »), et les suivants ne sont pas touchés.
+
+### ☐ I3. La vitrine, dans le panel
+Partie **Site vitrine** → **Mettre à jour la vitrine**.
+
+---
+
 ## Déjà installé ?
 
 Si tu avais déjà lancé `creer-vm.sh` avant un nouveau lot, pas besoin de refaire la VM.
 Relancer `install.sh` ajoute ce qui manque (Authentik au lot 1, le panel au lot 2, les
-sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7, les pages de vente au lot 8) sans
+sauvegardes au lot 3, la vitrine au lot 4, le dossier du support au lot 5, celui des annonces au lot 6, celui de l'IA au lot 7, les pages de vente au lot 8,
+et depuis les corrections des relectures : 4 Go de mémoire de secours, les mises à jour de sécurité
+automatiques de Debian, l'heure de Paris, la sauvegarde nocturne des comptes) sans
 toucher aux clients ni aux réglages. Dans la VM, en root :
 
 ```bash
@@ -386,3 +462,4 @@ Puis faire B2, B3 et C (si pas déjà faits), et retirer la protection Cloudflar
 | Le panel admin | https://admin.recipelog.cc (ton compte super-admin) |
 | La page de statut (à donner aux clients) | https://status.recipelog.cc |
 | Les sauvegardes des clients | dans la VM : `/srv/recipelog/sauvegardes/`, et dans ta sauvegarde PBS → OVH |
+| La sauvegarde des comptes (Authentik) et des réglages | dans la VM : `/srv/recipelog/sauvegardes/_plateforme/`, chaque nuit |

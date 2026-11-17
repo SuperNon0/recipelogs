@@ -69,3 +69,23 @@ En-tête : `Authorization: Bearer ${RECIPELOG_PASSERELLE_CLE}`. Réponses JSON. 
 | `POST /v1/equipe/<email>/invitation` | | `200 { "invitationEnvoyee": true }`. Renvoie l'email. |
 
 `401 { "error": "cle_invalide" }` si la clé ne correspond à aucun client. `503 { "error": "authentik_indisponible" }` si Authentik ne répond pas.
+
+## Session, maintenance et secours (corrections des relectures)
+
+- **Renouvellement** : la session dure 7 jours. Tant que l'appli est ouverte, `SessionKeeper`
+  appelle `POST /auth/renouveler` : passé 12 heures, la passerelle revérifie que la personne
+  est toujours dans l'équipe, puis la session repart pour 7 jours. Une personne retirée de
+  l'équipe perd donc l'accès en 12 heures au plus, sans attendre la fin des 7 jours.
+- **Session finie pendant le travail** : les actions répondent « Ta session a expiré »
+  (401 pour les routes d'API) au lieu d'un refus incompréhensible, et la page `/acces`
+  renvoie vers la connexion.
+- **Maintenance** : pendant la plage, les actions, les routes d'API et le MCP sont refusés
+  (503), pas seulement les pages. Le compte de maintenance (super-admin) passe. La dernière
+  réponse connue de la passerelle est gardée 15 minutes si elle ne répond plus.
+- **`RECIPELOG_AUTH_OFF=1`** est ignoré en mode `oidc` : sur la plateforme, rien d'autre ne
+  filtre l'entrée du site.
+- **Responsable** : la promotion automatique en administrateur ne se fait qu'une fois
+  (réglage `responsablePromu`) ; supprimé ou remis en attente, il ne revient pas tout seul.
+- **Lecture par IA** : l'appli demande la réponse en continu (`stream`), jusqu'à 64 000 jetons ;
+  la passerelle ne compte que les lectures finies normalement et écrit la vraie erreur
+  d'Anthropic dans ses journaux (`recipelog-plateforme logs passerelle`).
