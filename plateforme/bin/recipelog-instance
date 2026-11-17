@@ -1013,6 +1013,29 @@ cmd_exporter() {
 # fichiers/uploads/ (format de « exporter »), soit fichiers.tar.gz avec uploads/ dedans
 # (format de exporter-ancien.sh, pour un ancien site en LXC).
 # Une archive sans aucune photo ni facture est refusée (export raté ?), sauf --sans-fichiers.
+# convertir_dump_recent <base.dump> : sauvegarde faite par un PostgreSQL plus récent que celui
+# de la plateforme (ex. ancien site sous Debian 13 = PostgreSQL 17). Un pg_restore de la même
+# version la relit en SQL, chargée dans une base temporaire de la plateforme, puis ressortie
+# au format de la plateforme. Rien n'est touché si une étape échoue.
+PG_RECENT_IMAGE="${PG_RECENT_IMAGE:-postgres:17-alpine}"
+convertir_dump_recent() {
+  local f="$1" tmpdb="rl_conversion_$$" ok=1
+  info "Base de l'ancien site faite par un PostgreSQL plus récent : conversion (1 à 2 min)…"
+  docker run --rm -i --network none "${PG_RECENT_IMAGE}" pg_restore -f - --no-owner --no-acl < "${f}" > "${f}.sql" || return 1
+  # Réglage propre à PostgreSQL 17, inconnu des versions d'avant.
+  sed -i '/^SET transaction_timeout/d' "${f}.sql"
+  docker exec "${PG}" psql -U postgres -qc "DROP DATABASE IF EXISTS ${tmpdb}" >/dev/null 2>&1 && \
+  docker exec "${PG}" psql -U postgres -qc "CREATE DATABASE ${tmpdb}" >/dev/null || { rm -f "${f}.sql"; return 1; }
+  if docker exec -i "${PG}" psql -U postgres -q -v ON_ERROR_STOP=1 -d "${tmpdb}" < "${f}.sql" >/dev/null \
+    && docker exec "${PG}" pg_dump -U postgres -Fc --no-owner --no-acl -d "${tmpdb}" > "${f}.nouveau" \
+    && [ -s "${f}.nouveau" ]; then
+    mv "${f}.nouveau" "${f}"; ok=0
+  fi
+  docker exec "${PG}" psql -U postgres -qc "DROP DATABASE IF EXISTS ${tmpdb}" >/dev/null || true
+  rm -f "${f}.sql" "${f}.nouveau"
+  return "${ok}"
+}
+
 cmd_importer() {
   local nom="${1:-}" fichier="${2:-}" ok="" vide=0 racine id tmp nb comptes
   [ -n "${nom}" ] && [ -n "${fichier}" ] || die "Usage : recipelog-instance importer <nom> <archive.tar.gz> --oui [--sans-fichiers]"
@@ -1037,7 +1060,12 @@ cmd_importer() {
     || abandon "Archive illisible ou incomplète (copie coupée ?). Refais l'export et la copie."
   [ -f "${tmp}/base.dump" ] || abandon "Il manque base.dump dans l'archive (voir exporter-ancien.sh)."
   local erreur_pg
-  if ! erreur_pg="$(docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" 2>&1 >/dev/null)"; then
+  if ! erreur_pg="$(docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" 2>&1 >/dev/null)" \
+    && [[ "${erreur_pg}" == *"unsupported version"* ]]; then
+    convertir_dump_recent "${tmp}/base.dump" || abandon "La base de l'ancien site (PostgreSQL plus récent) n'a pas pu être convertie : rien n'a été importé."
+    erreur_pg="$(docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" 2>&1 >/dev/null)" || true
+  fi
+  if ! docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1; then
     # Le vrai message de PostgreSQL : souvent « unsupported version » (base exportée par un
     # PostgreSQL plus récent que celui de la plateforme) ou un fichier qui n'est pas un pg_dump.
     abandon "base.dump n'a pas pu être lu par PostgreSQL : ${erreur_pg:-raison inconnue} (début du fichier : « $(head -c 5 "${tmp}/base.dump" | tr -dc '[:print:]') », attendu « PGDMP »)."
