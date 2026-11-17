@@ -237,6 +237,10 @@ services:
       PANEL_OIDC_CLIENT_ID: ${PANEL_OIDC_CLIENT_ID:-}
       PANEL_OIDC_CLIENT_SECRET: ${PANEL_OIDC_CLIENT_SECRET:-}
       PANEL_SESSION_SECRET: ${PANEL_SESSION_SECRET:-}
+      # Bouton « Se connecter » du site vitrine (<domaine>/connexion) : install.sh les écrit.
+      PORTAIL_OIDC_ISSUER: ${PORTAIL_OIDC_ISSUER:-}
+      PORTAIL_OIDC_CLIENT_ID: ${PORTAIL_OIDC_CLIENT_ID:-}
+      PORTAIL_OIDC_CLIENT_SECRET: ${PORTAIL_OIDC_CLIENT_SECRET:-}
       OIDC_INTERNE: http://recipelog-authentik:9000
       MOTEUR_URL: http://recipelog-moteur:8000
       MOTEUR_CLE: ${MOTEUR_CLE:-}
@@ -254,10 +258,10 @@ services:
       traefik.http.routers.statut.entrypoints: web
       traefik.http.routers.statut.middlewares: securite@file,limite@file
       traefik.http.routers.statut.service: panel
-      # Tarifs et textes légaux (lot 8) : ces adresses du site vitrine sont servies par le panel,
+      # Tarifs et textes légaux (lot 8), et le bouton « Se connecter » (/connexion) : ces adresses du site vitrine sont servies par le panel,
       # avec leur feuille de style sous /_plateforme/ (admin.<domaine> peut donc être fermé
       # par Cloudflare Access sans casser ces pages).
-      traefik.http.routers.vente.rule: (Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)) && (Path(`/tarifs`) || Path(`/mentions-legales`) || Path(`/cgv`) || Path(`/confidentialite`) || Path(`/sous-traitance`) || PathPrefix(`/_plateforme/`))
+      traefik.http.routers.vente.rule: (Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)) && (Path(`/tarifs`) || Path(`/mentions-legales`) || Path(`/cgv`) || Path(`/confidentialite`) || Path(`/sous-traitance`) || Path(`/connexion`) || Path(`/connexion/retour`) || PathPrefix(`/_plateforme/`))
       traefik.http.routers.vente.priority: "200"
       traefik.http.routers.vente.entrypoints: web
       traefik.http.routers.vente.middlewares: securite@file,limite@file

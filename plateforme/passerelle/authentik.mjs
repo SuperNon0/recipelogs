@@ -560,6 +560,54 @@ export async function creerPanel(url = `https://admin.${DOMAINE}`) {
   };
 }
 
+/**
+ * Le bouton « Se connecter » du site vitrine (<domaine>/connexion, servi par le panel) :
+ * une application Authentik ouverte à TOUS les comptes (aucune règle d'accès). Elle ne
+ * donne accès à rien en elle-même : le panel lit seulement les groupes « client-<nom> »
+ * de la personne pour l'envoyer sur son RecipeLog, où Authentik revérifie l'accès.
+ * Rappelé à chaque installation : le secret est alors renouvelé (install.sh l'écrit dans .env).
+ */
+export async function creerPortail(url = `https://${DOMAINE}`) {
+  const slug = "rl-portail";
+  const secret = randomBytes(48).toString("hex");
+  const [autorisation, invalidation, openid, emailP, profil, cert] = await Promise.all([
+    flux("default-provider-authorization-implicit-consent"),
+    flux("recipelog-deconnexion"),
+    portee("goauthentik.io/providers/oauth2/scope-openid"),
+    portee("goauthentik.io/providers/oauth2/scope-email"),
+    portee("goauthentik.io/providers/oauth2/scope-profile"),
+    certificat(),
+  ]);
+  const corps = {
+    name: "RecipeLog - choix du site",
+    authorization_flow: autorisation.pk,
+    invalidation_flow: invalidation.pk,
+    client_type: "confidential",
+    client_id: slug,
+    client_secret: secret,
+    redirect_uris: [{ matching_mode: "strict", url: `${url}/connexion/retour` }],
+    property_mappings: [openid.pk, emailP.pk, profil.pk],
+    signing_key: cert.pk,
+    include_claims_in_id_token: true,
+    sub_mode: "hashed_user_id",
+    issuer_mode: "per_provider",
+    access_code_validity: "minutes=2",
+    access_token_validity: "minutes=10",
+  };
+  const [existant] = await tous("/providers/oauth2/", { client_id: slug });
+  const fournisseur = existant ? await api("PATCH", `/providers/oauth2/${existant.pk}/`, corps) : await api("POST", "/providers/oauth2/", corps);
+  const [appli] = await tous("/core/applications/", { slug, superuser_full_list: "true" });
+  // Tuile « Mes sites RecipeLog » sur auth.<domaine> ; la déconnexion y ramène aussi.
+  const app = { name: "Mes sites RecipeLog", slug, provider: fournisseur.pk, meta_launch_url: `${url}/connexion`, policy_engine_mode: "any" };
+  if (appli) await api("PATCH", `/core/applications/${slug}/`, app);
+  else await api("POST", "/core/applications/", app);
+  return {
+    PORTAIL_OIDC_ISSUER: `${URL_PUBLIQUE}/application/o/${slug}/`,
+    PORTAIL_OIDC_CLIENT_ID: slug,
+    PORTAIL_OIDC_CLIENT_SECRET: secret,
+  };
+}
+
 /** Pour le panel : places de chaque client en une fois { nom: { max, membres } }. */
 export async function resumeClients() {
   const groupes = await tous("/core/groups/", { name__startswith: "client-", include_users: "false" });

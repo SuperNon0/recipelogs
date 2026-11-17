@@ -1,7 +1,7 @@
 // Commandes d'administration de la passerelle, lancées par recipelog-instance
 // et install.sh avec : docker exec recipelog-passerelle node cli.mjs <commande> …
 // Répond en JSON sur la sortie standard ; message d'erreur et code 1 sinon.
-import { ErreurPasserelle, brancherGoogle, connexion, creerPanel, renvoyer, resumeClients, retirer, changerQuota, creerClient, equipe, initialiser, inviter, supprimerClient } from "./authentik.mjs";
+import { ErreurPasserelle, brancherGoogle, connexion, creerPanel, creerPortail, renvoyer, resumeClients, retirer, changerQuota, creerClient, equipe, initialiser, inviter, supprimerClient } from "./authentik.mjs";
 
 const tout = process.argv.slice(2);
 // --env : réponse en lignes CLE=valeur (pour un fichier .env), sinon JSON.
@@ -25,6 +25,8 @@ const commandes = {
   google: () => brancherGoogle(args[0], args[1]),
   // panel-creer [url] : l'application Authentik du panel admin (super-admins seulement)
   "panel-creer": () => creerPanel(args[0]),
+  // portail-creer [url] : le bouton « Se connecter » du site vitrine (tous les comptes)
+  "portail-creer": () => creerPortail(args[0]),
   // retirer <nom> <email> : retire de l'équipe (compte désactivé s'il ne sert plus ailleurs)
   retirer: () => retirer(args[0], args[1]).then(() => ({ ok: true })),
   // renvoyer <nom> <email> : renvoie l'email « Choisis ton mot de passe »
@@ -47,7 +49,7 @@ const commandes = {
 
 const f = commandes[commande];
 if (!f) {
-  console.error("Commandes : connexion, initialiser, client-creer, client-supprimer, quota, equipe, inviter, google, panel-creer, resume, retirer, renvoyer, attendre");
+  console.error("Commandes : connexion, initialiser, client-creer, client-supprimer, quota, equipe, inviter, google, panel-creer, portail-creer, resume, retirer, renvoyer, attendre");
   process.exit(2);
 }
 try {
