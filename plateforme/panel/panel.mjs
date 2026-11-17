@@ -345,7 +345,9 @@ async function portail(req, res, hote, url) {
       return res.end();
     }
     const email = String(charge.email ?? "");
-    const quitter = d.end_session_endpoint ? `<p class="petit">Connecté avec <b>${echapper(email)}</b>. <a href="${echapper(d.end_session_endpoint)}">Changer de compte</a></p>` : "";
+    // <!--email_off--> : sinon Cloudflare remplace l'adresse par « [email protected] » (son
+    // script de décodage est bloqué par notre CSP).
+    const quitter = d.end_session_endpoint ? `<p class="petit">Connecté avec <b><!--email_off-->${echapper(email)}<!--/email_off--></b>. <a href="${echapper(d.end_session_endpoint)}">Changer de compte</a></p>` : "";
     if (!sites.length && !superAdmin)
       return pagePortail(
         res,
