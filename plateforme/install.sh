@@ -142,6 +142,14 @@ if [ -d "${APP_DIR}/.git" ]; then
 else
   git clone -q --depth 1 --branch "${RECIPELOG_BRANCH}" "${REPO}" "${APP_DIR}"
 fi
+# Ce script a pu être lancé depuis une vieille copie (ex. /root/install-plateforme.sh, gardée
+# depuis la création de la VM) : on continue avec celui qu'on vient de télécharger, sinon les
+# corrections de l'installation elle-même ne serviraient jamais.
+if [ -z "${RECIPELOG_INSTALL_RELANCE:-}" ] && ! cmp -s "${BASH_SOURCE[0]:-/dev/null}" "${APP_DIR}/plateforme/install.sh"; then
+  export RECIPELOG_INSTALL_RELANCE=1 RECIPELOG_BRANCH
+  cp "${APP_DIR}/plateforme/install.sh" /root/install-plateforme.sh 2>/dev/null || true
+  exec bash "${APP_DIR}/plateforme/install.sh" "$@"
+fi
 ln -sf "${APP_DIR}/plateforme/bin/recipelog-instance" /usr/local/sbin/recipelog-instance
 cat > /usr/local/sbin/recipelog-plateforme <<EOF
 #!/bin/bash
