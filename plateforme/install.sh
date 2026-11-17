@@ -312,6 +312,16 @@ if PANEL="$(docker exec recipelog-passerelle node cli.mjs panel-creer "https://a
 else
   echo "⚠️  Panel non branché sur Authentik. À relancer : bash install.sh"
 fi
+info "Bouton « Se connecter » du site vitrine (${DOMAINE}/connexion)…"
+if PORTAIL="$(docker exec recipelog-passerelle node cli.mjs portail-creer "https://${DOMAINE}" --env)"; then
+  sed -i '/^PORTAIL_OIDC_/d' "${DONNEES}/.env"
+  umask 077; printf '%s\n' "${PORTAIL}" | sed "s/=\(.*\)$/='\1'/" >> "${DONNEES}/.env"; umask 022
+  # shellcheck disable=SC1091
+  set -a; . "${DONNEES}/.env"; set +a
+  recipelog-plateforme up -d panel >/dev/null
+else
+  echo "⚠️  Bouton « Se connecter » non branché sur Authentik. À relancer : bash install.sh"
+fi
 
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"

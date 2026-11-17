@@ -28,6 +28,17 @@ const GROUPE = "super-admins";
 const DUREE_SESSION = 12 * 3600;
 
 const pret = Boolean(ISSUER && CLIENT_ID && CLIENT_SECRET && SECRET.length >= 32 && MOTEUR_CLE);
+const PANEL_OIDC = { issuer: ISSUER, clientId: CLIENT_ID };
+
+// Bouton « Se connecter » du site vitrine (<domaine>/connexion) : application Authentik
+// « rl-portail », ouverte à tous les comptes (passerelle : portail-creer).
+const PORTAIL_OIDC = {
+  issuer: process.env.PORTAIL_OIDC_ISSUER || "",
+  clientId: process.env.PORTAIL_OIDC_CLIENT_ID || "",
+  secret: process.env.PORTAIL_OIDC_CLIENT_SECRET || "",
+};
+const URL_PORTAIL = `https://${DOMAINE}`;
+const portailPret = Boolean(PORTAIL_OIDC.issuer && PORTAIL_OIDC.clientId && PORTAIL_OIDC.secret && SECRET.length >= 32);
 
 // ------------------------------------------------------------ outils
 const b64u = (b) => Buffer.from(b).toString("base64url");
@@ -98,17 +109,20 @@ function appel(adresse, { methode = "GET", entetes = {}, corps } = {}) {
   });
 }
 
-let decouverte = null;
-async function oidc() {
-  if (decouverte && decouverte.exp > Date.now()) return decouverte;
-  const d = await appel(`${ISSUER}.well-known/openid-configuration`);
+// Découverte OIDC gardée 10 minutes, une par application (panel, portail).
+const decouvertes = new Map();
+async function oidc(issuer = ISSUER) {
+  const garde = decouvertes.get(issuer);
+  if (garde && garde.exp > Date.now()) return garde;
+  const d = await appel(`${issuer}.well-known/openid-configuration`);
   if (d.statut !== 200 || !d.json?.authorization_endpoint) throw new Error("Authentik ne répond pas.");
   const k = await appel(d.json.jwks_uri);
-  decouverte = { ...d.json, cles: k.json?.keys ?? [], exp: Date.now() + 10 * 60 * 1000 };
+  const decouverte = { ...d.json, cles: k.json?.keys ?? [], exp: Date.now() + 10 * 60 * 1000 };
+  decouvertes.set(issuer, decouverte);
   return decouverte;
 }
 
-function verifierJeton(idToken, d, nonce) {
+function verifierJeton(idToken, d, nonce, { issuer, clientId } = PANEL_OIDC) {
   const [h, p, s] = idToken.split(".");
   const entete = JSON.parse(Buffer.from(h, "base64url").toString("utf8"));
   const charge = JSON.parse(Buffer.from(p, "base64url").toString("utf8"));
@@ -118,8 +132,8 @@ function verifierJeton(idToken, d, nonce) {
   const ok = verifier("RSA-SHA256", Buffer.from(`${h}.${p}`), createPublicKey({ key: jwk, format: "jwk" }), Buffer.from(s, "base64url"));
   if (!ok) throw new Error("signature invalide");
   const aud = Array.isArray(charge.aud) ? charge.aud : [charge.aud];
-  if (charge.iss !== ISSUER) throw new Error("émetteur inattendu");
-  if (!aud.includes(CLIENT_ID)) throw new Error("destinataire inattendu");
+  if (charge.iss !== issuer) throw new Error("émetteur inattendu");
+  if (!aud.includes(clientId)) throw new Error("destinataire inattendu");
   if (!charge.exp || charge.exp * 1000 < Date.now() - 60000) throw new Error("jeton expiré");
   if (charge.nonce !== nonce) throw new Error("nonce inattendu");
   return charge;
@@ -251,6 +265,109 @@ function pageErreur(res, statut, titre, texte) {
 <p class="marque">RecipeLog · panel</p><h1>${echapper(titre)}</h1><p>${echapper(texte)}</p><p><a class="btn" href="/auth/connexion">Se reconnecter</a></p></main></body></html>`);
 }
 
+// ------------------------------------------------------------ « Se connecter » (site vitrine)
+// <domaine>/connexion → Authentik → <domaine>/connexion/retour → le RecipeLog de la personne.
+// Aucune liste de clients n'est lue ni montrée : seulement les groupes « client-<nom> » du
+// compte qui vient de se connecter (jeton signé par Authentik). L'adresse de destination est
+// toujours fabriquée ici (https://<nom>.<domaine>/), jamais reprise d'un paramètre : pas de
+// redirection ouverte. Le RecipeLog revérifie l'accès auprès d'Authentik (sans redemander
+// le mot de passe, la session Authentik est déjà ouverte).
+const NOM_CLIENT = /^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/;
+const CSS_PUBLIC = `${PREFIXE_PUBLIC}/panel.css`;
+
+function pagePortail(res, statut, titre, contenu) {
+  res.writeHead(statut, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'none'",
+    "Referrer-Policy": "no-referrer",
+  });
+  res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>${echapper(titre)} · RecipeLog</title><link rel="stylesheet" href="${CSS_PUBLIC}"></head>
+<body class="pause"><main class="carte-pause portail"><p class="marque">RecipeLog</p><h1>${echapper(titre)}</h1>${contenu}
+<p class="petit"><a href="/">Retour au site RecipeLog</a></p></main></body></html>`);
+}
+const recommencer = `<p><a class="btn principal" href="/connexion">Se connecter</a></p>`;
+
+async function portail(req, res, hote, url) {
+  // Toujours sur l'adresse principale : le cookie du flux et l'adresse de retour y sont liés.
+  if (hote !== DOMAINE) {
+    res.writeHead(302, { Location: `${URL_PORTAIL}/connexion` });
+    return res.end();
+  }
+  if (!portailPret)
+    return pagePortail(res, 503, "Connexion bientôt disponible", "<p>La connexion depuis ce site n'est pas encore ouverte. Utilise l'adresse de ton RecipeLog (par exemple <b>ton-nom.recipelog.cc</b>).</p>");
+  const jar = cookies(req);
+  try {
+    if (url.pathname === "/connexion") {
+      const d = await oidc(PORTAIL_OIDC.issuer);
+      const flux = { state: b64u(randomBytes(24)), nonce: b64u(randomBytes(24)), verifier: b64u(randomBytes(32)), exp: Math.floor(Date.now() / 1000) + 600 };
+      const vers = new URL(d.authorization_endpoint);
+      Object.entries({
+        response_type: "code",
+        client_id: PORTAIL_OIDC.clientId,
+        redirect_uri: `${URL_PORTAIL}/connexion/retour`,
+        scope: "openid email profile",
+        state: flux.state,
+        nonce: flux.nonce,
+        code_challenge: createHash("sha256").update(flux.verifier).digest("base64url"),
+        code_challenge_method: "S256",
+      }).forEach(([k, v]) => vers.searchParams.set(k, v));
+      res.writeHead(302, { Location: vers.toString(), "Set-Cookie": cookie("rl_portail_flux", signer(flux, "portail-flux"), 600), "Cache-Control": "no-store" });
+      return res.end();
+    }
+    if (url.pathname !== "/connexion/retour") {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      return res.end("Page introuvable.");
+    }
+    const flux = lire(jar.rl_portail_flux, "portail-flux");
+    const effacer = cookie("rl_portail_flux", "", 0);
+    res.setHeader("Set-Cookie", effacer);
+    if (url.searchParams.get("error")) return pagePortail(res, 403, "Connexion annulée", `<p>La connexion n'a pas abouti.</p>${recommencer}`);
+    if (!flux || flux.state !== url.searchParams.get("state")) return pagePortail(res, 400, "Connexion expirée", `<p>La page de connexion est restée ouverte trop longtemps. Recommence.</p>${recommencer}`);
+    const d = await oidc(PORTAIL_OIDC.issuer);
+    const corps = new URLSearchParams({ grant_type: "authorization_code", code: url.searchParams.get("code") ?? "", redirect_uri: `${URL_PORTAIL}/connexion/retour`, code_verifier: flux.verifier });
+    const t = await appel(d.token_endpoint, {
+      methode: "POST",
+      corps: corps.toString(),
+      entetes: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${Buffer.from(`${PORTAIL_OIDC.clientId}:${PORTAIL_OIDC.secret}`).toString("base64")}` },
+    });
+    if (t.statut !== 200 || !t.json?.id_token) return pagePortail(res, 400, "Connexion impossible", `<p>La connexion a échoué. Recommence.</p>${recommencer}`);
+    const charge = verifierJeton(t.json.id_token, d, flux.nonce, PORTAIL_OIDC);
+    const groupes = Array.isArray(charge.groups) ? charge.groups.map(String) : [];
+    const sites = [...new Set(groupes.filter((g) => g.startsWith("client-")).map((g) => g.slice(7)).filter((n) => NOM_CLIENT.test(n)))].sort();
+    const superAdmin = groupes.includes(GROUPE);
+    const adresse = (nom) => `https://${nom}.${DOMAINE}/`;
+
+    // Un seul RecipeLog : on y va directement.
+    if (sites.length === 1 && !superAdmin) {
+      res.writeHead(302, { Location: adresse(sites[0]), "Set-Cookie": effacer, "Cache-Control": "no-store" });
+      return res.end();
+    }
+    const email = String(charge.email ?? "");
+    const quitter = d.end_session_endpoint ? `<p class="petit">Connecté avec <b>${echapper(email)}</b>. <a href="${echapper(d.end_session_endpoint)}">Changer de compte</a></p>` : "";
+    if (!sites.length && !superAdmin)
+      return pagePortail(
+        res,
+        200,
+        "Aucun RecipeLog pour ce compte",
+        `<p>Ce compte n'a encore accès à aucun RecipeLog. Si ton établissement utilise RecipeLog, demande à ton responsable de t'inviter : tu recevras un email pour choisir ton mot de passe.</p>${quitter}`,
+      );
+    const liens = sites.map((n) => `<a class="btn principal site" href="${adresse(n)}"><b>${echapper(n)}</b><span>${echapper(n)}.${echapper(DOMAINE)}</span></a>`);
+    if (superAdmin) liens.push(`<a class="btn site" href="${echapper(URL_PANEL)}/"><b>Panel admin</b><span>${echapper(HOTE_PANEL)}</span></a>`);
+    return pagePortail(
+      res,
+      200,
+      "Choisis ton RecipeLog",
+      `<details class="aide-portail"><summary aria-label="Aide">?</summary><p>Ton compte a accès à plusieurs RecipeLog (par exemple deux établissements). Choisis celui que tu veux ouvrir. Tu pourras aussi y aller directement par son adresse, à garder dans tes favoris.</p></details>
+<nav class="choix-sites" aria-label="Tes RecipeLog">${liens.join("")}</nav>${quitter}`,
+    );
+  } catch (e) {
+    console.error("Connexion depuis le site vitrine :", e.message);
+    return pagePortail(res, 503, "Connexion indisponible", `<p>Le service de connexion ne répond pas pour le moment. Réessaie dans une minute.</p>${recommencer}`);
+  }
+}
+
 // ------------------------------------------------------------ serveur
 createServer(async (req, res) => {
   const hote = (req.headers.host ?? "").toLowerCase().split(":")[0];
@@ -287,6 +404,7 @@ createServer(async (req, res) => {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
       return res.end("Page introuvable.");
     }
+    if ((hote === DOMAINE || hote === `www.${DOMAINE}`) && req.method === "GET" && url.pathname.startsWith("/connexion")) return portail(req, res, hote, url);
     if ((hote === DOMAINE || hote === `www.${DOMAINE}`) && req.method === "GET" && Object.hasOwn(PAGES_VENTE, url.pathname.slice(1))) return pageLegale(res, url.pathname.slice(1));
     if (hote !== HOTE_PANEL) return pagePause(res, hote);
     if (!pret) return pageErreur(res, 503, "Panel pas encore réglé", "Relance install.sh sur la machine : il crée l'accès du panel dans Authentik.");

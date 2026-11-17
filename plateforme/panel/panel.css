@@ -446,6 +446,19 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .carte-pause h1 { margin: 8px 0 10px; }
 .carte-pause p { color: var(--soft); }
 .carte-pause .petit { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+/* « Se connecter » du site vitrine : choix du RecipeLog quand le compte en a plusieurs. */
+.portail { width: 100%; position: relative; }
+.portail .petit a, .portail p a:not(.btn) { color: var(--accent); }
+.choix-sites { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 8px; }
+.choix-sites .site { flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 16px; text-decoration: none; text-align: left; min-height: 56px; }
+.choix-sites .site b { font-size: 16px; }
+.choix-sites .site span { font-family: var(--f-mono); font-size: 12px; opacity: .8; }
+.aide-portail { position: absolute; top: 14px; right: 14px; text-align: left; }
+.aide-portail summary { list-style: none; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; font-weight: 700; color: var(--soft); }
+.aide-portail summary::-webkit-details-marker { display: none; }
+.aide-portail[open] { position: static; margin: 0 0 6px; }
+.aide-portail[open] summary { margin-left: auto; }
+.aide-portail p { font-size: 14px; background: var(--card2, var(--card)); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .barre.serree { margin-top: 0; }
 
 /* ---------------------------------------------------------------- maintenance et messages (lot 6) */

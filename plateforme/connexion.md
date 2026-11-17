@@ -109,3 +109,16 @@ En-tête : `Authorization: Bearer ${RECIPELOG_PASSERELLE_CLE}`. Réponses JSON. 
 - **Lecture par IA** : l'appli demande la réponse en continu (`stream`), jusqu'à 64 000 jetons ;
   la passerelle ne compte que les lectures finies normalement et écrit la vraie erreur
   d'Anthropic dans ses journaux (`recipelog-plateforme logs passerelle`).
+
+## « Se connecter » depuis le site vitrine (`<domaine>/connexion`)
+
+- Le bouton du site vitrine mène à `https://<domaine>/connexion`, servi par le panel (routeur
+  Traefik « vente »). Application Authentik `rl-portail` (« Mes sites RecipeLog »), ouverte à
+  tous les comptes, créée par `node cli.mjs portail-creer` (install.sh écrit `PORTAIL_OIDC_*`).
+- Au retour, le panel lit seulement les groupes `client-<nom>` du jeton : un seul site →
+  redirection directe vers `https://<nom>.<domaine>/` ; plusieurs (ou super-admin) → page de
+  choix ; aucun → message « demande à ton responsable de t'inviter ».
+- L'adresse de destination est fabriquée par le panel (nom vérifié), jamais lue dans la
+  demande : pas de redirection ouverte, et personne ne voit la liste des clients.
+- `rl-portail` ne donne accès à rien : le RecipeLog du client revérifie l'accès avec sa propre
+  application Authentik (sans redemander le mot de passe).
