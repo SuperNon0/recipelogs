@@ -299,7 +299,7 @@ a.chiffre:hover { border-color: var(--acc-line); }
 .aide-corps b { color: var(--text); }
 .champ { margin: 0 0 14px; }
 .champ label { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
-.champ input[type=text], .champ input[type=email], .champ input[type=number], .champ select { width: 100%; background: var(--creux); border: 1px solid var(--line2); border-radius: var(--r-md); padding: 10px 12px; }
+.champ input[type=text], .champ input[type=email], .champ input[type=number], .champ input[type=password], .champ select { width: 100%; background: var(--creux); border: 1px solid var(--line2); border-radius: var(--r-md); padding: 10px 12px; }
 .champ .case { display: flex; gap: 8px; align-items: center; font-weight: 400; }
 .champ .suffixe { display: flex; align-items: center; gap: 8px; }
 .champ .suffixe input { flex: 1; }

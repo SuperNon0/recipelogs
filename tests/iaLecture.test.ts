@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -163,6 +163,17 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("la clé mise dans le panel passe avant celle de l'installation, tout de suite", async () => {
+    writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 100 } }));
+    writeFileSync(join(dossier, "cle.json"), JSON.stringify({ cle: "sk-ant-du-panel", depuis: "2026-11-17T00:00:00Z" }));
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    expect(r.ok).toBe(true);
+    expect(recu!.headers["x-api-key"]).toBe("sk-ant-du-panel");
+    rmSync(join(dossier, "cle.json"));
+    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    expect(recu!.headers["x-api-key"]).toBe("sk-ant-plateforme");
+  });
+
   it("refuse une demande qui n'est pas une lecture", async () => {
     const { controler } = await import("../plateforme/passerelle/ia.mjs");
     const ok = { model: "claude-opus-5-5", max_tokens: 16000, messages: [{ role: "user", content: [{ type: "text", text: "x" }] }] };
@@ -171,5 +182,35 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(controler({ ...ok, tools: [] }, [])).toMatch(/tools/);
     expect(controler({ ...ok, max_tokens: 64000 }, [])).toMatch(/max_tokens/);
     expect(controler(ok, ["files-api-2025-04-14"])).toMatch(/refusée/);
+  });
+});
+
+describe("clé Claude réglée dans le panel", () => {
+  const cleOk = "sk-ant-api03-" + "a".repeat(40) + "WXYZ";
+  const faux = (statut: number) => (async () => new Response("{}", { status: statut })) as unknown as typeof fetch;
+
+  it("essaie la clé, la garde en 600 et ne montre que la fin", async () => {
+    const d = mkdtempSync(join(tmpdir(), "panel-"));
+    const ia = await import("../plateforme/panel/ia.mjs");
+    expect((await ia.resume(d)).cle).toBe(false);
+    expect(await ia.reglerCle(d, { cle: cleOk }, faux(200))).toEqual({ avertissement: null });
+    expect(statSync(join(d, "ia", "cle.json")).mode & 0o777).toBe(0o600);
+    const r = await ia.resume(d);
+    expect(r.cle).toBe(true);
+    expect(r.cleInfo).toMatchObject({ source: "panel", fin: "sk-ant-…WXYZ" });
+    expect(JSON.stringify(r)).not.toContain(cleOk);
+    await ia.reglerCle(d, { cle: null });
+    expect((await ia.resume(d)).cle).toBe(false);
+  });
+
+  it("refuse une clé fausse ou refusée par Anthropic, garde une clé non essayée avec un avertissement", async () => {
+    const d = mkdtempSync(join(tmpdir(), "panel-"));
+    const ia = await import("../plateforme/panel/ia.mjs");
+    await expect(ia.reglerCle(d, { cle: "bonjour" }, faux(200))).rejects.toThrow(/sk-ant-/);
+    await expect(ia.reglerCle(d, { cle: cleOk }, faux(401))).rejects.toThrow(/refuse/);
+    expect((await ia.resume(d)).cle).toBe(false);
+    const r = await ia.reglerCle(d, { cle: cleOk }, faux(529));
+    expect(r.avertissement).toMatch(/pas pu l'essayer/);
+    expect((await ia.resume(d)).cleInfo.source).toBe("panel");
   });
 });
