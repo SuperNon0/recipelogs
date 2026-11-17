@@ -257,13 +257,45 @@ a.chiffre:hover { border-color: var(--acc-line); }
 .ligne time, .ligne .qui { color: var(--muted); font-size: 12.5px; }
 .ligne button { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px; }
 
-/* ---------------------------------------------------------------- fenêtres (fermeture par la croix seulement) */
-.voile { position: fixed; inset: 0; background: var(--scrim); display: none; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 60; overflow-y: auto; }
-.voile.ouvert { display: flex; }
-.fenetre { width: min(560px, 100%); background: var(--pop); border: 1px solid var(--line2); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 20px 22px 22px; position: relative; }
-.fenetre h3 { font-family: var(--f-title); font-weight: 400; font-size: 26px; margin: 0 40px 4px 0; }
+/* ---------------------------------------------------------------- fenêtres (fermeture par la croix seulement)
+   Kit encre : feuille qui monte du bas sur téléphone, fenêtre centrée à partir de 760 px. */
+.voile { position: fixed; inset: 0; background: var(--scrim); display: none; z-index: 60; animation: fondu .2s var(--ease); }
+.voile.ouvert { display: block; }
+.voile-aide { z-index: 80; }
+.fenetre {
+  position: fixed; left: 0; right: 0; bottom: 0; max-height: 92vh; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--pop); border-top: 1px solid var(--line2); border-radius: 24px 24px 0 0; box-shadow: var(--shadow);
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  animation: monte .32s var(--ease);
+}
+.grab { width: 40px; height: 5px; border-radius: 99px; background: var(--line2); margin: 2px auto 14px; }
+.fenetre-t { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.fenetre-t h3 { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--f-title); font-weight: 400; font-size: 23px; line-height: 1.15; margin: 0; }
+.ib { width: 40px; height: 40px; flex: none; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--soft); display: inline-grid; place-items: center; cursor: pointer; padding: 0; transition: transform .12s var(--ease), color .2s; }
+.ib:hover { color: var(--text); }
+.ib:active { transform: scale(.94); }
+.ib:disabled { opacity: .4; cursor: default; }
 .fenetre .sub { margin-bottom: 14px; }
-.croix { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line2); background: var(--card); cursor: pointer; font-size: 18px; line-height: 1; }
+@media (min-width: 760px) {
+  .fenetre {
+    left: 50%; right: auto; top: 50%; bottom: auto; width: min(560px, calc(100vw - 48px)); max-height: min(86vh, 820px);
+    transform: translate(-50%, -50%); border: 1px solid var(--line2); border-radius: 20px; padding: 18px 20px 20px;
+    animation: apparait .22s var(--ease);
+  }
+  .fenetre .grab { display: none; }
+  .fenetre:has(pre.journaux), .fenetre:has(.pf-liste) { width: min(860px, calc(100vw - 48px)); }
+}
+@keyframes monte { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes apparait { from { opacity: 0; transform: translate(-50%, -48%) scale(.98); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@keyframes fondu { from { opacity: 0; } to { opacity: 1; } }
+
+/* Fenêtre d'aide (« ? ») */
+.fenetre.petite { max-height: 70vh; max-height: 70dvh; }
+@media (min-width: 760px) { .fenetre.petite { width: min(440px, calc(100vw - 48px)); } }
+.pastille-aide { width: 34px; height: 34px; flex: none; border-radius: 11px; display: inline-grid; place-items: center; background: var(--acc-dim); color: var(--accent); }
+.fenetre.petite .fenetre-t h3 { font-size: 21px; }
+.aide-corps { color: var(--soft); font-size: 15px; line-height: 1.55; }
+.aide-corps b { color: var(--text); }
 .champ { margin: 0 0 14px; }
 .champ label { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
 .champ input[type=text], .champ input[type=email], .champ input[type=number], .champ select { width: 100%; background: var(--creux); border: 1px solid var(--line2); border-radius: var(--r-md); padding: 10px 12px; }
@@ -271,7 +303,8 @@ a.chiffre:hover { border-color: var(--acc-line); }
 .champ .suffixe { display: flex; align-items: center; gap: 8px; }
 .champ .suffixe input { flex: 1; }
 .champ .suffixe span { color: var(--muted); white-space: nowrap; }
-.aide { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line2); background: var(--card); color: var(--soft); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+.aide { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 1px solid var(--line2); background: var(--card); color: var(--soft); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; transition: color .15s, border-color .15s, background .15s; }
+.aide:hover, .aide:focus-visible { color: var(--accent); border-color: var(--accent); background: var(--acc-dim); }
 .texte-aide { display: none; background: var(--acc-dim); color: var(--text); border-radius: var(--r-sm); padding: 8px 10px; font-size: 13.5px; margin: 0 0 8px; }
 .texte-aide.visible { display: block; }
 .pied { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
@@ -380,7 +413,6 @@ pre.sortie { background: var(--creux); border: 1px solid var(--line); border-rad
 .champ.note { border-top: 1px solid var(--line); padding-top: 14px; margin: 18px 0 0; }
 .case { display: flex; gap: 8px; align-items: center; }
 pre.journaux { max-height: 60vh; font-size: 11.5px; }
-@media (min-width: 861px) { .voile .fenetre:has(pre.journaux) { width: min(980px, 100%); } }
 
 /* ---------------------------------------------------------------- page de statut publique (status.<domaine>) */
 body.statut { min-height: 100vh; }

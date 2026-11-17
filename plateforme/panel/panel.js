@@ -70,14 +70,31 @@ async function api(methode, chemin, corps) {
 }
 
 // ------------------------------------------------------------ aide « ? »
+// Chaque « ? » ouvre une petite fenêtre avec son texte (le texte reste caché dans la page,
+// à côté du bouton). Elle passe par-dessus une fenêtre déjà ouverte et ne se ferme que par sa croix.
+const voileAide = $("#voile-aide");
+function titreAide(b) {
+  const src = b.closest("label, h1, h2, h3, h4, .tete-page, .aide-ligne, .tete-boite");
+  const t = (src?.textContent ?? "").replace(/\?/g, "").replace(/\s+/g, " ").trim();
+  if (t && t.length <= 60) return t;
+  const lbl = (b.getAttribute("aria-label") || "").replace(/^Aide( sur| :)?\s*/i, "").trim();
+  return lbl ? lbl.charAt(0).toUpperCase() + lbl.slice(1) : "Aide";
+}
 document.addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-aide]");
   if (!b) return;
+  ev.preventDefault();
   const t = document.getElementById(b.dataset.aide);
-  if (t) {
-    t.classList.toggle("visible");
-    b.setAttribute("aria-expanded", t.classList.contains("visible"));
-  }
+  if (!t) return;
+  $("#aide-titre").textContent = titreAide(b);
+  $("#aide-corps").innerHTML = t.innerHTML;
+  voileAide.classList.add("ouvert");
+  document.body.style.overflow = "hidden";
+  $("#aide-croix").focus();
+});
+$("#aide-croix").addEventListener("click", () => {
+  voileAide.classList.remove("ouvert");
+  if (!voile.classList.contains("ouvert")) document.body.style.overflow = "";
 });
 const aide = (id, texte) => `<button class="aide" type="button" data-aide="${id}" aria-label="Aide">?</button></label><p class="texte-aide" id="${id}">${texte}</p>`;
 
