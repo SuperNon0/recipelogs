@@ -139,6 +139,8 @@ async function moteur(methode, chemin, qui, corps) {
 const fichiers = {
   "/panel.css": ["text/css; charset=utf-8", "panel.css"],
   "/panel.js": ["text/javascript; charset=utf-8", "panel.js"],
+  "/theme.js": ["text/javascript; charset=utf-8", "theme.js"],
+  "/icones.svg": ["image/svg+xml; charset=utf-8", "icones.svg"],
 };
 const polices = /^\/polices\/[a-z0-9-]+\.woff2$/;
 const PREFIXE_PUBLIC = "/_plateforme";
@@ -395,7 +397,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|taches\/[0-9a-f]{16}|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|vente|alertes\/essai)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|taches\/[0-9a-f]{16}|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|vente|alertes\/essai|plateforme(\/maj)?)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();

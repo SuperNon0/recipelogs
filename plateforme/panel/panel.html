@@ -2,65 +2,145 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
   <title>Panel RecipeLog</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/panel.css">
   <script src="/panel.js" defer></script>
 </head>
 <body data-domaine="{{DOMAINE}}">
-  <header class="haut">
-    <p class="marque">RecipeLog <small>panel admin</small></p>
-    <div class="moi">{{EMAIL}}<a href="https://status.{{DOMAINE}}" target="_blank" rel="noopener">Page de statut ↗</a><a href="/auth/deconnexion">Se déconnecter</a></div>
-  </header>
-
-  <main class="panel">
-    <h1>Clients</h1>
-    <p class="sub">Chaque client a son propre RecipeLog sur &lt;nom&gt;.{{DOMAINE}}, avec sa base et son équipe.</p>
-
-    <section class="chiffres" id="chiffres" aria-label="Résumé"></section>
-
-    <div class="barre">
-      <button class="btn principal" id="nouveau" type="button">+ Nouveau client</button>
-      <button class="btn" id="tout-maj" type="button">Tout mettre à jour</button>
-      <button class="aide" type="button" data-aide="aide-maj" aria-label="Aide : tout mettre à jour">?</button>
-      <input class="recherche" id="recherche" type="search" placeholder="Chercher un client…" aria-label="Chercher un client">
+<div class="app">
+  <!-- Menu de gauche (ordinateur, 1000 px et plus) -->
+  <aside class="side" aria-label="Menu">
+    <a class="wm" href="#accueil">Recipe<b>Log</b><small>admin</small></a>
+    <a class="side-it" href="#accueil" data-nav="accueil"><svg class="ic s18"><use href="/icones.svg#i-home"/></svg>Accueil<span class="n" data-badge="accueil"></span></a>
+    <a class="side-it" href="#clients" data-nav="clients"><svg class="ic s18"><use href="/icones.svg#i-users"/></svg>Clients</a>
+    <a class="side-it" href="#support" data-nav="support"><svg class="ic s18"><use href="/icones.svg#i-chat"/></svg>Support<span class="n" data-badge="support"></span></a>
+    <a class="side-it" href="#maintenance" data-nav="maintenance"><svg class="ic s18"><use href="/icones.svg#i-wrench"/></svg>Maintenance et messages</a>
+    <p class="side-g">Vente</p>
+    <a class="side-it" href="#vitrine" data-nav="vitrine"><svg class="ic s18"><use href="/icones.svg#i-compass"/></svg>Site vitrine<span class="n" data-badge="vitrine"></span></a>
+    <a class="side-it" href="#vente" data-nav="vente"><svg class="ic s18"><use href="/icones.svg#i-ticket"/></svg>Tarifs et textes légaux</a>
+    <a class="side-it" href="#ia" data-nav="ia"><svg class="ic s18"><use href="/icones.svg#i-sparkle"/></svg>Factures par IA</a>
+    <p class="side-g">Surveillance</p>
+    <a class="side-it" href="#sante" data-nav="sante"><svg class="ic s18"><use href="/icones.svg#i-signal"/></svg>Santé de la machine</a>
+    <a class="side-it" href="#journal" data-nav="journal"><svg class="ic s18"><use href="/icones.svg#i-list"/></svg>Journal</a>
+    <div class="side-bas">
+      <span class="moi">{{EMAIL}}</span>
+      <a class="side-it" href="https://status.{{DOMAINE}}" target="_blank" rel="noopener"><svg class="ic s18"><use href="/icones.svg#i-external"/></svg>Page de statut</a>
+      <button class="side-it" type="button" data-apparence><svg class="ic s18"><use href="/icones.svg#i-palette"/></svg>Apparence</button>
+      <a class="side-it" href="/auth/deconnexion"><svg class="ic s18"><use href="/icones.svg#i-logout"/></svg>Se déconnecter</a>
     </div>
-    <p class="texte-aide" id="aide-maj">Télécharge la dernière version de chaque client, l'un après l'autre (2 à 3 minutes chacun). Un client qui ne redémarre pas revient tout seul à sa version d'avant, et la suite s'arrête. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
+  </aside>
 
-    <p class="aide-ligne"><button class="aide" type="button" data-aide="a-boutons" aria-label="Aide sur les boutons">?</button> <span class="sub">À quoi servent les boutons d'un client</span></p>
-    <p class="texte-aide" id="a-boutons"><b>Ouvrir</b> : son site. <b>Équipe</b> : inviter ou retirer des comptes. <b>Réglages</b> : nombre de comptes, essai, accès MCP. <b>Sauvegardes</b> : sauvegarder, tester, télécharger, restaurer. <b>Journaux</b> : ce que son site a écrit (pour comprendre une panne). <b>Mettre à jour</b> : sauvegarde, puis dernière version ; si elle ne démarre pas, retour tout seul à la version et à la base d'avant. <b>Pause</b> : son site affiche « en pause », rien n'est effacé. <b>Supprimer</b> : arrête le site et range ses données dans une archive. Une seule action tourne à la fois : les autres attendent leur tour.</p>
-    <section class="clients" id="clients" aria-live="polite"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></section>
+  <div class="main">
+    <!-- Barre du haut (téléphone et tablette) -->
+    <header class="top">
+      <a class="wm" href="#accueil">Recipe<b>Log</b><small>admin</small></a>
+      <div class="droite"><button class="ib" type="button" data-apparence aria-label="Apparence"><svg class="ic s18"><use href="/icones.svg#i-palette"/></svg></button></div>
+    </header>
 
-    <h2>Maintenance et messages</h2>
-    <section class="annonces" id="annonces"><div class="vide">Chargement…</div></section>
+    <main class="pages">
+      <!-- ============================================ Accueil -->
+      <section class="page" data-page="accueil">
+        <div class="tete-page"><h1>Accueil</h1><button class="aide" type="button" data-aide="a-accueil" aria-label="Aide sur l'accueil">?</button></div>
+        <p class="texte-aide" id="a-accueil">Ce qui demande ton attention, calculé à chaque rafraîchissement (toutes les 30 secondes) : demandes de support sans réponse, sites en panne, sauvegardes manquantes ou ratées, essais qui finissent, demandes reçues sur la vitrine, disque presque plein. Quand tout est réglé, la liste se vide toute seule.</p>
+        <section class="chiffres" id="chiffres" aria-label="Résumé"></section>
+        <h2>À faire <span class="n" data-badge="afaire"></span></h2>
+        <div class="afaire" id="afaire"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></div>
+        <div class="grille-accueil">
+          <div>
+            <h2>Dernières actions</h2>
+            <div class="boite"><div class="evts" id="accueil-journal"></div><a href="#journal">Tout le journal</a></div>
+          </div>
+          <div>
+            <h2>Machine</h2>
+            <div class="boite" id="accueil-machine"></div>
+            <h2>Plateforme</h2>
+            <div class="boite" id="accueil-plateforme"></div>
+          </div>
+        </div>
+      </section>
 
-    <h2>Lecture des factures par IA</h2>
-    <section class="ia" id="ia"><div class="vide">Chargement…</div></section>
+      <!-- ============================================ Clients -->
+      <section class="page" data-page="clients">
+        <div class="tete-page"><h1>Clients</h1><button class="aide" type="button" data-aide="a-clients" aria-label="Aide sur les clients">?</button></div>
+        <p class="texte-aide" id="a-clients">Chaque client a son propre RecipeLog sur &lt;nom&gt;.{{DOMAINE}}, avec sa base et son équipe. Clique sur un client pour ouvrir sa fiche : équipe, sauvegardes, journaux, réglages, pause et suppression. « Ouvrir » ouvre son site dans un nouvel onglet.</p>
+        <div class="barre">
+          <button class="btn principal" id="nouveau" type="button"><svg class="ic s18"><use href="/icones.svg#i-plus"/></svg>Nouveau client</button>
+          <button class="btn" id="tout-maj" type="button"><svg class="ic s18"><use href="/icones.svg#i-refresh"/></svg>Tout mettre à jour</button>
+          <button class="aide" type="button" data-aide="aide-maj" aria-label="Aide : tout mettre à jour">?</button>
+          <input class="recherche" id="recherche" type="search" placeholder="Chercher un client…" aria-label="Chercher un client">
+        </div>
+        <p class="texte-aide" id="aide-maj">Télécharge la dernière version de chaque client, l'un après l'autre (2 à 3 minutes chacun). Un client qui ne redémarre pas revient tout seul à sa version d'avant, et la suite s'arrête. Les clients en pause prendront la nouvelle version à leur réactivation. La nouvelle version, c'est ce qui est fusionné dans la branche <b>plateforme</b> (les changements de l'appli se préparent sur la branche <b>instance</b>).</p>
+        <div class="puces" id="filtres" role="group" aria-label="Filtrer les clients"></div>
+        <section class="liste-clients" id="clients" aria-live="polite"><div class="vide"><span class="attente"><span class="rond"></span>Chargement…</span></div></section>
+      </section>
 
-    <h2>Vente : tarifs et textes légaux</h2>
-    <section class="vente" id="vente"><div class="vide">Chargement…</div></section>
+      <!-- ============================================ Fiche d'un client (remplie par panel.js) -->
+      <section class="page" data-page="client" id="fiche"></section>
 
-    <h2>Support</h2>
-    <section class="support" id="support"><div class="vide">Chargement…</div></section>
+      <!-- ============================================ Support -->
+      <section class="page" data-page="support">
+        <div class="tete-page"><h1>Support</h1></div>
+        <section class="support" id="support"><div class="vide">Chargement…</div></section>
+      </section>
 
-    <h2>Santé de la machine</h2>
-    <section class="sante" id="sante"><div class="vide">Chargement…</div></section>
+      <!-- ============================================ Maintenance et messages -->
+      <section class="page" data-page="maintenance">
+        <div class="tete-page"><h1>Maintenance et messages</h1></div>
+        <section class="annonces" id="annonces"><div class="vide">Chargement…</div></section>
+      </section>
 
-    <h2>Site vitrine</h2>
-    <section class="vitrine" id="vitrine"><div class="vide">Chargement…</div></section>
+      <!-- ============================================ Vitrine -->
+      <section class="page" data-page="vitrine">
+        <div class="tete-page"><h1>Site vitrine</h1></div>
+        <section class="vitrine" id="vitrine"><div class="vide">Chargement…</div></section>
+      </section>
 
-    <h2>Journal de tes actions <button class="aide" type="button" data-aide="a-journal" aria-label="Aide sur le journal">?</button></h2>
-    <p class="texte-aide" id="a-journal">Tout ce qui a été fait sur la plateforme, par toi ou tout seul (sauvegardes de la nuit, pannes vues, fins d'essai). « Détails » montre ce que la machine a répondu : c'est là qu'on lit pourquoi une action a échoué. Une action lancée puis une page fermée finit quand même et apparaît ici.</p>
-    <section class="journal" id="journal"></section>
-  </main>
+      <!-- ============================================ Vente -->
+      <section class="page" data-page="vente">
+        <div class="tete-page"><h1>Tarifs et textes légaux</h1></div>
+        <section class="vente" id="vente"><div class="vide">Chargement…</div></section>
+      </section>
 
-  <!-- Une seule fenêtre, remplie selon l'action. Elle ne se ferme que par la croix. -->
-  <div class="voile" id="voile" role="dialog" aria-modal="true" aria-labelledby="fenetre-titre">
-    <div class="fenetre">
-      <button class="croix" id="croix" type="button" aria-label="Fermer">×</button>
-      <h3 id="fenetre-titre"></h3>
-      <div id="fenetre-corps"></div>
-    </div>
+      <!-- ============================================ IA -->
+      <section class="page" data-page="ia">
+        <div class="tete-page"><h1>Lecture des factures par IA</h1></div>
+        <section class="ia" id="ia"><div class="vide">Chargement…</div></section>
+      </section>
+
+      <!-- ============================================ Santé -->
+      <section class="page" data-page="sante">
+        <div class="tete-page"><h1>Santé de la machine</h1></div>
+        <section class="sante" id="sante"><div class="vide">Chargement…</div></section>
+      </section>
+
+      <!-- ============================================ Journal -->
+      <section class="page" data-page="journal">
+        <div class="tete-page"><h1>Journal</h1><button class="aide" type="button" data-aide="a-journal" aria-label="Aide sur le journal">?</button></div>
+        <p class="texte-aide" id="a-journal">Tout ce qui a été fait sur la plateforme, par toi ou tout seul (sauvegardes de la nuit, pannes vues, fins d'essai). « Détails » montre ce que la machine a répondu : c'est là qu'on lit pourquoi une action a échoué. Une action lancée puis une page fermée finit quand même et apparaît ici.</p>
+        <section class="journal" id="journal"></section>
+      </section>
+    </main>
   </div>
+</div>
+
+<!-- Barre d'onglets flottante en verre (téléphone et tablette) -->
+<nav class="tabbar" aria-label="Navigation">
+  <a class="tab" href="#accueil" data-nav="accueil"><svg class="ic s22"><use href="/icones.svg#i-home"/></svg>Accueil<span class="n" data-badge="accueil"></span></a>
+  <a class="tab" href="#clients" data-nav="clients"><svg class="ic s22"><use href="/icones.svg#i-users"/></svg>Clients</a>
+  <a class="tab" href="#support" data-nav="support"><svg class="ic s22"><use href="/icones.svg#i-chat"/></svg>Support<span class="n" data-badge="support"></span></a>
+  <button class="tab" type="button" id="bouton-plus" data-nav="plus"><svg class="ic s22"><use href="/icones.svg#i-dots"/></svg>Plus<span class="n" data-badge="plus"></span></button>
+</nav>
+
+<!-- Une seule fenêtre, remplie selon l'action. Elle ne se ferme que par la croix. -->
+<div class="voile" id="voile" role="dialog" aria-modal="true" aria-labelledby="fenetre-titre">
+  <div class="fenetre">
+    <button class="croix" id="croix" type="button" aria-label="Fermer">×</button>
+    <h3 id="fenetre-titre"></h3>
+    <div id="fenetre-corps"></div>
+  </div>
+</div>
 </body>
 </html>

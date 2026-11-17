@@ -9,7 +9,7 @@ FROM node:22-alpine
 # rsync : sauvegardes des fichiers sans recopier ce qui n'a pas changé ; util-linux : flock (une action à la fois).
 RUN apk add --no-cache bash docker-cli coreutils findutils tar sed grep tzdata rsync util-linux
 WORKDIR /app
-COPY plateforme/panel/*.mjs plateforme/panel/*.html plateforme/panel/*.css plateforme/panel/*.js ./
+COPY plateforme/panel/*.mjs plateforme/panel/*.html plateforme/panel/*.css plateforme/panel/*.js plateforme/panel/*.svg ./
 COPY public/polices/*.woff2 ./polices/
 ENV NODE_ENV=production
 CMD ["node", "panel.mjs"]

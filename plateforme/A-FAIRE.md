@@ -430,7 +430,26 @@ Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » 
 
 Trois choses se mettent à jour séparément. Dans l'ordre :
 
-### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans la VM en root
+**D'où viennent les nouveautés (en attendant la séparation des branches).** Trois branches :
+- `instance` : l'atelier de l'application des clients (recettes, factures, etc.). On y fait les
+  changements de l'appli, puis une PR `instance` → `plateforme` les fait entrer.
+- `plateforme` : ce que les boutons installent. GitHub y construit l'image des clients (action
+  **Image Docker**), et `install.sh` (I1) y prend le panel et les outils. Rien n'arrive chez un client
+  tant que ce n'est pas fusionné dans `plateforme`, puis mis à jour avec I2.
+- `site-vitrine` : la vitrine (I3).
+
+Comme l'appli et la plateforme partagent encore la branche `plateforme`, un changement de l'appli
+apparaît aussi dans les « nouveautés » du bloc Plateforme. Ce n'est pas grave : I1 ne touche pas aux
+sites des clients. Plus tard, l'appli passera sur `main`/`stable` sans rien réinstaller.
+
+### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans le panel
+Page **Accueil** → bloc **Plateforme** (en bas à droite) → **Mettre à jour la plateforme**. Le bloc dit
+quelle version est installée et combien de nouveautés attendent sur GitHub (une ligne apparaît
+aussi dans « À faire »). La fenêtre suit la mise à jour : le panel se coupe 5 à 10 minutes puis
+revient, et à la fin **Recharger la page** affiche le nouveau panel.
+
+La toute première fois (le bouton n'existe pas encore sur ta machine), ou si le panel ne répond
+plus, c'est la même chose à la main, dans la VM en root :
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperNon0/recipelogs/plateforme/plateforme/install.sh)"
 ```
@@ -440,15 +459,16 @@ clients restent en ligne pendant ce temps.
 ### ☐ I2. Les sites des clients, dans le panel
 1. Vérifie que l'action **Image Docker** de la branche `plateforme` est verte
    (github.com/SuperNon0/recipelogs → **Actions**).
-2. Essaie d'abord sur un seul : client `test` → **Mettre à jour**. Ouvre-le.
-3. Puis **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce
+2. Essaie d'abord sur un seul : page **Clients** → clique sur `test` → **Mettre à jour** (en haut
+   de sa fiche). Ouvre-le.
+3. Puis, page **Clients**, **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce
    moment qu'un client prend les nouveaux réglages de la plateforme, par exemple le service
    PDF commun.) Si la nouvelle
    version ne démarre pas chez l'un d'eux, il est remis tout seul sur sa version et sa base
    d'avant (badge « version gardée »), et les suivants ne sont pas touchés.
 
 ### ☐ I3. La vitrine, dans le panel
-Partie **Site vitrine** → **Mettre à jour la vitrine**.
+Page **Site vitrine** (menu de gauche, ou « Plus » sur téléphone) → **Mettre à jour la vitrine**.
 
 ---
 
