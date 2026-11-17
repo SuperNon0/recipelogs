@@ -66,6 +66,25 @@ async function comparer(de, vers) {
   return valeur;
 }
 
+// Vitrine téléchargée avant que son commit soit noté (pas de code/.commit) : on compte les
+// commits de la branche arrivés après la date du téléchargement. Gardé comme comparer().
+async function depuisDate(date, vers) {
+  const t = Date.parse(date ?? "");
+  if (!Number.isFinite(t) || !SHA.test(vers)) return null;
+  const cle = `${new Date(t).toISOString()}|${vers}`;
+  const c = comparaisons.get(cle);
+  if (c && (c.valeur || c.jusqua > Date.now())) return c.valeur;
+  let valeur = null;
+  try {
+    const j = await github(`/commits?sha=${vers}&since=${encodeURIComponent(new Date(t).toISOString())}&per_page=30`);
+    if (Array.isArray(j)) valeur = { enRetard: j.length, changements: j.slice(0, 15).map(titre) };
+  } catch {
+    valeur = null;
+  }
+  comparaisons.set(cle, { valeur, jusqua: Date.now() + 10 * 60 * 1000 });
+  return valeur;
+}
+
 // ------------------------------------------------------------ ce que GitHub propose
 // { date, erreur, canaux: { instance: { commit, date } }, vitrine: { commit, date } }
 let distant = null;
@@ -161,9 +180,9 @@ export async function resume(entree) {
   let vitrine = null;
   const vi = SHA.test(entree.vitrine ?? "") ? entree.vitrine : null;
   if (distant?.vitrine) {
-    const cmp = vi ? await comparer(vi, distant.vitrine.commit) : null;
-    vitrine = { installe: vi, disponible: distant.vitrine, enRetard: cmp ? cmp.enRetard : null, changements: cmp?.changements ?? [] };
-  } else vitrine = { installe: vi, disponible: null, enRetard: null, changements: [] };
+    const cmp = vi ? await comparer(vi, distant.vitrine.commit) : await depuisDate(entree.vitrineDate, distant.vitrine.commit);
+    vitrine = { installe: vi, installeLe: entree.vitrineDate ?? null, disponible: distant.vitrine, enRetard: cmp ? cmp.enRetard : null, changements: cmp?.changements ?? [] };
+  } else vitrine = { installe: vi, installeLe: entree.vitrineDate ?? null, disponible: null, enRetard: null, changements: [] };
   const p = entree.plateforme?.nouveautes;
   return {
     date: distant?.date ?? null,

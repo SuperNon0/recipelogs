@@ -419,7 +419,7 @@ function afficherPlateforme() {
   const vi = MAJ?.vitrine;
   if (vi) {
     const et = vi.enRetard > 0 ? `<span class="etiquette acc">${vi.enRetard} nouveauté${vi.enRetard > 1 ? "s" : ""}</span>` : vi.enRetard === 0 ? `<span class="etiquette ok">À jour</span>` : `<span class="etiquette pause">Inconnu</span>`;
-    const detail = vi.installe ? `installée : ${e(vi.installe.slice(0, 7))}` : "version installée inconnue : mets-la à jour une fois";
+    const detail = vi.installe ? `installée : ${e(vi.installe.slice(0, 7))}` : vi.installeLe ? `téléchargée le ${e(dateFr(vi.installeLe))}` : "version installée inconnue : mets-la à jour une fois";
     lignes.push(`<div class="maj-ligne"><div><b>Site vitrine</b><small>${detail}</small></div>${et}<button class="btn petit${vi.enRetard > 0 ? " principal" : ""}" type="button" id="maj-vitrine">Voir</button></div>`);
   }
   const [vAide, vTexte] = aideB(
