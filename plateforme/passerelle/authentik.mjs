@@ -469,12 +469,36 @@ export async function brancherGoogle(clientId, secret) {
   };
   const [existante] = await tous("/sources/oauth/", { slug: "google" });
   const source = existante ? await api("PATCH", "/sources/oauth/google/", corps) : await api("POST", "/sources/oauth/", corps);
-  const [etape] = await tous("/stages/identification/", { name: "default-authentication-identification" });
+  const [etape] = await tous("/stages/identification/", { name: ETAPE_CONNEXION });
   if (!etape) throw new ErreurPasserelle(500, "configuration", "Étape de connexion introuvable.");
   if (!etape.sources.includes(source.pk)) {
     await api("PATCH", `/stages/identification/${etape.pk}/`, { sources: [...etape.sources, source.pk] });
   }
   return { ok: true, adresseDeRetourGoogle: `${URL_PUBLIQUE}/source/oauth/callback/google/` };
+}
+
+/** L'écran de connexion RecipeLog (blueprint recipelog.yaml, flux « recipelog-connexion »). */
+const ETAPE_CONNEXION = "recipelog-connexion-identification";
+
+/**
+ * Passage à la page de connexion RecipeLog (novembre 2026) : un bouton
+ * « Google » déjà branché sur l'ancienne page d'Authentik est recopié sur la
+ * nouvelle. Rappelé à chaque installation ; sans effet s'il n'y a rien à faire.
+ * Attend jusqu'à 2 minutes que le blueprint ait créé l'étape.
+ */
+export async function connexion() {
+  let etape;
+  for (let i = 0; i < 24 && !etape; i += 1) {
+    [etape] = await tous("/stages/identification/", { name: ETAPE_CONNEXION });
+    if (!etape) await new Promise((r) => setTimeout(r, 5000));
+  }
+  if (!etape) throw new ErreurPasserelle(500, "configuration", "Page de connexion RecipeLog pas encore prête (blueprint).");
+  const [ancienne] = await tous("/stages/identification/", { name: "default-authentication-identification" });
+  const manquantes = (ancienne?.sources ?? []).filter((pk) => !etape.sources.includes(pk));
+  if (manquantes.length) {
+    await api("PATCH", `/stages/identification/${etape.pk}/`, { sources: [...etape.sources, ...manquantes] });
+  }
+  return { ok: true, sourcesRecopiees: manquantes.length };
 }
 
 /**
