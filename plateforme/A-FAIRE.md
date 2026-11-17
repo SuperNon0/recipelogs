@@ -271,6 +271,12 @@ quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout r
 
 ### ☐ E2. La démo
 
+**Le plus simple : une démo neuve.** Dans la VM : `recipelog-instance creer demo --demo --sans-authentik`.
+Elle se remplit toute seule avec les exemples (1 à 2 minutes). Quand elle te plaît :
+`recipelog-instance demo-figer demo`. Rien d'autre à faire (tu sautes ce qui suit).
+
+**Seulement si tu veux garder ce que tu as ajouté dans l'ancienne démo :**
+
 1. Sur l'hôte Proxmox (`115` = ton conteneur vitrine + démo) : l'option prend l'état « figé »
    de la démo, pas les essais des visiteurs.
    ```bash
