@@ -1036,7 +1036,12 @@ cmd_importer() {
   tar -C "${tmp}" --no-same-owner --no-same-permissions -xzf "${fichier}" \
     || abandon "Archive illisible ou incomplète (copie coupée ?). Refais l'export et la copie."
   [ -f "${tmp}/base.dump" ] || abandon "Il manque base.dump dans l'archive (voir exporter-ancien.sh)."
-  docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1 || abandon "base.dump n'est pas une sauvegarde PostgreSQL (pg_dump -Fc)."
+  local erreur_pg
+  if ! erreur_pg="$(docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" 2>&1 >/dev/null)"; then
+    # Le vrai message de PostgreSQL : souvent « unsupported version » (base exportée par un
+    # PostgreSQL plus récent que celui de la plateforme) ou un fichier qui n'est pas un pg_dump.
+    abandon "base.dump n'a pas pu être lu par PostgreSQL : ${erreur_pg:-raison inconnue} (début du fichier : « $(head -c 5 "${tmp}/base.dump" | tr -dc '[:print:]') », attendu « PGDMP »)."
+  fi
   if [ -f "${tmp}/fichiers.tar.gz" ]; then
     mkdir -p "${tmp}/fichiers"
     tar -C "${tmp}/fichiers" --no-same-owner --no-same-permissions -xzf "${tmp}/fichiers.tar.gz" \
