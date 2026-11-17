@@ -7,6 +7,7 @@
 // continue même quand Docker recrée le moteur et le panel. Le script écrit où il en est dans
 // ${DONNEES}/maj-plateforme/ (etat.json, journal.txt) ; install.sh y écrit version.json à la fin.
 import { readFile } from "node:fs/promises";
+import { PREFIXES, historique, numero } from "./nouveautes.mjs";
 
 const DONNEES = process.env.DONNEES || "/srv/recipelog";
 const DOSSIER = `${DONNEES}/maj-plateforme`;
@@ -70,8 +71,12 @@ export async function etat() {
   } catch {
     journal = "";
   }
+  // Numéro lisible (P1.0.<dernière PR>) et dernières PR installées, demandés une fois par version.
+  const h = version ? await historique(version.commit).catch(() => null) : null;
   return {
-    version: version ? { commit: version.commit, court: String(version.commit ?? "").slice(0, 7), branche: version.branche, date: version.date } : null,
+    version: version
+      ? { commit: version.commit, court: String(version.commit ?? "").slice(0, 7), numero: numero(PREFIXES.plateforme, h), branche: version.branche, date: version.date, historique: h?.prs ?? [] }
+      : null,
     maj,
     journal,
     nouveautes: version ? await chercherNouveautes(version) : null,

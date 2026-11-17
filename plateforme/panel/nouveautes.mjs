@@ -85,6 +85,41 @@ async function depuisDate(date, vers) {
   return valeur;
 }
 
+// ------------------------------------------------------------ numéro de version et historique
+// Numéro lisible d'une version installée, sur le modèle de l'appli (V<majeur>.<mineur>.<PR>) :
+// le dernier nombre est celui de la dernière PR fusionnée dans ce commit. Plateforme : P1.0.<PR>,
+// vitrine : 1.0.<PR>. Avec, les dernières PR fusionnées (« Version et nouveautés » du panel).
+export const PREFIXES = { plateforme: "P1.0", vitrine: "1.0" };
+const historiques = new Map();
+export async function historique(commit) {
+  if (!SHA.test(commit ?? "")) return null;
+  const c = historiques.get(commit);
+  if (c && (c.valeur || c.jusqua > Date.now())) return c.valeur;
+  let valeur = null;
+  try {
+    const j = await github(`/commits?sha=${commit}&per_page=60`);
+    if (Array.isArray(j)) {
+      const vus = new Set();
+      const prs = [];
+      for (const x of j) {
+        const premiere = String(x.commit?.message ?? "").split("\n")[0];
+        const m = /^Merge pull request #(\d+)/.exec(premiere) ?? /\(#(\d+)\)\s*$/.exec(premiere);
+        if (!m || vus.has(m[1])) continue;
+        vus.add(m[1]);
+        const t = titre(x);
+        prs.push({ numero: Number(m[1]), titre: t.titre.replace(/\s*\(#\d+\)\s*$/, ""), date: t.date });
+      }
+      valeur = { pr: prs[0]?.numero ?? null, prs: prs.slice(0, 25) };
+    }
+  } catch {
+    valeur = null;
+  }
+  if (historiques.size > 50) historiques.delete(historiques.keys().next().value);
+  historiques.set(commit, { valeur, jusqua: Date.now() + 10 * 60 * 1000 });
+  return valeur;
+}
+export const numero = (prefixe, h) => (h?.pr ? `${prefixe}.${h.pr}` : null);
+
 // ------------------------------------------------------------ ce que GitHub propose
 // { date, erreur, canaux: { instance: { commit, date } }, vitrine: { commit, date } }
 let distant = null;
@@ -183,6 +218,11 @@ export async function resume(entree) {
     const cmp = vi ? await comparer(vi, distant.vitrine.commit) : await depuisDate(entree.vitrineDate, distant.vitrine.commit);
     vitrine = { installe: vi, installeLe: entree.vitrineDate ?? null, disponible: distant.vitrine, enRetard: cmp ? cmp.enRetard : null, changements: cmp?.changements ?? [] };
   } else vitrine = { installe: vi, installeLe: entree.vitrineDate ?? null, disponible: null, enRetard: null, changements: [] };
+  if (vitrine.installe) {
+    const h = await historique(vitrine.installe);
+    vitrine.numero = numero(PREFIXES.vitrine, h);
+    vitrine.historique = h?.prs ?? [];
+  }
   const p = entree.plateforme?.nouveautes;
   return {
     date: distant?.date ?? null,
