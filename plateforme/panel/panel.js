@@ -398,7 +398,7 @@ function afficherPlateforme() {
     "Met à jour le panel, la connexion (Authentik), la passerelle, le service PDF et les outils, depuis GitHub. Le panel se coupe 5 à 10 minutes pendant ce temps, puis revient tout seul. Les sites des clients restent en ligne et ne changent pas de version : pour eux, ce sont les lignes Standard et Bêta juste en dessous.",
   );
   const lignes = [
-    `<div class="maj-ligne"><div><b>Plateforme</b><small>${v ? `${e(v.court)} · ${e(dateFr(v.date))}` : "version inconnue (visible après la prochaine mise à jour)"}</small></div>${quoi}<button class="btn petit${n?.enRetard > 0 ? " principal" : ""}" type="button" id="pf-voir">${m?.etat === "en-cours" ? "Suivre" : "Voir"}</button>${bAide}</div>${tAide}${echec}`,
+    `<div class="maj-ligne"><div><b>Plateforme</b><small>${v ? `${v.numero ? `<b class="num">${e(v.numero)}</b> · ` : ""}${e(v.court)} · ${e(dateFr(v.date))}` : "version inconnue (visible après la prochaine mise à jour)"}</small></div>${quoi}<button class="btn petit${n?.enRetard > 0 ? " principal" : ""}" type="button" id="pf-voir">${m?.etat === "en-cours" ? "Suivre" : "Voir"}</button>${bAide}</div>${tAide}${echec}`,
   ];
   // Clients, canal par canal (Standard, Bêta…), puis la vitrine.
   const canaux = Object.entries(MAJ?.canaux ?? {}).sort(([a], [b]) => (a === "instance" ? -1 : b === "instance" ? 1 : a.localeCompare(b)));
@@ -419,7 +419,7 @@ function afficherPlateforme() {
   const vi = MAJ?.vitrine;
   if (vi) {
     const et = vi.enRetard > 0 ? `<span class="etiquette acc">${vi.enRetard} nouveauté${vi.enRetard > 1 ? "s" : ""}</span>` : vi.enRetard === 0 ? `<span class="etiquette ok">À jour</span>` : `<span class="etiquette pause">Inconnu</span>`;
-    const detail = vi.installe ? `installée : ${e(vi.installe.slice(0, 7))}` : vi.installeLe ? `téléchargée le ${e(dateFr(vi.installeLe))}` : "version installée inconnue : mets-la à jour une fois";
+    const detail = vi.installe ? `installée : ${vi.numero ? `<b class="num">${e(vi.numero)}</b> · ` : ""}${e(vi.installe.slice(0, 7))}` : vi.installeLe ? `téléchargée le ${e(dateFr(vi.installeLe))}` : "version installée inconnue : mets-la à jour une fois";
     lignes.push(`<div class="maj-ligne"><div><b>Site vitrine</b><small>${detail}</small></div>${et}<button class="btn petit${vi.enRetard > 0 ? " principal" : ""}" type="button" id="maj-vitrine">Voir</button></div>`);
   }
   const [vAide, vTexte] = aideB(
@@ -435,11 +435,13 @@ function afficherPlateforme() {
     `<div class="maj-lignes">${lignes.join("")}</div>` +
     (MAJ?.erreur ? `<p class="discret">${e(MAJ.erreur)}</p>` : "") +
     `<div class="pf-bas"><span class="discret">${e(quand)}</span><button class="btn petit" type="button" id="maj-verifier">Vérifier maintenant</button>${vAide}</div>${vTexte}` +
+    `<div class="pf-bas"><button class="lien" type="button" id="maj-histo">Version et nouveautés</button></div>` +
     (MAJ ? `<label class="case maj-alerte"><input type="checkbox" id="maj-alerte"${MAJ.alerte ? " checked" : ""}> Me prévenir par message ${aAide}</label>${aTexte}` : "");
   $("#pf-voir").onclick = () => (m?.etat === "en-cours" ? suivrePlateforme() : fenetreMajPlateforme());
   z.querySelectorAll("[data-maj-canal]").forEach((b) => (b.onclick = () => fenetreMajCanal(b.dataset.majCanal)));
   const bv = $("#maj-vitrine");
   if (bv) bv.onclick = fenetreMajVitrine;
+  $("#maj-histo").onclick = fenetreVersions;
   $("#maj-verifier").onclick = async () => {
     const b = $("#maj-verifier");
     b.disabled = true;
@@ -499,6 +501,26 @@ function fenetreMajCanal(canal) {
   };
   const t = $("#maj-tous");
   if (t) t.onclick = () => executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour"));
+}
+
+// « Version et nouveautés » : numéro installé et ce que les dernières mises à jour ont apporté
+// (une ligne par PR fusionnée), pour la plateforme et pour la vitrine.
+function fenetreVersions() {
+  const bloc = (nom, numeroV, court, date, prs, vide) => `<h3 class="titre-histo">${e(nom)} ${numeroV ? `<span class="etiquette prog">${e(numeroV)}</span>` : ""}</h3>
+    <p class="sub">${court ? `Installée : ${e(court)}${date ? ` le ${e(dateFr(date))}` : ""}.` : vide}</p>
+    ${prs?.length ? `<ul class="pf-liste">${prs.map((x) => `<li><span><b class="num">#${e(x.numero)}</b> ${e(x.titre)}</span>${x.date ? `<time>${e(dateFr(x.date))}</time>` : ""}</li>`).join("")}</ul>` : ""}`;
+  const v = PLATEFORME?.version;
+  const vi = MAJ?.vitrine;
+  const [hAide, hTexte] = aideB(
+    "histo-a",
+    "Le numéro suit la même règle que l'appli : le dernier nombre est celui de la dernière modification (PR) installée. <b>P1.0.180</b> = plateforme avec tout jusqu'à la PR 180. Dessous, les dernières modifications déjà installées, la plus récente en haut. Ce qui n'est pas encore installé est dans « Voir » sur chaque ligne de la carte « Mises à jour ».",
+  );
+  ouvrir(
+    "Version et nouveautés",
+    `<div class="aide-ligne"><span class="sub">Ce que tu as installé</span>${hAide}</div>${hTexte}` +
+      bloc("Plateforme (panel, connexion, outils)", v?.numero, v?.court, v?.date, v?.historique, "Version inconnue : elle s'affichera après la prochaine mise à jour de la plateforme.") +
+      bloc("Site vitrine", vi?.numero, vi?.installe?.slice(0, 7), null, vi?.historique, "Version inconnue : mets la vitrine à jour une fois pour la voir ici."),
+  );
 }
 
 function fenetreMajVitrine() {
@@ -1224,7 +1246,7 @@ function afficherVitrine() {
     )
     .join("");
   zone.innerHTML = `<div class="carte-vitrine">
-      <div class="ligne-vitrine"><div><b>${e(DOMAINE)}</b><small>${VITRINE.version ? `Version ${e(VITRINE.commit ? VITRINE.commit.slice(0, 7) : VITRINE.version)}` : "Pas encore téléchargée"}${MAJ?.vitrine?.enRetard > 0 ? ` <span class="etiquette acc">nouvelle version : ${MAJ.vitrine.enRetard} changement${MAJ.vitrine.enRetard > 1 ? "s" : ""}</span>` : ""}</small></div>
+      <div class="ligne-vitrine"><div><b>${e(DOMAINE)}</b><small>${VITRINE.version ? `Version ${e(MAJ?.vitrine?.numero ?? (VITRINE.commit ? VITRINE.commit.slice(0, 7) : VITRINE.version))}` : "Pas encore téléchargée"}${MAJ?.vitrine?.enRetard > 0 ? ` <span class="etiquette acc">nouvelle version : ${MAJ.vitrine.enRetard} changement${MAJ.vitrine.enRetard > 1 ? "s" : ""}</span>` : ""}</small></div>
         <a class="btn petit" href="https://${e(DOMAINE)}" target="_blank" rel="noopener">Ouvrir</a>
         <button class="btn petit" type="button" id="v-maj">Mettre à jour la vitrine</button>
         <button class="aide" type="button" data-aide="v-a-maj" aria-label="Aide">?</button></div>
