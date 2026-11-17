@@ -24,6 +24,16 @@ import { PATH_HEADER, SEARCH_HEADER } from "@/lib/auth/path";
  */
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+
+  // Fiches OAuth de l'accès MCP (connexion de Claude par Authentik) : les
+  // adresses /.well-known/… imposées par les normes sont servies par
+  // /api/mcp/oauth/… (src/lib/mcp/oauth.ts). /.well-known/oauth-protected-resource/api/mcp
+  // (RFC 9728, ressource avec chemin) donne la même fiche.
+  const wellKnown = OAUTH_WELL_KNOWN.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
+  if (wellKnown) {
+    if (req.headers.has("next-action")) return new NextResponse("Forbidden", { status: 403 });
+    return NextResponse.rewrite(new URL(wellKnown[1], req.url));
+  }
   const isShare = path.startsWith("/share");
   const isMcp = path.startsWith("/api/mcp");
 
@@ -44,6 +54,11 @@ export function middleware(req: NextRequest) {
   headers.set(SEARCH_HEADER, req.nextUrl.search);
   return NextResponse.next({ request: { headers } });
 }
+
+const OAUTH_WELL_KNOWN: [string, string][] = [
+  ["/.well-known/oauth-protected-resource", "/api/mcp/oauth/ressource"],
+  ["/.well-known/oauth-authorization-server", "/api/mcp/oauth/serveur"],
+];
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],

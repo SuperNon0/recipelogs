@@ -14,10 +14,15 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
+  Unplug,
+  UserCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { disableMcpAccess, regenerateMcpAccess } from "@/app/actions/mcp";
+import { disableMcpAccess, regenerateMcpAccess, revokeMcpOauth } from "@/app/actions/mcp";
 import { Help } from "@/components/ui/Help";
+
+/** Connexion par compte (OAuth, RecipeLog en ligne) : dernières applications connectées. */
+export type OauthInfo = { connections: { name: string; email: string; at: string }[] };
 
 type ToolInfo = { name: string; description: string; kind: "read" | "write" | "delete" };
 export type ToolGroupInfo = { title: string; tools: ToolInfo[] };
@@ -32,7 +37,7 @@ const KIND: Record<ToolInfo["kind"], { icon: LucideIcon; label: string; color: s
 const GROUP_COLORS = ["var(--accent)", "var(--accent-2)", "var(--pending)", "var(--accent-3)", "#e48fc1", "#7cc4f0"];
 
 /** Réglages → Accès MCP : activer, copier l'adresse et la clé, changer la clé, couper. */
-export function McpAccess({ token, groups }: { token: string | null; groups: ToolGroupInfo[] }) {
+export function McpAccess({ token, groups, oauth = null }: { token: string | null; groups: ToolGroupInfo[]; oauth?: OauthInfo | null }) {
   const [pending, startTransition] = useTransition();
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -56,6 +61,13 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
     });
   };
 
+  const revoke = () => {
+    if (!confirm("Déconnecter Claude ? Il faudra cliquer à nouveau sur « Se connecter » dans ses réglages.")) return;
+    startTransition(async () => {
+      await revokeMcpOauth();
+    });
+  };
+
   const copy = async (what: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -74,16 +86,17 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
   );
 
   const total = groups.reduce((n, g) => n + g.tools.length, 0);
+  const on = !!token || !!oauth;
 
   return (
     <>
       <div className="mcp-status">
-        <span className={`mcp-pill ${token ? "on" : "off"}`}>
+        <span className={`mcp-pill ${on ? "on" : "off"}`}>
           <span className="dot" />
-          {token ? "Activé" : "Coupé"}
+          {on ? "Activé" : "Coupé"}
         </span>
         <span className="mcp-status-tx">
-          {token ? (
+          {on ? (
             <>
               Claude peut utiliser <b>{total} outils</b>
             </>
@@ -93,9 +106,75 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
         </span>
         <span className="mcp-setup">
           Mise en place
-          <SetupHelp endpoint={endpoint} />
+          {oauth ? <OauthSetupHelp /> : <SetupHelp endpoint={endpoint} />}
         </span>
       </div>
+
+      {oauth && (
+        <>
+          <div className="sect-title">
+            <h2>Connexion avec ton compte</h2>
+          </div>
+          <div className="fl-list">
+            <div className="fl-row">
+              <span className="ic mcp-ic" style={{ color: "var(--accent-2)" }}>
+                <Link2 size={17} />
+              </span>
+              <span className="set-tx">
+                <b>
+                  <span>Adresse</span>
+                  <Help title="Se connecter avec ton compte">
+                    La façon la plus simple : dans claude.ai, ajoute un connecteur personnalisé avec cette
+                    adresse, puis clique sur <b>Se connecter</b>. Tu te connectes avec ton e-mail et ton mot de
+                    passe RecipeLog (la même page que pour entrer dans l&apos;appli), puis tu cliques sur{" "}
+                    <b>Autoriser</b>. Aucune clé à copier. Seuls les comptes qui ont la permission « Gérer
+                    l&apos;accès Claude (MCP) » peuvent le faire. Claude reste connecté (il renouvelle seul
+                    sa connexion) jusqu&apos;à ce que tu cliques sur « Déconnecter ».
+                  </Help>
+                </b>
+                <small className="mcp-val">{endpoint}</small>
+              </span>
+              {copyButton("endpoint-oauth", endpoint)}
+            </div>
+            <div className="fl-row">
+              <span className="ic mcp-ic" style={{ color: "var(--accent)" }}>
+                <UserCheck size={17} />
+              </span>
+              <span className="set-tx">
+                <b>
+                  <span>Applications connectées</span>
+                  <Help title="Applications connectées">
+                    Les dernières connexions acceptées sur la page « Autoriser » : le nom de l&apos;application
+                    (par exemple Claude), le compte utilisé et la date. <b>Déconnecter</b> coupe tout de suite
+                    toutes ces connexions ; la clé secrète plus bas, elle, ne change pas. Un compte qui perd la
+                    permission « Gérer l&apos;accès Claude (MCP) » ou qui est suspendu perd aussi sa connexion.
+                  </Help>
+                </b>
+                <small>
+                  {oauth.connections.length
+                    ? oauth.connections
+                        .map((c) => `${c.name} · ${c.email} · ${new Date(c.at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`)
+                        .join(" — ")
+                    : "Aucune pour l'instant"}
+                </small>
+              </span>
+              {oauth.connections.length > 0 && (
+                <button type="button" className="fl-btn fl-btn-danger" onClick={revoke} disabled={pending}>
+                  <Unplug size={15} />
+                  Déconnecter
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="sect-title">
+            <h2>Clé secrète</h2>
+            <Help title="Clé secrète">
+              L&apos;ancienne méthode, toujours possible : utile pour Claude Code ou un outil qui ne sait pas se
+              connecter avec un compte. Inutile si Claude est connecté avec ton compte.
+            </Help>
+          </div>
+        </>
+      )}
 
       <div className="fl-list">
         {!token ? (
@@ -160,7 +239,7 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
                   <Help title="Sécurité">
                     Sans la clé, l&apos;adresse répond « introuvable ». <b>Changer</b> crée une nouvelle clé
                     et l&apos;ancienne cesse aussitôt de marcher : remets la nouvelle dans Claude.{" "}
-                    <b>Couper</b> ferme tout de suite l&apos;accès.
+                    <b>Couper</b> ferme tout de suite l&apos;accès par la clé.
                   </Help>
                 </b>
                 <small>Si la clé a fuité</small>
@@ -221,6 +300,60 @@ export function McpAccess({ token, groups }: { token: string | null; groups: Too
         );
       })}
     </>
+  );
+}
+
+/** RecipeLog en ligne : mise en place avec la connexion par compte (OAuth). */
+function OauthSetupHelp() {
+  const steps: { icon: LucideIcon; color: string; title: string; body: React.ReactNode }[] = [
+    {
+      icon: Link2,
+      color: "var(--accent)",
+      title: "Copier l'adresse",
+      body: <>Bouton « Copier » à côté de « Adresse ».</>,
+    },
+    {
+      icon: BookOpen,
+      color: "var(--accent-2)",
+      title: "Ajouter le connecteur dans Claude",
+      body: (
+        <>
+          claude.ai : Paramètres → Connecteurs → <i>Ajouter un connecteur personnalisé</i>. Nom : RecipeLog,
+          URL : l&apos;adresse copiée. Dans les paramètres avancés, garde le choix proposé par défaut (fiche
+          d&apos;identité de Claude, ou inscription automatique) et laisse « Client ID » et « Client secret »
+          vides.
+        </>
+      ),
+    },
+    {
+      icon: ShieldCheck,
+      color: "var(--pending)",
+      title: "Se connecter",
+      body: (
+        <>
+          Clique sur <b>Se connecter</b> : la page de connexion RecipeLog s&apos;ouvre. Entre ton e-mail et ton mot
+          de passe, puis clique sur <b>Autoriser</b>. Claude revient tout seul, connecté.
+        </>
+      ),
+    },
+  ];
+  return (
+    <Help title="Mise en place (une seule fois)" label="Comment brancher Claude">
+      <ol className="mcp-steps">
+        {steps.map((s, i) => (
+          <li key={s.title}>
+            <span className="no" style={{ color: s.color, borderColor: s.color }}>
+              {i + 1}
+            </span>
+            <span>
+              <b style={{ color: s.color }}>{s.title}</b>
+              <br />
+              {s.body}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Help>
   );
 }
 
