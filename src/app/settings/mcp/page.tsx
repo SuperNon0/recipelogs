@@ -5,12 +5,15 @@ import { MCP_TOOL_GROUPS } from "@/lib/mcp/tools";
 import { McpAccess, type ToolGroupInfo } from "@/components/settings/McpAccess";
 import { requirePage } from "@/lib/auth/guard";
 import { mcpAllowed } from "@/lib/mcp/allowed";
+import { getOauthState, oauthSetup } from "@/lib/mcp/oauth";
 
 export const dynamic = "force-dynamic";
 
 export default async function McpSettingsPage() {
   await requirePage("mcp.manage");
   const token = await getMcpToken();
+  // RecipeLog en ligne : Claude peut aussi se connecter avec un compte (OAuth).
+  const oauth = oauthSetup() ? { connections: (await getOauthState()).connections } : null;
   const groups: ToolGroupInfo[] = MCP_TOOL_GROUPS.map((g) => ({
     title: g.title,
     tools: g.tools.map((t) => ({
@@ -30,7 +33,7 @@ export default async function McpSettingsPage() {
         <p className="sub">Laisser Claude consulter et gérer RecipeLog</p>
       </div>
       {mcpAllowed() ? (
-        <McpAccess token={token} groups={groups} />
+        <McpAccess token={token} groups={groups} oauth={oauth} />
       ) : (
         <p className="sub">L'accès MCP n'est pas compris dans ton offre RecipeLog. Demande-le à RecipeLog pour l'activer.</p>
       )}

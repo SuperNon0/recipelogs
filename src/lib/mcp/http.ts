@@ -5,18 +5,35 @@ import { MCP_TOOLS } from "./tools";
 import { runAsService } from "@/lib/auth/service";
 import { authMode } from "@/lib/auth/config";
 import { getAnnonces } from "@/lib/auth/passerelle";
+import { checkAccessToken, looksLikeAccessToken, oauthSetup, wwwAuthenticate } from "./oauth";
 
 /**
  * Réponse HTTP du point d'accès MCP. La clé arrive dans l'en-tête
  * « Authorization: Bearer <clé> » ou « X-API-Key: <clé> ».
  * Sans clé valide : 404, comme si l'adresse n'existait pas.
+ *
+ * RecipeLog en ligne : un jeton OAuth (Claude connecté par Authentik, voir
+ * oauth.ts) est aussi accepté dans « Authorization: Bearer ». Sans clé ni jeton
+ * valable, la réponse est alors 401 avec l'adresse de la fiche OAuth, pour que
+ * Claude propose « Se connecter ».
  */
 export async function mcpResponse(req: Request): Promise<Response> {
   if (!mcpAllowed()) return new Response("Not found", { status: 404 });
   const expected = await getMcpToken();
   const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];
   const given = bearer ?? req.headers.get("x-api-key")?.trim();
-  if (!expected || !given || !tokensMatch(given, expected)) {
+  let ok = !!expected && !!given && tokensMatch(given, expected);
+  const oauth = oauthSetup();
+  if (!ok && oauth && given && looksLikeAccessToken(given)) {
+    ok = (await checkAccessToken(given, oauth)).ok;
+  }
+  if (!ok) {
+    if (oauth) {
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: { "WWW-Authenticate": wwwAuthenticate(oauth.base, !!given), "Cache-Control": "no-store" },
+      });
+    }
     return new Response("Not found", { status: 404 });
   }
   if (req.method !== "POST") {

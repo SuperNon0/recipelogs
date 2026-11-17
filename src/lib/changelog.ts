@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.19",
+    date: "2026-11-17",
+    title: "Brancher Claude avec son compte RecipeLog",
+    summary:
+      "RecipeLog en ligne : plus besoin de copier une clé pour brancher Claude. Dans claude.ai, on ajoute le connecteur avec l'adresse du site, on clique sur « Se connecter », on entre son e-mail et son mot de passe RecipeLog, puis « Autoriser ».",
+    features: [
+      "Réglages → Accès MCP → « Connexion avec ton compte » : l'adresse à donner à Claude, et la liste des applications connectées (nom, compte, date) avec un bouton « Déconnecter »",
+      "Page « Autoriser Claude ? » après la connexion : elle dit quel compte sera utilisé et ce que Claude pourra faire. Seuls les comptes qui ont la permission « Gérer l'accès Claude (MCP) » peuvent autoriser",
+      "Claude reste connecté tout seul ; un compte suspendu ou qui perd la permission perd aussi l'accès de Claude",
+      "La clé secrète marche toujours, par exemple pour Claude Code",
+    ],
+  },
+  {
     version: "V2.18",
     date: "2026-11-14",
     title: "RecipeLog prêt pour la plateforme en ligne",
