@@ -15,6 +15,7 @@ const conf = () => ({
 });
 
 export const courrielRegle = () => Boolean(conf().hote);
+const DELAI_GLOBAL_MS = Number(process.env.SMTP_DELAI_MS || 45000);
 
 const adresse = (v) => (v.match(/<([^>]+)>/)?.[1] ?? v).trim();
 const entete = (v) => (/^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${Buffer.from(v, "utf8").toString("base64")}?=`);
@@ -45,6 +46,7 @@ function session(socket) {
       a(rep);
     }
   };
+  socket.setMaxListeners(60); // un écouteur « close » par commande du dialogue
   socket.on("data", pousser);
   const lire = () =>
     new Promise((ok, ko) => {
@@ -53,7 +55,11 @@ function session(socket) {
         if (code >= 400) ko(new Error(`SMTP : ${rep.at(-1)}`));
         else ok({ code, rep });
       };
+      // Serveur qui raccroche sans répondre : sans ça, l'envoi resterait bloqué pour toujours.
+      const coupe = () => ko(new Error("SMTP : le serveur a fermé la connexion sans répondre"));
       socket.once("error", ko);
+      socket.once("close", coupe);
+      socket.once("end", coupe);
       pousser(Buffer.alloc(0));
     });
   const dire = (cmd) => {
@@ -64,7 +70,20 @@ function session(socket) {
 }
 
 /** envoyerCourriel({ a, sujet, texte, repondreA? }) : rejette en cas d'échec. */
-export async function envoyerCourriel({ a, sujet, texte, repondreA }) {
+export function envoyerCourriel(message) {
+  // Délai global : quoi qu'il arrive, l'envoi répond (réussi ou raté) en 45 secondes.
+  const prise = { socket: null };
+  let minuteur;
+  const delai = new Promise((_, ko) => {
+    minuteur = setTimeout(() => {
+      prise.socket?.destroy();
+      ko(new Error("SMTP : pas de réponse en 45 secondes"));
+    }, DELAI_GLOBAL_MS);
+  });
+  return Promise.race([envoyer(message, prise), delai]).finally(() => clearTimeout(minuteur));
+}
+
+async function envoyer({ a, sujet, texte, repondreA }, prise) {
   const c = conf();
   if (!c.hote) throw new Error("Emails pas réglés (SMTP_HOTE vide).");
   const direct = c.port === 465;
@@ -73,6 +92,7 @@ export async function envoyerCourriel({ a, sujet, texte, repondreA }) {
     s.once("error", ko);
     s.setTimeout(20000, () => s.destroy(new Error("SMTP : délai dépassé")));
   });
+  prise.socket = socket;
   try {
     let smtp = session(socket);
     await smtp.lire();
@@ -85,6 +105,7 @@ export async function envoyerCourriel({ a, sujet, texte, repondreA }) {
         const s = tls.connect({ socket, servername: c.hote }, () => ok(s));
         s.once("error", ko);
       });
+      prise.socket = socket;
       smtp = session(socket);
       ehlo = await smtp.dire("EHLO recipelog-moteur");
     }
@@ -95,7 +116,18 @@ export async function envoyerCourriel({ a, sujet, texte, repondreA }) {
     }
     const de = adresse(c.expediteur);
     await smtp.dire(`MAIL FROM:<${de}>`);
-    for (const dest of [].concat(a)) await smtp.dire(`RCPT TO:<${adresse(dest)}>`);
+    // Une adresse refusée n'empêche pas l'envoi aux autres (alerte à plusieurs admins).
+    let acceptes = 0;
+    let dernierRefus = null;
+    for (const dest of [].concat(a)) {
+      try {
+        await smtp.dire(`RCPT TO:<${adresse(dest)}>`);
+        acceptes += 1;
+      } catch (e) {
+        dernierRefus = e;
+      }
+    }
+    if (!acceptes) throw dernierRefus ?? new Error("SMTP : aucun destinataire.");
     await smtp.dire("DATA");
     const corps = Buffer.from(texte.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").replace(/.{76}/g, "$&\r\n");
     const message = [

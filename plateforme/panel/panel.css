@@ -1,8 +1,8 @@
 /* Panel admin RecipeLog : design « encre » (mêmes jetons que l'appli, src/encre/encre.css). */
-@font-face { font-family: "Archivo"; font-weight: 400 700; font-display: swap; src: url(/polices/archivo-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Serif Display"; font-display: swap; src: url(/polices/dm-serif-display-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Mono"; font-weight: 400; font-display: swap; src: url(/polices/dm-mono-400-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Mono"; font-weight: 500; font-display: swap; src: url(/polices/dm-mono-500-latin.woff2) format("woff2"); }
+@font-face { font-family: "Archivo"; font-weight: 400 700; font-display: swap; src: url(polices/archivo-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Serif Display"; font-display: swap; src: url(polices/dm-serif-display-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Mono"; font-weight: 400; font-display: swap; src: url(polices/dm-mono-400-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Mono"; font-weight: 500; font-display: swap; src: url(polices/dm-mono-500-latin.woff2) format("woff2"); }
 
 :root {
   color-scheme: dark;

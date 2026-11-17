@@ -13,38 +13,42 @@ const PANNE_APRES = 2; // vérifications ratées de suite (une par minute) avant
 // ------------------------------------------------------------ alertes
 const ADMINS = (process.env.ADMIN_EMAILS || "").split(/[,;\s]+/).filter(Boolean);
 
-/** Envoie une alerte par tous les canaux réglés. Ne lève jamais d'erreur. */
+/**
+ * Envoie une alerte par tous les canaux réglés. Ne lève jamais d'erreur.
+ * Rend le résultat canal par canal : { telegram, discord, email } avec true (parti),
+ * un texte (la raison de l'échec) ou null (canal pas réglé), et `ok` si au moins un est parti.
+ */
 export async function alerter(titre, texte) {
+  const canaux = { telegram: null, discord: null, email: null };
   const essais = [];
+  const essayer = (nom, promesse) =>
+    essais.push(
+      promesse.then(
+        () => (canaux[nom] = true),
+        (e) => {
+          canaux[nom] = String(e?.message ?? e).slice(0, 200);
+          console.error(`Alerte non envoyée (${nom}) :`, canaux[nom]);
+        },
+      ),
+    );
+  // Telegram et Discord répondent « 200 » seulement si le message est vraiment accepté.
+  const poster = async (url, corps) => {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps), signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error(`refusé (${r.status}) ${(await r.text().catch(() => "")).slice(0, 120)}`);
+  };
   const tg = process.env.ALERTE_TELEGRAM_JETON;
   const chat = process.env.ALERTE_TELEGRAM_CHAT;
-  if (tg && chat) {
-    essais.push(
-      fetch(`https://api.telegram.org/bot${tg}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chat, text: `${titre}\n${texte}`, disable_web_page_preview: true }),
-        signal: AbortSignal.timeout(10000),
-      }),
-    );
-  }
-  if (process.env.ALERTE_DISCORD_URL) {
-    essais.push(
-      fetch(process.env.ALERTE_DISCORD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: `**${titre}**\n${texte}`.slice(0, 1900) }),
-        signal: AbortSignal.timeout(10000),
-      }),
-    );
-  }
+  if (tg && chat) essayer("telegram", poster(`https://api.telegram.org/bot${tg}/sendMessage`, { chat_id: chat, text: `${titre}\n${texte}`, disable_web_page_preview: true }));
+  if (process.env.ALERTE_DISCORD_URL) essayer("discord", poster(process.env.ALERTE_DISCORD_URL, { content: `**${titre}**\n${texte}`.slice(0, 1900) }));
   if (process.env.ALERTE_EMAIL !== "non" && courrielRegle() && ADMINS.length) {
-    essais.push(envoyerCourriel({ a: ADMINS, sujet: `[RecipeLog] ${titre}`, texte: `${texte}\n\nPanel : https://admin.${DOMAINE}` }));
+    essayer("email", envoyerCourriel({ a: ADMINS, sujet: `[RecipeLog] ${titre}`, texte: `${texte}\n\nPanel : https://admin.${DOMAINE}` }));
   }
-  const r = await Promise.allSettled(essais);
-  for (const x of r) if (x.status === "rejected") console.error("Alerte non envoyée :", x.reason?.message ?? x.reason);
-  return r.some((x) => x.status === "fulfilled");
+  await Promise.all(essais);
+  return { ok: Object.values(canaux).some((v) => v === true), canaux };
 }
+
+// Sans attendre : une alerte lente (serveur d'e-mail qui traîne) ne doit jamais retarder la surveillance.
+const prevenir = (titre, texte) => void alerter(titre, texte).catch(() => {});
 
 export const canauxAlerte = () => ({
   telegram: Boolean(process.env.ALERTE_TELEGRAM_JETON && process.env.ALERTE_TELEGRAM_CHAT),
@@ -53,7 +57,24 @@ export const canauxAlerte = () => ({
 });
 
 // ------------------------------------------------------------ vérifications
-async function repond(url, delai = 5000) {
+// Le moteur n'est PAS sur le réseau des clients (un site piraté ne peut pas lui parler) :
+// il lit l'état de santé que Docker calcule déjà pour chaque conteneur (contrôle toutes
+// les 30 s). true = en forme, false = en panne, null = en train de démarrer (on attend).
+const enForme = (etat) => (etat === "healthy" || etat === "running" ? true : etat === "starting" ? null : false);
+
+// Services de la plateforme vérifiés en plus des clients (identifiant, nom affiché, conteneur).
+const SERVICES = [
+  ["connexion", "Connexion (Authentik)", "recipelog-authentik"],
+  ["passerelle", "Passerelle", "recipelog-passerelle"],
+  ["vitrine", "Site vitrine", "recipelog-vitrine"],
+  ["base", "Base de données", "recipelog-postgres"],
+  ["aiguilleur", "Aiguilleur (Traefik)", "recipelog-traefik"],
+];
+// Vu de l'extérieur : Cloudflare → tunnel → Traefik → panel. Sans ce contrôle, un tunnel
+// tombé coupe tous les sites sans qu'aucune alerte ne parte.
+const PUBLIC = process.env.SURVEILLANCE_PUBLIQUE === "oui" ? `https://status.${DOMAINE}/sante` : "";
+
+async function repond(url, delai = 10000) {
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(delai), redirect: "manual" });
     return r.status < 500;
@@ -61,13 +82,6 @@ async function repond(url, delai = 5000) {
     return false;
   }
 }
-
-// Services de la plateforme vérifiés en plus des clients (nom affiché, adresse interne).
-const SERVICES = [
-  ["connexion", "Connexion (Authentik)", "http://recipelog-authentik:9000/-/health/live/"],
-  ["passerelle", "Passerelle", "http://recipelog-passerelle:8000/sante"],
-  ["vitrine", "Site vitrine", "http://recipelog-vitrine/config.js"],
-];
 
 const etat = new Map(); // cible -> { ok, rates, depuis }
 
@@ -83,9 +97,16 @@ const duree = (ms) => {
 
 let initialise = false;
 let jourAlerteDisque = null; // à part de `etat` : ce n'est pas une cible surveillée
+const DEMARRE = Date.now();
+const REPIT_MS = 4 * 60000; // après le démarrage du moteur (donc de la machine) : tout redémarre en même temps
 
-/** Un tour de vérification. clients = liste --json (déjà lue par le moteur). */
-export async function verifier(clients, noter) {
+/**
+ * Un tour de vérification.
+ * clients = liste --json ; conteneurs = { nom du conteneur: état Docker } ;
+ * occupes(nom) = vrai si le moteur travaille sur ce client (mise à jour, restauration…) :
+ * il redémarre exprès, ce n'est pas une panne.
+ */
+export async function verifier(clients, conteneurs, noter, occupes = () => false) {
   // Après un redémarrage du moteur : reprendre les pannes encore ouvertes.
   if (!initialise) {
     initialise = true;
@@ -93,9 +114,11 @@ export async function verifier(clients, noter) {
     for (const e of await evenements()) dernier.set(e.cible, e);
     for (const [cible, e] of dernier) if (!e.ok) etat.set(cible, { ok: false, rates: PANNE_APRES, depuis: Date.parse(e.date) });
   }
+  const repit = Date.now() - DEMARRE < REPIT_MS;
   const cibles = [
-    ...clients.filter((c) => !c.suspendu).map((c) => [`client:${c.nom}`, c.nom, `http://rl-${c.nom}:3000/api/health`]),
-    ...SERVICES.map(([id, nom, url]) => [`service:${id}`, nom, url]),
+    ...clients.filter((c) => !c.suspendu).map((c) => [`client:${c.nom}`, c.nom, () => (occupes(c.nom) ? null : enForme(conteneurs[`rl-${c.nom}`] ?? "absent"))]),
+    ...SERVICES.map(([id, nom, conteneur]) => [`service:${id}`, nom, () => enForme(conteneurs[conteneur] ?? "absent")]),
+    ...(PUBLIC ? [["service:acces", "Accès depuis internet (Cloudflare et tunnel)", () => repond(PUBLIC)]] : []),
   ];
   // Un client mis en pause ou supprimé n'est plus surveillé : sa panne en cours est close.
   for (const cible of etat.keys()) {
@@ -105,40 +128,48 @@ export async function verifier(clients, noter) {
     }
   }
   await Promise.all(
-    cibles.map(async ([cible, nom, url]) => {
-      const ok = await repond(url);
+    cibles.map(async ([cible, nom, controle]) => {
+      const ok = await controle();
       const e = etat.get(cible) ?? { ok: true, rates: 0, depuis: Date.now() };
+      if (ok === null) return etat.set(cible, e); // démarre, ou le moteur travaille dessus : ni bon ni mauvais
       if (ok) {
         if (e.ok === false) {
           const panne = Date.now() - e.depuis;
           await noterEvenement(cible, true);
-          await alerter(`✅ ${nom} répond de nouveau`, `Panne de ${duree(panne)}.`);
+          prevenir(`✅ ${nom} répond de nouveau`, `Panne de ${duree(panne)}.`);
           await noter("automatique", "retour", nom, { ok: true, sortie: `Répond de nouveau après ${duree(panne)}.` });
           e.depuis = Date.now();
         }
         e.ok = true;
         e.rates = 0;
-      } else {
+      } else if (!repit || e.ok === false) {
         e.rates += 1;
         if (e.ok !== false && e.rates >= PANNE_APRES) {
           e.ok = false;
           e.depuis = Date.now() - (PANNE_APRES - 1) * 60000;
           await noterEvenement(cible, false);
-          const conseil = cible.startsWith("client:") ? `Panel → ${nom} → Journaux, ou « Mettre à jour » pour le relancer.` : "Dans la VM : recipelog-plateforme ps";
-          await alerter(`🔴 ${nom} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`);
+          const conseil = cible.startsWith("client:")
+            ? `Panel → ${nom} → Journaux, ou « Redémarrer ».`
+            : cible === "service:acces"
+              ? "Les sites ne sont plus joignables depuis internet. Dans la VM : recipelog-plateforme ps (cloudflared et traefik), et l'état du tunnel dans Cloudflare."
+              : "Dans la VM : recipelog-plateforme ps";
+          prevenir(`🔴 ${nom} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`);
           await noter("automatique", "panne", nom, { ok: false, sortie: `Ne répond plus depuis ${PANNE_APRES} minutes.` });
         }
       }
       etat.set(cible, e);
     }),
   );
-  // Disque presque plein : une alerte par jour au plus.
+  // Disque : une alerte par jour au plus, dès 85 % (à 95 %, les sauvegardes s'arrêtent).
   const d = await disque();
-  if (d && d.pourcent >= 90) {
+  if (d && d.pourcent >= 85) {
     const jour = new Date().toISOString().slice(0, 10);
     if (jourAlerteDisque !== jour) {
       jourAlerteDisque = jour;
-      await alerter("⚠️ Disque presque plein", `${d.pourcent} % utilisés sur la machine (${Math.round(d.libre / 1e9)} Go libres).`);
+      prevenir(
+        d.pourcent >= 95 ? "🔴 Disque plein : les sauvegardes sont arrêtées" : "⚠️ Disque presque plein",
+        `${d.pourcent} % utilisés sur la machine (${Math.round(d.libre / 1e9)} Go libres). Agrandis le disque de la VM dans Proxmox, ou supprime de vieilles sauvegardes.`,
+      );
     }
   }
 }
@@ -150,11 +181,14 @@ export const etatCourant = () =>
 // ------------------------------------------------------------ disponibilité
 async function evenements() {
   try {
-    return (await readFile(EVENEMENTS, "utf8"))
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => JSON.parse(l));
+    // Ligne par ligne : une ligne abîmée (coupure pendant l'écriture) ne vide pas tout l'historique.
+    return (await readFile(EVENEMENTS, "utf8")).split("\n").flatMap((l) => {
+      try {
+        return l.trim() ? [JSON.parse(l)] : [];
+      } catch {
+        return [];
+      }
+    });
   } catch {
     return [];
   }
@@ -226,9 +260,13 @@ export async function machine() {
   return { coeurs: os.cpus().length, charge: os.loadavg(), memoire, disque: await disque(), demarre };
 }
 
-/** Taille d'un dossier (octets), sans suivre les liens. */
+/**
+ * Taille d'un dossier (octets), sans suivre les liens. Un fichier présent dans plusieurs
+ * sauvegardes (lien vers le même contenu) n'est compté qu'une fois : c'est la place réelle.
+ */
 export async function taille(chemin) {
   let total = 0;
+  const vus = new Set();
   const pile = [chemin];
   while (pile.length) {
     const d = pile.pop();
@@ -241,7 +279,16 @@ export async function taille(chemin) {
     for (const e of entrees) {
       const p = `${d}/${e.name}`;
       if (e.isDirectory()) pile.push(p);
-      else if (e.isFile()) total += (await stat(p).catch(() => ({ size: 0 }))).size;
+      else if (e.isFile()) {
+        const f = await stat(p).catch(() => null);
+        if (!f) continue;
+        if (f.nlink > 1) {
+          const cle = `${f.dev}:${f.ino}`;
+          if (vus.has(cle)) continue;
+          vus.add(cle);
+        }
+        total += f.size;
+      }
     }
   }
   return total;

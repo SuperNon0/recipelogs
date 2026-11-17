@@ -21,7 +21,11 @@ networks:
     name: recipelog
   socket:
     name: recipelog-socket
-    internal: true # le proxy Docker n'est joignable que par Traefik (et plus tard le panel)
+    internal: true # le proxy Docker n'est joignable que par Traefik
+  # Le moteur (qui pilote Docker) n'est joignable que par le panel : les sites des
+  # clients, sur le réseau « recipelog », ne peuvent pas lui parler.
+  moteur:
+    name: recipelog-moteur
 
 services:
   # Accès à Docker limité : Traefik peut LIRE la liste des conteneurs, rien d'autre.
@@ -75,6 +79,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans /srv/recipelog/.env}
       POSTGRES_DB: postgres
+    # Chaque client a droit à 15 connexions au plus (recipelog-instance) : 300 laissent
+    # de la place à une vingtaine de clients très actifs, à Authentik et aux sauvegardes.
+    command: ["postgres", "-c", "max_connections=${POSTGRES_CONNEXIONS:-300}", "-c", "shared_buffers=${POSTGRES_MEMOIRE:-256MB}"]
     volumes:
       - ${DONNEES:-/srv/recipelog}/postgres:/var/lib/postgresql/data
     shm_size: 256mb
@@ -88,7 +95,7 @@ services:
   # Tunnel Cloudflare : relie la machine à Cloudflare sans ouvrir de port.
   # Démarré seulement si CF_TUNNEL_TOKEN est rempli (COMPOSE_PROFILES=tunnel).
   cloudflared:
-    image: cloudflare/cloudflared:2025.4.2
+    image: cloudflare/cloudflared:2026.11.0
     container_name: recipelog-cloudflared
     restart: unless-stopped
     profiles: [tunnel]
@@ -132,11 +139,25 @@ services:
       - ./authentik/blueprints:/blueprints/custom:ro
       - ./authentik/templates:/templates:ro
     networks: [recipelog]
+    # Authentik met 1 à 3 minutes à démarrer la première fois : pendant ce temps il est
+    # « en démarrage », pas « en panne » (la surveillance et install.sh attendent).
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
     labels:
       traefik.enable: "true"
       traefik.http.routers.authentik.rule: Host(`auth.${DOMAINE:-recipelog.cc}`)
       traefik.http.routers.authentik.entrypoints: web
       traefik.http.routers.authentik.middlewares: securite@file,limite@file
+      # Les étapes de connexion (mot de passe, code) : limite plus stricte par adresse,
+      # contre les essais de mots de passe en rafale.
+      traefik.http.routers.authentik-connexion.rule: Host(`auth.${DOMAINE:-recipelog.cc}`) && PathPrefix(`/api/v3/flows/executor/`)
+      traefik.http.routers.authentik-connexion.entrypoints: web
+      traefik.http.routers.authentik-connexion.middlewares: securite@file,limite-connexion@file
+      traefik.http.routers.authentik-connexion.service: authentik
       traefik.http.services.authentik.loadbalancer.server.port: "9000"
 
   authentik-worker:
@@ -181,6 +202,11 @@ services:
       # Maintenance et bandeaux (lot 6), écrits par le moteur.
       - ${DONNEES:-/srv/recipelog}/annonces:/annonces:ro
     networks: [recipelog]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8000/sante').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
 
   # Panel admin (admin.<domaine>), réservé aux super-admins. Il n'a aucun accès à
   # Docker : il demande tout au moteur. Il sert aussi la page « site en pause »
@@ -210,7 +236,7 @@ services:
       OIDC_INTERNE: http://recipelog-authentik:9000
       MOTEUR_URL: http://recipelog-moteur:8000
       MOTEUR_CLE: ${MOTEUR_CLE:-}
-    networks: [recipelog]
+    networks: [recipelog, moteur]
     labels:
       traefik.enable: "true"
       traefik.http.routers.panel.rule: Host(`admin.${DOMAINE:-recipelog.cc}`)
@@ -224,8 +250,10 @@ services:
       traefik.http.routers.statut.entrypoints: web
       traefik.http.routers.statut.middlewares: securite@file,limite@file
       traefik.http.routers.statut.service: panel
-      # Tarifs et textes légaux (lot 8) : ces adresses du site vitrine sont servies par le panel.
-      traefik.http.routers.vente.rule: (Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)) && (Path(`/tarifs`) || Path(`/mentions-legales`) || Path(`/cgv`) || Path(`/confidentialite`) || Path(`/sous-traitance`))
+      # Tarifs et textes légaux (lot 8) : ces adresses du site vitrine sont servies par le panel,
+      # avec leur feuille de style sous /_plateforme/ (admin.<domaine> peut donc être fermé
+      # par Cloudflare Access sans casser ces pages).
+      traefik.http.routers.vente.rule: (Host(`${DOMAINE:-recipelog.cc}`) || Host(`www.${DOMAINE:-recipelog.cc}`)) && (Path(`/tarifs`) || Path(`/mentions-legales`) || Path(`/cgv`) || Path(`/confidentialite`) || Path(`/sous-traitance`) || PathPrefix(`/_plateforme/`))
       traefik.http.routers.vente.priority: "200"
       traefik.http.routers.vente.entrypoints: web
       traefik.http.routers.vente.middlewares: securite@file,limite@file
@@ -273,6 +301,11 @@ services:
       ALERTE_TELEGRAM_CHAT: ${ALERTE_TELEGRAM_CHAT:-}
       ALERTE_DISCORD_URL: ${ALERTE_DISCORD_URL:-}
       ALERTE_EMAIL: ${ALERTE_EMAIL:-oui}
+      # Avec un tunnel Cloudflare : vérifie aussi chaque minute que les sites répondent
+      # depuis internet (https://status.<domaine>/sante). « non » pour couper ce contrôle.
+      SURVEILLANCE_PUBLIQUE: ${SURVEILLANCE_PUBLIQUE:-${CF_TUNNEL_TOKEN:+oui}}
+      # Version donnée aux nouveaux clients (seule « plateforme » existe pour l'instant).
+      CANAL_DEFAUT: ${CANAL_DEFAUT:-plateforme}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Même chemin que sur la machine : recipelog-instance donne ces chemins à Docker.
@@ -280,7 +313,8 @@ services:
       # Le dossier (pas le fichier seul) : une mise à jour du dépôt remplace le
       # fichier, et un fichier monté seul resterait sur l'ancienne version.
       - ./bin:/opt/recipelog/bin:ro
-    networks: [recipelog]
+    # Pas sur le réseau des clients : seulement joignable par le panel.
+    networks: [moteur]
 
   # Site vitrine (lot 4) sur <domaine> et www.<domaine>. Le code vient de la
   # branche site-vitrine : recipelog-instance vitrine maj (ou le panel).
@@ -317,6 +351,8 @@ services:
     user: "1000:1000"
     read_only: true
     command: ["python3", "/vitrine/code/scripts/vitrine-contact.py"]
+    environment:
+      TZ: ${TZ:-Europe/Paris}
     volumes:
       - ${DONNEES:-/srv/recipelog}/vitrine/code:/vitrine/code:ro
       - ${DONNEES:-/srv/recipelog}/vitrine/reglages:/etc/recipelog-vitrine:ro
