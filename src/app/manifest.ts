@@ -7,6 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "RecipeLog",
     description: "Gestion de recettes de pâtisserie",
     lang: "fr",
+    id: "/",
     start_url: "/",
     scope: "/",
     display: "standalone",
