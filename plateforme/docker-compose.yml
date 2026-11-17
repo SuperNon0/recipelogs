@@ -309,7 +309,7 @@ services:
       # depuis internet (https://status.<domaine>/sante). « non » pour couper ce contrôle.
       SURVEILLANCE_PUBLIQUE: ${SURVEILLANCE_PUBLIQUE:-${CF_TUNNEL_TOKEN:+oui}}
       # Version donnée aux nouveaux clients (seule « plateforme » existe pour l'instant).
-      CANAL_DEFAUT: ${CANAL_DEFAUT:-plateforme}
+      CANAL_DEFAUT: ${CANAL_DEFAUT:-instance}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Même chemin que sur la machine : recipelog-instance donne ces chemins à Docker.

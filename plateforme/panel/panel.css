@@ -214,9 +214,9 @@ a.chiffre:hover { border-color: var(--acc-line); }
 .kv small { color: var(--muted); font-size: 12.5px; }
 .zone-sensible { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: var(--r-lg); padding: 14px 16px; margin-top: 22px; display: grid; gap: 10px; }
 .zone-sensible .sec-t { margin: 0; }
-.zone-sensible .ligne-zs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; }
-.zone-sensible .ligne-zs div { min-width: 0; flex: 1 1 260px; }
-.zone-sensible .ligne-zs small { display: block; color: var(--muted); font-size: 13px; }
+.ligne-zs { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; }
+.ligne-zs div { min-width: 0; flex: 1 1 260px; }
+.ligne-zs small { display: block; color: var(--muted); font-size: 13px; }
 .formulaire { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; max-width: 620px; }
 
 /* ---------------------------------------------------------------- feuille « Plus » et apparence */

@@ -258,9 +258,9 @@ quelque chose cloche, tu remets simplement les anciennes adresses (E5) et tout r
    rm /tmp/monsite.tar.gz
    ```
    L'import affiche « Importé : N recette(s), N photo(s) et facture(s) » : compare avec le
-   nombre noté à l'étape 1. (Pour l'instant, tous les sites de la plateforme suivent la
-   branche `plateforme` : les versions « beta » et « stable » viendront quand elle sera
-   fusionnée dans `main`.)
+   nombre noté à l'étape 1. (Le client prend la version « Clients », branche `instance`.
+   Pour ton propre site, passe-le ensuite sur la bêta : sa fiche dans le panel → **Version de
+   l'appli** → **Changer…** → **Bêta**.)
 4. Ouvre **https://chanka.recipelog.cc** avec ton compte : tes recettes, factures et photos sont là.
 5. Pour envoyer à ton équipe l'email « Choisis ton mot de passe » (leurs rôles sont gardés) :
    ```bash
@@ -430,17 +430,36 @@ Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » 
 
 Trois choses se mettent à jour séparément. Dans l'ordre :
 
-**D'où viennent les nouveautés (en attendant la séparation des branches).** Trois branches :
-- `instance` : l'atelier de l'application des clients (recettes, factures, etc.). On y fait les
-  changements de l'appli, puis une PR `instance` → `plateforme` les fait entrer.
-- `plateforme` : ce que les boutons installent. GitHub y construit l'image des clients (action
-  **Image Docker**), et `install.sh` (I1) y prend le panel et les outils. Rien n'arrive chez un client
-  tant que ce n'est pas fusionné dans `plateforme`, puis mis à jour avec I2.
+**D'où viennent les nouveautés.** Quatre branches :
+- `beta-instance` : l'appli des clients en cours de développement (recettes, factures, etc.).
+  Tous les changements de l'appli se font ici. GitHub en construit la version **Bêta**, que tu
+  mets sur ta propre instance pour l'essayer.
+- `instance` : la version **Clients**. Quand la bêta te plaît, tu dis « passe la bêta en
+  instance » : tout ce qui est sur `beta-instance` passe sur `instance`, GitHub construit la
+  nouvelle version Clients, puis tu mets à jour chaque client (I2).
+- `plateforme` : la machine elle-même (panel, connexion, sauvegardes, PDF, scripts), installée
+  par I1. Elle ne touche pas à l'appli des clients.
 - `site-vitrine` : la vitrine (I3).
 
-Comme l'appli et la plateforme partagent encore la branche `plateforme`, un changement de l'appli
-apparaît aussi dans les « nouveautés » du bloc Plateforme. Ce n'est pas grave : I1 ne touche pas aux
-sites des clients. Plus tard, l'appli passera sur `main`/`stable` sans rien réinstaller.
+`main` et `stable` restent l'appli de tes sites LXC classiques (sans la plateforme).
+
+Chaque client a sa **version** (fiche du client → **Version de l'appli**) : « Clients » ou
+« Bêta ». **Changer…** le sauvegarde, le passe sur l'autre version et le redémarre ; si elle ne
+démarre pas, il revient tout seul sur celle d'avant. En ligne de commande :
+`recipelog-instance canal <nom> beta-instance` (ou `instance`).
+
+### ☐ I0. Une seule fois : passer sur les branches instance / beta-instance (17/11/2026)
+Les clients créés avant ce jour suivent encore l'ancienne version « plateforme ».
+1. Fais I1 (mettre à jour la plateforme) : le panel apprend les versions « Clients » et « Bêta »,
+   et les nouveaux clients prennent « Clients ».
+2. Vérifie dans **Actions** que l'action **Image Docker** est verte pour les branches `instance`
+   et `beta-instance`.
+3. Pour chaque client, sa fiche → **Version de l'appli** → **Changer…** : **Clients** pour tes
+   clients, **Bêta** pour ton propre site (et `test` si tu veux). Ou dans la VM, en root :
+   ```bash
+   recipelog-instance canal test beta-instance
+   recipelog-instance canal chanka beta-instance
+   ```
 
 ### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans le panel
 Page **Accueil** → bloc **Plateforme** (en bas à droite) → **Mettre à jour la plateforme**. Le bloc dit
@@ -457,8 +476,8 @@ Sans danger : les clients, leurs données et tes réglages ne sont pas touchés.
 clients restent en ligne pendant ce temps.
 
 ### ☐ I2. Les sites des clients, dans le panel
-1. Vérifie que l'action **Image Docker** de la branche `plateforme` est verte
-   (github.com/SuperNon0/recipelogs → **Actions**).
+1. Vérifie que l'action **Image Docker** de la branche `instance` (ou `beta-instance` pour la
+   bêta) est verte (github.com/SuperNon0/recipelogs → **Actions**).
 2. Essaie d'abord sur un seul : page **Clients** → clique sur `test` → **Mettre à jour** (en haut
    de sa fiche). Ouvre-le.
 3. Puis, page **Clients**, **Tout mettre à jour**. Chaque client est sauvegardé juste avant. (C'est aussi à ce

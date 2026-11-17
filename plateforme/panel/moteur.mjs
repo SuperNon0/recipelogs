@@ -117,6 +117,7 @@ const NOMS_ACTIONS = {
   suspendre: "mise en pause",
   reactiver: "réactivation",
   "plateforme-maj": "mise à jour de la plateforme",
+  canal: "changement de version",
 };
 function enTache(quoi, client, f) {
   const t = { id: randomBytes(8).toString("hex"), quoi, client, etat: "attente", etape: "", resultat: null, fin: 0 };
@@ -296,7 +297,9 @@ async function journal(n = 100) {
 
 // ------------------------------------------------------------ santé et usage (lot 5)
 const DOMAINE = process.env.DOMAINE || "recipelog.cc";
-const CANAL_DEFAUT = process.env.CANAL_DEFAUT || "plateforme";
+const CANAL_DEFAUT = process.env.CANAL_DEFAUT || "instance";
+// Étiquettes d'image construites par GitHub (voir recipelog-instance, CANAUX_RE).
+const CANAUX = ["instance", "beta-instance", "plateforme", "beta", "stable"];
 let santeCache = null;
 
 const octets = (t) => {
@@ -524,6 +527,11 @@ async function action(qui, nom, act, corps) {
       details = { mcp: corps.mcp };
       args = ["options", nom, "--mcp", corps.mcp ? "oui" : "non"];
       break;
+    case "canal":
+      exiger(CANAUX.includes(corps.canal), "Canal inconnu.");
+      details = { canal: corps.canal };
+      args = ["canal", nom, corps.canal];
+      break;
     case "essai":
       exiger(entier(corps.jours, 0, 3650), "Durée d'essai invalide.");
       details = { jours: corps.jours };
@@ -568,7 +576,7 @@ function creer(qui, c) {
   exiger(entier(c.max ?? 0, 0, 10000), "Nombre de places invalide.");
   exiger(entier(c.essai ?? 0, 0, 3650), "Durée d'essai invalide.");
   const canal = c.canal ?? CANAL_DEFAUT;
-  exiger(["stable", "beta", "plateforme"].includes(canal), "Canal inconnu.");
+  exiger(CANAUX.includes(canal), "Canal inconnu.");
   const args = ["creer", c.nom, "--canal", canal, "--max", String(c.max ?? 0)];
   if (c.responsable) args.push("--responsable", c.responsable.trim().toLowerCase());
   if (c.essai) args.push("--essai", String(c.essai));
