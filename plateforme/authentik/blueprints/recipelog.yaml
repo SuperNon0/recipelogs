@@ -586,3 +586,33 @@ entries:
           border: 1px solid var(--rl-line2) !important;
         }
         .pf-c-login__main-footer-links-item .pf-c-button img, .pf-c-login__main-footer-links-item .pf-c-button svg { width: 20px; height: 20px; }
+
+        /* ---------------------------------------------- page « Mes applications »
+           (auth.<domaine> une fois connecté) : même habit que l'appli. */
+        .pf-c-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .pf-c-button.pf-m-small { min-height: 36px; line-height: 34px !important; padding-top: 0 !important; padding-bottom: 0 !important; padding-left: 14px; padding-right: 14px; font-size: 13.5px !important; }
+        .pf-c-page { background: transparent !important; }
+        .pf-c-page__main .pf-c-page__header { background: transparent !important; border: 0 !important; backdrop-filter: none !important; }
+        header.pf-c-page__header {
+          background: color-mix(in srgb, var(--rl-bg) 86%, transparent) !important;
+          border-bottom: 1px solid var(--rl-line);
+          -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+        }
+        .background-wrapper, .background-default-slant { background: radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--rl-accent) 16%, transparent), transparent 70%), var(--rl-bg) !important; }
+        .pf-c-page__header-brand-link { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+        .pf-c-page__header-brand-link img.pf-c-brand { width: 34px; height: 34px; }
+        .pf-c-page__header-brand-link::after { content: "Recipe"; font: 400 23px/1 var(--rl-title); color: var(--rl-text); }
+        .pf-c-page__header-brand::after { content: "Log"; font: italic 400 23px/1 var(--rl-title); color: var(--rl-accent); }
+        .pf-c-page__header-brand { display: flex; align-items: center; }
+        .pf-c-page__title, .pf-c-content h1 { font-family: var(--rl-title) !important; font-weight: 400 !important; font-size: 28px !important; color: var(--rl-text); }
+        .pf-c-card {
+          background: var(--rl-card) !important;
+          border: 1px solid var(--rl-line) !important;
+          border-radius: 14px !important; box-shadow: none !important;
+          transition: border-color .15s, transform .15s;
+        }
+        .pf-c-card.pf-m-hoverable:hover { border-color: color-mix(in srgb, var(--rl-accent) 45%, transparent) !important; transform: translateY(-2px); }
+        .pf-c-card__title { font: 600 14px/1.3 var(--rl-body) !important; color: var(--rl-text); }
+        .pf-c-avatar { color: var(--rl-ink); background: var(--rl-accent); font-family: var(--rl-body); }
+        .pf-c-dropdown__toggle, .pf-c-dropdown__toggle-text { color: var(--rl-muted); }
+        .pf-c-dropdown__menu { background: var(--rl-card) !important; border: 1px solid var(--rl-line2); border-radius: 12px; box-shadow: var(--rl-shadow); }
