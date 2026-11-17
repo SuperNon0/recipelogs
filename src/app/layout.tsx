@@ -33,8 +33,18 @@ export const metadata: Metadata = {
   title: "RecipeLog",
   description: "Gestion de recettes de pâtisserie",
   appleWebApp: { capable: true, title: "RecipeLog", statusBarStyle: "black-translucent" },
-  // Icône de l'écran d'accueil de l'iPhone, intégrée à la page (voir apple-touch-icon.ts).
-  icons: { apple: [{ url: APPLE_TOUCH_ICON, sizes: "180x180", type: "image/png" }] },
+  icons: {
+    // Logo de l'onglet du navigateur. Écrit ici à la main : dès que `icons` est rempli,
+    // Next.js n'ajoute plus tout seul src/app/icon.svg, et l'onglet restait sans logo.
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    // Icône de l'écran d'accueil de l'iPhone, intégrée à la page (voir apple-touch-icon.ts).
+    apple: [{ url: APPLE_TOUCH_ICON, sizes: "180x180", type: "image/png" }],
+  },
+  // Anciens iPhone : ouvrir l'appli installée en plein écran, sans la barre de Safari.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
