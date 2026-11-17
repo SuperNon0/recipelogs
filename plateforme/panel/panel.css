@@ -501,3 +501,14 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .pf-liste { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow: auto; }
 .pf-liste li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: var(--creux); border: 1px solid var(--line); border-radius: var(--r-md); font-size: 13.5px; }
 .pf-liste time { color: var(--muted); white-space: nowrap; font-size: 12.5px; }
+
+/* Accueil : carte « Mises à jour » (plateforme, clients par canal, vitrine) et sa fenêtre */
+.maj-lignes { display: grid; gap: 0; margin-bottom: 8px; }
+.maj-ligne { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.maj-ligne:last-child { border-bottom: 0; }
+.maj-ligne > div:first-child { flex: 1; min-width: 0; }
+.maj-ligne b { display: block; font-size: 14px; }
+.maj-ligne small { display: block; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.maj-ligne .btn { flex: none; }
+.maj-alerte { margin-top: 10px; font-size: 13.5px; }
+@media (max-width: 420px) { .maj-ligne { flex-wrap: wrap; } .maj-ligne > div:first-child { flex-basis: 100%; } }

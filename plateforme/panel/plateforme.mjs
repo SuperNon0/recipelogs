@@ -40,6 +40,8 @@ async function chercherNouveautes(v) {
       const j = await r.json();
       valeur = {
         enRetard: j.ahead_by ?? 0,
+        // Dernier commit de la branche : sert à ne prévenir qu'une fois par nouvelle version.
+        dernier: (j.commits ?? []).at(-1)?.sha ?? null,
         changements: (j.commits ?? [])
           .map((c) => ({ titre: String(c.commit?.message ?? "").split("\n")[0].slice(0, 200), date: c.commit?.committer?.date ?? null }))
           .reverse()
@@ -51,6 +53,11 @@ async function chercherNouveautes(v) {
   }
   nouveautes = { cle, jusqua: Date.now() + (valeur ? 10 : 2) * 60 * 1000, valeur };
   return valeur;
+}
+
+// « Vérifier maintenant » dans le panel : redemander à GitHub sans attendre les 10 minutes.
+export function oublierNouveautes() {
+  nouveautes = { cle: "", jusqua: 0, valeur: null };
 }
 
 export async function etat() {
