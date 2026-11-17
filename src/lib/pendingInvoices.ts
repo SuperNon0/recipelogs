@@ -202,8 +202,13 @@ export async function deletePendingInvoice(id: number): Promise<boolean> {
 export async function finishPendingInvoice(id: number, orderId: number): Promise<boolean> {
   try {
     const doc = await pendingDocument(id);
-    const order = await prisma.purchaseOrder.findUnique({ where: { id: orderId }, select: { filePath: true } });
+    const [order, attente] = await Promise.all([
+      prisma.purchaseOrder.findUnique({ where: { id: orderId }, select: { filePath: true, note: true } }),
+      prisma.pendingInvoice.findUnique({ where: { id }, select: { note: true } }),
+    ]);
     if (!order) return false;
+    // La remarque tapée en prenant la photo est reprise si la facture n'en a pas.
+    if (!order.note && attente?.note) await prisma.purchaseOrder.update({ where: { id: orderId }, data: { note: attente.note } });
     const ext = doc.mime === "application/pdf" ? ".pdf" : (Object.entries(INVOICE_MIME).find(([, m]) => m === doc.mime)?.[0] ?? ".jpg");
     const rel = await saveInvoiceFile(orderId, doc.data, ext === ".jpeg" ? ".jpg" : ext);
     await prisma.purchaseOrder.update({ where: { id: orderId }, data: { filePath: rel } });
