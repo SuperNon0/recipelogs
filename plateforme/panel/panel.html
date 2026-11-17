@@ -134,12 +134,22 @@
   <button class="tab" type="button" id="bouton-plus" data-nav="plus"><svg class="ic s22"><use href="/icones.svg#i-dots"/></svg>Plus<span class="n" data-badge="plus"></span></button>
 </nav>
 
-<!-- Une seule fenêtre, remplie selon l'action. Elle ne se ferme que par la croix. -->
+<!-- Une seule fenêtre, remplie selon l'action : feuille du bas sur téléphone, fenêtre
+     centrée sur ordinateur (kit encre). Elle ne se ferme que par la croix. -->
 <div class="voile" id="voile" role="dialog" aria-modal="true" aria-labelledby="fenetre-titre">
   <div class="fenetre">
-    <button class="croix" id="croix" type="button" aria-label="Fermer">×</button>
-    <h3 id="fenetre-titre"></h3>
+    <div class="grab" aria-hidden="true"></div>
+    <div class="fenetre-t"><h3 id="fenetre-titre"></h3><button class="ib" id="croix" type="button" aria-label="Fermer"><svg class="ic s18"><use href="/icones.svg#i-x"/></svg></button></div>
     <div id="fenetre-corps"></div>
+  </div>
+</div>
+
+<!-- Aide d'un « ? » : une petite fenêtre par-dessus tout le reste, fermée par la croix. -->
+<div class="voile voile-aide" id="voile-aide" role="dialog" aria-modal="true" aria-labelledby="aide-titre">
+  <div class="fenetre petite">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="fenetre-t"><span class="pastille-aide" aria-hidden="true"><svg class="ic s18"><use href="/icones.svg#i-help"/></svg></span><h3 id="aide-titre">Aide</h3><button class="ib" id="aide-croix" type="button" aria-label="Fermer l'aide"><svg class="ic s18"><use href="/icones.svg#i-x"/></svg></button></div>
+    <div class="aide-corps" id="aide-corps"></div>
   </div>
 </div>
 </body>
