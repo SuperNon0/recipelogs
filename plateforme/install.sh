@@ -24,7 +24,8 @@
 #   ADMIN_EMAILS       ton adresse (administrateur caché des clients)
 #   DOMAINE            défaut : recipelog.cc
 #   RECIPELOG_BRANCH   branche du dépôt pour les fichiers de la plateforme (défaut : plateforme)
-#   CREER_TEST         1 = créer le client « test » (défaut : 1)
+#   CREER_TEST         1 = créer le client « test » à la première installation (défaut : 1 ;
+#                      jamais recréé ensuite)
 #   SMTP_HOTE, SMTP_PORT, SMTP_UTILISATEUR, SMTP_MOT_DE_PASSE, SMTP_EXPEDITEUR
 #                      serveur d'envoi des emails (invitations, mot de passe
 #                      oublié). Par exemple Brevo : smtp-relay.brevo.com, 587.
@@ -170,7 +171,9 @@ chmod 755 /usr/local/sbin/recipelog-plateforme
 # ------------------------------------------------------------ 4. Réglages
 mkdir -p "${DONNEES}/instances" "${DONNEES}/archives"
 chmod 700 "${DONNEES}"
+PREMIERE_INSTALLATION=0
 if [ ! -f "${DONNEES}/.env" ]; then
+  PREMIERE_INSTALLATION=1
   ask DOMAINE "Nom de domaine" "recipelog.cc"
   ask ADMIN_EMAILS "Ton adresse email (administrateur caché des clients)" ""
   ask CF_TUNNEL_TOKEN "Jeton du tunnel Cloudflare de la plateforme (Entrée = plus tard)" ""
@@ -302,7 +305,9 @@ fi
 
 # ------------------------------------------------------------ 6. Client de test
 CREER_TEST="${CREER_TEST:-1}"
-# Mise à jour lancée depuis le panel (RECIPELOG_MAJ=1) : on ne recrée pas un client « test » supprimé.
+# Seulement à la toute première installation : une relance (ou une mise à jour depuis le
+# panel) ne recrée jamais un client « test » que tu as supprimé.
+[ "${PREMIERE_INSTALLATION}" = 1 ] || CREER_TEST=0
 [ "${RECIPELOG_MAJ:-0}" = 1 ] && CREER_TEST=0
 if [ "${CREER_TEST}" = 1 ] && [ ! -d "${DONNEES}/instances/test" ]; then
   info "Client de test « test »…"
