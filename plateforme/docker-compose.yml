@@ -136,6 +136,8 @@ services:
       AUTHENTIK_DEFAULT_USER_CHANGE_USERNAME: "false"
     volumes:
       - ${DONNEES:-/srv/recipelog}/authentik/media:/media
+      # Polices et icône des pages de connexion (servies sous /media/recipelog/).
+      - ./authentik/theme:/media/recipelog:ro
       - ./authentik/blueprints:/blueprints/custom:ro
       - ./authentik/templates:/templates:ro
     networks: [recipelog]
@@ -171,6 +173,8 @@ services:
     environment: *authentik-env
     volumes:
       - ${DONNEES:-/srv/recipelog}/authentik/media:/media
+      # Polices et icône des pages de connexion (servies sous /media/recipelog/).
+      - ./authentik/theme:/media/recipelog:ro
       - ./authentik/blueprints:/blueprints/custom:ro
       - ./authentik/templates:/templates:ro
     networks: [recipelog]
