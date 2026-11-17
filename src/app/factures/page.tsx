@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { listPurchaseOrders } from "@/lib/purchaseOrders";
 import { formatEuro } from "@/lib/cost";
 import { InvoiceList } from "@/components/suppliers/InvoiceList";
-import { AiReaderButton } from "@/components/suppliers/AiReader";
+import { NouvelleFactureButton, FacturesATraiter } from "@/components/suppliers/NouvelleFacture";
+import { listPendingInvoices, limitesFactures } from "@/lib/pendingInvoices";
 import { viewerCan } from "@/lib/auth/viewer";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +19,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const from = day(sp.du);
   const to = day(sp.au);
   const supplierId = Number(sp.fournisseur) || null;
-  const [orders, suppliers] = await Promise.all([
+  const peutModifier = viewerCan(viewer, "costs.edit");
+  const [orders, suppliers, aTraiter, limites] = await Promise.all([
     listPurchaseOrders({ from, to, supplierId }),
     prisma.supplier.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    peutModifier ? listPendingInvoices() : Promise.resolve([]),
+    peutModifier ? limitesFactures() : Promise.resolve(null),
   ]);
   const total = orders.reduce((s, o) => s + (o.total ?? 0), 0);
   const filtered = !!(from || to || supplierId);
@@ -32,13 +36,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </Link>
       <div className="page-head">
         <h1>Factures</h1>
-        {viewerCan(viewer, "costs.edit") && <AiReaderButton type="facture" fournisseurs={suppliers.map((s) => s.name)} />}
+        {peutModifier && <NouvelleFactureButton fournisseurs={suppliers.map((s) => s.name)} />}
         <p className="sub">
           {orders.length} facture{orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} HT` : ""}
           {filtered ? " sur cette sélection" : ", de la plus récente à la plus ancienne"}
         </p>
       </div>
+      {peutModifier && <FacturesATraiter factures={aTraiter} fournisseurs={suppliers.map((s) => s.name)} limite={limites?.attente ?? 0} />}
       <form className="sup-range" method="get">
         <select name="fournisseur" className="fl-input" defaultValue={supplierId ?? ""} aria-label="Fournisseur">
           <option value="">Tous les fournisseurs</option>

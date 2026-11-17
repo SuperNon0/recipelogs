@@ -26,7 +26,9 @@ import {
 } from "@/lib/purchaseOrders";
 import { attachInvoiceFile, createUploadLink, removeInvoiceFile } from "@/lib/invoiceFiles";
 import { currentOrigin } from "@/lib/auth/service";
+import { deletePendingInvoice, finishPendingInvoice, getPendingInvoice, listPendingInvoices, readPendingPage } from "@/lib/pendingInvoices";
 import { DELETE, READ, WRITE, id, js, parseArgs, text, type McpTool } from "./helpers";
+import type { McpToolResult } from "../protocol";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date au format AAAA-MM-JJ");
 const money = z.number().min(0).max(10_000_000);
@@ -75,7 +77,8 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       "produit = la désignation exacte écrite sur la facture (garde l'origine : « Fraise Espagne cat I »). article = nom commun court qui REGROUPE les variantes d'un même produit et sert à comparer entre fournisseurs : sans origine, calibre, catégorie ni taille de barquette (« Fraise », « Tomate », « Citron vert »), mais en gardant ce qui change la recette (« Chocolat noir 64 % », « Crème 35 % », « Farine T45 », « Boîte pâtissière 20 × 8 »). Réutilise TOUJOURS l'article existant, même orthographe (voir voir_fournisseur et comparer_prix_fournisseurs) : les variantes d'un article ont un seul historique de prix, et l'ingrédient des recettes relié suit le dernier prix payé pour l'article. En cas de doute entre deux articles, demande à l'utilisateur avant d'enregistrer. " +
       `${FAMILIES_HELP} ` +
       "ingredient = nom exact (ou id) d'un ingrédient des recettes auquel ce produit correspond (voir lister_ingredients) : il prend alors ce prix s'il n'avait pas encore de produit choisi. Ne crée JAMAIS d'ingrédient pour un produit qui ne sert pas en recette, et ne mets jamais les prix avec regler_fiches_ingredients. " +
-      "Réponse : nouveaux produits, prix qui ont changé (avant → après), variantes_regroupees (nouvelle variante d'un article déjà acheté, avec l'évolution), ingrédients mis à jour, lignes à vérifier. À montrer à l'utilisateur. Ensuite, joins le PDF ou la photo de la facture avec joindre_fichier_facture.",
+      "Réponse : nouveaux produits, prix qui ont changé (avant → après), variantes_regroupees (nouvelle variante d'un article déjà acheté, avec l'évolution), ingrédients mis à jour, lignes à vérifier. À montrer à l'utilisateur. Ensuite, joins le PDF ou la photo de la facture avec joindre_fichier_facture. " +
+      "Facture prise en photo sur le site (voir lister_factures_a_traiter) : passe son id dans facture_a_traiter_id, ses photos sont alors jointes toutes seules et elle quitte la liste « À traiter ».",
     inputSchema: {
       type: "object",
       properties: {
@@ -85,6 +88,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         total: js.num("Total HT de la facture en €, s'il est écrit"),
         note: js.str("Remarque libre"),
         remplacer: js.bool("true pour remplacer une facture déjà enregistrée avec le même numéro"),
+        facture_a_traiter_id: js.int("Id d'une facture « à traiter » (lister_factures_a_traiter) : ses photos sont jointes et elle sort de la liste"),
         lignes: {
           type: "array",
           description: "Une entrée par ligne de la facture",
@@ -119,10 +123,14 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           total: money.optional(),
           note: z.string().trim().max(2000).optional(),
           remplacer: z.boolean().default(false),
+          facture_a_traiter_id: id.optional(),
           lignes: z.array(lineSchema).min(1).max(500),
         }),
         args,
       );
+      if (a.facture_a_traiter_id && !(await getPendingInvoice(a.facture_a_traiter_id))) {
+        throw new Error(`facture à traiter ${a.facture_a_traiter_id} introuvable (déjà enregistrée ou supprimée ? voir lister_factures_a_traiter)`);
+      }
       const summary = await recordPurchaseOrder({
         supplier: a.fournisseur,
         date: a.date,
@@ -144,8 +152,109 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           ingredient: l.ingredient,
         })),
       });
+      const photosJointes = a.facture_a_traiter_id ? await finishPendingInvoice(a.facture_a_traiter_id, summary.facture_id) : undefined;
       refresh();
-      return text({ ...summary, voir: `/factures/${summary.facture_id}` });
+      return text({
+        ...summary,
+        voir: `/factures/${summary.facture_id}`,
+        ...(photosJointes === undefined
+          ? {}
+          : { photos_jointes: photosJointes, ...(photosJointes ? {} : { a_faire: "les photos n'ont pas pu être jointes : la facture reste dans « À traiter », supprime-la une fois vérifiée" }) }),
+      });
+    },
+  },
+
+  {
+    name: "lister_factures_a_traiter",
+    title: "Lister les factures à traiter",
+    description:
+      "Factures prises en photo sur le site (bouton « Nouvelle facture ») et pas encore enregistrées : id, date d'ajout, nombre de pages, remarque, qui l'a ajoutée, erreur de la dernière lecture par IA. " +
+      "Pour en remplir une : voir_facture_a_traiter (pour lire les photos), puis enregistrer_facture avec facture_a_traiter_id.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: READ,
+    run: async () => {
+      const liste = await listPendingInvoices();
+      return text({
+        nombre: liste.length,
+        factures: liste.map((f) => ({
+          id: f.id,
+          ajoutee_le: f.createdAt,
+          pages: f.pages,
+          pdf: f.pdf,
+          remarque: f.note,
+          ajoutee_par: f.addedBy,
+          derniere_erreur_ia: f.lastError,
+        })),
+        page: `${currentOrigin() ?? ""}/factures`,
+      });
+    },
+  },
+
+  {
+    name: "voir_facture_a_traiter",
+    title: "Voir les photos d'une facture à traiter",
+    description:
+      "Renvoie les photos (ou le PDF) d'une facture à traiter pour que tu la lises. Recopie ensuite CHAQUE ligne avec enregistrer_facture (facture_a_traiter_id = cet id), en suivant ses règles : " +
+      "avant d'enregistrer, regarde les articles déjà utilisés (comparer_prix_fournisseurs, voir_fournisseur) et REGROUPE les produits proches sous l'article existant, même orthographe (« Fraise Espagne » et « Fraise France » → article « Fraise » ; tomates, citrons verts… idem), " +
+      "sauf ce qui change la recette, comme le chocolat qui se distingue par son % (« Chocolat noir 64 % »). En cas de doute entre deux articles, demande à l'utilisateur. Si une page est illisible, dis-le plutôt que de deviner.",
+    inputSchema: {
+      type: "object",
+      properties: { id: js.int("Id de la facture à traiter (lister_factures_a_traiter)") },
+      required: ["id"],
+    },
+    annotations: READ,
+    run: async (args) => {
+      const a = parseArgs(z.object({ id }), args);
+      const f = await getPendingInvoice(a.id);
+      if (!f) throw new Error("facture à traiter introuvable (déjà enregistrée ou supprimée ?)");
+      const pages: McpToolResult["content"] = [];
+      for (let i = 1; i <= f.pages; i++) {
+        const p = await readPendingPage(f.id, i);
+        if (!p) continue;
+        pages.push(
+          p.type === "application/pdf"
+            ? { type: "resource", resource: { uri: `recipelog://factures-a-traiter/${f.id}.pdf`, mimeType: p.type, blob: p.bytes.toString("base64") } }
+            : { type: "image", data: p.bytes.toString("base64"), mimeType: p.type },
+        );
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                id: f.id,
+                pages: f.pages,
+                pages_lisibles: pages.length,
+                remarque: f.note,
+                ajoutee_le: f.createdAt,
+                ensuite: `enregistrer_facture avec facture_a_traiter_id: ${f.id}`,
+              },
+              null,
+              2,
+            ),
+          },
+          ...pages,
+        ],
+      };
+    },
+  },
+
+  {
+    name: "supprimer_facture_a_traiter",
+    title: "Supprimer une facture à traiter",
+    description: "Supprime une facture à traiter et ses photos (doublon, photo ratée…). Demande d'abord à l'utilisateur. Ne touche à aucune facture enregistrée.",
+    inputSchema: {
+      type: "object",
+      properties: { id: js.int("Id de la facture à traiter") },
+      required: ["id"],
+    },
+    annotations: DELETE,
+    run: async (args) => {
+      const a = parseArgs(z.object({ id }), args);
+      if (!(await deletePendingInvoice(a.id))) throw new Error("facture à traiter introuvable");
+      refresh();
+      return text({ ok: true, supprimee: a.id });
     },
   },
 

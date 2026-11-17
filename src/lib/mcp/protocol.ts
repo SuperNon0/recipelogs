@@ -11,7 +11,11 @@ export const SERVER_INFO = { name: "recipelog", title: "RecipeLog", version: "1.
 export const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 export type McpToolResult = {
-  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
+  content: (
+    | { type: "text"; text: string }
+    | { type: "image"; data: string; mimeType: string }
+    | { type: "resource"; resource: { uri: string; mimeType: string; blob: string } }
+  )[];
   isError?: boolean;
 };
 

@@ -21,6 +21,7 @@ import { INVOICE_MAX_BYTES, attachInvoiceFile, sniffInvoiceExt } from "@/lib/inv
 import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
 import { articleKey } from "@/lib/suppliers";
 import { lireTableur } from "@/lib/mercurialeFichier";
+import { finishPendingInvoice, pendingDocument, setPendingError } from "@/lib/pendingInvoices";
 
 /**
  * Lecture des factures et des mercuriales par IA (lot 7 de la plateforme).
@@ -79,17 +80,27 @@ export async function etatLectureIA(): Promise<EtatIA> {
 
 export type ResultatLecture = ResultatIA;
 
-/** fd : fichier (PDF ou photo), type (facture | mercuriale), fournisseurId (mercuriale). */
+/**
+ * fd : fichier (PDF ou photo), type (facture | mercuriale), fournisseurId (mercuriale) ;
+ * ou attenteId : une facture « à traiter » déjà gardée sur le site (ses pages sont lues ensemble).
+ */
 export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: string } | Erreur> {
   const viewer = await requireAccess("costs.edit");
   try {
-    const f = fd.get("fichier");
-    if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
-    if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: `Fichier trop lourd (${Math.round(INVOICE_MAX_BYTES / 1024 / 1024)} Mo au plus).` };
-    const data = Buffer.from(await f.arrayBuffer());
-    const mime = mimeDe(data);
-    if (!mime || !fichierAccepte(mime)) return { ok: false, error: "Envoie un PDF ou une photo (JPG, PNG ou WebP)." };
-    const type: TypeLecture = fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
+    const attenteId = Number(fd.get("attenteId")) || null;
+    let fichier: { data: Buffer; mime: string; nom: string };
+    if (attenteId) {
+      fichier = await pendingDocument(attenteId);
+    } else {
+      const f = fd.get("fichier");
+      if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
+      if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: `Fichier trop lourd (${Math.round(INVOICE_MAX_BYTES / 1024 / 1024)} Mo au plus).` };
+      const data = Buffer.from(await f.arrayBuffer());
+      const mime = mimeDe(data);
+      if (!mime || !fichierAccepte(mime)) return { ok: false, error: "Envoie un PDF ou une photo (JPG, PNG ou WebP)." };
+      fichier = { data, mime, nom: f.name };
+    }
+    const type: TypeLecture = attenteId ? "facture" : fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
     const fournisseurId = Number(fd.get("fournisseurId")) || null;
 
     const reglages = await getReglagesIA();
@@ -101,7 +112,12 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
     const ctx = { articles: produits.map((p) => p.article!).filter(Boolean), fournisseur: fournisseur?.name ?? null };
     const id = lancer<ResultatLecture>(
       qui(viewer),
-      () => lireAvecIA(reglages, { data, mime, nom: f.name }, type, ctx),
+      async () => {
+        const r = await lireAvecIA(reglages, fichier, type, ctx);
+        // La facture reste « à traiter » : on note pourquoi la lecture a échoué, pour la liste.
+        if (attenteId) await setPendingError(attenteId, r.ok ? null : r.message);
+        return r;
+      },
       () => ({ ok: false, code: "ia_erreur", message: "Erreur inattendue pendant la lecture." }),
     );
     return { ok: true, id };
@@ -195,7 +211,7 @@ function relire(doc: unknown): DocumentLu {
   });
 }
 
-/** fd : document (JSON vérifié), remplacer (« 1 »), fichier (joint à la facture). */
+/** fd : document (JSON vérifié), remplacer (« 1 »), fichier (joint à la facture) ou attenteId (ses pages sont jointes, puis elle sort de « À traiter »). */
 export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; resume: PurchaseOrderSummary; fichierJoint: boolean } | Erreur> {
   await requireAccess("costs.edit");
   try {
@@ -222,7 +238,10 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
     });
     let fichierJoint = false;
     const f = fd.get("fichier");
-    if (f instanceof File && f.size > 0) {
+    const attenteId = Number(fd.get("attenteId")) || null;
+    if (attenteId) {
+      fichierJoint = await finishPendingInvoice(attenteId, resume.facture_id);
+    } else if (f instanceof File && f.size > 0) {
       try {
         await attachInvoiceFile(resume.facture_id, Buffer.from(await f.arrayBuffer()));
         fichierJoint = true;

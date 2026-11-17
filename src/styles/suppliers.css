@@ -621,3 +621,159 @@ button.cost-line:hover {
 .modal > div:has(> .ia-lignes) {
   flex-shrink: 0;
 }
+
+/* ─── Nouvelle facture (photo depuis le téléphone) et liste « À traiter » ─── */
+.nf-choix {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 420px) {
+  .nf-choix {
+    grid-template-columns: 1fr;
+  }
+}
+.nf-tuile {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+}
+.nf-tuile svg {
+  color: var(--accent);
+}
+.nf-tuile small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.nf-tuile:active {
+  transform: scale(0.98);
+}
+.nf-pages {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.nf-page {
+  position: relative;
+  flex: none;
+  width: 96px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+.nf-page img,
+.nf-pdf {
+  width: 96px;
+  height: 128px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.nf-pdf {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nf-num {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nf-retirer {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text) 70%, transparent);
+  color: var(--bg, #fff);
+  cursor: pointer;
+}
+.nf-actions {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.nf-actions .fl-btn {
+  justify-content: center;
+  min-height: 44px;
+}
+.nf-fini {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 6px;
+  text-align: center;
+}
+.nf-fini svg {
+  color: var(--accent-2);
+}
+.nf-attente {
+  margin-bottom: 18px;
+}
+.nf-ligne {
+  flex-wrap: wrap;
+}
+.nf-ligne .set-tx {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.nf-mini {
+  flex: none;
+  width: 44px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.nf-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.nf-err {
+  color: var(--danger) !important;
+}
+.nf-btns {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+.nf-grand {
+  display: grid;
+  gap: 10px;
+}
+.nf-grand img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
