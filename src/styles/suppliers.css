@@ -549,6 +549,9 @@ button.cost-line:hover {
   gap: 2px;
   min-width: 0;
 }
+.ia-ligne-champs .ia-champ-article {
+  grid-column: span 2;
+}
 .ia-ligne-champs span {
   font-size: 11.5px;
   color: var(--muted);

@@ -214,8 +214,9 @@ export async function relayer(client, req, res, query) {
         res.destroy();
         return;
       }
-      res.end();
+      // La lecture est comptée avant de finir la réponse : la suivante trouve le bon compteur.
       await noter(u, fin);
+      res.end();
       return;
     }
     const texte = await amont.text();

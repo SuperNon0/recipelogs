@@ -19,6 +19,7 @@ import { lancer, suivre } from "@/lib/ia/travaux";
 import { recordPurchaseOrder, type PurchaseOrderSummary } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, attachInvoiceFile, sniffInvoiceExt } from "@/lib/invoiceFiles";
 import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
+import { articleKey } from "@/lib/suppliers";
 import { lireTableur } from "@/lib/mercurialeFichier";
 
 /**
@@ -116,7 +117,7 @@ export async function suivreLecture(id: string): Promise<{ etat: "en_cours" } | 
 }
 
 /** Produits déjà connus chez ce fournisseur (pour marquer les lignes nouvelles et les prix qui changent). */
-export async function produitsConnus(fournisseur: string): Promise<{ nom: string; reference: string | null; prix: number | null; unite: string; contenance: number | null }[]> {
+export async function produitsConnus(fournisseur: string): Promise<{ nom: string; reference: string | null; article: string | null; prix: number | null; unite: string; contenance: number | null }[]> {
   await requireAccess("costs.edit");
   const nom = fournisseur.trim();
   if (!nom) return [];
@@ -124,14 +125,39 @@ export async function produitsConnus(fournisseur: string): Promise<{ nom: string
   if (!s) return [];
   const p = await prisma.supplierProduct.findMany({
     where: { supplierId: s.id },
-    select: { name: true, reference: true, price: true, priceUnit: true, packSize: true },
+    select: { name: true, reference: true, article: true, price: true, priceUnit: true, packSize: true },
   });
-  return p.map((x) => ({ nom: x.name, reference: x.reference, prix: x.price == null ? null : Number(x.price), unite: x.priceUnit, contenance: x.packSize == null ? null : Number(x.packSize) }));
+  return p.map((x) => ({ nom: x.name, reference: x.reference, article: x.article?.trim() || null, prix: x.price == null ? null : Number(x.price), unite: x.priceUnit, contenance: x.packSize == null ? null : Number(x.packSize) }));
+}
+
+/** Articles déjà utilisés, tous fournisseurs confondus (liste proposée dans le champ Article). */
+export async function articlesConnus(): Promise<string[]> {
+  await requireAccess("costs.edit");
+  const p = await prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 2000 });
+  return p.map((x) => x.article!.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
 }
 
 // ─────────────────────────────────────────────
 // Enregistrement après vérification
 // ─────────────────────────────────────────────
+
+/** « RIBERA SAS » et « Ribera » : même nom une fois retirés la casse, les accents, la ponctuation et la forme de société. */
+function cleFournisseur(nom: string): string {
+  return articleKey(nom)
+    .replace(/[.,;:'’()&/-]+/g, " ")
+    .replace(/\b(sas|sasu|sarl|sa|eurl|sci|snc|ets|etablissements|societe|ste|et fils|france)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Un fournisseur déjà enregistré dont le nom ressemble à celui-ci (sans être exactement le même). */
+async function fournisseurRessemblant(nom: string): Promise<string | null> {
+  const tous = await prisma.supplier.findMany({ select: { name: true } });
+  if (tous.some((s) => s.name.trim().toLowerCase() === nom.trim().toLowerCase())) return null;
+  const cle = cleFournisseur(nom);
+  if (!cle) return null;
+  return tous.find((s) => cleFournisseur(s.name) === cle)?.name ?? null;
+}
 
 function versLignes(lignes: LigneLue[]) {
   return lignes.map((l) => ({
@@ -177,6 +203,12 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
     if (!doc.fournisseur) return { ok: false, error: "Indique le fournisseur." };
     if (!doc.date) return { ok: false, error: "Indique la date de la facture." };
     if (!doc.lignes.length) return { ok: false, error: "Aucune ligne à enregistrer." };
+    if (fd.get("nouveauFournisseur") !== "1") {
+      const proche = await fournisseurRessemblant(doc.fournisseur);
+      if (proche) {
+        return { ok: false, error: `Ce fournisseur ressemble à « ${proche} », déjà enregistré. Choisis « ${proche} » dans le champ Fournisseur pour lui ajouter cette facture, ou coche la case pour créer un nouveau fournisseur.` };
+      }
+    }
     const note = String(fd.get("note") ?? "").trim().slice(0, 2000) || null;
     const resume = await recordPurchaseOrder({
       supplier: doc.fournisseur,
@@ -185,6 +217,7 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
       total: doc.total,
       note,
       replace: fd.get("remplacer") === "1",
+      keepFamily: true,
       lines: versLignes(doc.lignes),
     });
     let fichierJoint = false;
@@ -218,6 +251,7 @@ export async function enregistrerMercuriale(input: { fournisseurId: number; date
       date: doc.date,
       manual: true,
       note: `Mercuriale importée${input.nomFichier ? ` (${String(input.nomFichier).slice(0, 120)})` : ""}`,
+      keepFamily: true,
       lines: versLignes(doc.lignes),
     });
     refresh();

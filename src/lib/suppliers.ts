@@ -49,7 +49,9 @@ export function unitPriceOf(line: {
   if (ok(line.unitPrice)) return round4(line.unitPrice);
   const size = ok(line.packSize) ? line.packSize : 1;
   if (ok(line.packPrice)) return round4(line.packPrice / size);
-  if (ok(line.lineTotal) && ok(line.quantity)) return round4(line.lineTotal / (line.quantity * size));
+  // Avoir : montant et quantité négatifs tous les deux, le prix reste positif.
+  const t = line.lineTotal, q = line.quantity;
+  if (t != null && q != null && Number.isFinite(t) && Number.isFinite(q) && t * q > 0) return round4(t / (q * size));
   return null;
 }
 

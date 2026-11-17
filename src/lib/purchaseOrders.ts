@@ -213,6 +213,11 @@ export type PurchaseOrderInput = {
   replace?: boolean;
   /** Liste de prix (mercuriale) : les prix entrent dans l'historique, mais pas dans la liste des factures. */
   manual?: boolean;
+  /**
+   * Lecture par IA : la famille d'un produit déjà connu n'est pas remplacée par celle que
+   * l'IA propose (l'écran de vérification ne la montre pas).
+   */
+  keepFamily?: boolean;
   lines: PurchaseLineInput[];
 };
 
@@ -265,6 +270,35 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           // Sans nouvelle remarque, celle de la facture remplacée est gardée (le fichier joint aussi : même facture).
           keptNote = dup.note;
         }
+      } else if (input.manual) {
+        // La même mercuriale importée deux fois (même fournisseur, même date, même fichier) remplace la première.
+        const note = input.note?.trim() || null;
+        const dup = await tx.purchaseOrder.findFirst({
+          where: { supplierId: supplier.id, manual: true, date, note },
+          select: { id: true, lines: { select: { productId: true } } },
+        });
+        if (dup) {
+          touched.push(...dup.lines.map((l) => l.productId));
+          replacedId = dup.id;
+        }
+      } else {
+        // Facture sans numéro : même fournisseur, même date, même total et même nombre de lignes = sans doute la même.
+        const valides = input.lines.filter((l) => l.product.trim() && unitPriceOf(l) != null).length;
+        const memes = await tx.purchaseOrder.findMany({
+          where: { supplierId: supplier.id, manual: false, date, number: null },
+          select: { id: true, note: true, total: true, _count: { select: { lines: true } }, lines: { select: { productId: true } } },
+        });
+        const dup = memes.find((o) => o._count.lines === valides && (input.total == null || num(o.total) == null || Math.abs(num(o.total)! - input.total) < 0.01));
+        if (dup) {
+          if (!input.replace) {
+            throw new Error(
+              `une facture de ${supplier.name} du ${isoDay(date)} avec les mêmes lignes est déjà enregistrée (id ${dup.id}) : remets remplacer=true pour la remplacer, ou donne son numéro`,
+            );
+          }
+          touched.push(...dup.lines.map((l) => l.productId));
+          replacedId = dup.id;
+          keptNote = dup.note;
+        }
       }
 
       const data = {
@@ -283,6 +317,12 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       const linked: { baseId: number; productId: number }[] = [];
       let computedTotal = 0;
       let lineCount = 0;
+      // Produits du fournisseur par nom « à plat » (sans accents ni majuscules) : « Creme 35% » = « Crème 35% ».
+      const parCle = new Map(
+        (await tx.supplierProduct.findMany({ where: { supplierId: supplier.id }, select: { id: true, name: true }, orderBy: { id: "desc" } })).map(
+          (p) => [articleKey(p.name), p.id] as const,
+        ),
+      );
 
       for (const l of input.lines) {
         const name = l.product.trim();
@@ -298,7 +338,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             : null) ??
           (await tx.supplierProduct.findFirst({
             where: { supplierId: supplier.id, name: { equals: name, mode: "insensitive" } },
-          }));
+          })) ??
+          (parCle.has(articleKey(name)) ? await tx.supplierProduct.findUnique({ where: { id: parCle.get(articleKey(name))! } }) : null);
         const details = {
           ...(reference ? { reference } : {}),
           ...(l.article?.trim() ? { article: l.article.trim() } : {}),
@@ -310,7 +351,14 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             data: { supplierId: supplier.id, name, priceUnit: l.unit, ...details },
           });
           created.push(name);
+          parCle.set(articleKey(name), product.id);
         } else {
+          if (input.keepFamily && product.family?.trim()) delete (details as { family?: string }).family;
+          if (product.price != null && product.priceUnit !== l.unit) {
+            warnings.push(
+              `${product.name} : le prix était suivi ${product.priceUnit === "pièce" ? "à la pièce" : `au ${product.priceUnit}`}, ce document le donne ${l.unit === "pièce" ? "à la pièce" : `au ${l.unit}`}. Le coût des recettes qui utilisent ce produit a pu changer : vérifie l'unité.`,
+            );
+          }
           if (!before.has(product.id)) {
             before.set(product.id, { name: product.name, price: num(product.price), unit: product.priceUnit });
           }

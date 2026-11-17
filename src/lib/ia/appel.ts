@@ -22,8 +22,10 @@ export type OptionsIA = {
 };
 
 const TYPES_IMAGES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_SORTIE = 16000;
-const DELAI_MS = 5 * 60_000;
+// Lecture en continu : la réponse arrive au fil de l'eau, donc une longue mercuriale
+// (plusieurs pages, plusieurs centaines de lignes) tient dans une seule lecture.
+const MAX_SORTIE = 64000;
+const DELAI_MS = 15 * 60_000;
 
 const erreur = (code: string, message: string): ResultatIA => ({ ok: false, code, message });
 
@@ -60,7 +62,8 @@ async function claude(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA)
           apiKey: null,
           authToken: (process.env.RECIPELOG_PASSERELLE_CLE ?? "").trim(),
           baseURL: opts.anthropicBaseURL ?? `${passerelle}/v1/ia/anthropic`,
-          maxRetries: 1,
+          // Pas de second essai automatique : la passerelle compterait deux lectures dans le quota.
+          maxRetries: 0,
           timeout: DELAI_MS,
         }
       : { apiKey: r.cle, baseURL: opts.anthropicBaseURL, maxRetries: 2, timeout: DELAI_MS },
@@ -71,7 +74,8 @@ async function claude(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA)
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data } }
       : { type: "image", source: { type: "base64", media_type: f.mime as "image/jpeg", data } };
   try {
-    const rep = await client.beta.messages.create({
+    const rep = await client.beta.messages
+      .stream({
       model: plateforme ? MODELE_PLATEFORME : r.modele,
       max_tokens: MAX_SORTIE,
       // Si le modèle refuse (filtre de sécurité trop prudent), l'API relance avec le modèle de secours conseillé.
@@ -79,7 +83,8 @@ async function claude(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA)
       fallbacks: "default",
       output_config: { format: { type: "json_schema", schema: SCHEMA_DOCUMENT as unknown as Record<string, unknown> } },
       messages: [{ role: "user", content: [piece, { type: "text", text: texte }] }],
-    });
+    })
+      .finalMessage();
     if (rep.stop_reason === "refusal") return erreur("refus", "L'IA a refusé de lire ce document. Essaie avec une photo plus nette ou saisis la facture à la main.");
     if (rep.stop_reason === "max_tokens") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
     const t = rep.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
@@ -91,6 +96,12 @@ async function claude(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA)
 }
 
 function erreurClaude(e: unknown, plateforme: boolean): ResultatIA {
+  // La vraie raison reste dans les journaux du site : le message affiché est volontairement simple.
+  if (e instanceof Anthropic.APIError) {
+    console.error(`IA : erreur de Claude (${e.status ?? "sans réponse"}) : ${String(e.message).slice(0, 800)}`);
+  } else {
+    console.error("IA : erreur pendant la lecture :", e instanceof Error ? e.message : e);
+  }
   if (e instanceof Anthropic.APIError) {
     // Refus de la passerelle : { error: "quota_ia", message: "…" }.
     const corps = (e.error ?? {}) as { error?: unknown; message?: unknown };
@@ -103,6 +114,9 @@ function erreurClaude(e: unknown, plateforme: boolean): ResultatIA {
     }
     if (e instanceof Anthropic.PermissionDeniedError) return erreur("cle_refusee", "Ta clé Claude n'a pas le droit d'utiliser ce modèle.");
     if (e instanceof Anthropic.RateLimitError) return erreur("limite", "L'IA reçoit trop de demandes en ce moment. Réessaie dans une minute.");
+    if (!plateforme && e instanceof Anthropic.BadRequestError && /credit|billing/i.test(String(e.message))) {
+      return erreur("credit", "Le crédit de ton compte Claude est épuisé. Recharge-le chez Anthropic, puis réessaie.");
+    }
     if (e instanceof Anthropic.BadRequestError) return erreur("refus_api", "L'IA n'a pas accepté ce fichier (trop gros, trop de pages ou illisible).");
     if (e instanceof Anthropic.APIConnectionTimeoutError) return erreur("delai", "L'IA a mis trop de temps à répondre. Réessaie avec moins de pages.");
     if (e instanceof Anthropic.APIConnectionError) return erreur("injoignable", "L'IA ne répond pas pour l'instant. Réessaie dans quelques minutes.");
@@ -130,9 +144,13 @@ async function posterJson(
       body: JSON.stringify(corps),
       signal: AbortSignal.timeout(DELAI_MS),
     });
-    if (!res.ok) return { ok: false, status: res.status };
+    if (!res.ok) {
+      console.error(`IA : ${new URL(url).hostname} a répondu ${res.status} : ${(await res.text().catch(() => "")).slice(0, 800)}`);
+      return { ok: false, status: res.status };
+    }
     return { ok: true, json: (await res.json()) as Record<string, unknown> };
-  } catch {
+  } catch (e) {
+    console.error(`IA : ${new URL(url).hostname} injoignable :`, e instanceof Error ? e.message : e);
     return { ok: false, status: 0 };
   }
 }
@@ -164,6 +182,7 @@ async function chatgpt(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA
   if (!rep.ok) return erreurHttp("ChatGPT", rep.status);
   const sortie = Array.isArray(rep.json.output) ? (rep.json.output as { type?: string; content?: { type?: string; text?: string }[] }[]) : [];
   const t = sortie.flatMap((o) => (o.type === "message" ? (o.content ?? []).filter((c) => c.type === "output_text").map((c) => c.text ?? "") : [])).join("");
+  if (rep.json.status === "incomplete") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
   if (!t) return erreur("refus", "ChatGPT n'a rien renvoyé pour ce document.");
   return finir(t, r.modele);
 }
@@ -183,8 +202,9 @@ async function gemini(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA)
     generationConfig: { responseMimeType: "application/json" },
   });
   if (!rep.ok) return erreurHttp("Gemini", rep.status);
-  const cand = Array.isArray(rep.json.candidates) ? (rep.json.candidates as { content?: { parts?: { text?: string }[] } }[]) : [];
+  const cand = Array.isArray(rep.json.candidates) ? (rep.json.candidates as { finishReason?: string; content?: { parts?: { text?: string }[] } }[]) : [];
   const t = (cand[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  if (cand[0]?.finishReason === "MAX_TOKENS") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
   if (!t) return erreur("refus", "Gemini n'a rien renvoyé pour ce document.");
   return finir(t, r.modele);
 }

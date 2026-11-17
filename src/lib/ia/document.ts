@@ -104,7 +104,9 @@ export function consigne(type: TypeLecture, ctx: ContexteLecture): string {
 // Nettoyage de la réponse de l'IA
 // ─────────────────────────────────────────────
 
-const MAX_LIGNES = 500;
+// Même limite que la lecture des tableurs (mercurialeFichier.ts) : ce que l'écran montre est
+// ce qui est enregistré, rien n'est coupé en silence.
+export const MAX_LIGNES = 3000;
 
 function texte(v: unknown, max = 200): string | null {
   if (typeof v !== "string") return null;
@@ -112,18 +114,21 @@ function texte(v: unknown, max = 200): string | null {
   return t || null;
 }
 
-/** Nombre positif lu tel quel ou depuis un texte « 12,50 € ». */
-export function nombre(v: unknown): number | null {
+/**
+ * Nombre lu tel quel ou depuis un texte « 12,50 € », « 12,50 €/kg », « 12,50 € HT ».
+ * Positif, sauf `negatif` (quantité, montant et total d'un avoir).
+ */
+export function nombre(v: unknown, negatif = false): number | null {
   let n: number;
   if (typeof v === "number") n = v;
   else if (typeof v === "string") {
-    let t = v.replace(/[\s\u00a0\u202f€]/g, "");
+    let t = v.replace(/[\s\u00a0\u202f]/g, "").replace(/(€|eur(os?)?)?(\/?(kg|l|litre|pi[eè]ce|pce|u|unit[ée]))?(h\.?t\.?)?$/i, "").replace(/€/g, "");
     // « 1.234,50 » ou « 12,5 » : virgule décimale à la française. « 1,234.50 » : à l'anglaise.
     t = /,\d{1,4}$/.test(t) ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
     if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
     n = Number(t);
   } else return null;
-  if (!Number.isFinite(n) || n < 0 || n > 10_000_000) return null;
+  if (!Number.isFinite(n) || (n < 0 && !negatif) || Math.abs(n) > 10_000_000) return null;
   return Math.round(n * 10000) / 10000;
 }
 
@@ -160,12 +165,12 @@ export function nettoyerDocument(brut: unknown): DocumentLu {
         reference: texte(l.reference, 100),
         article: texte(l.article),
         famille: texte(l.famille, 100),
-        quantite: nombre(l.quantite),
+        quantite: nombre(l.quantite, true),
         contenance: nombre(l.contenance),
         unite: unite(l.unite_prix),
         prixUnitaire: nombre(l.prix_unitaire),
         prixColis: nombre(l.prix_colis),
-        montant: nombre(l.montant_ligne),
+        montant: nombre(l.montant_ligne, true),
         aVerifier: texte(l.a_verifier, 300),
       } satisfies LigneLue;
     })
@@ -174,7 +179,7 @@ export function nettoyerDocument(brut: unknown): DocumentLu {
     fournisseur: texte(o.fournisseur),
     date: jour(o.date),
     numero: texte(o.numero, 100),
-    total: nombre(o.total_ht),
+    total: nombre(o.total_ht, true),
     remarque: texte(o.remarque, 1000),
     lignes,
   };
@@ -205,7 +210,8 @@ export function prixALUnite(l: Pick<LigneLue, "prixUnitaire" | "prixColis" | "co
   if (ok(l.prixUnitaire)) return l.prixUnitaire;
   const c = ok(l.contenance) ? l.contenance : 1;
   if (ok(l.prixColis)) return Math.round((l.prixColis / c) * 10000) / 10000;
-  if (ok(l.montant) && ok(l.quantite)) return Math.round((l.montant / (l.quantite * c)) * 10000) / 10000;
+  // Avoir : montant et quantité négatifs tous les deux, le prix reste positif.
+  if (l.montant != null && l.quantite != null && l.montant * l.quantite > 0) return Math.round((l.montant / (l.quantite * c)) * 10000) / 10000;
   return null;
 }
 
