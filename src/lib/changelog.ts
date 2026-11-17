@@ -22,6 +22,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Claude reste connecté tout seul ; un compte suspendu ou qui perd la permission perd aussi l'accès de Claude",
       "La clé secrète marche toujours, par exemple pour Claude Code",
     ],
+    fixes: [
+      "RecipeLog en ligne : le bouton « Mettre à jour le site » des réglages (et la commande pour le lancer depuis Claude) est retiré. Ton site est mis à jour par l'équipe RecipeLog, rien à faire de ton côté",
+    ],
   },
   {
     version: "V2.18",

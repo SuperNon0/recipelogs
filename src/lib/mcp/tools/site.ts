@@ -1,18 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { BOOT_TIME } from "@/lib/bootTime";
 import { CHANGELOG } from "@/lib/changelog";
-import { deploySteps } from "@/lib/deployLog";
 import { getMergedPrs } from "@/lib/pr-log";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { fullVersion } from "@/lib/version";
 import { importRecipesFromJson } from "@/app/actions/import";
-import { triggerDeploy } from "@/app/actions/admin";
 import { READ, WRITE, id, js, parseArgs, runAction, text, type McpTool } from "./helpers";
-
-const DEPLOY_LOG = "/tmp/recipelog-deploy.log";
-const DEPLOY_LOCK = "/tmp/recipelog-deploy.lock";
 
 const jsonIngredient = z.object({ name: z.string().trim().min(1), quantity: z.number().nonnegative().default(0), quantity_max: z.number().nonnegative().nullable().optional(), unit: z.string().default("g") });
 const jsonRecipe = z.object({
@@ -155,47 +149,16 @@ export const SITE_TOOLS: McpTool[] = [
     name: "etat_du_site",
     title: "État du site",
     description:
-      "Donne la version de RecipeLog, l'heure de démarrage du serveur, les dernières mises à jour installées, les étapes horodatées de la dernière mise à jour (pour voir ce qui prend du temps) et la fin de son journal.",
+      "Donne la version de RecipeLog, l'heure de démarrage du serveur et les dernières mises à jour installées. Les mises à jour du site se font uniquement depuis le panel d'administration de la plateforme.",
     inputSchema: { type: "object", properties: {} },
     annotations: READ,
     run: async () => {
       const current = CHANGELOG[0];
-      let journal: string[] = [];
-      let etapes: string[] = [];
-      try {
-        if (existsSync(DEPLOY_LOG)) {
-          const log = readFileSync(DEPLOY_LOG, "utf8").trimEnd();
-          journal = log.split("\n").slice(-20);
-          etapes = deploySteps(log).slice(-40);
-        }
-      } catch {
-        /* journal illisible : on l'omet */
-      }
       return text({
         version: current ? { numero: fullVersion(current.version), date: current.date, titre: current.title } : null,
         demarre_le: new Date(BOOT_TIME).toISOString(),
-        mise_a_jour_en_cours: existsSync(DEPLOY_LOCK),
         dernieres_mises_a_jour: getMergedPrs().slice(0, 10).map((p) => ({ pr: p.number, date: p.date, titre: p.title })),
-        etapes_de_la_derniere_mise_a_jour: etapes,
-        fin_du_journal_de_mise_a_jour: journal,
       });
-    },
-  },
-
-  {
-    name: "lancer_mise_a_jour",
-    title: "Lancer la mise à jour du site",
-    description:
-      "Lance « Mettre à jour le site » : récupère la dernière version sur GitHub (déjà construite par GitHub Actions, attendue si le build est en cours) puis redémarre le site. En général 1 à 5 minutes, coupure de quelques secondes à la fin. Toujours demander confirmation à l'utilisateur avant. Suivre l'avancement avec etat_du_site.",
-    inputSchema: { type: "object", properties: {} },
-    annotations: { ...WRITE, destructiveHint: true },
-    run: async () => {
-      try {
-        await runAction(() => triggerDeploy());
-      } catch (e) {
-        throw new Error(`mise à jour non lancée : ${(e as Error).message}`);
-      }
-      return text("Mise à jour lancée. Suis l'avancement avec etat_du_site ; le site redémarrera à la fin.");
     },
   },
 ];

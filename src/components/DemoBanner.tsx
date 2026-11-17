@@ -12,7 +12,7 @@ export function DemoBanner() {
       <Help title="Site de démonstration">
         Ce RecipeLog sert à découvrir l&apos;appli : tu peux ouvrir, modifier, multiplier ou imprimer les
         recettes, et en créer. Chaque nuit, le site revient aux recettes de démo d&apos;origine. Les comptes,
-        l&apos;accès Claude (MCP) et la mise à jour du site sont coupés ici : ils servent sur un vrai RecipeLog
+        l&apos;accès Claude (MCP) et les réglages du site sont coupés ici : ils servent sur un vrai RecipeLog
         installé chez soi.
       </Help>
     </div>

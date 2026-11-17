@@ -192,7 +192,7 @@ export function canBeViewedAs(target: AccountWithRole): boolean {
 
 /** Le visiteur peut-il faire ça ? (compte actif avec la permission, ou comptes désactivés) */
 export function viewerCan(viewer: Viewer, access: Access): boolean {
-  // Mode démo : comptes, clé MCP et mise à jour du site fermés à tout le monde.
+  // Mode démo : comptes, clé MCP et réglages du site fermés à tout le monde.
   if (demoBlocks(access)) return false;
   if (viewer.kind === "open") return true;
   if (viewer.kind !== "account" || viewer.account.status !== "active" || !viewer.account.role) return false;

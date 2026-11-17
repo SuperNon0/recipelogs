@@ -84,8 +84,8 @@ export const PERMISSIONS = [
   {
     key: "site.update",
     group: "Administration",
-    label: "Mettre à jour le site",
-    help: "Utiliser le bouton « Mettre à jour le site », changer le lien du logo et le partage public.",
+    label: "Réglages du site",
+    help: "Changer le lien du logo, le partage public et la lecture des factures par IA.",
   },
   {
     key: "mcp.manage",
