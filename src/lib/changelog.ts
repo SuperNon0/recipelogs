@@ -43,6 +43,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Lecture d'une facture ou d'une mercuriale : chaque ligne a maintenant un champ « Article » (le nom commun qui regroupe les produits semblables), avec la liste des articles déjà utilisés. Un badge « Nouvel article » prévient avant de créer un presque-doublon, et l'article d'un produit déjà connu n'est plus jamais changé tout seul",
       "RecipeLog en ligne : la connexion se prolonge toute seule tant que l'appli est ouverte. Si elle est quand même finie, un message clair propose de se reconnecter",
       "RecipeLog en ligne : les PDF (recettes, cahiers, listes de courses) sont fabriqués par un service commun de la plateforme. Rien ne change à l'écran, et chaque site garde plus de mémoire pour le reste",
+      "RecipeLog en ligne : la page de connexion prend les couleurs de l'appli (fond encre, carte arrondie, nom RecipeLog et bouton ambre, clair ou sombre comme ton appareil). L'e-mail et le mot de passe se tapent sur le même écran",
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
     fixes: [

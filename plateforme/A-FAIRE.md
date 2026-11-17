@@ -430,6 +430,18 @@ Dis-moi si je peux y ajouter « Tarifs », « Mentions légales » et « CGV » 
 
 Trois choses se mettent à jour séparément. Dans l'ordre :
 
+**D'où viennent les nouveautés (en attendant la séparation des branches).** Trois branches :
+- `instance` : l'atelier de l'application des clients (recettes, factures, etc.). On y fait les
+  changements de l'appli, puis une PR `instance` → `plateforme` les fait entrer.
+- `plateforme` : ce que les boutons installent. GitHub y construit l'image des clients (action
+  **Image Docker**), et `install.sh` (I1) y prend le panel et les outils. Rien n'arrive chez un client
+  tant que ce n'est pas fusionné dans `plateforme`, puis mis à jour avec I2.
+- `site-vitrine` : la vitrine (I3).
+
+Comme l'appli et la plateforme partagent encore la branche `plateforme`, un changement de l'appli
+apparaît aussi dans les « nouveautés » du bloc Plateforme. Ce n'est pas grave : I1 ne touche pas aux
+sites des clients. Plus tard, l'appli passera sur `main`/`stable` sans rien réinstaller.
+
 ### ☐ I1. La plateforme elle-même (panel, connexion, outils), dans le panel
 Page **Accueil** → bloc **Plateforme** (en bas à droite) → **Mettre à jour la plateforme**. Le bloc dit
 quelle version est installée et combien de nouveautés attendent sur GitHub (une ligne apparaît

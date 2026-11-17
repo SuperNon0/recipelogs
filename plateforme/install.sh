@@ -156,6 +156,7 @@ if [ "\${1:-}" = appliquer ]; then
   echo "==> Attente de la connexion (Authentik)…"
   docker exec recipelog-passerelle node cli.mjs attendre >/dev/null || { echo "❌ Authentik ne répond pas : recipelog-plateforme logs authentik" >&2; exit 1; }
   recipelog-instance vitrine reglages >/dev/null || true
+  docker exec recipelog-passerelle node cli.mjs connexion >/dev/null || echo "⚠️  Page de connexion pas encore prête : relance recipelog-plateforme appliquer dans 2 minutes."
   if [ -n "\${ADMIN_EMAILS:-}" ]; then
     docker exec recipelog-passerelle node cli.mjs initialiser "\${ADMIN_EMAILS}" || echo "⚠️  Compte super-admin non vérifié."
   fi
@@ -280,6 +281,9 @@ info "Démarrage de Traefik, du tunnel, d'Authentik et de la passerelle…"
 recipelog-plateforme up -d --build --wait --wait-timeout 600 || echo "⚠️  Un service met du temps à démarrer (voir : recipelog-plateforme ps). L'installation continue."
 info "Attente d'Authentik (2 à 5 minutes au premier démarrage)…"
 docker exec recipelog-passerelle node cli.mjs attendre >/dev/null || die "Authentik ne démarre pas : recipelog-plateforme logs authentik"
+info "Page de connexion RecipeLog…"
+docker exec recipelog-passerelle node cli.mjs connexion >/dev/null \
+  || echo "⚠️  Page de connexion pas encore prête. À relancer : bash install.sh"
 if [ -n "${ADMIN_EMAILS}" ]; then
   info "Ton compte super-admin dans Authentik…"
   docker exec recipelog-passerelle node cli.mjs initialiser "${ADMIN_EMAILS}" >/dev/null \
