@@ -549,8 +549,8 @@ entries:
         .pf-c-alert { border-radius: 10px; font-family: var(--rl-body); }
 
         /* Pied de page : pas de « Powered by authentik », seulement nos liens discrets. */
-        .pf-c-login__footer, .pf-c-list, .pf-c-list a { color: var(--rl-muted) !important; font: 500 11px/1.4 var(--rl-mono); letter-spacing: .08em; text-transform: uppercase; }
-        .pf-c-list li:has(span:only-child) { display: none; }
+        :host(.pf-c-login__footer) .pf-c-list, :host(.pf-c-login__footer) .pf-c-list a { color: var(--rl-muted) !important; font: 500 11px/1.4 var(--rl-mono); letter-spacing: .08em; text-transform: uppercase; }
+        :host(.pf-c-login__footer) .pf-c-list li:has(span:only-child) { display: none; }
 
         /* Téléphone : la carte occupe la largeur, sans coller aux bords. */
         @media (max-width: 600px) {
@@ -616,3 +616,16 @@ entries:
         .pf-c-avatar { color: var(--rl-ink); background: var(--rl-accent); font-family: var(--rl-body); }
         .pf-c-dropdown__toggle, .pf-c-dropdown__toggle-text { color: var(--rl-muted); }
         .pf-c-dropdown__menu { background: var(--rl-card) !important; border: 1px solid var(--rl-line2); border-radius: 12px; box-shadow: var(--rl-shadow); }
+
+        /* ---------------------------------------------- interface d'administration */
+        .pf-c-page__sidebar { background: var(--rl-surface) !important; border-right: 1px solid var(--rl-line); }
+        .pf-c-nav { background: transparent !important; }
+        .pf-c-nav__link { font-family: var(--rl-body); border-radius: 10px; }
+        .pf-c-nav__link.pf-m-current, .pf-c-nav__link.pf-m-current:hover {
+          background: color-mix(in srgb, var(--rl-accent) 14%, transparent) !important;
+          color: var(--rl-text) !important;
+        }
+        .pf-c-nav__link.pf-m-current::after, .pf-c-nav__link::after { border-color: var(--rl-accent) !important; }
+        .pf-c-nav__item, .pf-c-nav__section { border-color: var(--rl-line) !important; }
+        .pf-c-table, .pf-c-table tr, .pf-c-table td, .pf-c-table th { background-color: transparent !important; border-color: var(--rl-line) !important; }
+        .pf-c-modal-box { background: var(--rl-card) !important; border: 1px solid var(--rl-line2); border-radius: 20px !important; }

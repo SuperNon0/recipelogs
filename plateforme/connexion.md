@@ -69,7 +69,8 @@ démarrage d'Authentik) :
   la copie qu'il met aussi dans la page elle-même est abîmée (caractères échappés), donc
   rien n'est posé sur `html` ou `body` : le fond est sur `.pf-c-page__drawer` ;
 - le même CSS habille aussi la page « Mes applications » (`auth.<domaine>` une fois
-  connecté) : barre du haut avec « Recipe*Log* », tuiles arrondies ;
+  connecté) : barre du haut avec « Recipe*Log* », tuiles arrondies ; et l'interface
+  d'administration d'Authentik (menu, tableaux, fenêtres) ;
 - polices et icône : `authentik/theme/`, montées en lecture seule sous `/media/recipelog/`.
 
 `node cli.mjs connexion` (lancé par install.sh et `recipelog-plateforme appliquer`) recopie
