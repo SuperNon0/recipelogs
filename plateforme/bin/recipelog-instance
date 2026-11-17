@@ -4,7 +4,7 @@
 # Un client = une base dans le PostgreSQL partagé + un conteneur RecipeLog
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
-#   recipelog-instance creer <nom> [--canal plateforme|beta|stable] [--responsable email]
+#   recipelog-instance creer <nom> [--canal instance|beta-instance|…] [--responsable email]
 #                                  [--max N] [--essai jours] [--sans-mcp] [--admin email]
 #                                  [--demo --sans-authentik]   (sans Authentik : démo seulement)
 #   recipelog-instance liste [--json]
@@ -17,6 +17,7 @@
 #   recipelog-instance quota <nom> <N|0>          (0 = pas de plafond)
 #   recipelog-instance brancher-authentik <nom> [--responsable email] [--max N]
 #   recipelog-instance mettre-a-jour <nom>|--tous   (sauvegarde avant, retour arrière si ça rate)
+#   recipelog-instance canal <nom> <canal>          (change sa version puis le met à jour)
 #   recipelog-instance redemarrer <nom>
 #   recipelog-instance journaux <nom>
 #   recipelog-instance supprimer <nom> --oui
@@ -75,7 +76,13 @@ LIBRE_MIN_MO="${SAUVEGARDE_LIBRE_MIN_MO:-2048}"
 DISQUE_MAX="${SAUVEGARDE_DISQUE_MAX:-95}"
 # Clients supprimés : leur archive est effacée après ce nombre de jours (0 = jamais).
 ARCHIVES_JOURS="${ARCHIVES_GARDER_JOURS:-365}"
-CANAL_DEFAUT="${CANAL_DEFAUT:-plateforme}"
+CANAL_DEFAUT="${CANAL_DEFAUT:-instance}"
+# Canaux = étiquettes de l'image, construites par GitHub (.github/workflows/docker-image.yml) :
+#   instance       branche « instance »      : les clients
+#   beta-instance  branche « beta-instance » : la bêta (l'instance de Noë), essayée avant les clients
+#   plateforme     branche « plateforme »    : l'ancien canal, avant le 17/11/2026
+#   beta, stable   branches main et stable   : l'appli des sites LXC, sans la connexion Authentik
+CANAUX_RE='^(instance|beta-instance|plateforme|beta|stable)$'
 
 die() { echo "❌ $*" >&2; exit 1; }
 info() { echo "==> $*"; }
@@ -253,7 +260,7 @@ cmd_creer() {
   # Sans Authentik, un site est ouvert à tout internet : réservé à la démo publique.
   [ "${authentik}" = 1 ] || [ "${demo}" = 1 ] || die "--sans-authentik ne sert qu'à la démo (avec --demo) : sans connexion, le site serait ouvert à tout internet."
   [ "${authentik}" = 0 ] || passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps)."
-  [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (plateforme, beta ou stable)."
+  [[ "${canal}" =~ ${CANAUX_RE} ]] || die "Canal « ${canal} » inconnu (instance ou beta-instance)."
   existe "${nom}" && die "Le client « ${nom} » existe déjà."
 
   local dir="${INSTANCES}/${nom}" db mdp
@@ -578,6 +585,31 @@ cmd_maj() {
     maj_un "$1"
     menage_images
   fi
+}
+
+# canal : passe un client sur une autre version (instance ↔ beta-instance), puis le met
+# à jour comme « mettre-a-jour » (sauvegarde avant, retour arrière si ça rate). Si la
+# nouvelle version ne démarre pas, il est remis sur son canal d'avant.
+cmd_canal() {
+  [ $# -eq 2 ] && existe "$1" || die "Usage : recipelog-instance canal <nom existant> <instance|beta-instance>"
+  local nom="$1" nouveau="$2" ancien
+  [[ "${nouveau}" =~ ${CANAUX_RE} ]] || die "Canal « ${nouveau} » inconnu (instance ou beta-instance)."
+  ancien="$(conf_lire "${nom}" CANAL)"
+  if [ "${ancien}" = "${nouveau}" ]; then
+    info "${nom} est déjà sur « ${nouveau} »."
+    return 0
+  fi
+  # L'image d'abord : si elle n'existe pas encore, rien ne change.
+  info "${nom} : téléchargement de ${IMAGE}:${nouveau}…"
+  tirer "${IMAGE}:${nouveau}"
+  conf_ecrire "${nom}" CANAL "${nouveau}"
+  conf_ecrire "${nom}" IMAGE_REFUSEE
+  info "${nom} : canal « ${ancien:-?} » → « ${nouveau} »."
+  if ! maj_un "${nom}"; then
+    conf_ecrire "${nom}" CANAL "${ancien}"
+    die "${nom} : la mise à jour a raté, il reste sur « ${ancien} » avec sa version d'avant."
+  fi
+  menage_images
 }
 
 menage_images() {
@@ -1289,6 +1321,7 @@ case "${action}" in
   quota) cmd_quota "$@" ;;
   brancher-authentik) cmd_brancher "$@" ;;
   mettre-a-jour) cmd_maj "$@" ;;
+  canal) cmd_canal "$@" ;;
   redemarrer) cmd_redemarrer "$@" ;;
   journaux) cmd_journaux "$@" ;;
   supprimer) cmd_supprimer "$@" ;;

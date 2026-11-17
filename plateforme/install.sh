@@ -190,8 +190,9 @@ if [ ! -f "${DONNEES}/.env" ]; then
 DOMAINE='${DOMAINE}'
 DONNEES='${DONNEES}'
 IMAGE='ghcr.io/supernon0/recipelog'
-# Version donnée aux nouveaux clients. Seule « plateforme » existe pour l'instant.
-CANAL_DEFAUT='plateforme'
+# Version donnée aux nouveaux clients : « instance » (branche instance). La bêta,
+# « beta-instance », se choisit client par client dans le panel.
+CANAL_DEFAUT='instance'
 ADMIN_EMAILS='${ADMIN_EMAILS}'
 POSTGRES_PASSWORD='$(openssl rand -hex 32)'
 CF_TUNNEL_TOKEN='${CF_TUNNEL_TOKEN}'
@@ -201,11 +202,12 @@ EOF
   info "Réglages écrits dans ${DONNEES}/.env"
 else
   info "Réglages existants gardés (${DONNEES}/.env)."
-  # Les versions « stable » et « beta » n'existent pas encore : une plateforme installée
-  # avant cette correction créait des clients qui ne démarraient pas.
-  if grep -qE "^CANAL_DEFAUT='?stable'?$" "${DONNEES}/.env"; then
-    sed -i -E "s/^CANAL_DEFAUT='?stable'?$/CANAL_DEFAUT='plateforme'/" "${DONNEES}/.env"
-    info "Version par défaut des nouveaux clients : « plateforme » (« stable » n'existe pas encore)."
+  # Depuis le 17/11/2026, l'appli des clients vient des branches instance / beta-instance.
+  # Les nouveaux clients prennent « instance » ; les clients déjà créés gardent leur canal
+  # jusqu'à ce qu'on le change dans le panel (fiche du client → Version).
+  if grep -qE "^CANAL_DEFAUT='?(stable|plateforme)'?$" "${DONNEES}/.env"; then
+    sed -i -E "s/^CANAL_DEFAUT='?(stable|plateforme)'?$/CANAL_DEFAUT='instance'/" "${DONNEES}/.env"
+    info "Version par défaut des nouveaux clients : « instance »."
   fi
 fi
 # shellcheck disable=SC1091
@@ -311,7 +313,7 @@ CREER_TEST="${CREER_TEST:-1}"
 [ "${RECIPELOG_MAJ:-0}" = 1 ] && CREER_TEST=0
 if [ "${CREER_TEST}" = 1 ] && [ ! -d "${DONNEES}/instances/test" ]; then
   info "Client de test « test »…"
-  recipelog-instance creer test --canal plateforme || echo "⚠️  Le client de test n'a pas démarré ; la plateforme, elle, tourne. Voir : recipelog-instance journaux test"
+  recipelog-instance creer test || echo "⚠️  Le client de test n'a pas démarré ; la plateforme, elle, tourne. Voir : recipelog-instance journaux test"
 fi
 
 # Version installée, lue par le panel (Accueil → Plateforme → « Mettre à jour la plateforme »).

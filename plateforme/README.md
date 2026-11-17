@@ -2,8 +2,9 @@
 
 > **Ce que tu dois faire toi-même :** [A-FAIRE.md](A-FAIRE.md), toutes les installations, dans l'ordre.
 > **Où en est le chantier :** voir [Journal du chantier](#journal-du-chantier) en bas de cette page.
-> Tout le travail se fait sur la branche `plateforme` et sur les branches `claude/…` qui y
-> fusionnent. `main`, `stable` et les autres branches ne sont jamais modifiées par ce chantier.
+> La machine (panel, connexion, sauvegardes, scripts) se fait sur la branche `plateforme`.
+> L'appli des clients se fait sur `beta-instance` (la bêta), puis passe sur `instance` (les
+> clients) quand Noë le dit. `main` et `stable` (sites LXC) ne sont pas touchées par ce chantier.
 
 Tout RecipeLog en ligne sur **une seule machine** de ton Proxmox : chaque client a
 son propre RecipeLog sur `<nom>.recipelog.cc`, avec sa propre base.
@@ -249,10 +250,11 @@ Ce sont des brouillons sérieux, pas un avis d'avocat : à faire relire avant le
 ```bash
 recipelog-instance liste                    # les clients et leur état
 recipelog-instance creer chanka --responsable chef@patisserie.fr --max 10
-                                            # nouveau client sur chanka.recipelog.cc (canal stable) :
+                                            # nouveau client sur chanka.recipelog.cc (version « Standard », branche instance) :
                                             # le responsable reçoit son invitation et sera administrateur,
                                             # 10 comptes au plus (sans --max : pas de plafond)
-recipelog-instance creer essai --canal beta # suit la bêta (main)
+recipelog-instance creer essai --canal beta-instance # suit la bêta (branche beta-instance)
+recipelog-instance canal chanka beta-instance       # passer un client sur la bêta (instance pour revenir)
 recipelog-instance equipe chanka            # qui peut se connecter, et les places
 recipelog-instance inviter chanka a@b.fr    # inviter quelqu'un (l'appli le fait aussi : Réglages → Comptes)
 recipelog-instance quota chanka 15          # changer le nombre de places (0 = pas de plafond)
@@ -319,6 +321,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-17 | Branches instance / beta-instance | L'appli des clients vient maintenant de deux branches : `beta-instance` (la bêta, où se font tous les changements de l'appli) et `instance` (la version des clients). GitHub construit une image pour chacune (`:beta-instance`, `:instance`). Les nouveaux clients prennent `instance`. Choix Standard / Bêta à la création ; dans le panel, fiche du client → « Version de l'appli » → « Passer en bêta » / « Repasser en standard » (réglé par toi seul, le client ne le voit pas) (sauvegarde avant, retour arrière si ça rate) ; en ligne de commande `recipelog-instance canal <nom> <canal>`. | Étape I0 de [A-FAIRE.md](A-FAIRE.md) : mettre à jour la plateforme, puis passer chaque client en « Standard » ou en « Bêta ». |
 | 2026-11-17 | Client « test » | Le client « test » n'est créé qu'à la toute première installation : relancer l'installation ne le recrée plus. | Rien. |
 | 2026-11-17 | Correction applications Authentik | Authentik ne montre la liste des applications qu'à ceux qui peuvent les ouvrir, sauf demande « liste complète ». La plateforme ne voyait donc pas les applications existantes : relancer l'installation essayait de recréer celle du panel (refusé, « slug existe déjà »), et supprimer un client laissait son application derrière lui (impossible ensuite de recréer un client du même nom). Les recherches demandent maintenant la liste complète, et créer un client enlève d'abord les restes d'une ancienne suppression. Vérifié dans le code d'Authentik 2025.10.2. | VM déjà installée : relancer `bash /root/install-plateforme.sh` dans la VM (panel + client test). |
 | 2026-11-17 | Fenêtres et aides du panel | Les fenêtres du panel prennent le style du kit encre : une feuille qui monte du bas sur téléphone (avec sa poignée), une fenêtre centrée et animée sur ordinateur, avec le titre et la croix sur une même ligne. Chaque « ? » ouvre maintenant une petite fenêtre d'aide (titre = le champ ou la page concernée), au lieu d'un texte qui s'affichait dans la page. Elle passe par-dessus une fenêtre déjà ouverte. Comme toutes les fenêtres, elle ne se ferme que par sa croix. | Rien. |
