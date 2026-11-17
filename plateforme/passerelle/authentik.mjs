@@ -100,6 +100,9 @@ function requete(methode, adresse, corps, { anonyme = false, cookie = "" } = {})
 const q = (o) => "?" + new URLSearchParams(o).toString();
 
 // Toutes les pages (500 par page) : au-delà de 500 clients ou comptes, rien n'est oublié.
+// Attention : /core/applications/ ne liste que les applications que le compte du jeton a le
+// droit d'ouvrir, sauf avec superuser_full_list=true (sinon une application existante
+// paraît absente : création refusée « slug existe déjà », suppression qui l'oublie).
 async function tous(chemin, params = {}) {
   const resultats = [];
   for (let page = 1; page <= 40; page += 1) {
@@ -334,6 +337,9 @@ export async function renvoyer(nom, email) {
 export async function creerClient(nom, { max = null, url = `https://${nom}.${DOMAINE}` } = {}) {
   if (!nomValide(nom)) throw new ErreurPasserelle(400, "nom_invalide", `Nom de client invalide : ${nom}`);
   if (await groupe(groupeClient(nom))) throw new ErreurPasserelle(409, "existe", `Le client « ${nom} » existe déjà dans Authentik.`);
+  // Restes d'une ancienne suppression incomplète (application, fournisseur sans groupe) :
+  // on les enlève, sinon Authentik refuse « slug existe déjà ».
+  await supprimerClient(nom);
   const cle = randomBytes(32).toString("hex");
   const secret = randomBytes(48).toString("hex");
   const slug = slugClient(nom);
@@ -403,7 +409,7 @@ async function finirClient(nom, g, { cle, secret, slug, url }) {
 
 export async function supprimerClient(nom) {
   const slug = slugClient(nom);
-  const [appli] = await tous("/core/applications/", { slug });
+  const [appli] = await tous("/core/applications/", { slug, superuser_full_list: "true" });
   if (appli) await api("DELETE", `/core/applications/${slug}/`);
   const [f] = await tous("/providers/oauth2/", { client_id: slug });
   if (f) await api("DELETE", `/providers/oauth2/${f.pk}/`);
@@ -535,7 +541,7 @@ export async function creerPanel(url = `https://admin.${DOMAINE}`) {
   };
   const [existant] = await tous("/providers/oauth2/", { client_id: slug });
   const fournisseur = existant ? await api("PATCH", `/providers/oauth2/${existant.pk}/`, corps) : await api("POST", "/providers/oauth2/", corps);
-  let [appli] = await tous("/core/applications/", { slug });
+  let [appli] = await tous("/core/applications/", { slug, superuser_full_list: "true" });
   if (!appli) {
     appli = await api("POST", "/core/applications/", {
       name: "RecipeLog panel admin",
