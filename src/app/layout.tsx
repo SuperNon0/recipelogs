@@ -23,6 +23,7 @@ import { getAnnonces, type Annonces } from "@/lib/auth/passerelle";
 import { isMaintenanceEmail } from "@/lib/auth/maintenance";
 import { PlatformBanners } from "@/components/PlatformBanners";
 import { MaintenancePage } from "@/components/MaintenancePage";
+import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { hiddenCookbookIds, visibleRecipeWhere } from "@/lib/auth/visibility";
 
 // Le menu latéral affiche des compteurs lus en base : jamais de page figée au build.
@@ -181,6 +182,7 @@ export default async function RootLayout({
         <CommandPalette />
         </PermissionsProvider>
         <ZoomReset />
+        {authMode() === "oidc" && viewer.kind === "account" && <SessionKeeper />}
         {encreJs}
       </body>
     </EncreHtml>

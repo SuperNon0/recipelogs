@@ -6,7 +6,8 @@
 FROM node:22-alpine
 # Pour le moteur : recipelog-instance est un script bash qui utilise docker,
 # tar, find et la commande date de GNU ; tzdata pour l'heure de Paris.
-RUN apk add --no-cache bash docker-cli coreutils findutils tar sed grep tzdata
+# rsync : sauvegardes des fichiers sans recopier ce qui n'a pas changé ; util-linux : flock (une action à la fois).
+RUN apk add --no-cache bash docker-cli coreutils findutils tar sed grep tzdata rsync util-linux
 WORKDIR /app
 COPY plateforme/panel/*.mjs plateforme/panel/*.html plateforme/panel/*.css plateforme/panel/*.js ./
 COPY public/polices/*.woff2 ./polices/

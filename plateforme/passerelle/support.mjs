@@ -93,7 +93,18 @@ export async function listerDemandes(client, email) {
   return (await toutes(client)).filter((t) => t.email === e).map(pourClient);
 }
 
+// Messages de suivi : 60 par jour et par client au plus (même protection que pour les demandes).
+const suivis = new Map(); // client -> { jour, n }
+function compterSuivi(client) {
+  const jour = new Date().toISOString().slice(0, 10);
+  const c = suivis.get(client);
+  const n = c && c.jour === jour ? c.n + 1 : 1;
+  suivis.set(client, { jour, n });
+  if (n > 60) throw new ErreurPasserelle(429, "trop_de_demandes", "Trop de messages aujourd'hui : réessaie demain, ou écris directement à RecipeLog.");
+}
+
 export async function ajouterMessage(client, id, corps) {
+  compterSuivi(client);
   const t = await lire(client, id);
   const email = texte(corps.email, 254).toLowerCase();
   if (t.email !== email) throw new ErreurPasserelle(404, "introuvable", "Demande introuvable.");

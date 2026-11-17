@@ -44,6 +44,8 @@ export function suivre<T>(qui: string, id: string): Travail<T> | null {
   const t = travaux.get(id);
   if (!t || t.qui !== qui) return null;
   if (t.etat === "en_cours") return { etat: "en_cours" };
-  travaux.delete(id);
+  // Le résultat reste lisible jusqu'à son expiration (30 minutes) : si la réponse se perd en
+  // route (réseau coupé au mauvais moment), le navigateur la redemande au lieu de payer une
+  // seconde lecture.
   return { etat: "fini", resultat: t.resultat as T };
 }

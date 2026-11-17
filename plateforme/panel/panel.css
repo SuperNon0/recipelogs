@@ -1,8 +1,8 @@
 /* Panel admin RecipeLog : design « encre » (mêmes jetons que l'appli, src/encre/encre.css). */
-@font-face { font-family: "Archivo"; font-weight: 400 700; font-display: swap; src: url(/polices/archivo-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Serif Display"; font-display: swap; src: url(/polices/dm-serif-display-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Mono"; font-weight: 400; font-display: swap; src: url(/polices/dm-mono-400-latin.woff2) format("woff2"); }
-@font-face { font-family: "DM Mono"; font-weight: 500; font-display: swap; src: url(/polices/dm-mono-500-latin.woff2) format("woff2"); }
+@font-face { font-family: "Archivo"; font-weight: 400 700; font-display: swap; src: url(polices/archivo-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Serif Display"; font-display: swap; src: url(polices/dm-serif-display-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Mono"; font-weight: 400; font-display: swap; src: url(polices/dm-mono-400-latin.woff2) format("woff2"); }
+@font-face { font-family: "DM Mono"; font-weight: 500; font-display: swap; src: url(polices/dm-mono-500-latin.woff2) format("woff2"); }
 
 :root {
   color-scheme: dark;
@@ -306,3 +306,4 @@ body.pause { min-height: 100vh; display: flex; align-items: center; justify-cont
 .liens-legal { display: flex; flex-wrap: wrap; gap: 6px 18px; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 16px; font-size: 14px; }
 .liens-legal b { color: var(--text); }
 @media (max-width: 600px) { .page-legal table { font-size: 13px; } .page-legal th, .page-legal td { padding-right: 6px; } }
+.aide-ligne { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }

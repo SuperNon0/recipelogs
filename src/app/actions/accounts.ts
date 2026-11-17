@@ -184,6 +184,9 @@ export async function inviteMember(emailInput: string, roleId: number): Promise<
     // Déjà dans l'équipe chez Authentik mais pas encore de compte ici : on le prépare quand même.
     if (r.code !== "deja_membre") return { ok: false, error: r.message };
     notice = "Cette personne faisait déjà partie de l'équipe : son compte est prêt, elle se connecte avec son mot de passe habituel.";
+  } else if (!r.invitationEnvoyee) {
+    // Le compte est créé, mais l'e-mail n'est pas parti (envoi des e-mails en panne ou pas réglé sur la plateforme).
+    notice = "Le compte est créé, mais l'e-mail d'invitation n'a pas pu être envoyé. Réessaie plus tard avec « Renvoyer l'invitation » ; si ça continue, préviens RecipeLog.";
   }
   await prisma.account.upsert({
     where: { email },
@@ -203,6 +206,7 @@ export async function resendInvitation(id: number): Promise<ActionResult> {
   const acc = await target(id);
   const r = await renvoyerInvitation(acc.email);
   if (!r.ok) return { ok: false, error: r.message };
+  if (!r.invitationEnvoyee) return { ok: false, error: "L'e-mail n'a pas pu être envoyé pour l'instant. Réessaie plus tard ; si ça continue, préviens RecipeLog." };
   await audit(me.email, "invite_again", acc.email);
   return { ok: true };
 }

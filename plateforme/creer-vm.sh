@@ -14,7 +14,8 @@
 #   VM_MEMOIRE (Mo, 12288), VM_DISQUE (Go, 100), VM_STOCKAGE (local-lvm),
 #   VM_PONT (vmbr0), VM_CLE_SSH (fichier de clés publiques, défaut
 #   /root/.ssh/authorized_keys de l'hôte), ADMIN_EMAILS, CF_TUNNEL_TOKEN,
-#   RECIPELOG_BRANCH (plateforme)
+#   SMTP_HOTE, SMTP_PORT, SMTP_UTILISATEUR, SMTP_MOT_DE_PASSE, SMTP_EXPEDITEUR
+#   (envoi des emails, par exemple Brevo), RECIPELOG_BRANCH (plateforme)
 # ============================================================
 set -euo pipefail
 
@@ -56,6 +57,15 @@ ask VM_PONT "Pont réseau" "vmbr0"
 ask VM_CLE_SSH "Fichier des clés SSH autorisées" "/root/.ssh/authorized_keys"
 ask ADMIN_EMAILS "Ton adresse email (administrateur caché des clients)" ""
 ask CF_TUNNEL_TOKEN "Jeton du tunnel Cloudflare de la plateforme (Entrée = plus tard)" "" secret
+# Envoi des emails : sans lui, l'email « Choisis ton mot de passe » ne part pas et tu ne
+# peux pas entrer dans le panel. Mieux vaut le régler tout de suite (A-FAIRE.md, étape A3).
+ask SMTP_HOTE "Serveur d'envoi des emails (Brevo : smtp-relay.brevo.com ; Entrée = plus tard)" ""
+if [ -n "${SMTP_HOTE}" ]; then
+  ask SMTP_PORT "Port du serveur d'emails" "587"
+  ask SMTP_UTILISATEUR "Identifiant SMTP (chez Brevo : il ressemble à 8xxxxx@smtp-brevo.com)" ""
+  ask SMTP_MOT_DE_PASSE "Clé SMTP (la saisie ne s'affiche pas)" "" secret
+  ask SMTP_EXPEDITEUR "Expéditeur des emails (une adresse de ton domaine, validée chez Brevo)" "RecipeLog <noreply@recipelog.cc>"
+fi
 ask RECIPELOG_BRANCH "Branche du dépôt" "plateforme"
 
 [[ "${VMID}" =~ ^[0-9]+$ ]] || die "Numéro de VM invalide : ${VMID}"
@@ -74,6 +84,12 @@ if [ ! -f "${IMG}" ] || [ -n "$(find "${IMG}" -mtime +30 2>/dev/null)" ]; then
 fi
 
 # Réglages lus par install.sh au premier démarrage, puis effacés.
+# Chaque valeur est écrite « protégée » (%q) : un espace, un $ ou un guillemet dans un mot
+# de passe est gardé tel quel quand install.sh relit le fichier.
+reglage() { printf '      %s=%q\n' "$1" "${!1:-}"; }
+REGLAGES="$(for v in ADMIN_EMAILS CF_TUNNEL_TOKEN RECIPELOG_BRANCH SMTP_HOTE SMTP_PORT SMTP_UTILISATEUR SMTP_MOT_DE_PASSE SMTP_EXPEDITEUR; do
+  [ -n "${!v:-}" ] && reglage "$v"
+done)"
 SNIPPET="${SNIPPETS_DIR}/recipelog-plateforme-${VMID}.yaml"
 umask 077
 cat > "${SNIPPET}" <<EOF
@@ -84,9 +100,7 @@ write_files:
   - path: /root/plateforme.env
     permissions: "0600"
     content: |
-      ADMIN_EMAILS=${ADMIN_EMAILS}
-      CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
-      RECIPELOG_BRANCH=${RECIPELOG_BRANCH}
+${REGLAGES}
       CREER_TEST=1
 runcmd:
   - systemctl enable --now qemu-guest-agent
@@ -107,26 +121,38 @@ qm set "${VMID}" --ide2 "${VM_STOCKAGE}:cloudinit" --boot order=scsi0 \
   --cicustom "vendor=${SNIPPETS_STORAGE}:snippets/$(basename "${SNIPPET}")" >/dev/null
 qm start "${VMID}"
 
-info "VM démarrée. Installation de la plateforme dans la VM (5 à 10 minutes)…"
+info "VM démarrée. Installation de la plateforme dans la VM (5 à 15 minutes)…"
+echo "    Ce qui se passe s'affiche ici au fur et à mesure. Tu peux laisser tourner."
+# Texte renvoyé par une commande lancée dans la VM (qm guest exec répond en JSON).
+dans_vm() { qm guest exec "${VMID}" -- "$@" 2>/dev/null | sed -n 's/^ *"out-data" : "\(.*\)",\{0,1\}$/\1/p' | sed 's/\\n/\n/g; s/\\t/\t/g; s/\\"/"/g'; }
 FINI=0
-for _ in $(seq 1 120); do
+DERNIERE=""
+for _ in $(seq 1 180); do
   sleep 10
   if qm guest exec "${VMID}" -- test -f /root/recipelog-plateforme.txt 2>/dev/null | grep -Eq '"exitcode" *: *0'; then
     FINI=1; break
   fi
-  printf '.'
+  # La dernière étape écrite par install.sh (« ==> … »), affichée quand elle change.
+  LIGNE="$(dans_vm sh -c "grep -a '^==>\|^⚠️\|^❌' /root/install-plateforme.log 2>/dev/null | tail -n 1" | tail -n 1)"
+  if [ -n "${LIGNE}" ] && [ "${LIGNE}" != "${DERNIERE}" ]; then
+    echo "    ${LIGNE}"
+    DERNIERE="${LIGNE}"
+  fi
 done
-echo
 
 # Le jeton n'a plus rien à faire sur l'hôte.
 qm set "${VMID}" --delete cicustom >/dev/null 2>&1 || true
 rm -f "${SNIPPET}"
 
 if [ "${FINI}" = 1 ]; then
-  qm guest exec "${VMID}" -- cat /root/recipelog-plateforme.txt 2>/dev/null \
-    | sed -n 's/^ *"out-data" : "\(.*\)",\{0,1\}$/\1/p' | sed 's/\\n/\n/g; s/\\t/\t/g'
-  info "✅ Plateforme installée dans la VM ${VMID}. Connexion : ssh recipelog@<adresse ci-dessus>, puis sudo -i"
+  dans_vm cat /root/recipelog-plateforme.txt
+  info "✅ Plateforme installée dans la VM ${VMID}."
+  echo "    Pour entrer dans la VM, depuis CE shell Proxmox (la clé SSH est ici) :"
+  echo "      ssh recipelog@<adresse « Machine » ci-dessus>     puis :  sudo -i"
+  echo "    Sans SSH : dans Proxmox, VM ${VMID} → Console (xterm.js)."
 else
-  echo "⚠️  L'installation n'a pas fini dans les temps. Pour voir où elle en est :"
+  echo "⚠️  L'installation n'a pas fini en 30 minutes. Pour voir où elle en est :"
   echo "    qm guest exec ${VMID} -- tail -n 30 /root/install-plateforme.log"
+  echo "    Si elle s'est arrêtée sur une erreur, elle peut être relancée sans danger dans la VM :"
+  echo "    bash /root/install-plateforme.sh"
 fi

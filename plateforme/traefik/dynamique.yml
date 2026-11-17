@@ -21,11 +21,13 @@ http:
         sourceCriterion:
           requestHeaderName: Cf-Connecting-Ip
 
-    # Plus strict, pour les pages de connexion et les formulaires (lot 1).
+    # Plus strict, pour les étapes de connexion d'Authentik (mot de passe, code) :
+    # une connexion normale fait une dizaine de requêtes ; au-delà de 60 par minute
+    # pour une même adresse, Traefik refuse (essais de mots de passe en rafale).
     limite-connexion:
       rateLimit:
-        average: 10
+        average: 60
         period: 1m
-        burst: 20
+        burst: 60
         sourceCriterion:
           requestHeaderName: Cf-Connecting-Ip

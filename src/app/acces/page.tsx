@@ -16,5 +16,7 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
   const need: Access = isPermission(besoin) ? besoin : "read";
   const viewer = await getViewer();
   if (viewerCan(viewer, need)) redirect("/");
+  // Plateforme : session expirée → la page de connexion, pas une page d'explication.
+  if (viewer.kind === "anonymous" && authMode() === "oidc") redirect("/auth/connexion?retour=%2F");
   return <AccessGate viewer={viewer} need={need} logout={authMode() === "oidc"} />;
 }

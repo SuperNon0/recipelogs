@@ -3,6 +3,8 @@ import { handleMcpBody } from "./protocol";
 import { getMcpToken, tokensMatch } from "./token";
 import { MCP_TOOLS } from "./tools";
 import { runAsService } from "@/lib/auth/service";
+import { authMode } from "@/lib/auth/config";
+import { getAnnonces } from "@/lib/auth/passerelle";
 
 /**
  * Réponse HTTP du point d'accès MCP. La clé arrive dans l'en-tête
@@ -20,6 +22,10 @@ export async function mcpResponse(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     // Pas de flux serveur → client (SSE) : le protocole prévoit 405 dans ce cas.
     return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
+  }
+  // Plateforme : pendant une maintenance, Claude ne peut rien lire ni modifier non plus.
+  if (authMode() === "oidc" && (await getAnnonces()).maintenance) {
+    return new Response("RecipeLog est en maintenance. Réessaie dans quelques minutes.", { status: 503, headers: { "Retry-After": "120", "Cache-Control": "no-store" } });
   }
   const body = await req.text();
   // Clé valide : les outils ont tous les droits, même quand les comptes sont activés.

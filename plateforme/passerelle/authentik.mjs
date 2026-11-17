@@ -99,9 +99,15 @@ function requete(methode, adresse, corps, { anonyme = false, cookie = "" } = {})
 
 const q = (o) => "?" + new URLSearchParams(o).toString();
 
+// Toutes les pages (500 par page) : au-delà de 500 clients ou comptes, rien n'est oublié.
 async function tous(chemin, params = {}) {
-  const r = await api("GET", chemin + q({ page_size: "500", ...params }));
-  return r?.results ?? [];
+  const resultats = [];
+  for (let page = 1; page <= 40; page += 1) {
+    const r = await api("GET", chemin + q({ page_size: "500", ...params, page: String(page) }));
+    resultats.push(...(r?.results ?? []));
+    if (!r?.pagination?.next) break;
+  }
+  return resultats;
 }
 
 // ------------------------------------------------------------ objets fixes
@@ -139,6 +145,11 @@ async function assurerUtilisateur(email, nomAffiche) {
   const e = email.trim().toLowerCase();
   const existant = await utilisateurParEmail(e);
   if (existant) {
+    // Un compte qui n'a pas été créé par RecipeLog (compte de secours akadmin, compte
+    // technique) n'est jamais touché : ni réactivé, ni ajouté à une équipe.
+    if (!gereParRecipelog(existant)) {
+      throw new ErreurPasserelle(409, "compte_reserve", "Cette adresse est réservée à l'administration de la plateforme. Utilise une autre adresse.");
+    }
     if (!existant.is_active) await api("PATCH", `/core/users/${existant.pk}/`, { is_active: true });
     return existant;
   }
@@ -190,6 +201,25 @@ export async function envoyerInvitation(utilisateur) {
 }
 
 const estSuperAdmin = (u) => (u.groups_obj ?? []).some((g) => g.name === GROUPE_SUPER);
+// Les comptes créés par RecipeLog sont rangés dans le dossier « recipelog » d'Authentik.
+const gereParRecipelog = (u) => u.path === "recipelog";
+// Désactivable : un compte RecipeLog ordinaire. Jamais un super-admin, un administrateur
+// d'Authentik ou un compte créé hors de RecipeLog.
+const desactivable = (u) => gereParRecipelog(u) && !estSuperAdmin(u) && !u.is_superuser;
+
+// Emails d'invitation : 40 par heure et par client au plus, et pas deux fois la même adresse
+// en moins de 2 minutes. Un site piraté ne peut pas s'en servir pour inonder des boîtes.
+const envois = new Map(); // client -> [{ t, email }]
+function limiterInvitations(nom, email) {
+  const t = Date.now();
+  const liste = (envois.get(nom) ?? []).filter((x) => x.t > t - 3600_000);
+  if (liste.some((x) => x.email === email && x.t > t - 120_000)) {
+    throw new ErreurPasserelle(429, "trop_vite", "Une invitation vient déjà d'être envoyée à cette adresse. Attends deux minutes avant de la renvoyer.");
+  }
+  if (liste.length >= 40) throw new ErreurPasserelle(429, "trop_d_invitations", "Trop d'invitations envoyées en une heure. Réessaie plus tard.");
+  liste.push({ t, email });
+  envois.set(nom, liste);
+}
 const groupesClients = (u) => (u.groups_obj ?? []).filter((g) => g.name.startsWith("client-"));
 
 function versMembre(u) {
@@ -209,14 +239,23 @@ export async function clientParCle(cle) {
   const h = hacher(cle);
   const c = parCle.get(h);
   if (c && c.jusqua > Date.now()) return c.nom;
-  const groupes = await tous("/core/groups/", { search: "client-", include_users: "false" });
+  let groupes;
+  try {
+    groupes = await tous("/core/groups/", { search: "client-", include_users: "false" });
+  } catch (e) {
+    // Authentik redémarre ou ne répond pas : une clé reconnue il y a moins de 24 heures reste
+    // acceptée (sinon tous les sites perdraient d'un coup bandeaux, maintenance et support).
+    if (c && c.vu > Date.now() - 24 * 3600_000) return c.nom;
+    throw e;
+  }
   for (const g of groupes) {
     const a = g.attributes ?? {};
     if (a.recipelog_cle_sha256 === h && typeof a.recipelog_instance === "string") {
-      parCle.set(h, { nom: a.recipelog_instance, jusqua: Date.now() + 60_000 });
+      parCle.set(h, { nom: a.recipelog_instance, jusqua: Date.now() + 60_000, vu: Date.now() });
       return a.recipelog_instance;
     }
   }
+  parCle.delete(h); // clé retirée (client supprimé) : plus acceptée, même en secours
   return null;
 }
 
@@ -239,6 +278,7 @@ export async function inviter(nom, email, nomAffiche) {
   if (max !== null && membres.length >= max) {
     throw new ErreurPasserelle(409, "quota", `Ton abonnement compte ${max} utilisateurs et ils sont tous pris. Demande des places en plus pour inviter quelqu'un d'autre.`, { max });
   }
+  limiterInvitations(nom, e);
   const u = await assurerUtilisateur(e, nomAffiche);
   await api("POST", `/core/groups/${g.pk}/add_user/`, { pk: u.pk });
   const invitationEnvoyee = await envoyerInvitation(u);
@@ -254,7 +294,7 @@ export async function retirer(nom, email) {
   }
   await api("POST", `/core/groups/${g.pk}/remove_user/`, { pk: u.pk });
   const autres = groupesClients(u).filter((x) => x.name !== g.name);
-  if (!autres.length && !estSuperAdmin(u)) {
+  if (!autres.length && desactivable(u)) {
     await api("PATCH", `/core/users/${u.pk}/`, { is_active: false });
   }
 }
@@ -264,6 +304,7 @@ export async function renvoyer(nom, email) {
   if (!u || !groupesClients(u).some((x) => x.name === groupeClient(nom))) {
     throw new ErreurPasserelle(404, "inconnu", "Cette personne ne fait pas partie de l'équipe.");
   }
+  limiterInvitations(nom, (u.email || "").toLowerCase());
   return { invitationEnvoyee: await envoyerInvitation(u) };
 }
 
@@ -288,6 +329,17 @@ export async function creerClient(nom, { max = null, url = `https://${nom}.${DOM
       max_utilisateurs: Number.isInteger(max) && max > 0 ? max : null,
     },
   });
+  // Si la suite échoue (Authentik qui redémarre…), on défait ce qui a été créé : sinon le
+  // nom resterait « déjà pris » dans Authentik et le client ne pourrait plus être recréé.
+  try {
+    return await finirClient(nom, g, { cle, secret, slug, url });
+  } catch (e) {
+    await supprimerClient(nom).catch((x) => console.error(`Nettoyage de ${nom} dans Authentik impossible :`, x.message));
+    throw e;
+  }
+}
+
+async function finirClient(nom, g, { cle, secret, slug, url }) {
   const [autorisation, invalidation, openid, emailP, profil, cert] = await Promise.all([
     flux("default-provider-authorization-implicit-consent"),
     flux("recipelog-deconnexion"),
@@ -344,7 +396,7 @@ export async function supprimerClient(nom) {
     await api("DELETE", `/core/groups/${g.pk}/`);
     for (const u of membres) {
       const autres = groupesClients(u).filter((x) => x.name !== g.name);
-      if (!autres.length && !estSuperAdmin(u)) await api("PATCH", `/core/users/${u.pk}/`, { is_active: false });
+      if (!autres.length && desactivable(u)) await api("PATCH", `/core/users/${u.pk}/`, { is_active: false });
     }
   }
 }
@@ -366,8 +418,11 @@ export async function initialiser(adminEmails) {
     const existait = !!(await utilisateurParEmail(email));
     const u = await assurerUtilisateur(email, "");
     await api("POST", `/core/groups/${sup.pk}/add_user/`, { pk: u.pk });
-    const invitation = existait ? false : await envoyerInvitation(u);
-    resultats.push({ email, cree: !existait, invitationEnvoyee: invitation });
+    // Tant que tu ne t'es jamais connecté, l'email « Choisis ton mot de passe » repart à chaque
+    // passage : le compte a pu être créé avant que l'envoi des emails soit réglé.
+    const jamaisConnecte = !u.last_login;
+    const invitation = jamaisConnecte ? await envoyerInvitation(u) : false;
+    resultats.push({ email, cree: !existait, dejaConnecte: !jamaisConnecte, invitationEnvoyee: invitation });
   }
   return resultats;
 }

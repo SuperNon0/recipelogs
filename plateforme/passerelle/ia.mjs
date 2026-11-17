@@ -19,9 +19,16 @@ const AMONT = (process.env.IA_ANTHROPIC_URL || "https://api.anthropic.com").repl
 const MODELES = new Set((process.env.IA_MODELES || "claude-opus-5-5").split(",").map((m) => m.trim()).filter(Boolean));
 const QUOTA_DEFAUT = Number.isFinite(Number(process.env.IA_QUOTA_DEFAUT)) ? Number(process.env.IA_QUOTA_DEFAUT) : 30;
 const MAX_CORPS = 16 * 1024 * 1024; // un PDF de 10 Mo fait ~13,4 Mo en base64
-const MAX_SORTIE = 16000;
+// Lecture en continu : jusqu'à 64 000 jetons de réponse (une mercuriale de plusieurs pages).
+// Sans lecture en continu, on reste à 16 000 (au-delà, la réponse met trop de temps à arriver d'un bloc).
+const MAX_SORTIE = 64000;
+const MAX_SORTIE_BLOC = 16000;
 const BETAS = new Set(["server-side-fallback-2026-07-01"]);
 const DELAI_MS = 5 * 60_000;
+const DELAI_FLUX_MS = 15 * 60_000;
+// Une lecture ne compte dans le quota du client que si l'IA est allée au bout de sa réponse :
+// un document trop long (réponse coupée) ou refusé n'est pas compté.
+const FINS_COMPTEES = new Set(["end_turn", "stop_sequence"]);
 
 const enCours = new Map(); // client → lectures en cours (pour ne pas dépasser le quota en parallèle)
 const verrous = new Map(); // client → promesse : les mises à jour du fichier d'usage passent une par une
@@ -106,7 +113,8 @@ export function controler(corps, betas) {
   if (!corps || typeof corps !== "object" || Array.isArray(corps)) return "Demande illisible.";
   if (!MODELES.has(corps.model)) return "Ce modèle n'est pas proposé par la plateforme.";
   if (!(Number.isInteger(corps.max_tokens) && corps.max_tokens > 0 && corps.max_tokens <= MAX_SORTIE)) return `max_tokens doit aller de 1 à ${MAX_SORTIE}.`;
-  if (corps.stream) return "Lecture en continu non proposée.";
+  if (corps.stream !== undefined && typeof corps.stream !== "boolean") return "Demande illisible.";
+  if (!corps.stream && corps.max_tokens > MAX_SORTIE_BLOC) return `Sans lecture en continu, max_tokens doit aller de 1 à ${MAX_SORTIE_BLOC}.`;
   for (const interdit of ["tools", "tool_choice", "mcp_servers", "container", "system", "speed", "service_tier", "context_management"]) {
     if (corps[interdit] !== undefined) return `Champ « ${interdit} » refusé par la plateforme.`;
   }
@@ -156,22 +164,78 @@ export async function relayer(client, req, res, query) {
         ...(betas.length ? { "anthropic-beta": betas.join(",") } : {}),
       },
       body: brut,
-      signal: AbortSignal.timeout(DELAI_MS),
+      signal: AbortSignal.timeout(corps.stream ? DELAI_FLUX_MS : DELAI_MS),
     });
-    const texte = await amont.text();
-    if (amont.ok) {
-      let u = {};
-      try {
-        u = JSON.parse(texte).usage ?? {};
-      } catch {
-        /* réponse rendue telle quelle */
+    const noter = async (u, fin) => {
+      if (!FINS_COMPTEES.has(fin)) {
+        console.error(`IA : lecture de ${client} non comptée (fin : ${fin ?? "inconnue"}).`);
+        return;
       }
       const entree = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
       await compter(client, entree, u.output_tokens ?? 0).catch((e) => console.error(`IA : usage de ${client} non noté (${e.message})`));
-    } else if (amont.status === 401 || amont.status === 403) {
-      // Clé de la plateforme refusée : ce n'est pas la faute du client, on ne lui renvoie pas l'erreur d'Anthropic.
-      console.error(`IA : la clé Anthropic de la plateforme est refusée (${amont.status}).`);
-      return refuser(res, 503, "ia_indisponible", "La lecture par IA de la plateforme est en panne. RecipeLog est prévenu ; réessaie plus tard.");
+    };
+    // Lecture en continu : la réponse est transmise au fil de l'eau ; on y lit au passage
+    // la consommation et la raison de fin (événements message_start et message_delta).
+    if (amont.ok && corps.stream && amont.body) {
+      res.writeHead(200, { "Content-Type": amont.headers.get("content-type") || "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
+      const decodeur = new TextDecoder();
+      let reste = "";
+      let u = {};
+      let fin = null;
+      const lire = (bloc) => {
+        for (const l of bloc.split("\n")) {
+          if (!l.startsWith("data:")) continue;
+          try {
+            const j = JSON.parse(l.slice(5));
+            if (j.type === "message_start") u = { ...u, ...(j.message?.usage ?? {}) };
+            if (j.type === "message_delta") {
+              u = { ...u, ...(j.usage ?? {}) };
+              if (j.delta?.stop_reason) fin = j.delta.stop_reason;
+            }
+            if (j.type === "error") console.error(`IA : erreur d'Anthropic pendant la lecture de ${client} : ${JSON.stringify(j.error).slice(0, 500)}`);
+          } catch {
+            /* morceau illisible : transmis quand même */
+          }
+        }
+      };
+      try {
+        for await (const m of amont.body) {
+          res.write(m);
+          reste += decodeur.decode(m, { stream: true }).replace(/\r/g, "");
+          let i;
+          while ((i = reste.indexOf("\n\n")) >= 0) {
+            lire(reste.slice(0, i));
+            reste = reste.slice(i + 2);
+          }
+        }
+        if (reste) lire(reste);
+      } catch (e) {
+        console.error(`IA : lecture de ${client} coupée en route (${e.message})`);
+        res.destroy();
+        return;
+      }
+      // La lecture est comptée avant de finir la réponse : la suivante trouve le bon compteur.
+      await noter(u, fin);
+      res.end();
+      return;
+    }
+    const texte = await amont.text();
+    if (amont.ok) {
+      let j = {};
+      try {
+        j = JSON.parse(texte);
+      } catch {
+        /* réponse rendue telle quelle */
+      }
+      await noter(j.usage ?? {}, j.stop_reason ?? null);
+    } else {
+      // La vraie raison dans les journaux (recipelog-plateforme logs passerelle) : crédit épuisé,
+      // modèle inconnu, fichier refusé… Sans ça, toute erreur ressemblait à « fichier illisible ».
+      console.error(`IA : Anthropic a répondu ${amont.status} pour ${client} : ${texte.slice(0, 800)}`);
+      if (amont.status === 401 || amont.status === 403) {
+        // Clé de la plateforme refusée : ce n'est pas la faute du client, on ne lui renvoie pas l'erreur d'Anthropic.
+        return refuser(res, 503, "ia_indisponible", "La lecture par IA de la plateforme est en panne. RecipeLog est prévenu ; réessaie plus tard.");
+      }
     }
     res.writeHead(amont.status, {
       "Content-Type": amont.headers.get("content-type") || "application/json",
@@ -181,7 +245,8 @@ export async function relayer(client, req, res, query) {
     res.end(texte);
   } catch (e) {
     console.error(`IA : Anthropic injoignable (${e.message})`);
-    refuser(res, 502, "ia_injoignable", "L'IA ne répond pas pour l'instant. Réessaie dans quelques minutes.");
+    if (res.headersSent) res.destroy();
+    else refuser(res, 502, "ia_injoignable", "L'IA ne répond pas pour l'instant. Réessaie dans quelques minutes.");
   } finally {
     enCours.set(client, Math.max(0, (enCours.get(client) ?? 1) - 1));
   }

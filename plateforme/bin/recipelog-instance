@@ -4,11 +4,11 @@
 # Un client = une base dans le PostgreSQL partagé + un conteneur RecipeLog
 # sur <nom>.<domaine>. Le panel admin (lot 2) fera la même chose en 1 clic.
 #
-#   recipelog-instance creer <nom> [--canal beta|stable|plateforme] [--responsable email]
+#   recipelog-instance creer <nom> [--canal plateforme|beta|stable] [--responsable email]
 #                                  [--max N] [--essai jours] [--sans-mcp] [--admin email]
-#                                  [--demo] [--sans-authentik]
+#                                  [--demo --sans-authentik]   (sans Authentik : démo seulement)
 #   recipelog-instance liste [--json]
-#   recipelog-instance suspendre <nom> | reactiver <nom>
+#   recipelog-instance suspendre <nom> | reactiver <nom> [--essai jours]
 #   recipelog-instance options <nom> --mcp oui|non
 #   recipelog-instance essai <nom> <jours|0>     (0 = plus d'essai : client normal)
 #   recipelog-instance verifier-essais           (met en pause les essais terminés)
@@ -16,16 +16,19 @@
 #   recipelog-instance inviter <nom> <email> [nom affiché]
 #   recipelog-instance quota <nom> <N|0>          (0 = pas de plafond)
 #   recipelog-instance brancher-authentik <nom> [--responsable email] [--max N]
-#   recipelog-instance mettre-a-jour <nom>|--tous
+#   recipelog-instance mettre-a-jour <nom>|--tous   (sauvegarde avant, retour arrière si ça rate)
 #   recipelog-instance redemarrer <nom>
 #   recipelog-instance journaux <nom>
 #   recipelog-instance supprimer <nom> --oui
 #   recipelog-instance sauvegarder <nom>|--tous [--etiquette mot]
+#   recipelog-instance sauvegarder-plateforme      (comptes Authentik + réglages .env)
 #   recipelog-instance sauvegardes <nom> [--json]
 #   recipelog-instance restaurer <nom> <sauvegarde> --oui
 #   recipelog-instance tester-sauvegarde <nom>|--tous
 #   recipelog-instance exporter <nom> <sauvegarde> > fichier.tar.gz   (sans mots de passe)
-#   recipelog-instance importer <nom> <archive.tar.gz> --oui    (déménagement : voir exporter-ancien.sh)
+#   recipelog-instance importer <nom> <archive.tar.gz> --oui [--sans-fichiers]
+#                                                  (déménagement : voir exporter-ancien.sh)
+#   recipelog-instance menage                      (vieilles images Docker, vieilles archives)
 #   recipelog-instance inviter-comptes <nom>     (invite les comptes actifs après un import)
 #   recipelog-instance demo-figer <nom> | demo-remettre <nom>|--toutes
 #   recipelog-instance vitrine maj | bandeau "texte" | demandes [--json] | traitee <clé>
@@ -38,6 +41,8 @@
 #                  de connexion Authentik : voir ../connexion.md)
 #   uploads/       photos et factures envoyées
 # Sauvegardes de chaque client dans /srv/recipelog/sauvegardes/<nom>/.
+# Une seule commande qui modifie à la fois (verrou /srv/recipelog/.verrou) : une
+# commande lancée à la main attend la fin de la sauvegarde de nuit, et l'inverse.
 # ============================================================
 set -euo pipefail
 
@@ -60,6 +65,17 @@ GARDER_MOIS="${SAUVEGARDE_MOIS:-6}"
 PG="recipelog-postgres"
 RESERVES=" www admin auth demo api status mail smtp traefik panel plateforme "
 MEMOIRE="${INSTANCE_MEMOIRE:-1g}"
+# Un client ne peut pas prendre toute la machine : processeur, processus, connexions à la base.
+CPUS="${INSTANCE_CPUS:-1.5}"
+PIDS="${INSTANCE_PIDS:-512}"
+CONNEXIONS_APPLI="${INSTANCE_CONNEXIONS:-5}"   # connexions ouvertes par l'appli (Prisma)
+CONNEXIONS_MAX="${INSTANCE_CONNEXIONS_MAX:-15}" # plafond côté PostgreSQL pour ce client
+# Sauvegardes : place libre exigée avant de commencer (Mo), et plafond d'occupation du disque (%).
+LIBRE_MIN_MO="${SAUVEGARDE_LIBRE_MIN_MO:-2048}"
+DISQUE_MAX="${SAUVEGARDE_DISQUE_MAX:-95}"
+# Clients supprimés : leur archive est effacée après ce nombre de jours (0 = jamais).
+ARCHIVES_JOURS="${ARCHIVES_GARDER_JOURS:-365}"
+CANAL_DEFAUT="${CANAL_DEFAUT:-plateforme}"
 
 die() { echo "❌ $*" >&2; exit 1; }
 info() { echo "==> $*"; }
@@ -89,7 +105,7 @@ passerelle_ok() { docker inspect -f '{{.State.Running}}' recipelog-passerelle 2>
 # brancher <nom> <max> <responsable>
 brancher() {
   local nom="$1" max="$2" resp="$3" dir="${INSTANCES}/$1" reglages
-  passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps). Sans Authentik : --sans-authentik."
+  passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps)."
   info "Client « ${nom} » dans Authentik…"
   reglages="$(passerelle client-creer "${nom}" "${max}" "https://${nom}.${DOMAINE}" --env)" || die "Authentik a refusé la création du client « ${nom} »."
   sed -i '/^RECIPELOG_AUTH_MODE=/d;/^RECIPELOG_URL=/d;/^OIDC_/d;/^RECIPELOG_SESSION_SECRET=/d;/^RECIPELOG_PASSERELLE_/d;/^RECIPELOG_RESPONSABLE_EMAIL=/d' "${dir}/instance.env"
@@ -132,24 +148,42 @@ verifier_max() { [[ "$1" =~ ^[0-9]+$ ]] || die "Nombre de comptes invalide : $1 
 
 psql_admin() { docker exec -i "${PG}" psql -v ON_ERROR_STOP=1 -q -U postgres "$@"; }
 
+# État du conteneur d'un client : healthy, starting, unhealthy, running, exited… ou « absent ».
+# (docker inspect écrit une ligne vide quand le conteneur n'existe pas : on ne garde que la 1re.)
+etat_brut() {
+  local e
+  e="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "$1")" 2>/dev/null | head -1)" || true
+  echo "${e:-absent}"
+}
+
+# Image que doit utiliser un client : la version exacte gardée après un retour
+# arrière (IMAGE_FIXE), sinon la dernière de son canal.
+image_de() {
+  local fixe canal
+  fixe="$(conf_lire "$1" IMAGE_FIXE)"
+  canal="$(conf_lire "$1" CANAL)"
+  echo "${fixe:-${IMAGE}:${canal:-${CANAL_DEFAUT}}}"
+}
+
 # Lance (ou relance) le conteneur d'un client à partir de son dossier.
 # $2 facultatif : image exacte à utiliser (retour en arrière).
 lancer() {
-  local nom="$1" image_forcee="${2:-}" dir="${INSTANCES}/$1" c
+  local nom="$1" image_forcee="${2:-}" dir="${INSTANCES}/$1" c canal image
   c="$(conteneur "${nom}")"
-  # shellcheck disable=SC1091
-  . "${dir}/instance.conf"
-  local image="${image_forcee:-${IMAGE}:${CANAL}}"
+  canal="$(conf_lire "${nom}" CANAL)"
+  image="${image_forcee:-$(image_de "${nom}")}"
   docker rm -f "${c}" >/dev/null 2>&1 || true
   docker run -d --name "${c}" \
     --network recipelog \
     --restart unless-stopped \
     --memory "${MEMOIRE}" \
+    --cpus "${CPUS}" \
+    --pids-limit "${PIDS}" \
     --shm-size 256m \
     --env-file "${dir}/instance.env" \
     -v "${dir}/uploads:/data/uploads" \
     --label "recipelog.instance=${nom}" \
-    --label "recipelog.canal=${CANAL}" \
+    --label "recipelog.canal=${canal}" \
     --label "traefik.enable=true" \
     --label "traefik.http.routers.${c}.rule=Host(\`${nom}.${DOMAINE}\`)" \
     --label "traefik.http.routers.${c}.entrypoints=web" \
@@ -160,21 +194,42 @@ lancer() {
 
 # Attend que le conteneur réponde (migrations + démarrage). 0 = prêt.
 attendre() {
-  local c; c="$(conteneur "$1")"
   local etat
-  for _ in $(seq 1 60); do
-    etat="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${c}" 2>/dev/null || echo absent)"
+  for _ in $(seq 1 90); do
+    etat="$(etat_brut "$1")"
     case "${etat}" in
       healthy) return 0 ;;
       exited|dead|absent) return 1 ;;
     esac
-    sleep 3
+    # Un conteneur qui plante et repart en boucle ne deviendra pas sain : inutile d'attendre 3 minutes.
+    [ "$(docker inspect -f '{{.RestartCount}}' "$(conteneur "$1")" 2>/dev/null | head -1)" -ge 4 ] 2>/dev/null && return 1
+    sleep 2
   done
   return 1
 }
 
+# ------------------------------------------------------------ création
+# Une création qui échoue en route est défaite en entier (base, dossier, Authentik) :
+# on peut la relancer avec le même nom. Seul ce que CETTE commande a créé est retiré.
+CREATION_NOM="" CREATION_BASE=0 CREATION_AUTHENTIK=0
+defaire_creation() {
+  local code=$? nom="${CREATION_NOM}" db
+  [ -n "${nom}" ] && [ "${code}" -ne 0 ] || return 0
+  CREATION_NOM=""
+  echo "↩️  La création de « ${nom} » a échoué : je retire ce qui avait été créé…" >&2
+  docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
+  if [ "${CREATION_BASE}" = 1 ]; then
+    db="$(base "${nom}")"
+    psql_admin -c "DROP DATABASE IF EXISTS ${db} WITH (FORCE);" >/dev/null 2>&1 || true
+    psql_admin -c "DROP ROLE IF EXISTS ${db};" >/dev/null 2>&1 || true
+  fi
+  if [ "${CREATION_AUTHENTIK}" = 1 ]; then passerelle client-supprimer "${nom}" >/dev/null 2>&1 || true; fi
+  rm -rf "${INSTANCES:?}/${nom}"
+  echo "   Rien n'est resté : tu peux relancer la création de « ${nom} »." >&2
+}
+
 cmd_creer() {
-  local nom="" canal="${CANAL_DEFAUT:-stable}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1 essai=0 mcp=oui
+  local nom="" canal="${CANAL_DEFAUT}" admin="${ADMIN_EMAILS:-}" demo=0 resp="" max=0 authentik=1 essai=0 mcp=oui
   while [ $# -gt 0 ]; do
     case "$1" in
       --canal) canal="${2:-}"; shift 2 ;;
@@ -194,17 +249,28 @@ cmd_creer() {
   [ -z "${resp}" ] || verifier_email "${resp}"
   verifier_max "${max}"
   [[ "${essai}" =~ ^[0-9]+$ ]] || die "Durée d'essai invalide : ${essai} (en jours)."
-  [ "${authentik}" = 0 ] || passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps). Sans Authentik : --sans-authentik."
-  [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (beta, stable ou plateforme)."
+  # Sans Authentik, un site est ouvert à tout internet : réservé à la démo publique.
+  [ "${authentik}" = 1 ] || [ "${demo}" = 1 ] || die "--sans-authentik ne sert qu'à la démo (avec --demo) : sans connexion, le site serait ouvert à tout internet."
+  [ "${authentik}" = 0 ] || passerelle_ok || die "La passerelle ne tourne pas (recipelog-plateforme ps)."
+  [[ "${canal}" =~ ^(beta|stable|plateforme)$ ]] || die "Canal « ${canal} » inconnu (plateforme, beta ou stable)."
   existe "${nom}" && die "Le client « ${nom} » existe déjà."
 
   local dir="${INSTANCES}/${nom}" db mdp
   db="$(base "${nom}")"
   mdp="$(aleatoire 24)"
 
+  # L'image d'abord : si elle manque, rien n'a encore été créé.
+  info "Téléchargement de ${IMAGE}:${canal}…"
+  tirer "${IMAGE}:${canal}"
+  [ -z "$(docker exec "${PG}" psql -U postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '${db}' UNION SELECT 1 FROM pg_database WHERE datname = '${db}'")" ] \
+    || die "Une base « ${db} » existe déjà dans PostgreSQL (reste d'un ancien client ?). Je n'y touche pas : choisis un autre nom, ou retire-la à la main."
+
+  CREATION_NOM="${nom}"
+  trap defaire_creation EXIT
   info "Base ${db} dans PostgreSQL…"
+  CREATION_BASE=1
   psql_admin <<SQL
-CREATE ROLE ${db} LOGIN PASSWORD '${mdp}';
+CREATE ROLE ${db} LOGIN PASSWORD '${mdp}' CONNECTION LIMIT ${CONNEXIONS_MAX};
 CREATE DATABASE ${db} OWNER ${db};
 REVOKE ALL ON DATABASE ${db} FROM PUBLIC;
 SQL
@@ -223,32 +289,34 @@ $([ "${demo}" = 1 ] && echo "DEMO=1")
 $([ "${essai}" -gt 0 ] && echo "ESSAI_FIN=$(date -u -d "+${essai} days" +%Y-%m-%d)")
 CONF
   {
-    echo "DATABASE_URL=postgresql://${db}:${mdp}@${PG}:5432/${db}"
+    # connection_limit : sans lui, chaque site ouvre une dizaine de connexions et
+    # PostgreSQL sature vers 8 clients actifs.
+    echo "DATABASE_URL=postgresql://${db}:${mdp}@${PG}:5432/${db}?connection_limit=${CONNEXIONS_APPLI}"
     echo "RECIPELOG_INSTANCE=${nom}"
     echo "RECIPELOG_ADMIN_EMAILS=${admin}"
-    [ "${demo}" = 1 ] && echo "RECIPELOG_DEMO=1"
-    [ "${mcp}" = non ] && echo "RECIPELOG_MCP=0"
+    if [ "${demo}" = 1 ]; then echo "RECIPELOG_DEMO=1"; fi
+    if [ "${mcp}" = non ]; then echo "RECIPELOG_MCP=0"; fi
   } > "${dir}/instance.env"
   umask 022
-  [ "${authentik}" = 1 ] && brancher "${nom}" "${max}" "${resp}"
+  if [ "${authentik}" = 1 ]; then
+    brancher "${nom}" "${max}" "${resp}"
+    CREATION_AUTHENTIK=1
+  fi
 
-  info "Téléchargement de ${IMAGE}:${canal}…"
-  tirer "${IMAGE}:${canal}"
   info "Démarrage de $(conteneur "${nom}")…"
   lancer "${nom}"
-  if attendre "${nom}"; then
-    info "✅ ${nom} est prêt : https://${nom}.${DOMAINE}"
-    if [ "${authentik}" = 1 ]; then
-      inviter_responsable "${nom}" "${resp}"
-    elif [ "${demo}" = 1 ]; then
-      echo "   Démo ouverte à tous. Prépare-la, puis : recipelog-instance demo-figer ${nom}"
-      [ -d "${DONNEES}/vitrine/reglages" ] && vitrine_reglages
-    else
-      echo "   Sans Authentik : protège cette adresse dans Cloudflare Access."
-    fi
-  else
+  if ! attendre "${nom}"; then
     docker logs --tail 40 "$(conteneur "${nom}")" >&2 || true
-    die "${nom} ne démarre pas (journaux ci-dessus). Le dossier et la base sont gardés : recipelog-instance redemarrer ${nom}"
+    die "${nom} ne démarre pas (journaux ci-dessus)."
+  fi
+  CREATION_NOM=""
+  trap - EXIT
+  info "✅ ${nom} est prêt : https://${nom}.${DOMAINE}"
+  if [ "${authentik}" = 1 ]; then
+    inviter_responsable "${nom}" "${resp}"
+  else
+    echo "   Démo ouverte à tous. Prépare-la, puis : recipelog-instance demo-figer ${nom}"
+    if [ -d "${DONNEES}/vitrine/reglages" ]; then vitrine_reglages; fi
   fi
 }
 
@@ -292,26 +360,35 @@ cmd_quota() {
 }
 
 etat_conteneur() {
-  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$(conteneur "$1")" 2>/dev/null || echo arrêté
+  local e; e="$(etat_brut "$1")"
+  [ "${e}" = absent ] && e="arrêté"
+  echo "${e}"
 }
 
+# Valeur sûre dans du JSON : une seule ligne, sans guillemet, barre oblique inverse ni caractère de contrôle.
+j() { printf '%s' "$1" | tr -d '\000-\037"\\' ; }
+
 cmd_liste() {
-  local json=0 d nom etat canal cx premier=1
+  local json=0 d nom etat canal cx premier=1 fin aujourdhui
   [ "${1:-}" = "--json" ] && json=1
+  aujourdhui="$(date -u +%Y-%m-%d)"
   if [ "${json}" = 1 ]; then
     printf '['
     for d in "${INSTANCES}"/*/; do
       [ -d "${d}" ] || continue
       nom="$(basename "${d}")"
+      [ -r "${d}instance.conf" ] || continue # dossier en cours de création ou abîmé
       [ "${premier}" = 1 ] || printf ','
       premier=0
-      # Valeurs contrôlées (noms, dates, mots-clés) : pas de guillemets à échapper.
-      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","mcp":%s,"demo":%s}' \
-        "${nom}" "$(conf_lire "${nom}" CANAL)" "$(conf_lire "${nom}" CONNEXION)" "$(etat_conteneur "${nom}")" \
-        "${nom}" "${DOMAINE}" "$(conf_lire "${nom}" CREE_LE)" \
-        "$(suspendu "${nom}" && echo true || echo false)" "$(conf_lire "${nom}" ESSAI_FIN)" \
+      fin="$(conf_lire "${nom}" ESSAI_FIN)"
+      printf '{"nom":"%s","canal":"%s","connexion":"%s","etat":"%s","adresse":"https://%s.%s","creeLe":"%s","suspendu":%s,"essaiFin":"%s","essaiFini":%s,"mcp":%s,"demo":%s,"versionBloquee":%s}' \
+        "$(j "${nom}")" "$(j "$(conf_lire "${nom}" CANAL)")" "$(j "$(conf_lire "${nom}" CONNEXION)")" "$(j "$(etat_conteneur "${nom}")")" \
+        "$(j "${nom}")" "$(j "${DOMAINE}")" "$(j "$(conf_lire "${nom}" CREE_LE)")" \
+        "$(suspendu "${nom}" && echo true || echo false)" "$(j "${fin}")" \
+        "$([ -n "${fin}" ] && [[ "${fin}" < "${aujourdhui}" ]] && echo true || echo false)" \
         "$([ "$(conf_lire "${nom}" MCP)" = non ] && echo false || echo true)" \
-        "$([ "$(conf_lire "${nom}" DEMO)" = 1 ] && echo true || echo false)"
+        "$([ "$(conf_lire "${nom}" DEMO)" = 1 ] && echo true || echo false)" \
+        "$([ -n "$(conf_lire "${nom}" IMAGE_FIXE)" ] && echo true || echo false)"
     done
     printf ']\n'
     return
@@ -336,12 +413,42 @@ cmd_suspendre() {
   info "⏸️  $1 est en pause : son adresse affiche « site en pause ». Les données sont gardées."
 }
 
+# reactiver <nom> [--essai jours] : rouvre un client en pause. Si son essai est terminé,
+# il devient un client normal (ou l'essai est prolongé avec --essai), sinon il
+# repasserait en pause dans l'heure.
 cmd_reactiver() {
-  [ $# -eq 1 ] && existe "$1" || die "Usage : recipelog-instance reactiver <nom existant>"
-  conf_ecrire "$1" SUSPENDU
-  tirer "${IMAGE}:$(conf_lire "$1" CANAL)"
-  lancer "$1"
-  attendre "$1" && info "✅ $1 est de nouveau en ligne." || die "$1 ne démarre pas : recipelog-instance journaux $1"
+  local nom="${1:-}" essai="" fin image
+  [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance reactiver <nom existant> [--essai jours]"
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --essai) essai="${2:-}"; [[ "${essai}" =~ ^[0-9]+$ ]] || die "Durée d'essai invalide (en jours)."; shift 2 ;;
+      *) die "Option inconnue : $1" ;;
+    esac
+  done
+  if ! suspendu "${nom}"; then
+    info "${nom} n'est pas en pause : rien à faire. (Pour le relancer : redemarrer ; pour la dernière version : mettre-a-jour.)"
+    return 0
+  fi
+  fin="$(conf_lire "${nom}" ESSAI_FIN)"
+  if [ -n "${essai}" ] && [ "${essai}" -gt 0 ]; then
+    conf_ecrire "${nom}" ESSAI_FIN "$(date -u -d "+${essai} days" +%Y-%m-%d)"
+    info "${nom} : essai prolongé jusqu'au $(conf_lire "${nom}" ESSAI_FIN) inclus."
+  elif [ -n "${fin}" ] && { [ "${essai}" = 0 ] || [[ "${fin}" < "$(date -u +%Y-%m-%d)" ]]; }; then
+    conf_ecrire "${nom}" ESSAI_FIN
+    info "${nom} : l'essai est terminé, il devient un client normal (plus de pause automatique)."
+  fi
+  image="$(image_de "${nom}")"
+  [[ "${image}" == sha256:* ]] || tirer "${image}"
+  conf_ecrire "${nom}" SUSPENDU
+  lancer "${nom}"
+  if attendre "${nom}"; then
+    info "✅ ${nom} est de nouveau en ligne."
+  else
+    docker stop "$(conteneur "${nom}")" >/dev/null 2>&1 || true
+    conf_ecrire "${nom}" SUSPENDU 1
+    die "${nom} ne démarre pas, il reste en pause : recipelog-instance journaux ${nom}"
+  fi
 }
 
 cmd_options() {
@@ -393,50 +500,104 @@ cmd_verifier_essais() {
   done
 }
 
-# Met à jour un client : nouvelle image, puis retour à l'ancienne s'il ne
-# redémarre pas. Avec --tous : un client après l'autre, arrêt au premier échec.
+# Met à jour un client. Dans l'ordre : nouvelle image, sauvegarde « avant-maj »,
+# démarrage de la nouvelle version. Si elle ne démarre pas : la base d'avant est
+# remise (une nouvelle version peut avoir commencé à la modifier), l'ancienne
+# version est relancée et gardée (IMAGE_FIXE) jusqu'à la prochaine mise à jour
+# réussie : un redémarrage ne remet donc pas la version cassée.
+# $2 = lot : dans « --tous », un client dont la version disponible a déjà échoué est sauté.
 maj_un() {
-  local nom="$1" c ancienne canal
+  local nom="$1" mode="${2:-}" c ancienne canal nouvelle secu db
   existe "${nom}" || die "Client « ${nom} » inconnu."
   if suspendu "${nom}"; then
     info "${nom} est en pause : il prendra la dernière version à sa réactivation."
+    conf_ecrire "${nom}" IMAGE_FIXE
     return 0
   fi
   c="$(conteneur "${nom}")"
-  canal="$(sed -n 's/^CANAL=//p' "${INSTANCES}/${nom}/instance.conf")"
-  ancienne="$(docker inspect -f '{{.Image}}' "${c}" 2>/dev/null || true)"
+  canal="$(conf_lire "${nom}" CANAL)"
+  ancienne="$(docker inspect -f '{{.Image}}' "${c}" 2>/dev/null | head -1)" || true
   info "${nom} : téléchargement de ${IMAGE}:${canal}…"
   tirer "${IMAGE}:${canal}"
-  if [ -n "${ancienne}" ] && [ "$(docker image inspect -f '{{.Id}}' "${IMAGE}:${canal}")" = "${ancienne}" ]; then
+  nouvelle="$(docker image inspect -f '{{.Id}}' "${IMAGE}:${canal}")"
+  if [ -n "${ancienne}" ] && [ "${nouvelle}" = "${ancienne}" ] && [ "$(etat_brut "${nom}")" = healthy ]; then
+    conf_ecrire "${nom}" IMAGE_FIXE
     info "${nom} : déjà à jour."
     return 0
   fi
-  lancer "${nom}"
+  if [ "${mode}" = lot ] && [ "$(conf_lire "${nom}" IMAGE_REFUSEE)" = "${nouvelle}" ]; then
+    info "${nom} : la version disponible est celle qui a déjà échoué chez lui, il garde la sienne. (Pour réessayer : mettre-a-jour ${nom}.)"
+    return 0
+  fi
+  info "${nom} : sauvegarde avant la mise à jour…"
+  if ! secu="$(sauvegarder_un "${nom}" avant-maj --sans-rotation)"; then
+    echo "❌ ${nom} : sauvegarde ratée, la mise à jour n'est pas faite (rien n'a changé)." >&2
+    return 1
+  fi
+  lancer "${nom}" "${IMAGE}:${canal}"
   if attendre "${nom}"; then
+    conf_ecrire "${nom}" IMAGE_FIXE
+    conf_ecrire "${nom}" IMAGE_REFUSEE
     info "✅ ${nom} : mis à jour."
     return 0
   fi
   echo "⚠️  ${nom} ne redémarre pas avec la nouvelle version :" >&2
   docker logs --tail 30 "${c}" >&2 || true
+  conf_ecrire "${nom}" IMAGE_REFUSEE "${nouvelle}"
   if [ -n "${ancienne}" ]; then
-    info "${nom} : retour à la version précédente…"
-    lancer "${nom}" "${ancienne}"
-    attendre "${nom}" && info "${nom} : version précédente remise." || echo "❌ ${nom} : la version précédente ne redémarre pas non plus." >&2
+    info "${nom} : retour à la version précédente, avec la base d'avant la mise à jour (${secu})…"
+    docker rm -f "${c}" >/dev/null 2>&1 || true
+    db="$(base "${nom}")"
+    charger_base "${db}" "${db}" "$(dossier_sauv "${nom}")/${secu}/base.dump" \
+      || echo "❌ ${nom} : la base d'avant n'a pas pu être remise (sauvegarde ${secu} à restaurer à la main)." >&2
+    conf_ecrire "${nom}" IMAGE_FIXE "${ancienne}"
+    lancer "${nom}"
+    if attendre "${nom}"; then
+      info "${nom} : version précédente remise. Elle est gardée jusqu'à la prochaine mise à jour réussie."
+    else
+      echo "❌ ${nom} : la version précédente ne redémarre pas non plus. Sauvegarde d'avant : ${secu}" >&2
+    fi
   fi
   return 1
 }
 
 cmd_maj() {
-  [ $# -eq 1 ] || die "Usage : recipelog-instance mettre-a-jour <nom>|--tous"
+  [ $# -ge 1 ] || die "Usage : recipelog-instance mettre-a-jour <nom>|--tous"
   if [ "$1" = "--tous" ]; then
     local d
     for d in "${INSTANCES}"/*/; do
       [ -d "${d}" ] || continue
-      maj_un "$(basename "${d}")" || die "Arrêt : les clients suivants n'ont pas été mis à jour."
+      maj_un "$(basename "${d}")" lot || die "Arrêt : les clients suivants n'ont pas été mis à jour."
     done
+    menage_images
+  elif [ "${2:-}" = "--lot" ]; then
+    # Appelé par le panel (« Tout mettre à jour »), client après client : le ménage est fait à la fin.
+    maj_un "$1" lot
   else
     maj_un "$1"
+    menage_images
   fi
+}
+
+menage_images() {
+  docker image prune -f --filter "until=168h" >/dev/null 2>&1 || true
+}
+
+# menage : vieilles images Docker, archives des clients supprimés depuis longtemps,
+# restes de sauvegardes interrompues. Lancé chaque nuit par le moteur.
+cmd_menage() {
+  local n=0 d
+  menage_images
+  if [ "${ARCHIVES_JOURS}" -gt 0 ] && [ -d "${ARCHIVES}" ]; then
+    while IFS= read -r d; do
+      [ -n "${d}" ] || continue
+      rm -rf "${d}"
+      info "Archive effacée (client supprimé il y a plus de ${ARCHIVES_JOURS} jours) : $(basename "${d}")"
+      n=$((n + 1))
+    done < <(find "${ARCHIVES}" -mindepth 1 -maxdepth 1 -type d -mtime "+${ARCHIVES_JOURS}")
+  fi
+  find "${SAUVEGARDES}" -mindepth 2 -maxdepth 2 -type d -name '*.partiel' -mmin +720 -exec rm -rf {} + 2>/dev/null || true
+  if [ "${n}" -gt 0 ]; then info "Ménage fait (${n} archive(s) effacée(s))."; else info "Ménage fait."; fi
 }
 
 cmd_redemarrer() {
@@ -454,40 +615,94 @@ cmd_journaux() {
 # ------------------------------------------------------------ sauvegardes (lot 3)
 # Une sauvegarde = un dossier sauvegardes/<nom>/<AAAAMMJJ-HHMMSS>/ :
 #   base.dump        la base du client (pg_dump, format compressé)
-#   fichiers.tar.gz  photos et factures (uploads/) + instance.conf
+#   fichiers/        uploads/ (photos et factures) et instance.conf. Un fichier qui n'a
+#                    pas changé depuis la sauvegarde d'avant n'est pas recopié : c'est un
+#                    lien vers le même fichier (rsync --link-dest), sans place en plus.
+#                    17 sauvegardes d'un client ne prennent donc guère plus qu'une seule.
 #   reglages.tar.gz  instance.env (mots de passe : jamais dans un export)
-#   infos.json       date, étiquette, version, tailles
+#   infos.json       date, étiquette, version, tailles, nombre de fichiers
 # Rotation : TOUTES celles des GARDER_JOURS derniers jours ; avant, la plus récente
 # de chaque semaine (GARDER_SEMAINES semaines) et de chaque mois (GARDER_MOIS mois).
 dossier_sauv() { echo "${SAUVEGARDES}/$1"; }
 id_valide() { [[ "$1" =~ ^[0-9]{8}-[0-9]{6}$ ]] || die "Sauvegarde « $1 » inconnue."; }
+# Identifiants des sauvegardes d'un client, la plus récente d'abord.
+ids_sauvegardes() {
+  local racine; racine="$(dossier_sauv "$1")"
+  [ -d "${racine}" ] || return 0
+  find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r
+}
+nouvel_id() { # nouvel_id <dossier> : identifiant libre (un par seconde)
+  local id; id="$(date -u +%Y%m%d-%H%M%S)"
+  while [ -e "$1/${id}" ] || [ -e "$1/${id}.partiel" ]; do sleep 1; id="$(date -u +%Y%m%d-%H%M%S)"; done
+  echo "${id}"
+}
 
 version_client() {
-  docker exec "$(conteneur "$1")" node -e 'fetch("http://127.0.0.1:3000/api/health").then(r=>r.json()).then(j=>console.log(j.version||"")).catch(()=>{})' 2>/dev/null || true
+  docker exec "$(conteneur "$1")" node -e 'fetch("http://127.0.0.1:3000/api/health").then(r=>r.json()).then(j=>console.log(j.version||"")).catch(()=>{})' 2>/dev/null | head -1 || true
+}
+
+# Assez de place pour sauvegarder ? Un disque plein arrête la base de TOUS les clients.
+disque_ok() {
+  local libre pct
+  read -r libre pct < <(df -Pm "${SAUVEGARDES}" | awk 'NR==2 { sub("%", "", $5); print $4, $5 }') || true
+  [ "${libre:-0}" -ge "${LIBRE_MIN_MO}" ] && [ "${pct:-100}" -lt "${DISQUE_MAX}" ]
+}
+disque_texte() { df -Ph "${SAUVEGARDES}" | awk 'NR==2 { print $5 " utilisés, " $4 " libres" }'; }
+
+# copier_fichiers <nom> <dossier de la sauvegarde en cours> : photos et factures.
+copier_fichiers() {
+  local nom="$1" tmp="$2" dir="${INSTANCES}/$1" racine prec="" i code=0
+  racine="$(dossier_sauv "${nom}")"
+  local ids=()
+  mapfile -t ids < <(ids_sauvegardes "${nom}")
+  for i in "${ids[@]}"; do
+    if [ -d "${racine}/${i}/fichiers/uploads" ]; then prec="${racine}/${i}/fichiers/uploads/"; break; fi
+  done
+  mkdir -p "${tmp}/fichiers/uploads" || return 1
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a ${prec:+--link-dest="${prec}"} "${dir}/uploads/" "${tmp}/fichiers/uploads/" || code=$?
+    # 24 : un fichier a disparu pendant la copie (photo supprimée au même moment). Sans gravité.
+    [ "${code}" = 0 ] || [ "${code}" = 24 ] || return 1
+  else
+    cp -a "${dir}/uploads/." "${tmp}/fichiers/uploads/" || return 1
+  fi
+  cp "${dir}/instance.conf" "${tmp}/fichiers/instance.conf" || return 1
 }
 
 # sauvegarder_un <nom> [etiquette] [--sans-rotation] : affiche l'identifiant de la sauvegarde.
+# Chaque étape est vérifiée : au moindre échec, rien n'est rangé et le code est 1.
 sauvegarder_un() {
-  local nom="$1" etiquette="${2:-auto}" rotation="${3:-}" dir="${INSTANCES}/$1" racine id tmp db version
+  local nom="$1" etiquette="${2:-auto}" rotation="${3:-}" dir="${INSTANCES}/$1" racine id tmp db version nb
   racine="$(dossier_sauv "${nom}")"
   db="$(base "${nom}")"
-  mkdir -p "${racine}"; chmod 700 "${SAUVEGARDES}" "${racine}"
+  mkdir -p "${racine}" || return 1
+  chmod 700 "${SAUVEGARDES}" "${racine}" || return 1
   # Restes d'une sauvegarde interrompue.
-  find "${racine}" -mindepth 1 -maxdepth 1 -type d -name '*.partiel' -exec rm -rf {} +
-  id="$(date -u +%Y%m%d-%H%M%S)"
-  while [ -e "${racine}/${id}" ]; do sleep 1; id="$(date -u +%Y%m%d-%H%M%S)"; done
+  find "${racine}" -mindepth 1 -maxdepth 1 -type d -name '*.partiel' -exec rm -rf {} + || true
+  # Le ménage AVANT : sur un disque presque plein, c'est lui qui refait de la place.
+  [ "${rotation}" = "--sans-rotation" ] || elaguer "${nom}" || true
+  if ! disque_ok; then
+    echo "❌ ${nom} : disque presque plein ($(disque_texte)). Sauvegarde non faite : libère de la place." >&2
+    return 1
+  fi
+  id="$(nouvel_id "${racine}")"
   tmp="${racine}/${id}.partiel"
-  mkdir -m 700 "${tmp}"
-  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${tmp}/base.dump" || { echo "❌ ${nom} : la base n'a pas pu être sauvegardée." >&2; return 1; }
-  tar -C "${dir}" -czf "${tmp}/fichiers.tar.gz" uploads instance.conf || { echo "❌ ${nom} : les fichiers n'ont pas pu être sauvegardés." >&2; return 1; }
-  tar -C "${dir}" -czf "${tmp}/reglages.tar.gz" instance.env
-  version="$(version_client "${nom}")"
-  printf '{"id":"%s","date":"%s","etiquette":"%s","version":"%s","base":%s,"fichiers":%s}\n' \
-    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${etiquette}" "${version}" \
-    "$(stat -c %s "${tmp}/base.dump")" "$(stat -c %s "${tmp}/fichiers.tar.gz")" > "${tmp}/infos.json"
-  chmod 600 "${tmp}"/*
-  mv "${tmp}" "${racine}/${id}"
-  [ "${rotation}" = "--sans-rotation" ] || elaguer "${nom}"
+  mkdir -m 700 "${tmp}" || return 1
+  rate() { echo "❌ ${nom} : $1" >&2; rm -rf "${tmp:?}"; return 1; }
+  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${tmp}/base.dump" || { rate "la base n'a pas pu être sauvegardée."; return 1; }
+  # Le fichier se relit-il ? (disque plein ou coupure en cours d'écriture)
+  docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1 || { rate "le fichier de la base est illisible."; return 1; }
+  copier_fichiers "${nom}" "${tmp}" || { rate "les photos et factures n'ont pas pu être sauvegardées."; return 1; }
+  tar -C "${dir}" -czf "${tmp}/reglages.tar.gz" instance.env || { rate "les réglages n'ont pas pu être sauvegardés."; return 1; }
+  version="$(version_client "${nom}")" || version=""
+  nb="$(find "${tmp}/fichiers/uploads" -type f | wc -l)" || nb=0
+  printf '{"id":"%s","date":"%s","etiquette":"%s","version":"%s","base":%s,"fichiers":%s,"nbFichiers":%s}\n' \
+    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(j "${etiquette}")" "$(j "${version}")" \
+    "$(stat -c %s "${tmp}/base.dump")" "$(du -sb "${tmp}/fichiers" | cut -f1)" "${nb}" > "${tmp}/infos.json" \
+    || { rate "le résumé n'a pas pu être écrit."; return 1; }
+  grep -q '^{.*}$' "${tmp}/infos.json" || { rate "le résumé est illisible."; return 1; }
+  chmod 600 "${tmp}/base.dump" "${tmp}/reglages.tar.gz" "${tmp}/infos.json" || true
+  mv "${tmp}" "${racine}/${id}" || { rate "la sauvegarde n'a pas pu être rangée."; return 1; }
   echo "${id}"
 }
 
@@ -498,7 +713,7 @@ elaguer() {
   limite="$(date -u -d "-$((GARDER_JOURS - 1)) days" +%Y%m%d)"
   declare -A semaines=() moisv=() garder=()
   local ids=()
-  mapfile -t ids < <(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r)
+  mapfile -t ids < <(ids_sauvegardes "$1")
   for id in "${ids[@]}"; do
     jour="${id:0:8}"
     sem="$(date -u -d "${jour}" +%G%V)"
@@ -523,14 +738,15 @@ cmd_sauvegarder() {
     esac
   done
   if [ "${cible}" = "--tous" ]; then
-    local d n echecs=0
+    local d n id echecs=0
     for d in "${INSTANCES}"/*/; do
       [ -d "${d}" ] || continue
       n="$(basename "${d}")"
       [ "$(conf_lire "${n}" DEMO)" = 1 ] && continue # la démo a sa référence (demo-figer)
       if id="$(sauvegarder_un "${n}" "${etiquette}")"; then info "${n} : sauvegarde ${id}"; else echecs=$((echecs + 1)); fi
     done
-    [ "${echecs}" -eq 0 ] || die "${echecs} client(s) non sauvegardé(s)."
+    ( cmd_sauvegarder_plateforme ) || echecs=$((echecs + 1))
+    [ "${echecs}" -eq 0 ] || die "${echecs} sauvegarde(s) ratée(s)."
   else
     existe "${cible}" || die "Client « ${cible} » inconnu."
     local id; id="$(sauvegarder_un "${cible}" "${etiquette}")" || die "Sauvegarde de ${cible} ratée."
@@ -538,20 +754,46 @@ cmd_sauvegarder() {
   fi
 }
 
+# La plateforme elle-même : tous les comptes et mots de passe (base d'Authentik) et
+# les réglages (.env). Sans eux, les bases des clients reviendraient mais plus
+# personne ne pourrait se connecter. 14 gardées, dans sauvegardes/_plateforme/.
+cmd_sauvegarder_plateforme() {
+  local racine="${SAUVEGARDES}/_plateforme" id tmp vieux
+  mkdir -p "${racine}"; chmod 700 "${SAUVEGARDES}" "${racine}"
+  find "${racine}" -mindepth 1 -maxdepth 1 -type d -name '*.partiel' -exec rm -rf {} + || true
+  disque_ok || die "Plateforme : disque presque plein ($(disque_texte)). Sauvegarde non faite."
+  id="$(nouvel_id "${racine}")"
+  tmp="${racine}/${id}.partiel"
+  mkdir -m 700 "${tmp}"
+  if ! docker exec "${PG}" pg_dump -U postgres -Fc authentik > "${tmp}/authentik.dump" \
+    || ! docker exec -i "${PG}" pg_restore -l < "${tmp}/authentik.dump" >/dev/null 2>&1; then
+    rm -rf "${tmp:?}"
+    die "Plateforme : la base des comptes (Authentik) n'a pas pu être sauvegardée."
+  fi
+  cp "${ENV_FILE}" "${tmp}/env"
+  chmod 600 "${tmp}/authentik.dump" "${tmp}/env"
+  mv "${tmp}" "${racine}/${id}"
+  while IFS= read -r vieux; do
+    [ -n "${vieux}" ] && rm -rf "${racine:?}/${vieux}"
+  done < <(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r | tail -n +15)
+  info "✅ Plateforme : comptes et réglages sauvegardés (${id})."
+}
+
 cmd_sauvegardes() {
   local nom="${1:-}" json="${2:-}" racine id
   [ -n "${nom}" ] || die "Usage : recipelog-instance sauvegardes <nom> [--json]"
   racine="$(dossier_sauv "${nom}")"
   local ids=()
-  [ -d "${racine}" ] && mapfile -t ids < <(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' | sort -r)
+  mapfile -t ids < <(ids_sauvegardes "${nom}")
   if [ "${json}" = "--json" ]; then
     local sep="" test="null"
     printf '{"sauvegardes":['
     for id in "${ids[@]}"; do
-      [ -r "${racine}/${id}/infos.json" ] || continue
+      # Un résumé vide ou coupé (disque plein) ne doit pas casser la liste entière.
+      grep -q '^{.*}$' "${racine}/${id}/infos.json" 2>/dev/null || continue
       printf '%s%s' "${sep}" "$(tr -d '\n' < "${racine}/${id}/infos.json")"; sep=","
     done
-    [ -r "${racine}/dernier-test.json" ] && test="$(tr -d '\n' < "${racine}/dernier-test.json")"
+    if grep -q '^{.*}$' "${racine}/dernier-test.json" 2>/dev/null; then test="$(tr -d '\n' < "${racine}/dernier-test.json")"; fi
     printf '],"test":%s}\n' "${test}"
   else
     [ "${#ids[@]}" -gt 0 ] || { echo "Aucune sauvegarde pour ${nom}."; return 0; }
@@ -560,10 +802,10 @@ cmd_sauvegardes() {
       local f="${racine}/${id}/infos.json"
       printf '%-17s %-20s %10s %10s\n' "${id}" \
         "$(sed -n 's/.*"etiquette":"\([^"]*\)".*/\1/p' "${f}")" \
-        "$(numfmt --to=iec "$(sed -n 's/.*"base":\([0-9]*\).*/\1/p' "${f}")")" \
-        "$(numfmt --to=iec "$(sed -n 's/.*"fichiers":\([0-9]*\).*/\1/p' "${f}")")"
+        "$(numfmt --to=iec "$(sed -n 's/.*"base":\([0-9]*\).*/\1/p' "${f}")" 2>/dev/null || echo '?')" \
+        "$(numfmt --to=iec "$(sed -n 's/.*"fichiers":\([0-9]*\).*/\1/p' "${f}")" 2>/dev/null || echo '?')"
     done
-    [ -r "${racine}/dernier-test.json" ] && echo "Dernier test de restauration : $(cat "${racine}/dernier-test.json")"
+    if [ -r "${racine}/dernier-test.json" ]; then echo "Dernier test de restauration : $(cat "${racine}/dernier-test.json")"; fi
   fi
 }
 
@@ -572,43 +814,63 @@ charger_base() {
   local db="$1" role="$2" dump="$3"
   psql_admin >/dev/null <<SQL
 SET client_min_messages TO warning;
-SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${db}' AND pid <> pg_backend_pid();
-DROP DATABASE IF EXISTS ${db};
+DROP DATABASE IF EXISTS ${db} WITH (FORCE);
 CREATE DATABASE ${db} OWNER ${role};
 REVOKE ALL ON DATABASE ${db} FROM PUBLIC;
 SQL
   docker exec -i "${PG}" pg_restore -U postgres -d "${db}" --no-owner --role="${role}" --exit-on-error < "${dump}"
 }
 
-# remettre_fichiers <nom> <dossier de sauvegarde> : remplace uploads/ par celui de la sauvegarde.
-remettre_fichiers() {
-  local dir="${INSTANCES}/$1" sauv="$2" neuf
-  neuf="${dir}/uploads.neuf"
-  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.neuf' -exec rm -rf {} +
-  mkdir -p "${neuf}"
-  tar -C "${neuf}" -xzf "${sauv}/fichiers.tar.gz" uploads 2>/dev/null || mkdir -p "${neuf}/uploads"
-  find "${dir}" -mindepth 1 -maxdepth 1 -name 'uploads.avant' -exec rm -rf {} +
+# preparer_fichiers <nom> <dossier de sauvegarde> : recopie les photos de la sauvegarde
+# dans uploads.neuf, SANS toucher aux photos actuelles. Code 1 si la copie échoue.
+preparer_fichiers() {
+  local dir="${INSTANCES}/$1" sauv="$2" neuf="${INSTANCES}/$1/uploads.neuf"
+  rm -rf "${neuf:?}"
+  mkdir -p "${neuf}" || return 1
+  if [ -d "${sauv}/fichiers/uploads" ]; then
+    # Vraie copie (pas de lien) : le site ne doit jamais écrire dans une sauvegarde.
+    cp -a "${sauv}/fichiers/uploads" "${neuf}/uploads" || { rm -rf "${neuf:?}"; return 1; }
+  elif [ -f "${sauv}/fichiers.tar.gz" ]; then
+    tar -C "${neuf}" --no-same-owner -xzf "${sauv}/fichiers.tar.gz" uploads || { rm -rf "${neuf:?}"; return 1; }
+  else
+    rm -rf "${neuf:?}"
+    return 1
+  fi
+  [ -d "${neuf}/uploads" ] || { rm -rf "${neuf:?}"; return 1; }
+}
+
+# basculer_fichiers <nom> : uploads.neuf devient uploads (les anciennes photos ne sont
+# effacées qu'une fois les nouvelles en place).
+basculer_fichiers() {
+  local dir="${INSTANCES}/$1"
+  rm -rf "${dir:?}/uploads.avant"
   mv "${dir}/uploads" "${dir}/uploads.avant"
-  mv "${neuf}/uploads" "${dir}/uploads"
-  find "${dir}" -mindepth 1 -maxdepth 1 \( -name 'uploads.neuf' -o -name 'uploads.avant' \) -exec rm -rf {} +
+  mv "${dir}/uploads.neuf/uploads" "${dir}/uploads"
   chown -R 1000:1000 "${dir}/uploads"
+  rm -rf "${dir:?}/uploads.neuf" "${dir:?}/uploads.avant"
 }
 
 # appliquer <nom> <dossier de sauvegarde> : arrête le client, remet base + fichiers.
-# Code 1 si la base n'a pas pu être rechargée (le client reste arrêté).
+# Code 2 : les photos de la sauvegarde sont illisibles, RIEN n'a été changé.
+# Code 1 : la base n'a pas pu être rechargée (le client est arrêté).
 appliquer() {
   local nom="$1" sauv="$2" db
   db="$(base "${nom}")"
+  info "Préparation des photos et factures…"
+  preparer_fichiers "${nom}" "${sauv}" || return 2
   info "Arrêt de ${nom}…"
   docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
   info "Remise de la base…"
-  charger_base "${db}" "${db}" "${sauv}/base.dump" || return 1
+  if ! charger_base "${db}" "${db}" "${sauv}/base.dump"; then
+    rm -rf "${INSTANCES:?}/${nom}/uploads.neuf"
+    return 1
+  fi
   info "Remise des photos et factures…"
-  remettre_fichiers "${nom}" "${sauv}"
+  basculer_fichiers "${nom}"
 }
 
 cmd_restaurer() {
-  local nom="${1:-}" id="${2:-}" ok="${3:-}" sauv secu
+  local nom="${1:-}" id="${2:-}" ok="${3:-}" sauv secu code=0
   [ -n "${nom}" ] && [ -n "${id}" ] || die "Usage : recipelog-instance restaurer <nom> <sauvegarde> --oui"
   existe "${nom}" || die "Client « ${nom} » inconnu."
   id_valide "${id}"
@@ -617,7 +879,10 @@ cmd_restaurer() {
   [ "${ok}" = "--oui" ] || die "Ajoute --oui : les données actuelles de ${nom} seront remplacées."
   info "Sauvegarde de sécurité de l'état actuel…"
   secu="$(sauvegarder_un "${nom}" avant-restauration --sans-rotation)" || die "Sauvegarde de sécurité ratée : rien n'a été changé."
-  if ! appliquer "${nom}" "${sauv}"; then
+  appliquer "${nom}" "${sauv}" || code=$?
+  if [ "${code}" = 2 ]; then
+    die "Les photos et factures de la sauvegarde ${id} sont illisibles : restauration annulée, rien n'a été changé."
+  elif [ "${code}" != 0 ]; then
     echo "❌ La base n'a pas pu être remise. Retour à l'état d'avant (${secu})…" >&2
     charger_base "$(base "${nom}")" "$(base "${nom}")" "$(dossier_sauv "${nom}")/${secu}/base.dump" || true
     suspendu "${nom}" || lancer "${nom}"
@@ -633,23 +898,46 @@ cmd_restaurer() {
 }
 
 # Restaure la dernière sauvegarde dans une base temporaire pour vérifier qu'elle est bonne.
+# La base de test s'appelle test_rl_… : jamais le nom d'une base de client (rl_…). Elle
+# appartient au rôle du client et est remplie avec ses droits à lui, pas ceux de PostgreSQL.
 tester_un() {
-  local nom="$1" racine id essai recettes ok=true raison=""
+  local nom="$1" racine id essai role recettes="" ok=true raison="" attendu reel
   racine="$(dossier_sauv "${nom}")"
-  id="$(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' 2>/dev/null | sort -r | head -1)"
+  id="$(ids_sauvegardes "${nom}" | head -1)" || true
   [ -n "${id}" ] || { echo "⚠️  ${nom} : aucune sauvegarde à tester." >&2; return 1; }
-  essai="rl_essai_${nom//-/_}"
-  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai};" -c "CREATE DATABASE ${essai};" >/dev/null
-  if ! docker exec -i "${PG}" pg_restore -U postgres -d "${essai}" --no-owner --exit-on-error < "${racine}/${id}/base.dump" >/dev/null 2>&1; then
+  role="$(base "${nom}")"
+  essai="test_${role}"
+  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai} WITH (FORCE);" -c "CREATE DATABASE ${essai} OWNER ${role};" -c "REVOKE ALL ON DATABASE ${essai} FROM PUBLIC;" >/dev/null
+  if ! docker exec -i "${PG}" pg_restore -U postgres -d "${essai}" --no-owner --role="${role}" --exit-on-error < "${racine}/${id}/base.dump" >/dev/null 2>&1; then
     ok=false; raison="la base ne se recharge pas"
   else
     recettes="$(docker exec "${PG}" psql -U postgres -d "${essai}" -tAc 'SELECT count(*) FROM recipes' 2>/dev/null)" || { ok=false; raison="table des recettes absente"; }
   fi
-  if ${ok} && ! tar -tzf "${racine}/${id}/fichiers.tar.gz" >/dev/null 2>&1; then ok=false; raison="archive des fichiers abîmée"; fi
-  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai};" >/dev/null || true
+  if ${ok}; then
+    if [ -d "${racine}/${id}/fichiers/uploads" ]; then
+      attendu="$(sed -n 's/.*"nbFichiers":\([0-9]*\).*/\1/p' "${racine}/${id}/infos.json" 2>/dev/null)" || true
+      reel="$(find "${racine}/${id}/fichiers/uploads" -type f | wc -l)" || reel=0
+      if [ -n "${attendu}" ] && [ "${attendu}" != "${reel}" ]; then ok=false; raison="il manque des photos ou des factures (${reel} sur ${attendu})"; fi
+    elif ! tar -tzf "${racine}/${id}/fichiers.tar.gz" >/dev/null 2>&1; then
+      ok=false; raison="photos et factures absentes ou abîmées"
+    fi
+  fi
+  psql_admin -c "SET client_min_messages TO warning;" -c "DROP DATABASE IF EXISTS ${essai} WITH (FORCE);" >/dev/null || true
   printf '{"date":"%s","sauvegarde":"%s","ok":%s,"recettes":%s,"raison":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${id}" "${ok}" "${recettes:-0}" "${raison}" > "${racine}/dernier-test.json"
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${id}" "${ok}" "${recettes:-0}" "$(j "${raison}")" > "${racine}/dernier-test.json"
   if ${ok}; then info "${nom} : sauvegarde ${id} relue sans erreur (${recettes} recettes)."; else echo "❌ ${nom} : sauvegarde ${id} : ${raison}." >&2; return 1; fi
+}
+
+# La sauvegarde de la plateforme (comptes) se relit-elle ?
+tester_plateforme() {
+  local racine="${SAUVEGARDES}/_plateforme" id
+  id="$(find "${racine}" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}-[0-9]{6}' -printf '%f\n' 2>/dev/null | sort -r | head -1)" || true
+  [ -n "${id}" ] || { echo "⚠️  Plateforme : aucune sauvegarde des comptes à tester." >&2; return 1; }
+  if docker exec -i "${PG}" pg_restore -l < "${racine}/${id}/authentik.dump" >/dev/null 2>&1 && [ -s "${racine}/${id}/env" ]; then
+    info "Plateforme : sauvegarde des comptes ${id} relue sans erreur."
+  else
+    echo "❌ Plateforme : la sauvegarde des comptes ${id} est illisible." >&2; return 1
+  fi
 }
 
 cmd_tester_sauvegarde() {
@@ -661,7 +949,10 @@ cmd_tester_sauvegarde() {
       [ "$(conf_lire "$(basename "${d}")" DEMO)" = 1 ] && continue
       tester_un "$(basename "${d}")" || echecs=$((echecs + 1))
     done
+    tester_plateforme || echecs=$((echecs + 1))
     [ "${echecs}" -eq 0 ] || die "${echecs} sauvegarde(s) en échec."
+  elif [ "$1" = "_plateforme" ]; then
+    tester_plateforme || exit 1
   else
     existe "$1" || die "Client « $1 » inconnu."
     tester_un "$1" || exit 1
@@ -676,41 +967,73 @@ cmd_exporter() {
   sauv="$(dossier_sauv "${nom}")/${id}"
   [ -r "${sauv}/base.dump" ] || die "Sauvegarde « ${id} » introuvable pour ${nom}."
   [ -t 1 ] && die "Rediriger la sortie vers un fichier : … > ${nom}-${id}.tar.gz"
-  tar -C "${sauv}" -czf - base.dump fichiers.tar.gz infos.json
+  if [ -d "${sauv}/fichiers" ]; then
+    tar -C "${sauv}" -czf - base.dump infos.json fichiers
+  else
+    tar -C "${sauv}" -czf - base.dump infos.json fichiers.tar.gz
+  fi
 }
 
 # ------------------------------------------------------------ déménagement (lot 4)
 # importer <nom> <archive.tar.gz> --oui : remplace les données d'un client (déjà créé)
-# par une archive qui contient base.dump (pg_dump -Fc) et fichiers.tar.gz (uploads/).
-# C'est le format de « exporter » et de exporter-ancien.sh (ancien site en LXC).
+# par une archive qui contient base.dump (pg_dump -Fc) et les fichiers : soit un dossier
+# fichiers/uploads/ (format de « exporter »), soit fichiers.tar.gz avec uploads/ dedans
+# (format de exporter-ancien.sh, pour un ancien site en LXC).
+# Une archive sans aucune photo ni facture est refusée (export raté ?), sauf --sans-fichiers.
 cmd_importer() {
-  local nom="${1:-}" fichier="${2:-}" ok="${3:-}" racine id tmp db
-  [ -n "${nom}" ] && [ -n "${fichier}" ] || die "Usage : recipelog-instance importer <nom> <archive.tar.gz> --oui"
+  local nom="${1:-}" fichier="${2:-}" ok="" vide=0 racine id tmp nb comptes
+  [ -n "${nom}" ] && [ -n "${fichier}" ] || die "Usage : recipelog-instance importer <nom> <archive.tar.gz> --oui [--sans-fichiers]"
+  shift 2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --oui) ok="--oui"; shift ;;
+      --sans-fichiers) vide=1; shift ;;
+      *) die "Option inconnue : $1" ;;
+    esac
+  done
   existe "${nom}" || die "Crée d'abord le client : recipelog-instance creer ${nom} …"
   [ -r "${fichier}" ] || die "Archive ${fichier} introuvable."
   [ "${ok}" = "--oui" ] || die "Ajoute --oui : les données actuelles de ${nom} seront remplacées par l'archive."
   racine="$(dossier_sauv "${nom}")"
   mkdir -p "${racine}"; chmod 700 "${SAUVEGARDES}" "${racine}"
-  id="$(date -u +%Y%m%d-%H%M%S)"
-  while [ -e "${racine}/${id}" ]; do sleep 1; id="$(date -u +%Y%m%d-%H%M%S)"; done
+  id="$(nouvel_id "${racine}")"
   tmp="${racine}/${id}.partiel"
   mkdir -m 700 "${tmp}"
-  tar -C "${tmp}" --no-same-owner -xzf "${fichier}" base.dump fichiers.tar.gz \
-    || die "Archive illisible : il faut base.dump et fichiers.tar.gz dedans (voir exporter-ancien.sh)."
-  docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1 || die "base.dump n'est pas une sauvegarde PostgreSQL (pg_dump -Fc)."
-  tar -tzf "${tmp}/fichiers.tar.gz" >/dev/null 2>&1 || die "fichiers.tar.gz est abîmé."
-  printf '{"id":"%s","date":"%s","etiquette":"importee","version":"","base":%s,"fichiers":%s}\n' \
-    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(stat -c %s "${tmp}/base.dump")" "$(stat -c %s "${tmp}/fichiers.tar.gz")" > "${tmp}/infos.json"
-  chmod 600 "${tmp}"/*
+  abandon() { rm -rf "${tmp:?}"; die "$1"; }
+  tar -C "${tmp}" --no-same-owner --no-same-permissions -xzf "${fichier}" \
+    || abandon "Archive illisible ou incomplète (copie coupée ?). Refais l'export et la copie."
+  [ -f "${tmp}/base.dump" ] || abandon "Il manque base.dump dans l'archive (voir exporter-ancien.sh)."
+  docker exec -i "${PG}" pg_restore -l < "${tmp}/base.dump" >/dev/null 2>&1 || abandon "base.dump n'est pas une sauvegarde PostgreSQL (pg_dump -Fc)."
+  if [ -f "${tmp}/fichiers.tar.gz" ]; then
+    mkdir -p "${tmp}/fichiers"
+    tar -C "${tmp}/fichiers" --no-same-owner --no-same-permissions -xzf "${tmp}/fichiers.tar.gz" \
+      || abandon "fichiers.tar.gz (photos et factures) est abîmé : rien n'a été importé."
+    rm -f "${tmp}/fichiers.tar.gz"
+  fi
+  # Démo figée d'une ancienne installation : uploads/uploads/… → un cran de trop.
+  if [ -d "${tmp}/fichiers/uploads/uploads" ] && [ "$(find "${tmp}/fichiers/uploads" -mindepth 1 -maxdepth 1 | wc -l)" = 1 ]; then
+    mv "${tmp}/fichiers/uploads/uploads" "${tmp}/fichiers/uploads.bon"
+    rmdir "${tmp}/fichiers/uploads"
+    mv "${tmp}/fichiers/uploads.bon" "${tmp}/fichiers/uploads"
+  fi
+  mkdir -p "${tmp}/fichiers/uploads"
+  nb="$(find "${tmp}/fichiers/uploads" -type f | wc -l)"
+  if [ "${nb}" = 0 ] && [ "${vide}" = 0 ]; then
+    abandon "L'archive ne contient AUCUNE photo ni facture : l'export a sans doute raté. Rien n'a été importé. (Si l'ancien site n'avait vraiment aucun fichier : ajoute --sans-fichiers.)"
+  fi
+  find "${tmp}" -mindepth 1 -maxdepth 1 ! -name base.dump ! -name fichiers -exec rm -rf {} +
+  printf '{"id":"%s","date":"%s","etiquette":"importee","version":"","base":%s,"fichiers":%s,"nbFichiers":%s}\n' \
+    "${id}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(stat -c %s "${tmp}/base.dump")" "$(du -sb "${tmp}/fichiers" | cut -f1)" "${nb}" > "${tmp}/infos.json"
+  chmod 600 "${tmp}/base.dump" "${tmp}/infos.json"
   mv "${tmp}" "${racine}/${id}"
-  info "Archive rangée comme sauvegarde ${id} (« importée »)."
+  info "Archive rangée comme sauvegarde ${id} (« importée ») : ${nb} photo(s) et facture(s)."
   cmd_restaurer "${nom}" "${id}" --oui
-  db="$(base "${nom}")"
-  local comptes
+  info "Importé : $(docker exec "${PG}" psql -U postgres -d "$(base "${nom}")" -tAc 'SELECT count(*) FROM recipes' 2>/dev/null || echo '?') recette(s), ${nb} photo(s) et facture(s)."
   comptes="$(comptes_actifs "${nom}")"
   if [ -n "${comptes}" ]; then
     echo
     echo "Comptes actifs de l'ancien site (rôles gardés) :"
+    # shellcheck disable=SC2086
     printf '  %s\n' ${comptes}
     if [ "$(conf_lire "${nom}" CONNEXION)" = authentik ]; then
       echo "Pour envoyer à chacun l'email « Choisis ton mot de passe » :"
@@ -730,10 +1053,9 @@ comptes_actifs() {
 
 # Invite dans Authentik chaque compte actif de l'appli (après un import).
 cmd_inviter_comptes() {
-  local nom="${1:-}" db email n=0 echecs=0
+  local nom="${1:-}" email n=0 echecs=0
   [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance inviter-comptes <nom existant>"
   [ "$(conf_lire "${nom}" CONNEXION)" = authentik ] || die "${nom} n'utilise pas Authentik."
-  db="$(base "${nom}")"
   for email in $(comptes_actifs "${nom}"); do
     if passerelle inviter "${nom}" "${email}" >/dev/null 2>&1; then
       info "Invitation envoyée à ${email}."; n=$((n + 1))
@@ -765,21 +1087,23 @@ cmd_demo_remettre() {
   [ -n "${nom}" ] && existe "${nom}" || die "Usage : recipelog-instance demo-remettre <nom>|--toutes"
   ref="$(demo_ref "${nom}")"
   [ -r "${ref}/base.dump" ] || die "Pas encore de référence pour ${nom} : recipelog-instance demo-figer ${nom}"
-  appliquer "${nom}" "${ref}" || { suspendu "${nom}" || lancer "${nom}"; die "La référence de ${nom} ne se recharge pas."; }
-  suspendu "${nom}" && { info "${nom} remis à zéro (reste en pause)."; return 0; }
+  appliquer "${nom}" "${ref}" || { suspendu "${nom}" || lancer "${nom}"; die "La référence de ${nom} ne se recharge pas : la démo n'a pas été remise à zéro."; }
+  if suspendu "${nom}"; then info "${nom} remis à zéro (reste en pause)."; return 0; fi
   lancer "${nom}"
   attendre "${nom}" || die "${nom} ne redémarre pas : recipelog-instance journaux ${nom}"
   info "✅ Démo ${nom} remise à zéro."
 }
 
 cmd_demos_remettre() {
-  local d n
+  local d n echecs=0
   for d in "${INSTANCES}"/*/; do
     [ -d "${d}" ] || continue
     n="$(basename "${d}")"
     [ "$(conf_lire "${n}" DEMO)" = 1 ] && [ -r "$(demo_ref "${n}")/base.dump" ] || continue
-    cmd_demo_remettre "${n}" || true
+    # Dans un sous-processus : une démo qui rate n'empêche pas les suivantes.
+    ( cmd_demo_remettre "${n}" ) || echecs=$((echecs + 1))
   done
+  [ "${echecs}" -eq 0 ] || die "${echecs} démo(s) non remise(s) à zéro."
 }
 
 # ------------------------------------------------------------ vitrine
@@ -801,7 +1125,10 @@ vitrine_reglages() {
   local r="${VITRINE}/reglages" contact demo="" de
   mkdir -p "${r}" "${VITRINE}/messages"
   chown 1000:1000 "${VITRINE}/messages"
+  # Adresse montrée aux visiteurs (VITRINE_CONTACT) ; les messages du formulaire arrivent
+  # à VITRINE_DESTINATAIRE, sinon à ton adresse d'administrateur.
   contact="${VITRINE_CONTACT:-${ADMIN_EMAILS%%,*}}"
+  local destinataire="${VITRINE_DESTINATAIRE:-${ADMIN_EMAILS%%,*}}"
   existe demo && demo="https://demo.${DOMAINE}"
   printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s" };\n' "${demo}" "${contact}" > "${r}/config.js"
   printf '%s' "${contact}" > "${r}/contact"
@@ -809,7 +1136,7 @@ vitrine_reglages() {
   de="$(printf '%s' "${SMTP_EXPEDITEUR:-}" | sed -n 's/.*<\([^>]*\)>.*/\1/p')"
   umask 077
   printf 'SMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_USER=%s\nSMTP_PASS=%s\nSMTP_FROM=%s\nMAIL_TO=%s\n' \
-    "${SMTP_HOTE:-}" "${SMTP_PORT:-587}" "${SMTP_UTILISATEUR:-}" "${SMTP_MOT_DE_PASSE:-}" "${de:-${SMTP_EXPEDITEUR:-}}" "${contact}" > "${r}/smtp"
+    "${SMTP_HOTE:-}" "${SMTP_PORT:-587}" "${SMTP_UTILISATEUR:-}" "${SMTP_MOT_DE_PASSE:-}" "${de:-${SMTP_EXPEDITEUR:-}}" "${destinataire:-${contact}}" > "${r}/smtp"
   umask 022
   chown 1000:1000 "${r}/smtp"
   [ -f "${r}/bandeau.js" ] || printf '/* pas de bandeau */\n' > "${r}/bandeau.js"
@@ -908,12 +1235,12 @@ cmd_supprimer() {
   arch="${ARCHIVES}/${nom}-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "${arch}"
   info "Archive de la base et des fichiers dans ${arch}…"
-  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${arch}/base.dump"
-  tar -C "${INSTANCES}/${nom}" -czf "${arch}/fichiers.tar.gz" .
+  docker exec "${PG}" pg_dump -U postgres -Fc "${db}" > "${arch}/base.dump" || { rm -rf "${arch:?}"; die "La base n'a pas pu être archivée : ${nom} n'est PAS supprimé."; }
+  tar -C "${INSTANCES}/${nom}" -czf "${arch}/fichiers.tar.gz" . || { rm -rf "${arch:?}"; die "Les fichiers n'ont pas pu être archivés : ${nom} n'est PAS supprimé."; }
   chmod -R go-rwx "${arch}"
   docker rm -f "$(conteneur "${nom}")" >/dev/null 2>&1 || true
   psql_admin <<SQL
-DROP DATABASE IF EXISTS ${db};
+DROP DATABASE IF EXISTS ${db} WITH (FORCE);
 DROP ROLE IF EXISTS ${db};
 SQL
   if grep -q '^CONNEXION=authentik' "${INSTANCES}/${nom}/instance.conf"; then
@@ -921,13 +1248,33 @@ SQL
     passerelle client-supprimer "${nom}" >/dev/null || echo "⚠️  Authentik : client « ${nom} » non retiré. À refaire : docker exec recipelog-passerelle node cli.mjs client-supprimer ${nom}" >&2
   fi
   if [ -d "$(dossier_sauv "${nom}")" ]; then mv "$(dossier_sauv "${nom}")" "${arch}/sauvegardes"; fi
+  # Demandes de support et compteurs IA : un futur client du même nom n'en hérite pas.
+  if [ -d "${DONNEES}/support/${nom}" ]; then mv "${DONNEES}/support/${nom}" "${arch}/support"; fi
+  if [ -f "${DONNEES}/ia/usage/${nom}.json" ]; then mv "${DONNEES}/ia/usage/${nom}.json" "${arch}/ia-usage.json"; fi
   rm -rf "${INSTANCES:?}/${nom}"
-  info "✅ ${nom} supprimé. Archive (avec ses sauvegardes) : ${arch}"
+  info "✅ ${nom} supprimé. Archive (avec ses sauvegardes) : ${arch}$([ "${ARCHIVES_JOURS}" -gt 0 ] && echo ", effacée dans ${ARCHIVES_JOURS} jours")"
 }
 
 [ "$(id -u)" -eq 0 ] || die "À lancer en root."
 mkdir -p "${INSTANCES}" "${ARCHIVES}" "${SAUVEGARDES}"
 action="${1:-}"; shift || true
+
+# Une seule commande qui modifie à la fois, que ce soit le panel, la nuit ou toi à la main.
+# Les commandes qui ne font que lire passent sans attendre.
+case "${action}" in
+  liste|equipe|journaux|sauvegardes|exporter|"") ;;
+  vitrine) case "${1:-}" in demandes|"") ;; *) VERROU=1 ;; esac ;;
+  *) VERROU=1 ;;
+esac
+if [ "${VERROU:-0}" = 1 ] && command -v flock >/dev/null 2>&1; then
+  exec 9>>"${DONNEES}/.verrou"
+  if ! flock -n 9; then
+    echo "⏳ Une autre action est en cours ($(cat "${DONNEES}/.verrou.quoi" 2>/dev/null || echo "?")) : j'attends qu'elle finisse…" >&2
+    flock -w "${VERROU_ATTENTE:-14400}" 9 || die "L'autre action n'a pas fini après 4 heures : abandon."
+  fi
+  echo "${action} ${1:-} depuis $(date '+%H:%M')" > "${DONNEES}/.verrou.quoi" 2>/dev/null || true
+fi
+
 case "${action}" in
   creer) cmd_creer "$@" ;;
   liste) cmd_liste "$@" ;;
@@ -945,6 +1292,8 @@ case "${action}" in
   journaux) cmd_journaux "$@" ;;
   supprimer) cmd_supprimer "$@" ;;
   sauvegarder) cmd_sauvegarder "$@" ;;
+  sauvegarder-plateforme) cmd_sauvegarder_plateforme ;;
+  menage) cmd_menage ;;
   sauvegardes) cmd_sauvegardes "$@" ;;
   restaurer) cmd_restaurer "$@" ;;
   tester-sauvegarde) cmd_tester_sauvegarde "$@" ;;
@@ -954,5 +1303,5 @@ case "${action}" in
   demo-figer) cmd_demo_figer "$@" ;;
   demo-remettre) if [ "${1:-}" = "--toutes" ]; then cmd_demos_remettre; else cmd_demo_remettre "$@"; fi ;;
   vitrine) cmd_vitrine "$@" ;;
-  *) sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

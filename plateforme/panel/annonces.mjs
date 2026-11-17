@@ -76,7 +76,18 @@ function modifier(f) {
 
 async function envois(n = 50) {
   try {
-    return (await readFile(ENVOIS, "utf8")).trim().split("\n").filter(Boolean).slice(-n).reverse().map((l) => JSON.parse(l));
+    // Ligne par ligne : une ligne abîmée ne vide pas tout le journal des envois.
+    return (await readFile(ENVOIS, "utf8"))
+      .split("\n")
+      .flatMap((l) => {
+        try {
+          return l.trim() ? [JSON.parse(l)] : [];
+        } catch {
+          return [];
+        }
+      })
+      .slice(-n)
+      .reverse();
   } catch {
     return [];
   }
@@ -131,7 +142,7 @@ async function envoyer(qui, sujet, corps, cibleListe, clientsConnus, equipe, rai
       echecs.push(`${email} : ${e.message}`);
     }
   }
-  const ligne = { date: new Date().toISOString(), qui, raison, cibles: cibleListe, sujet, envoyes: ok, echecs: echecs.length, details: [...echecs.slice(0, 10), ...sans.map((s) => `${s} : équipe illisible`)] };
+  const ligne = { date: new Date().toISOString(), qui, raison, cibles: cibleListe, sujet, envoyes: ok, echecs: echecs.length, illisibles: sans.length, details: [...echecs.slice(0, 10), ...sans.map((s) => `${s} : équipe illisible`)] };
   await mkdir(DOSSIER, { recursive: true });
   await appendFile(ENVOIS, JSON.stringify(ligne) + "\n", { mode: 0o600 });
   return ligne;
@@ -168,7 +179,8 @@ export async function action(act, id, corps, ctx) {
       };
       await modifier((a) => a.maintenances.push(m));
       await noter(qui, "maintenance-prevue", m.cibles.includes("*") ? "tous" : m.cibles.join(", "), { ok: true, sortie: `Maintenance ${plage(m)}.` });
-      await tour(ctx); // une maintenance immédiate s'applique tout de suite (vitrine)
+      // Une maintenance immédiate s'applique tout de suite (vitrine). Sans attendre : le panel répond aussitôt.
+      tour(ctx).catch((e) => console.error("Maintenance :", e.message));
       return { ok: true, maintenance: m };
     }
     case "terminer":
@@ -182,8 +194,17 @@ export async function action(act, id, corps, ctx) {
         return x;
       });
       await noter(qui, `maintenance-${act === "annuler" ? "annulee" : "finie"}`, m.cibles.includes("*") ? "tous" : m.cibles.join(", "), { ok: true, sortie: "" });
-      await tour(ctx);
-      return { ok: true };
+      // Les équipes ont été prévenues par email : il faut aussi leur dire que ça n'aura pas lieu.
+      let prevenus = false;
+      if (act === "annuler" && m.preavisEnvoye && m.emailPreavis && Date.parse(m.debut) > Date.now() && courrielRegle()) {
+        prevenus = true;
+        const corps = `Bonjour,\n\nLa maintenance de RecipeLog prévue ${plage(m)} est annulée : le site reste ouvert normalement.`;
+        envoyer(qui, "RecipeLog : maintenance annulée", corps, m.cibles.filter((c) => c !== "vitrine"), clients, equipe, "annulation")
+          .then((l) => noter(qui, "annulation", m.cibles.includes("*") ? "tous" : m.cibles.join(", "), { ok: l.echecs === 0 && l.envoyes > 0, sortie: `${l.envoyes} email(s) d'annulation envoyé(s), ${l.echecs} échec(s).` }))
+          .catch((e) => console.error("Annulation :", e.message));
+      }
+      tour(ctx).catch((e) => console.error("Maintenance :", e.message));
+      return { ok: true, sortie: prevenus ? "Maintenance annulée. Un email d'annulation part vers les équipes déjà prévenues." : "" };
     }
     case "bandeau": {
       const b = {
@@ -233,14 +254,29 @@ export async function tour(ctx) {
   for (const m of a.maintenances) {
     if (m.preavisEnvoye || !m.emailPreavis || etatMaintenance(m, t) !== "prevue") continue;
     if (Date.parse(m.debut) - m.preavisHeures * 3600000 > t) continue;
-    await modifier((b) => {
-      const x = b.maintenances.find((y) => y.id === m.id);
-      if (x) x.preavisEnvoye = true;
-    });
+    const marquer = (envoye, essais) =>
+      modifier((b) => {
+        const x = b.maintenances.find((y) => y.id === m.id);
+        if (x) {
+          x.preavisEnvoye = envoye;
+          x.preavisEssais = essais;
+        }
+      });
+    const essais = (m.preavisEssais ?? 0) + 1;
+    // Marqué tout de suite (pas de double envoi), puis l'envoi continue derrière sans bloquer le tour.
+    await marquer(true, essais);
     if (!courrielRegle()) continue;
     const corps = `Bonjour,\n\nRecipeLog sera en maintenance ${plage(m)}. Pendant ce temps, le site affichera une page d'attente : pense à enregistrer ton travail avant.\n\n${m.message}`;
-    const l = await envoyer("automatique", "RecipeLog : maintenance prévue", corps, m.cibles.filter((c) => c !== "vitrine"), ctx.clients, ctx.equipe, "preavis");
-    await ctx.noter("automatique", "preavis", m.cibles.includes("*") ? "tous" : m.cibles.join(", "), { ok: l.echecs === 0, sortie: `${l.envoyes} email(s) de préavis envoyé(s).` });
+    const pour = m.cibles.includes("*") ? "tous" : m.cibles.join(", ");
+    envoyer("automatique", "RecipeLog : maintenance prévue", corps, m.cibles.filter((c) => c !== "vitrine"), ctx.clients, ctx.equipe, "preavis")
+      .then(async (l) => {
+        const rien = l.envoyes === 0 && (l.echecs > 0 || l.illisibles > 0);
+        // Personne n'a rien reçu (connexion ou envoi d'emails en panne) : on réessaie aux tours suivants, 5 fois au plus.
+        if (rien && essais < 5) await marquer(false, essais);
+        if (rien && essais >= 5) await ctx.alerter?.("⚠️ Préavis de maintenance non envoyé", `Aucun email de préavis n'a pu partir pour la maintenance ${plage(m)} (${pour}). Regarde Maintenance → Journal des envois dans le panel.`);
+        if (!rien || essais >= 5) await ctx.noter("automatique", "preavis", pour, { ok: l.echecs === 0 && !rien, sortie: `${l.envoyes} email(s) de préavis envoyé(s), ${l.echecs} échec(s).\n${l.details.join("\n")}` });
+      })
+      .catch((e) => console.error("Préavis :", e.message));
   }
   // Ménage : maintenances finies depuis plus de 60 jours, bandeaux expirés depuis 30.
   const vieux = (iso, j) => iso && Date.parse(iso) < t - j * 86400000;

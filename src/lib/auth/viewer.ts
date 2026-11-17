@@ -111,7 +111,8 @@ export const getViewer = cache(async (): Promise<Viewer> => {
     authMode() === "oidc" &&
     isResponsableEmail(who.email) &&
     !isMaintenanceEmail(who.email) &&
-    (!account || account.status === "pending")
+    (!account || account.status === "pending") &&
+    !(await responsableDejaPromu(who.email))
   ) {
     account = await ensureResponsableAccount(who.email);
   }
@@ -148,6 +149,20 @@ async function ensureMaintenanceAccount(email: string): Promise<AccountWithRole>
 }
 
 /**
+ * La promotion automatique du responsable ne se fait qu'UNE fois : si son compte est
+ * ensuite supprimé ou remis en attente par un autre administrateur, il ne revient pas
+ * tout seul comme administrateur à sa prochaine visite.
+ */
+const RESPONSABLE_KEY = "responsablePromu";
+async function responsableDejaPromu(email: string): Promise<boolean> {
+  const row = await prisma.setting.findUnique({ where: { key: RESPONSABLE_KEY } });
+  if (row?.value === email) return true;
+  // Sites créés avant ce réglage : le journal des comptes garde la trace de la promotion.
+  const trace = await prisma.auditLog.findFirst({ where: { actorEmail: email, action: { in: ["responsable", "responsable_active"] } }, select: { id: true } });
+  return !!trace;
+}
+
+/**
  * Compte du responsable (RECIPELOG_RESPONSABLE_EMAIL) : actif, Administrateur,
  * visible dans la liste des comptes, une ligne au journal à sa création.
  * Ensuite il se gère comme les autres (le dernier administrateur reste protégé).
@@ -163,6 +178,9 @@ async function ensureResponsableAccount(email: string): Promise<AccountWithRole>
     create: { email, roleId: role.id, status: "active", approvedAt: new Date() },
     include: { role: true },
   });
+  await prisma.setting
+    .upsert({ where: { key: RESPONSABLE_KEY }, update: { value: email }, create: { key: RESPONSABLE_KEY, value: email } })
+    .catch(() => {});
   await audit(email, existed ? "responsable_active" : "responsable");
   return account;
 }

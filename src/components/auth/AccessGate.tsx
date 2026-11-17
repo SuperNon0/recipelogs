@@ -11,6 +11,20 @@ const DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "s
  * blocage, et accès direct sans Cloudflare. Affichée à la place du site.
  */
 export function AccessGate({ viewer, need, logout }: { viewer: Viewer; need?: Access; logout?: boolean }) {
+  if (viewer.kind === "anonymous" && logout) {
+    // Plateforme (connexion RecipeLog) : session finie ou jamais ouverte.
+    return (
+      <Card icon={ShieldAlert} tone="var(--accent)" title="Reconnecte-toi">
+        <p className="access-text">Ta session est terminée. Reconnecte-toi pour retrouver RecipeLog.</p>
+        <p>
+          <a className="fl-btn fl-btn-primary access-full" href="/auth/connexion">
+            Se connecter
+          </a>
+        </p>
+        <p className="access-note">{viewer.error}</p>
+      </Card>
+    );
+  }
   if (viewer.kind === "anonymous") {
     return (
       <Card logout={logout} icon={ShieldAlert} tone="var(--danger)" title="Connexion impossible">

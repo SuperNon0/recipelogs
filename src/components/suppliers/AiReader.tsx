@@ -10,7 +10,9 @@ import { PRICE_UNITS, type PriceUnit } from "@/lib/cost";
 import { montantLigne, prixALUnite, type DocumentLu, type LigneLue, type TypeLecture } from "@/lib/ia/document";
 import { NOMS_ROLES, ROLES, lignesDepuisTableau, type Colonnes, type Role } from "@/lib/mercuriale";
 import type { PurchaseOrderSummary } from "@/lib/purchaseOrders";
+import { articleKey } from "@/lib/suppliers";
 import {
+  articlesConnus,
   enregistrerFactureLue,
   enregistrerMercuriale,
   etatLectureIA,
@@ -37,10 +39,17 @@ type Etape =
   | { e: "verifier"; doc: DocumentLu; modele: string | null; secours: boolean }
   | { e: "fini"; resume: PurchaseOrderSummary; fichierJoint: boolean | null };
 
-const jour = () => new Date().toISOString().slice(0, 10);
+// Le jour d'ici (pas celui de Londres : entre minuit et 2 h du matin, ce n'est pas le même).
+const jour = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+/** Ligne à l'écran : `articleChoisi` quand la personne a touché au champ Article. */
+type LigneEcran = LigneLue & { articleChoisi?: boolean };
 const euro = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const prixTxt = (n: number, u: string) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €/${u}`;
-const cleProduit = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+// Même règle que le serveur pour reconnaître un produit déjà connu (sans accents ni majuscules).
+const cleProduit = articleKey;
 
 const ligneVide = (): LigneLue => ({
   produit: "", reference: null, article: null, famille: null, quantite: null, contenance: null,
@@ -159,7 +168,7 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
           fournisseurFixe={fournisseur}
           fournisseurs={fournisseurs}
           onRetour={() => setEtape({ e: "choisir" })}
-          onEnregistrer={async (doc, remplacer, note) => {
+          onEnregistrer={async (doc, remplacer, note, nouveauFournisseur) => {
             if (type === "mercuriale") {
               if (!fournisseur) return "Fournisseur inconnu.";
               const r = await enregistrerMercuriale({ fournisseurId: fournisseur.id, date: doc.date ?? jour(), nomFichier: fichier?.name ?? "", lignes: doc.lignes });
@@ -169,6 +178,7 @@ function AiReaderModal({ type, fournisseur, fournisseurs, onClose }: { type: Typ
               const fd = new FormData();
               fd.set("document", JSON.stringify(doc));
               if (remplacer) fd.set("remplacer", "1");
+              if (nouveauFournisseur) fd.set("nouveauFournisseur", "1");
               if (note) fd.set("note", note);
               if (fichier && !tableur(fichier)) fd.set("fichier", fichier);
               const r = await enregistrerFactureLue(fd);
@@ -358,13 +368,14 @@ const AIDE_ROLES: Record<Role, string> = {
 // 3. Vérifier
 // ─────────────────────────────────────────────
 
-function NumInput({ value, onChange, label, placeholder }: { value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string }) {
+function NumInput({ value, onChange, label, placeholder, negatif }: { value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string; negatif?: boolean }) {
   const [txt, setTxt] = useState(value == null ? "" : String(value).replace(".", ","));
   useEffect(() => {
     const n = txt.trim() === "" ? null : Number(txt.replace(/\s/g, "").replace(",", "."));
     if (n !== value && !(n != null && Number.isNaN(n))) setTxt(value == null ? "" : String(value).replace(".", ","));
   }, [value]);
-  const bad = txt.trim() !== "" && !(Number(txt.replace(/\s/g, "").replace(",", ".")) >= 0);
+  const lu = Number(txt.replace(/\s/g, "").replace(",", "."));
+  const bad = txt.trim() !== "" && !(negatif ? Number.isFinite(lu) : lu >= 0);
   return (
     <input
       className="fl-input"
@@ -377,7 +388,7 @@ function NumInput({ value, onChange, label, placeholder }: { value: number | nul
         setTxt(e.target.value);
         const t = e.target.value.trim();
         const n = t === "" ? null : Number(t.replace(/\s/g, "").replace(",", "."));
-        if (n === null || n >= 0) onChange(n);
+        if (n === null || n >= 0 || (negatif && Number.isFinite(n))) onChange(n);
       }}
     />
   );
@@ -387,12 +398,14 @@ function Verifier({
   type, initial, modele, secours, fournisseurFixe, fournisseurs, onRetour, onEnregistrer,
 }: {
   type: TypeLecture; initial: DocumentLu; modele: string | null; secours: boolean; fournisseurFixe?: Fournisseur; fournisseurs: string[];
-  onRetour: () => void; onEnregistrer: (doc: DocumentLu, remplacer: boolean, note: string) => Promise<string | null>;
+  onRetour: () => void; onEnregistrer: (doc: DocumentLu, remplacer: boolean, note: string, nouveauFournisseur: boolean) => Promise<string | null>;
 }) {
   const [doc, setDoc] = useState<DocumentLu>(initial);
   const [connus, setConnus] = useState<Connu[]>([]);
+  const [articles, setArticles] = useState<string[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [remplacer, setRemplacer] = useState(false);
+  const [nouveauFournisseur, setNouveauFournisseur] = useState(false);
   const [note, setNote] = useState(initial.remarque ?? "");
   const [occupe, setOccupe] = useState(false);
   const facture = type === "facture";
@@ -403,18 +416,31 @@ function Verifier({
     return () => clearTimeout(t);
   }, [doc.fournisseur]);
 
+  useEffect(() => {
+    articlesConnus().then(setArticles).catch(() => setArticles([]));
+  }, []);
+
+  const clesArticles = useMemo(() => new Set(articles.map(articleKey)), [articles]);
   const parNom = useMemo(() => new Map(connus.map((c) => [cleProduit(c.nom), c])), [connus]);
   const parRef = useMemo(() => new Map(connus.filter((c) => c.reference).map((c) => [c.reference!.trim(), c])), [connus]);
-  const ligne = (i: number, p: Partial<LigneLue>) => setDoc((d) => ({ ...d, lignes: d.lignes.map((l, j) => (j === i ? { ...l, ...p } : l)) }));
+  const trouver = (l: LigneLue) => (l.reference && parRef.get(l.reference.trim())) || parNom.get(cleProduit(l.produit));
+  /**
+   * L'article qui sera enregistré : celui que la personne a écrit ; sinon celui que le produit
+   * a déjà dans RecipeLog (jamais remplacé par la proposition de l'IA) ; sinon la proposition.
+   */
+  const articleDe = (l: LigneEcran) => (l.articleChoisi ? l.article : (trouver(l)?.article ?? l.article));
+  const ligne = (i: number, p: Partial<LigneEcran>) => setDoc((d) => ({ ...d, lignes: d.lignes.map((l, j) => (j === i ? { ...l, ...p } : l)) }));
   const somme = doc.lignes.reduce((s, l) => s + (montantLigne(l) ?? 0), 0);
   const ecart = facture && doc.total != null && somme > 0 && Math.abs(somme - doc.total) > Math.max(0.05, doc.total * 0.005);
   const sansPrix = doc.lignes.filter((l) => l.produit.trim() && prixALUnite(l) == null).length;
   const doute = erreur?.includes("déjà enregistrée");
+  const ressemble = erreur?.includes("ressemble à");
 
   async function enregistrer() {
     setErreur(null);
     setOccupe(true);
-    const e = await onEnregistrer({ ...doc, lignes: doc.lignes.filter((l) => l.produit.trim()) }, remplacer, note);
+    const lignes = doc.lignes.filter((l) => l.produit.trim()).map((l) => ({ ...l, article: articleDe(l)?.trim() || null }));
+    const e = await onEnregistrer({ ...doc, lignes }, remplacer, note, nouveauFournisseur);
     setOccupe(false);
     if (e) setErreur(e);
   }
@@ -469,7 +495,7 @@ function Verifier({
                 Total HT (€)
                 <Help title="Total HT">Le total hors taxe écrit sur la facture. Le site le compare à la somme des lignes pour repérer un oubli.</Help>
               </span>
-              <NumInput label="Total HT" value={doc.total} onChange={(v) => setDoc({ ...doc, total: v })} />
+              <NumInput label="Total HT" negatif value={doc.total} onChange={(v) => setDoc({ ...doc, total: v })} />
             </label>
           </>
         )}
@@ -488,11 +514,23 @@ function Verifier({
           de 50). Le prix ramené à l&apos;unité s&apos;affiche à droite. « Nouveau » : produit jamais acheté chez ce fournisseur. Une ligne en
           orange est un doute de l&apos;IA à vérifier.
         </Help>
+        <Help title="Article" example="« Fraise France cat. I » et « Fraise Espagne » ont le même article : « Fraise ».">
+          L&apos;article est le nom commun qui regroupe les produits semblables, pour suivre un seul prix et comparer les fournisseurs. Choisis
+          un article déjà dans la liste quand c&apos;est le même produit. « Nouvel article » prévient que ce nom n&apos;existe pas encore : vérifie
+          que ce n&apos;est pas un presque-doublon (« Fraises » au lieu de « Fraise »). L&apos;article d&apos;un produit déjà connu n&apos;est jamais
+          changé tout seul. Vide : le produit reste seul sous son propre nom.
+        </Help>
       </div>
+      <datalist id="ia-articles">
+        {articles.map((a) => <option key={a} value={a} />)}
+      </datalist>
       <div className="ia-lignes">
         {doc.lignes.map((l, i) => {
-          const connu = (l.reference && parRef.get(l.reference.trim())) || parNom.get(cleProduit(l.produit));
+          const connu = trouver(l);
           const pu = prixALUnite(l);
+          const article = articleDe(l) ?? "";
+          const nouvelArticle = article.trim() !== "" && !clesArticles.has(articleKey(article));
+          const uniteChange = connu && connu.prix != null && connu.unite !== l.unite;
           const change = connu && connu.prix != null && pu != null && connu.unite === l.unite ? Math.round(((pu - connu.prix) / connu.prix) * 100) : null;
           return (
             <div key={i} className="ia-ligne" data-doute={!!l.aVerifier || (l.produit.trim() !== "" && pu == null) || undefined}>
@@ -503,8 +541,12 @@ function Verifier({
                 </button>
               </div>
               <div className="ia-ligne-champs">
+                <label className="ia-champ-article">
+                  <span>Article</span>
+                  <input className="fl-input" aria-label="Article" list="ia-articles" value={article} placeholder="comme le produit" onChange={(e) => ligne(i, { article: e.target.value || null, articleChoisi: true })} />
+                </label>
                 <label><span>Réf.</span><input className="fl-input" aria-label="Référence" value={l.reference ?? ""} onChange={(e) => ligne(i, { reference: e.target.value || null })} /></label>
-                {facture && <label><span>Quantité</span><NumInput label="Quantité" value={l.quantite} onChange={(v) => ligne(i, { quantite: v })} /></label>}
+                {facture && <label><span>Quantité</span><NumInput label="Quantité" negatif value={l.quantite} onChange={(v) => ligne(i, { quantite: v })} /></label>}
                 <label><span>Contenance</span><NumInput label="Contenance" value={l.contenance} placeholder="1" onChange={(v) => ligne(i, { contenance: v })} /></label>
                 <label>
                   <span>Unité</span>
@@ -514,11 +556,15 @@ function Verifier({
                 </label>
                 <label><span>Prix colis</span><NumInput label="Prix du colis" value={l.prixColis} onChange={(v) => ligne(i, { prixColis: v })} /></label>
                 <label><span>Prix /{l.unite}</span><NumInput label="Prix à l'unité" value={l.prixUnitaire} onChange={(v) => ligne(i, { prixUnitaire: v })} /></label>
-                {facture && <label><span>Montant</span><NumInput label="Montant de la ligne" value={l.montant} onChange={(v) => ligne(i, { montant: v })} /></label>}
+                {facture && <label><span>Montant</span><NumInput label="Montant de la ligne" negatif value={l.montant} onChange={(v) => ligne(i, { montant: v })} /></label>}
               </div>
               <div className="ia-ligne-bas">
                 <span className="ia-pu">{pu != null ? `= ${prixTxt(pu, l.unite)}` : "Prix manquant : la ligne sera ignorée"}</span>
                 {!connu && l.produit.trim() && <span className="ia-badge">Nouveau</span>}
+                {nouvelArticle && <span className="ia-badge" data-sens="hausse">Nouvel article</span>}
+                {uniteChange && (
+                  <span className="ia-doute"><AlertTriangle size={13} /> Ce produit était suivi en « {connu!.unite} » : enregistrer change son unité, et le coût des recettes qui l&apos;utilisent.</span>
+                )}
                 {change != null && change !== 0 && (
                   <span className="ia-badge" data-sens={change > 0 ? "hausse" : "baisse"}>
                     {change > 0 ? "+" : ""}{change} % (avant {prixTxt(connu!.prix!, connu!.unite)})
@@ -545,6 +591,12 @@ function Verifier({
       )}
       {sansPrix > 0 && <span className="ing-fact-msg">{sansPrix} ligne(s) sans prix seront ignorées.</span>}
       {erreur && <span className="ing-fact-msg" data-err="true">{erreur}</span>}
+      {(ressemble || nouveauFournisseur) && (
+        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="checkbox" checked={nouveauFournisseur} onChange={(e) => setNouveauFournisseur(e.target.checked)} />
+          C&apos;est bien un nouveau fournisseur : le créer
+        </label>
+      )}
       {doute && (
         <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input type="checkbox" checked={remplacer} onChange={(e) => setRemplacer(e.target.checked)} />

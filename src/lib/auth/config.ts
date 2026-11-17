@@ -9,7 +9,8 @@ import { isDemo } from "@/lib/demo";
  *
  * Secours : RECIPELOG_AUTH_OFF=1 dans le .env du serveur coupe les comptes
  * sans toucher à la base (si Cloudflare change de clé ou d'équipe et que plus
- * personne ne peut entrer).
+ * personne ne peut entrer). Ignoré sur la plateforme (mode oidc) : là, rien
+ * d'autre ne filtre l'entrée, couper les comptes ouvrirait le site à tout internet.
  */
 export type AuthSettings = { enabled: boolean; team: string; aud: string };
 
@@ -33,7 +34,7 @@ export async function getAuthSettings(): Promise<AuthSettings> {
   // Plateforme : les comptes sont toujours activés (Authentik filtre l'entrée).
   const on = authMode() === "oidc" || v.enabled === true;
   return {
-    enabled: on && process.env.RECIPELOG_AUTH_OFF !== "1" && !isDemo(),
+    enabled: on && !authForcedOff() && !isDemo(),
     team: typeof v.team === "string" ? v.team : "",
     aud: typeof v.aud === "string" ? v.aud : "",
   };
@@ -45,5 +46,5 @@ export async function saveAuthSettings(next: AuthSettings): Promise<void> {
 }
 
 export function authForcedOff(): boolean {
-  return process.env.RECIPELOG_AUTH_OFF === "1";
+  return authMode() !== "oidc" && process.env.RECIPELOG_AUTH_OFF === "1";
 }

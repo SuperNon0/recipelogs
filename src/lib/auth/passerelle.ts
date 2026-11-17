@@ -235,6 +235,9 @@ export type Annonces = { maintenance: { message: string; fin: string | null } | 
 
 const AUCUNE: Annonces = { maintenance: null, bandeaux: [] };
 let cache: { valeur: Annonces; jusqua: number } | null = null;
+// Dernière réponse réussie : resservie pendant 15 minutes si la plateforme ne répond plus.
+let derniere: { valeur: Annonces; date: number } | null = null;
+const SECOURS_MS = 15 * 60 * 1000;
 
 function toAnnonces(j: Record<string, unknown> | null): Annonces {
   const m = j?.maintenance as Record<string, unknown> | null | undefined;
@@ -260,13 +263,21 @@ function toAnnonces(j: Record<string, unknown> | null): Annonces {
 
 /**
  * GET /v1/annonces : maintenance en cours et bandeaux de la plateforme pour ce site.
- * Gardé 30 secondes (chaque page le demande). Plateforme injoignable = rien à afficher :
- * une panne de la passerelle ne doit jamais bloquer le site.
+ * Gardé 30 secondes (chaque page le demande). Plateforme injoignable : on garde la
+ * dernière réponse connue pendant 15 minutes (une maintenance en cours ne disparaît pas
+ * parce que la passerelle ou Authentik redémarre), puis plus rien : une longue panne de
+ * la passerelle ne doit jamais bloquer le site.
  */
 export async function getAnnonces(opts: PasserelleOptions = {}): Promise<Annonces> {
   if (!opts.fetch && cache && cache.jusqua > Date.now()) return cache.valeur;
   const r = await call("GET", "/v1/annonces", undefined, { timeoutMs: 3000, ...opts });
-  const valeur = r.ok ? toAnnonces(r.json) : AUCUNE;
+  let valeur: Annonces;
+  if (r.ok) {
+    valeur = toAnnonces(r.json);
+    if (!opts.fetch) derniere = { valeur, date: Date.now() };
+  } else {
+    valeur = !opts.fetch && derniere && Date.now() - derniere.date < SECOURS_MS ? derniere.valeur : AUCUNE;
+  }
   if (!opts.fetch) cache = { valeur, jusqua: Date.now() + (r.ok ? 30000 : 10000) };
   return valeur;
 }

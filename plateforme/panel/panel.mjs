@@ -7,6 +7,8 @@ import { createServer, request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { createHash, createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as verifier } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { PAGES as PAGES_VENTE, PAR_DEFAUT as VENTE_DEFAUT, page as pageVente } from "./vente.mjs";
@@ -29,11 +31,13 @@ const pret = Boolean(ISSUER && CLIENT_ID && CLIENT_SECRET && SECRET.length >= 32
 
 // ------------------------------------------------------------ outils
 const b64u = (b) => Buffer.from(b).toString("base64url");
-const signer = (obj) => {
-  const corps = b64u(JSON.stringify(obj));
+// Chaque cookie signé porte son rôle (`t`) : « session » (connecté) ou « flux » (connexion
+// en cours). Sans ça, le cookie du flux, signé avec la même clé, passait pour une session.
+const signer = (obj, type) => {
+  const corps = b64u(JSON.stringify({ ...obj, t: type }));
   return `${corps}.${createHmac("sha256", SECRET).update(corps).digest("base64url")}`;
 };
-function lire(valeur) {
+function lire(valeur, type) {
   if (!valeur) return null;
   const [corps, sig] = valeur.split(".");
   if (!corps || !sig) return null;
@@ -43,7 +47,7 @@ function lire(valeur) {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
     const o = JSON.parse(Buffer.from(corps, "base64url").toString("utf8"));
-    return o.exp && o.exp * 1000 > Date.now() ? o : null;
+    return o && o.t === type && o.exp && o.exp * 1000 > Date.now() ? o : null;
   } catch {
     return null;
   }
@@ -137,25 +141,41 @@ const fichiers = {
   "/panel.js": ["text/javascript; charset=utf-8", "panel.js"],
 };
 const polices = /^\/polices\/[a-z0-9-]+\.woff2$/;
+const PREFIXE_PUBLIC = "/_plateforme";
+
+// État d'un site (pause, démarre, inconnu), gardé 20 s : cette page est servie à n'importe
+// qui sur internet, elle ne doit pas réveiller le moteur à chaque visite.
+const etats = new Map();
+async function etatDe(nom) {
+  if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/.test(nom)) return "inconnu";
+  const garde = etats.get(nom);
+  if (garde && garde.jusqua > Date.now()) return garde.etat;
+  const r = await moteur("GET", `/etat/${nom}`, "page-pause");
+  if (r.statut !== 200) throw new Error("moteur");
+  const etat = JSON.parse(r.corps).etat;
+  if (etats.size > 500) etats.clear();
+  etats.set(nom, { etat, jusqua: Date.now() + 20000 });
+  return etat;
+}
 
 async function pagePause(res, hote) {
   const nom = hote.split(".")[0];
   let etat = "inconnu";
   try {
-    const r = await moteur("GET", "/clients", "page-pause");
-    const c = JSON.parse(r.corps).clients?.find((x) => x.nom === nom);
-    if (c) etat = c.suspendu ? "pause" : "demarre";
+    etat = await etatDe(nom);
   } catch {
-    etat = "inconnu";
+    etat = "indisponible";
   }
   const textes = {
     pause: ["Ce RecipeLog est en pause", "Le site est mis en pause pour le moment. Les recettes et les données sont gardées : contacte RecipeLog pour le réactiver."],
     demarre: ["RecipeLog redémarre", "Une mise à jour est en cours. Cette page se recharge toute seule dans quelques secondes."],
     inconnu: ["Adresse inconnue", "Aucun RecipeLog n'existe à cette adresse. Vérifie l'adresse qu'on t'a donnée."],
+    indisponible: ["Site indisponible pour le moment", "Réessaie dans une minute. Cette page se recharge toute seule."],
   }[etat];
-  res.writeHead(etat === "inconnu" ? 404 : 503, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...(etat === "demarre" ? { Refresh: "10" } : {}) });
+  const recharge = etat === "demarre" || etat === "indisponible";
+  res.writeHead(etat === "inconnu" ? 404 : 503, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...(recharge ? { Refresh: "10" } : {}) });
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${echapper(textes[0])}</title><link rel="stylesheet" href="https://${HOTE_PANEL}/panel.css"></head>
+<title>${echapper(textes[0])}</title><link rel="stylesheet" href="/panel.css"></head>
 <body class="pause"><main class="carte-pause"><p class="marque">RecipeLog</p><h1>${echapper(textes[0])}</h1><p>${echapper(textes[1])}</p>
 <p class="petit">${echapper(hote)}</p></main></body></html>`);
 }
@@ -217,7 +237,9 @@ async function pageLegale(res, nom) {
     v = VENTE_DEFAUT;
   }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60" });
-  res.end(pageVente(nom, v, { domaine: DOMAINE, cssUrl: `https://${HOTE_PANEL}/panel.css` }));
+  // Feuille de style servie sur le domaine lui-même (routeur Traefik « vente ») : le panel
+  // peut ainsi être fermé par Cloudflare Access sans casser ces pages publiques.
+  res.end(pageVente(nom, v, { domaine: DOMAINE, cssUrl: `${PREFIXE_PUBLIC}/panel.css` }));
 }
 
 function pageErreur(res, statut, titre, texte) {
@@ -230,22 +252,40 @@ function pageErreur(res, statut, titre, texte) {
 // ------------------------------------------------------------ serveur
 createServer(async (req, res) => {
   const hote = (req.headers.host ?? "").toLowerCase().split(":")[0];
-  const url = new URL(req.url, URL_PANEL);
   try {
-    // Fichiers communs (aussi utilisés par la page « en pause »).
-    if (req.method === "GET" && fichiers[url.pathname]) {
-      const [type, f] = fichiers[url.pathname];
-      res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" });
-      return res.end(await readFile(path.join(ICI, f)));
+    let url;
+    try {
+      url = new URL(req.url, URL_PANEL);
+    } catch {
+      res.writeHead(400);
+      return res.end();
     }
-    if (req.method === "GET" && polices.test(url.pathname)) {
+    // Fichiers communs (aussi utilisés par la page « en pause », la page de statut et les
+    // pages de vente, où ils sont demandés sous /_plateforme/…).
+    const chemin = url.pathname.startsWith(`${PREFIXE_PUBLIC}/`) ? url.pathname.slice(PREFIXE_PUBLIC.length) : url.pathname;
+    if (req.method === "GET" && Object.hasOwn(fichiers, chemin)) {
+      const [type, f] = fichiers[chemin];
+      const contenu = await readFile(path.join(ICI, f)); // lu avant l'en-tête : une erreur donne une vraie page d'erreur
+      res.writeHead(200, { "Content-Type": type, "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" });
+      return res.end(contenu);
+    }
+    if (req.method === "GET" && polices.test(chemin)) {
+      const contenu = await readFile(path.join(ICI, chemin)).catch(() => null);
+      if (!contenu) {
+        res.writeHead(404);
+        return res.end();
+      }
       res.writeHead(200, { "Content-Type": "font/woff2", "Cache-Control": "public, max-age=31536000", "Access-Control-Allow-Origin": "*" });
-      return res.end(await readFile(path.join(ICI, url.pathname)));
+      return res.end(contenu);
     }
     if (url.pathname === "/sante") return res.end("ok");
 
-    if (hote === `status.${DOMAINE}` && req.method === "GET" && url.pathname === "/") return pageStatut(res);
-    if ((hote === DOMAINE || hote === `www.${DOMAINE}`) && req.method === "GET" && PAGES_VENTE[url.pathname.slice(1)]) return pageLegale(res, url.pathname.slice(1));
+    if (hote === `status.${DOMAINE}`) {
+      if (req.method === "GET" && url.pathname === "/") return pageStatut(res);
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      return res.end("Page introuvable.");
+    }
+    if ((hote === DOMAINE || hote === `www.${DOMAINE}`) && req.method === "GET" && Object.hasOwn(PAGES_VENTE, url.pathname.slice(1))) return pageLegale(res, url.pathname.slice(1));
     if (hote !== HOTE_PANEL) return pagePause(res, hote);
     if (!pret) return pageErreur(res, 503, "Panel pas encore réglé", "Relance install.sh sur la machine : il crée l'accès du panel dans Authentik.");
 
@@ -267,11 +307,11 @@ createServer(async (req, res) => {
         code_challenge: defi,
         code_challenge_method: "S256",
       }).forEach(([k, v]) => vers.searchParams.set(k, v));
-      res.writeHead(302, { Location: vers.toString(), "Set-Cookie": cookie("rl_admin_flux", signer(flux), 600) });
+      res.writeHead(302, { Location: vers.toString(), "Set-Cookie": cookie("rl_admin_flux", signer(flux, "flux"), 600) });
       return res.end();
     }
     if (url.pathname === "/auth/retour") {
-      const flux = lire(jar.rl_admin_flux);
+      const flux = lire(jar.rl_admin_flux, "flux");
       if (url.searchParams.get("error")) return pageErreur(res, 403, "Connexion refusée", "Seuls les super-admins entrent dans le panel.");
       if (!flux || flux.state !== url.searchParams.get("state")) return pageErreur(res, 400, "Connexion expirée", "Recommence la connexion.");
       const d = await oidc();
@@ -285,8 +325,10 @@ createServer(async (req, res) => {
       const charge = verifierJeton(t.json.id_token, d, flux.nonce);
       const groupes = charge.groups ?? [];
       if (!groupes.includes(GROUPE)) return pageErreur(res, 403, "Accès refusé", "Ce panel est réservé aux super-admins.");
-      const session = { email: String(charge.email ?? "").toLowerCase(), exp: Math.floor(Date.now() / 1000) + DUREE_SESSION };
-      res.writeHead(302, { Location: "/", "Set-Cookie": [cookie("rl_admin", signer(session), DUREE_SESSION), cookie("rl_admin_flux", "", 0)] });
+      const email = String(charge.email ?? "").toLowerCase();
+      if (!email) return pageErreur(res, 403, "Accès refusé", "Ce compte n'a pas d'adresse email.");
+      const session = { email, exp: Math.floor(Date.now() / 1000) + DUREE_SESSION };
+      res.writeHead(302, { Location: "/", "Set-Cookie": [cookie("rl_admin", signer(session, "session"), DUREE_SESSION), cookie("rl_admin_flux", "", 0)] });
       return res.end();
     }
     if (url.pathname === "/auth/deconnexion") {
@@ -302,7 +344,9 @@ createServer(async (req, res) => {
     }
 
     // --- tout le reste demande une session
-    const session = lire(jar.rl_admin);
+    // Une session = un cookie de type « session », avec une adresse email (jamais le cookie du flux).
+    const lue = lire(jar.rl_admin, "session");
+    const session = lue && typeof lue.email === "string" && lue.email ? lue : null;
     if (!session) {
       if (url.pathname.startsWith("/api/")) {
         res.writeHead(401, { "Content-Type": "application/json" });
@@ -334,8 +378,14 @@ createServer(async (req, res) => {
         "Content-Disposition": r.headers.get("content-disposition") ?? "attachment",
         "Cache-Control": "no-store",
       });
-      for await (const morceau of r.body) res.write(morceau);
-      return res.end();
+      // Au fil de l'eau, en respectant le débit du navigateur (une grosse archive ne remplit pas la mémoire).
+      try {
+        await pipeline(Readable.fromWeb(r.body), res);
+      } catch (e) {
+        console.error("Téléchargement interrompu :", e.message);
+        res.destroy();
+      }
+      return;
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -345,7 +395,7 @@ createServer(async (req, res) => {
         return res.end();
       }
       const chemin = url.pathname.slice(4);
-      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|vente|alertes\/essai)$/;
+      const permis = /^\/(clients(\/[a-z0-9-]+\/[a-z-]+)?|taches\/[0-9a-f]{16}|journal|tous\/mettre-a-jour|vitrine(\/(maj|bandeau|traitee))?|mesures|annonces(\/[a-z-]+(\/[0-9a-f]{8})?)?|support(\/[a-z0-9-]+\/[0-9]{8}-[0-9]{6}-[0-9a-f]{4}\/[a-z]+)?|ia(\/quota)?|vente|alertes\/essai)$/;
       if (!permis.test(chemin)) {
         res.writeHead(404);
         return res.end();
@@ -354,7 +404,12 @@ createServer(async (req, res) => {
       if (req.method === "POST") {
         const m = [];
         for await (const x of req) m.push(x);
-        corps = m.length ? JSON.parse(Buffer.concat(m).toString("utf8")) : {};
+        try {
+          corps = m.length ? JSON.parse(Buffer.concat(m).toString("utf8")) : {};
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          return res.end(JSON.stringify({ error: "refus", message: "Demande illisible." }));
+        }
       }
       const r = await moteur(req.method, chemin, session.email, corps);
       res.writeHead(r.statut, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
