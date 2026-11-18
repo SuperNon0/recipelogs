@@ -185,13 +185,53 @@ describe("IA de la plateforme choisie dans le panel (Gemini, ChatGPT, Claude Hai
     return { f, appels };
   };
 
-  it("Gemini : passe par la passerelle avec la clé du site, pas de clé Google", async () => {
-    const { f, appels } = espion({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: doc }] } }] });
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "gemini", modele: "gemini-2.5-flash" } });
-    expect(r).toMatchObject({ ok: true, modele: "gemini-2.5-flash" });
-    expect(appels[0].url).toBe("http://passerelle/v1/ia/gemini/v1beta/models/gemini-2.5-flash:generateContent");
+  // Gemini répond en continu (text/event-stream) : la réponse arrive en plusieurs morceaux.
+  const flux = (morceaux: unknown[]) =>
+    morceaux.map((m) => `data: ${JSON.stringify(m)}\r\n\r\n`).join("");
+  const espionFlux = (texte: string, statut = 200) => {
+    const appels: { url: string; headers: Record<string, string>; corps: Record<string, unknown> }[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      appels.push({ url, headers: init.headers as Record<string, string>, corps: JSON.parse(String(init.body)) });
+      // Le flux est coupé n'importe où, même au milieu d'un caractère accentué.
+      const octets = new TextEncoder().encode(texte);
+      const corps = new ReadableStream<Uint8Array>({
+        start(c) {
+          for (let i = 0; i < octets.length; i += 7) c.enqueue(octets.slice(i, i + 7));
+          c.close();
+        },
+      });
+      return new Response(corps, { status: statut });
+    }) as unknown as typeof fetch;
+    return { f, appels };
+  };
+
+  it("Gemini : passe par la passerelle avec la clé du site, pas de clé Google, et lit la réponse en continu", async () => {
+    const moitie = Math.floor(doc.length / 2);
+    const { f, appels } = espionFlux(
+      flux([
+        { candidates: [{ content: { parts: [{ text: "je réfléchis", thought: true }] } }] },
+        { candidates: [{ content: { parts: [{ text: doc.slice(0, moitie) }] } }] },
+        { candidates: [{ finishReason: "STOP", content: { parts: [{ text: doc.slice(moitie) }] } }] },
+      ]),
+    );
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "gemini", modele: "gemini-3.8-flash" } });
+    expect(r).toMatchObject({ ok: true, modele: "gemini-3.8-flash", document: { fournisseur: "Ribera" } });
+    expect(appels[0].url).toBe("http://passerelle/v1/ia/gemini/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse");
     expect(appels[0].headers.Authorization).toBe("Bearer cle-de-maison-assez-longue-pour-passer");
     expect(appels[0].headers["x-goog-api-key"]).toBeUndefined();
+    expect((appels[0].corps.generationConfig as Record<string, unknown>).maxOutputTokens).toBe(64000);
+  });
+
+  it("Gemini avec la clé du client : une clé refusée (400 chez Google) est expliquée", async () => {
+    const { f } = espion({ error: { code: 400, message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } }, 400);
+    const r = await lireAvecIA({ mode: "cle", fournisseur: "gemini", cle: "AIza-fausse", modele: "gemini-3.8-flash" }, fichier, "facture", { articles: [] }, { fetch: f });
+    expect(r).toMatchObject({ ok: false, code: "cle_refusee" });
+  });
+
+  it("Gemini : réponse coupée par la limite de longueur = document trop long", async () => {
+    const { f } = espionFlux(flux([{ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "{\"lignes\": [" }] } }] }]));
+    const r = await lireAvecIA({ mode: "cle", fournisseur: "gemini", cle: "AIza-cle", modele: "gemini-3.8-flash" }, fichier, "mercuriale", { articles: [] }, { fetch: f });
+    expect(r).toMatchObject({ ok: false, code: "trop_long" });
   });
 
   it("ChatGPT : passe par la passerelle ; un refus de la passerelle garde son message", async () => {

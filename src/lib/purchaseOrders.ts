@@ -29,22 +29,30 @@ export function parseDay(s: string): Date {
 // Prix actuel d'un produit et ingrédients qui le suivent
 // ─────────────────────────────────────────────
 
-/** Recalcule le prix actuel des produits d'après leur facture la plus récente. */
+/**
+ * Recalcule le prix actuel des produits d'après leur facture la plus récente.
+ * Deux requêtes en tout, quel que soit le nombre de produits : une mercuriale de
+ * plusieurs centaines de lignes s'enregistre aussi vite qu'une petite facture.
+ */
 async function refreshProducts(tx: Tx, productIds: number[]) {
   const ids = [...new Set(productIds)];
-  for (const id of ids) {
-    const last = await tx.purchaseOrderLine.findFirst({
-      where: { productId: id },
-      orderBy: [{ order: { date: "desc" } }, { id: "desc" }],
-      select: { unitPrice: true, priceUnit: true, order: { select: { date: true } } },
-    });
-    await tx.supplierProduct.update({
-      where: { id },
-      data: last
-        ? { price: last.unitPrice, priceUnit: last.priceUnit, priceDate: last.order.date }
-        : { price: null, priceDate: null },
-    });
-  }
+  if (ids.length === 0) return;
+  await tx.$executeRaw`
+    UPDATE supplier_products p
+       SET price = d.unit_price, price_unit = d.price_unit, price_date = d.date, updated_at = now()
+      FROM (
+        SELECT DISTINCT ON (l.product_id) l.product_id, l.unit_price, l.price_unit, o.date
+          FROM purchase_order_lines l
+          JOIN purchase_orders o ON o.id = l.order_id
+         WHERE l.product_id = ANY(${ids}::int[])
+         ORDER BY l.product_id, o.date DESC, l.id DESC
+      ) d
+     WHERE p.id = d.product_id`;
+  await tx.$executeRaw`
+    UPDATE supplier_products p
+       SET price = NULL, price_date = NULL, updated_at = now()
+     WHERE p.id = ANY(${ids}::int[])
+       AND NOT EXISTS (SELECT 1 FROM purchase_order_lines l WHERE l.product_id = p.id)`;
   await syncChosenIngredients(tx, ids);
 }
 
@@ -92,9 +100,12 @@ async function followArticles(tx: Tx, supplierId: number, productIds: number[]) 
     select: { id: true, name: true, article: true, priceUnit: true, priceDate: true, baseId: true },
   });
   const keyOf = (p: (typeof all)[number]) => `${articleKey(articleOf(p))}|${p.priceUnit}`;
-  const touchedKeys = new Set(all.filter((p) => productIds.includes(p.id)).map(keyOf));
+  const touchedIds = new Set(productIds);
+  const groupes = new Map<string, (typeof all)[number][]>();
+  for (const p of all) groupes.set(keyOf(p), [...(groupes.get(keyOf(p)) ?? []), p]);
+  const touchedKeys = new Set(all.filter((p) => touchedIds.has(p.id)).map(keyOf));
   for (const key of touchedKeys) {
-    const group = all.filter((p) => keyOf(p) === key);
+    const group = groupes.get(key) ?? [];
     if (group.length < 2) continue;
     const newest = group
       .slice()
@@ -102,7 +113,7 @@ async function followArticles(tx: Tx, supplierId: number, productIds: number[]) 
     const linkedBases = [...new Set(group.map((p) => p.baseId).filter((b): b is number => b != null))];
     // Une seule correspondance possible : les variantes sans ingrédient prennent celui de l'article.
     if (linkedBases.length === 1) {
-      const unlinked = group.filter((p) => p.baseId == null && productIds.includes(p.id)).map((p) => p.id);
+      const unlinked = group.filter((p) => p.baseId == null && touchedIds.has(p.id)).map((p) => p.id);
       if (unlinked.length) {
         await tx.supplierProduct.updateMany({ where: { id: { in: unlinked } }, data: { baseId: linkedBases[0] } });
       }
@@ -239,6 +250,16 @@ export type PurchaseOrderSummary = {
 
 const fmtPrice = (p: number, u: string) => `${p.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €/${u}`;
 
+/** Évite une écriture quand la ligne n'apporte rien de nouveau sur le produit (cas courant d'une mercuriale relue). */
+function changeQuelqueChose(p: { reference: string | null; article: string | null; family: string | null; packSize: Prisma.Decimal | null }, d: { reference?: string; article?: string; family?: string; packSize?: number }): boolean {
+  return (
+    (d.reference !== undefined && d.reference !== p.reference) ||
+    (d.article !== undefined && d.article !== p.article) ||
+    (d.family !== undefined && d.family !== p.family) ||
+    (d.packSize !== undefined && num(p.packSize) !== d.packSize)
+  );
+}
+
 export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrderSummary> {
   const date = parseDay(input.date);
   const supplierName = input.supplier.trim();
@@ -317,12 +338,26 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       const linked: { baseId: number; productId: number }[] = [];
       let computedTotal = 0;
       let lineCount = 0;
-      // Produits du fournisseur par nom « à plat » (sans accents ni majuscules) : « Creme 35% » = « Crème 35% ».
-      const parCle = new Map(
-        (await tx.supplierProduct.findMany({ where: { supplierId: supplier.id }, select: { id: true, name: true }, orderBy: { id: "desc" } })).map(
-          (p) => [articleKey(p.name), p.id] as const,
-        ),
-      );
+      // Tous les produits du fournisseur, lus une seule fois : par référence, par nom (sans majuscules)
+      // et par nom « à plat » (sans accents ni majuscules : « Creme 35% » = « Crème 35% »).
+      type Produit = Awaited<ReturnType<typeof tx.supplierProduct.create>>;
+      const existants = await tx.supplierProduct.findMany({ where: { supplierId: supplier.id }, orderBy: { id: "asc" } });
+      const parRef = new Map<string, Produit>();
+      const parNom = new Map<string, Produit>();
+      const parCle = new Map<string, Produit>();
+      const ranger = (p: Produit, remplace = false) => {
+        if (p.reference && (remplace || !parRef.has(p.reference))) parRef.set(p.reference, p);
+        if (remplace || !parNom.has(p.name.toLowerCase())) parNom.set(p.name.toLowerCase(), p);
+      };
+      for (const p of existants) ranger(p);
+      // À nom « à plat » égal, le plus ancien produit l'emporte (comme avant).
+      for (const p of existants) if (!parCle.has(articleKey(p.name))) parCle.set(articleKey(p.name), p);
+      const majProduit = (p: Produit) => {
+        if (p.reference) parRef.set(p.reference, p);
+        parNom.set(p.name.toLowerCase(), p);
+        for (const [k, v] of parCle) if (v.id === p.id) parCle.set(k, p);
+      };
+      const lignesACreer: Prisma.PurchaseOrderLineCreateManyInput[] = [];
 
       for (const l of input.lines) {
         const name = l.product.trim();
@@ -332,14 +367,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           continue;
         }
         const reference = l.reference?.trim() || null;
-        let product =
-          (reference
-            ? await tx.supplierProduct.findFirst({ where: { supplierId: supplier.id, reference } })
-            : null) ??
-          (await tx.supplierProduct.findFirst({
-            where: { supplierId: supplier.id, name: { equals: name, mode: "insensitive" } },
-          })) ??
-          (parCle.has(articleKey(name)) ? await tx.supplierProduct.findUnique({ where: { id: parCle.get(articleKey(name))! } }) : null);
+        let product: Produit | null =
+          (reference ? parRef.get(reference) : undefined) ?? parNom.get(name.toLowerCase()) ?? parCle.get(articleKey(name)) ?? null;
         const details = {
           ...(reference ? { reference } : {}),
           ...(l.article?.trim() ? { article: l.article.trim() } : {}),
@@ -351,7 +380,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             data: { supplierId: supplier.id, name, priceUnit: l.unit, ...details },
           });
           created.push(name);
-          parCle.set(articleKey(name), product.id);
+          ranger(product, true);
+          parCle.set(articleKey(name), product);
         } else {
           if (input.keepFamily && product.family?.trim()) delete (details as { family?: string }).family;
           if (product.price != null && product.priceUnit !== l.unit) {
@@ -362,11 +392,13 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           if (!before.has(product.id)) {
             before.set(product.id, { name: product.name, price: num(product.price), unit: product.priceUnit });
           }
-          if (Object.keys(details).length) product = await tx.supplierProduct.update({ where: { id: product.id }, data: details });
+          if (Object.keys(details).length && changeQuelqueChose(product, details)) {
+            product = await tx.supplierProduct.update({ where: { id: product.id }, data: details });
+            majProduit(product);
+          }
         }
 
-        await tx.purchaseOrderLine.create({
-          data: {
+        lignesACreer.push({
             orderId: order.id,
             productId: product.id,
             quantity: l.quantity ?? null,
@@ -375,7 +407,6 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
             unitPrice,
             priceUnit: l.unit,
             lineTotal: l.lineTotal ?? null,
-          },
         });
         lineCount++;
         touched.push(product.id);
@@ -394,13 +425,17 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
                 });
           if (!base) notFound.push(String(l.ingredient));
           else {
-            await tx.supplierProduct.update({ where: { id: product.id }, data: { baseId: base.id } });
+            if (product.baseId !== base.id) {
+              product = await tx.supplierProduct.update({ where: { id: product.id }, data: { baseId: base.id } });
+              majProduit(product);
+            }
             linked.push({ baseId: base.id, productId: product.id });
           }
         }
       }
 
       if (lineCount === 0) throw new Error("aucune ligne avec un prix : rien n'a été enregistré");
+      await tx.purchaseOrderLine.createMany({ data: lignesACreer });
       if (input.total == null && computedTotal > 0 && !input.manual) {
         await tx.purchaseOrder.update({ where: { id: order.id }, data: { total: Math.round(computedTotal * 100) / 100 } });
       }
@@ -435,9 +470,17 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           select: { id: true, name: true, article: true, price: true, priceUnit: true, priceDate: true },
         });
         const keyOf = (p: (typeof all)[number]) => `${articleKey(articleOf(p))}|${p.priceUnit}`;
-        for (const p of all.filter((x) => created.includes(x.name))) {
-          const prev = all
-            .filter((x) => x.id !== p.id && !created.includes(x.name) && keyOf(x) === keyOf(p) && x.price != null)
+        const nouveaux = new Set(created);
+        // Anciens produits rangés par article : pas de double boucle sur tout le catalogue.
+        const anciens = new Map<string, (typeof all)[number][]>();
+        for (const x of all) {
+          if (nouveaux.has(x.name) || x.price == null) continue;
+          const k = keyOf(x);
+          anciens.set(k, [...(anciens.get(k) ?? []), x]);
+        }
+        for (const p of all.filter((x) => nouveaux.has(x.name))) {
+          const prev = (anciens.get(keyOf(p)) ?? [])
+            .filter((x) => x.id !== p.id)
             .sort((a, b) => (b.priceDate?.getTime() ?? 0) - (a.priceDate?.getTime() ?? 0))[0];
           const now = num(p.price);
           if (!prev || now == null) continue;
@@ -497,7 +540,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         ...(replacedId !== null ? { remplace: true } : {}),
       };
     },
-    { timeout: 30_000 },
+    // Une très longue mercuriale (plusieurs centaines de lignes) sur un petit serveur : on laisse le temps.
+    { timeout: 120_000, maxWait: 10_000 },
   );
 }
 

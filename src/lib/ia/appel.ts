@@ -228,28 +228,94 @@ async function chatgpt(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA
   return finir(t, r.modele);
 }
 
+/**
+ * Gemini en continu (streamGenerateContent) : la réponse arrive morceau par morceau.
+ * Sans ça, une longue mercuriale (plus de 5 minutes de lecture) était coupée par
+ * Node, qui abandonne une réponse dont les en-têtes tardent plus de 5 minutes.
+ */
 async function gemini(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA): Promise<ResultatIA> {
   const plateforme = r.mode === "plateforme";
   const base = plateforme ? `${passerelleURL()}/v1/ia/gemini` : "https://generativelanguage.googleapis.com";
-  const url = `${base}/v1beta/models/${encodeURIComponent(r.modele)}:generateContent`;
-  const rep = await posterJson(opts, url, plateforme ? { Authorization: `Bearer ${passerelleCle()}` } : { "x-goog-api-key": r.cle }, {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { inline_data: { mime_type: f.mime, data: f.data.toString("base64") } },
-          { text: `${texte}\nRéponds uniquement par un objet JSON qui suit ce schéma :\n${JSON.stringify(SCHEMA_DOCUMENT)}` },
+  const url = `${base}/v1beta/models/${encodeURIComponent(r.modele)}:streamGenerateContent?alt=sse`;
+  const doFetch = opts.fetch ?? fetch;
+  let res: Response;
+  try {
+    res = await doFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(plateforme ? { Authorization: `Bearer ${passerelleCle()}` } : { "x-goog-api-key": r.cle }) },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: f.mime, data: f.data.toString("base64") } },
+              { text: `${texte}\nRéponds uniquement par un objet JSON qui suit ce schéma :\n${JSON.stringify(SCHEMA_DOCUMENT)}` },
+            ],
+          },
         ],
-      },
-    ],
-    generationConfig: { responseMimeType: "application/json" },
-  });
-  if (!rep.ok) return plateforme ? erreurPlateforme("Gemini", rep.status, rep.corps) : erreurHttp("Gemini", rep.status);
-  const cand = Array.isArray(rep.json.candidates) ? (rep.json.candidates as { finishReason?: string; content?: { parts?: { text?: string }[] } }[]) : [];
-  const t = (cand[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  if (cand[0]?.finishReason === "MAX_TOKENS") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: MAX_SORTIE },
+      }),
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+  } catch (e) {
+    console.error(`IA : Gemini injoignable :`, e instanceof Error ? e.message : e);
+    return plateforme ? erreurPlateforme("Gemini", 0) : erreurHttp("Gemini", 0);
+  }
+  if (!res.ok) {
+    const corps = await res.text().catch(() => "");
+    console.error(`IA : Gemini a répondu ${res.status} : ${corps.slice(0, 800)}`);
+    if (plateforme) return erreurPlateforme("Gemini", res.status, corps);
+    return erreurHttp("Gemini", cleGeminiRefusee(res.status, corps) ? 401 : res.status);
+  }
+  let t = "";
+  let fin: string | undefined;
+  try {
+    for await (const evt of evenementsSSE(res)) {
+      const j = evt as { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[]; error?: { message?: string } };
+      if (j.error) throw new Error(j.error.message ?? "erreur de Gemini");
+      const c = j.candidates?.[0];
+      t += (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("");
+      if (c?.finishReason) fin = c.finishReason;
+    }
+  } catch (e) {
+    console.error("IA : lecture Gemini coupée :", e instanceof Error ? e.message : e);
+    return erreur("injoignable", "La lecture a été coupée en route. Réessaie dans quelques minutes.");
+  }
+  if (fin === "MAX_TOKENS") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
   if (!t) return erreur("refus", "Gemini n'a rien renvoyé pour ce document.");
   return finir(t, r.modele);
+}
+
+/** Google répond 400 (et non 401) quand la clé d'API n'est pas valable. */
+function cleGeminiRefusee(status: number, corps: string): boolean {
+  return status === 400 && /API_KEY_INVALID|API key not valid|API_KEY/i.test(corps);
+}
+
+/** Lit un flux « text/event-stream » et rend chaque « data: {…} » en objet. */
+async function* evenementsSSE(res: Response): AsyncGenerator<unknown> {
+  if (!res.body) return;
+  const lecteur = res.body.getReader();
+  const decodeur = new TextDecoder();
+  let reste = "";
+  const lire = (bloc: string) =>
+    bloc
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .filter(Boolean)
+      .map((d) => JSON.parse(d) as unknown);
+  for (;;) {
+    const { value, done } = await lecteur.read();
+    if (done) break;
+    reste += decodeur.decode(value, { stream: true }).replace(/\r/g, "");
+    let i;
+    while ((i = reste.indexOf("\n\n")) >= 0) {
+      yield* lire(reste.slice(0, i));
+      reste = reste.slice(i + 2);
+    }
+  }
+  reste += decodeur.decode();
+  if (reste.trim()) yield* lire(reste);
 }
 
 /**
@@ -276,7 +342,8 @@ export async function testerCle(r: ReglagesIA, opts: OptionsIA = {}): Promise<{ 
         ? await doFetch(`https://api.openai.com/v1/models/${encodeURIComponent(r.modele)}`, { headers: { Authorization: `Bearer ${r.cle}` }, signal: AbortSignal.timeout(20_000) })
         : await doFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(r.modele)}`, { headers: { "x-goog-api-key": r.cle }, signal: AbortSignal.timeout(20_000) });
     if (res.ok) return { ok: true };
-    const e = erreurHttp(nom, res.status);
+    const corps = r.fournisseur === "gemini" ? await res.text().catch(() => "") : "";
+    const e = erreurHttp(nom, cleGeminiRefusee(res.status, corps) ? 401 : res.status);
     return { ok: false, message: e.ok ? "" : e.message };
   } catch {
     return { ok: false, message: `${nom} ne répond pas pour l'instant.` };

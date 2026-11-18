@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
   // puis l'échange avec .next : un build raté ne casse plus le site en ligne.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
+  // pdf.js lit le texte des PDF côté serveur (MCP) : chargé tel quel depuis node_modules.
+  serverExternalPackages: ["pdfjs-dist"],
   env: {
     NEXT_PUBLIC_MERGED_PRS: JSON.stringify(prs),
     // Dernier nombre du numéro de version, « V2.3.88 » (src/lib/version.ts).

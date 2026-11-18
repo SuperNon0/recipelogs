@@ -18,7 +18,7 @@ export type ReglagesIA = { mode: ModeIA; fournisseur: FournisseurIA; cle: string
 export const FOURNISSEURS_IA: { id: FournisseurIA; nom: string; modele: string; ouObtenir: string }[] = [
   { id: "anthropic", nom: "Claude (Anthropic)", modele: "claude-opus-5-5", ouObtenir: "https://platform.claude.com/settings/keys" },
   { id: "openai", nom: "ChatGPT (OpenAI)", modele: "gpt-5", ouObtenir: "https://platform.openai.com/api-keys" },
-  { id: "gemini", nom: "Gemini (Google)", modele: "gemini-2.5-flash", ouObtenir: "https://aistudio.google.com/apikey" },
+  { id: "gemini", nom: "Gemini (Google)", modele: "gemini-3.8-flash", ouObtenir: "https://aistudio.google.com/apikey" },
 ];
 
 /** Modèle utilisé avec la clé de la plateforme (la passerelle refuse les autres). */
