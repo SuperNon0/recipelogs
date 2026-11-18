@@ -211,9 +211,9 @@ sans apparaître dans la liste des factures.
 
 D'où vient l'IA (Réglages → **Lecture des factures par IA**, réservé à l'administrateur) :
 
-- **IA de RecipeLog** : la passerelle appelle Claude avec **ta** clé Anthropic
-  (mise dans le panel, **Factures par IA → Mettre une clé Claude**, ou en secours
-  `IA_ANTHROPIC_CLE`), que les clients ne voient jamais, et compte les lectures. Dans le
+- **IA de RecipeLog** : la passerelle appelle l'IA choisie dans le panel (Claude, Gemini ou
+  ChatGPT, et le modèle) avec **ta** clé (**Factures par IA → Mettre une clé d'IA**, ou en
+  secours la clé Claude `IA_ANTHROPIC_CLE`), que les clients ne voient jamais, et compte les lectures. Dans le
   panel, partie **Lecture des factures par IA** : lectures du mois de chaque client, coût
   estimé, et le nombre de lectures par mois (30 par défaut, un nombre à part par client,
   0 = coupé). Le compteur revient à zéro le 1er du mois.
