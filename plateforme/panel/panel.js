@@ -2202,7 +2202,7 @@ function afficherNotifications() {
       liste
         .map(
           (n) => `<article class="demande notif${n.lu ? "" : " non-lu"}" data-id="${e(n.id)}">
-        <span class="nt-ic t-${e(n.type)}" aria-hidden="true">${ic(ICONES_NOTIF[n.type] ?? "bell")}</span>
+        <span class="nt-ic t-${e(n.type)}${n.niveau === "ok" ? " ok" : ""}" aria-hidden="true">${ic(n.niveau === "ok" ? "check" : ICONES_NOTIF[n.type] ?? "bell")}</span>
         <div class="nt-corps"><b>${e(n.titre)}</b>
           <small>${e(quandFr(n.date))} · ${e(nomTypeNotif(n.type))}${n.lu ? "" : " · <b>nouvelle</b>"}</small>
           <p>${e(n.texte)}</p></div>

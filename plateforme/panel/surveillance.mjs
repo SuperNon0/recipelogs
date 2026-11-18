@@ -13,15 +13,20 @@ const PANNE_APRES = 2; // vérifications ratées de suite (une par minute) avant
 // ------------------------------------------------------------ alertes
 // Tout passe par notifications.mjs : Discord (BotPanel) et la cloche du panel.
 // Plus d'email ni de Telegram pour Noë (quota Brevo gardé pour les clients).
-export const alerter = (type, titre, texte) => notifier(type, titre, texte);
+export const alerter = (type, titre, texte, details) => notifier(type, titre, texte, details);
 
 // Sans attendre : une alerte lente (BotPanel qui traîne) ne doit jamais retarder la surveillance.
-const prevenir = (type, titre, texte) => void alerter(type, titre, texte).catch(() => {});
+const prevenir = (type, titre, texte, details) => void alerter(type, titre, texte, details).catch(() => {});
 
 export const canauxAlerte = async () => {
   const r = await reglages().catch(() => ({ botpanel: "" }));
   return { discord: Boolean(r.botpanel), panel: true };
 };
+
+// Pour les notifications : nom court (« Accès depuis internet (Cloudflare et tunnel) » →
+// « Accès depuis internet ») et sorte de cible.
+const court = (nom) => String(nom).replace(/\s*\([^)]*\)\s*$/, "");
+const genre = (cible) => (cible.startsWith("client:") ? "Client" : "Service");
 
 // ------------------------------------------------------------ vérifications
 // Le moteur n'est PAS sur le réseau des clients (un site piraté ne peut pas lui parler) :
@@ -104,7 +109,10 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
         if (e.ok === false) {
           const panne = Date.now() - e.depuis;
           await noterEvenement(cible, true);
-          prevenir("panne", `✅ ${nom} répond de nouveau`, `Panne de ${duree(panne)}.`);
+          prevenir("panne", `✅ ${court(nom)} est revenu`, `Panne de ${duree(panne)}.`, {
+            niveau: "ok",
+            champs: { qui: court(nom), genre: genre(cible), duree: duree(panne) },
+          });
           await noter("automatique", "retour", nom, { ok: true, sortie: `Répond de nouveau après ${duree(panne)}.` });
           e.depuis = Date.now();
         }
@@ -117,11 +125,13 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
           e.depuis = Date.now() - (PANNE_APRES - 1) * 60000;
           await noterEvenement(cible, false);
           const conseil = cible.startsWith("client:")
-            ? `Panel → ${nom} → Journaux, ou « Redémarrer ».`
+            ? `Panel → ${court(nom)} → Journaux, ou « Redémarrer ».`
             : cible === "service:acces"
-              ? "Les sites ne sont plus joignables depuis internet. Dans la VM : recipelog-plateforme ps (cloudflared et traefik), et l'état du tunnel dans Cloudflare."
-              : "Dans la VM : recipelog-plateforme ps";
-          prevenir("panne", `🔴 ${nom} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`);
+              ? "Vérifie le tunnel dans Cloudflare, et dans la VM : `recipelog-plateforme ps`."
+              : "Dans la VM : `recipelog-plateforme ps`.";
+          prevenir("panne", `🔴 ${court(nom)} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`, {
+            champs: { qui: court(nom), genre: genre(cible), depuis: `${PANNE_APRES} min`, conseil },
+          });
           await noter("automatique", "panne", nom, { ok: false, sortie: `Ne répond plus depuis ${PANNE_APRES} minutes.` });
         }
       }
@@ -136,8 +146,15 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
       jourAlerteDisque = jour;
       prevenir(
         "disque",
-        d.pourcent >= 95 ? "🔴 Disque plein : les sauvegardes sont arrêtées" : "⚠️ Disque presque plein",
-        `${d.pourcent} % utilisés sur la machine (${Math.round(d.libre / 1e9)} Go libres). Agrandis le disque de la VM dans Proxmox, ou supprime de vieilles sauvegardes.`,
+        d.pourcent >= 95 ? `🔴 Disque plein à ${d.pourcent} %` : `💽 Disque presque plein (${d.pourcent} %)`,
+        `${Math.round(d.libre / 1e9)} Go libres. ${d.pourcent >= 95 ? "Les sauvegardes sont arrêtées. " : ""}Agrandis le disque de la VM dans Proxmox, ou supprime de vieilles sauvegardes.`,
+        {
+          champs: {
+            pourcent: `${d.pourcent} %`,
+            libre: `${Math.round(d.libre / 1e9)} Go`,
+            etat: d.pourcent >= 95 ? "🔴 Sauvegardes arrêtées" : "⚠️ Bientôt plein",
+          },
+        },
       );
     }
   }

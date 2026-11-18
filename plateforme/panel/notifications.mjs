@@ -3,7 +3,10 @@
 // historique, lu / non lu). Plus aucun email ni Telegram pour Noë : le quota Brevo
 // (300 emails par mois) est gardé pour les emails importants envoyés aux clients.
 //
-// BotPanel : POST <adresse>/api/notify { id: <slug>, vars: { titre, texte, lien, type } }.
+// BotPanel : POST <adresse>/api/notify { id: <slug>, vars: { titre, texte, lien, type, … } }.
+// En plus de titre et texte, chaque sorte envoie ses infos rangées (client, durée, email…)
+// pour que BotPanel les mette en champs dans l'embed Discord (voir A-FAIRE.md, étape F).
+// Un retour à la normale (niveau « ok ») part sur <slug>_ok (ex. recipelog_panne_ok, en vert).
 // Chaque type de notification a son slug (recipelog_panne, recipelog_support…) créé une fois
 // dans BotPanel : le salon, la couleur et la mise en forme se règlent là-bas.
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -19,7 +22,7 @@ export class RefusNotif extends Error {}
 
 // Les types, dans l'ordre affiché dans le panel. aide = texte du « ? ».
 export const TYPES = [
-  ["panne", "Site ou service en panne", "Un client ou un service (connexion, passerelle, vitrine, base…) ne répond plus depuis 2 minutes, puis quand il répond de nouveau (avec la durée de la panne)."],
+  ["panne", "Site ou service en panne", "Un client ou un service (connexion, passerelle, vitrine, base…) ne répond plus depuis 2 minutes (en rouge), puis quand il répond de nouveau, avec la durée de la panne (en vert, notification BotPanel « …_ok »)."],
   ["disque", "Disque presque plein", "Le disque des données dépasse 85 % (une fois par jour au plus). À 95 %, les sauvegardes s'arrêtent."],
   ["sauvegarde", "Sauvegardes", "Sauvegarde de la nuit ratée, client sans sauvegarde depuis plus de 36 heures, ou test de restauration de la semaine raté."],
   ["support", "Support", "Une nouvelle demande d'un client (Réglages → Signaler un problème), ou un nouveau message dans une demande en cours."],
@@ -154,7 +157,14 @@ async function toutes() {
  * Rend { ok, canaux: { discord, panel } } : true (parti), un texte (pourquoi ça a raté),
  * ou null (coupé dans les réglages / BotPanel pas réglé).
  */
-export async function notifier(type, titre, texte, lien = `https://admin.${DOMAINE}`) {
+export async function notifier(type, titre, texte, details = {}) {
+  const lien = `https://admin.${DOMAINE}`;
+  // Infos rangées pour les champs de l'embed : toujours du texte, jamais vide (sinon Discord
+  // affiche un champ blanc).
+  const champs = {};
+  for (const [k, v] of Object.entries(details.champs ?? {})) {
+    if (/^[a-z_]{1,30}$/.test(k)) champs[k] = String(v ?? "").trim().slice(0, 1000) || "—";
+  }
   const canaux = { discord: null, panel: null };
   let r;
   try {
@@ -165,9 +175,11 @@ export async function notifier(type, titre, texte, lien = `https://admin.${DOMAI
   const essai = type === "test";
   const t = essai ? { discord: true, panel: true, slug: "recipelog_test" } : r.types[type] ?? { discord: true, panel: true, slug: `recipelog_${type}` };
   const entree = { id: `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`, date: new Date().toISOString(), type, titre: String(titre).slice(0, 200), texte: String(texte).slice(0, 2000) };
+  if (details.niveau === "ok") entree.niveau = "ok";
   if (t.discord && r.botpanel) {
     try {
-      await versBotpanel(r.botpanel, t.slug, { titre: entree.titre, texte: entree.texte.slice(0, 1800), lien, type });
+      const slug = details.niveau === "ok" ? `${t.slug}_ok`.slice(0, 64) : t.slug;
+      await versBotpanel(r.botpanel, slug, { titre: entree.titre, texte: entree.texte.slice(0, 1800), lien, type, ...champs });
       canaux.discord = true;
     } catch (e) {
       const code = e?.cause?.code ?? e?.cause?.errors?.[0]?.code ?? e?.cause?.message;

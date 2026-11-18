@@ -247,7 +247,8 @@ export async function regler(corps) {
 }
 
 const NOMS = { instance: "Standard", "beta-instance": "Bêta", plateforme: "Ancienne (plateforme)", beta: "Bêta des sites LXC", stable: "Stable des sites LXC" };
-const liste = (ch) => ch.slice(0, 5).map((c) => `  • ${c.titre}`).join("\n");
+const liste = (ch) => ch.slice(0, 3).map((c) => `• ${c.titre}`).join("\n") + (ch.length > 3 ? `\n• … et ${ch.length - 3} autre${ch.length - 3 > 1 ? "s" : ""}` : "");
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
 // Vérifie maintenant. entree() rend { clients, vitrine, plateforme } (lu au dernier moment).
 // alerter(type, titre, texte) : celui de surveillance.mjs. Une seule alerte par nouvelle version.
@@ -265,17 +266,17 @@ export async function verifier(entree, alerter) {
     if (!dispo || !k.aMettreAJour.length || prevenu[`canal:${canal}`] === dispo) continue;
     nouveau[`canal:${canal}`] = dispo;
     morceaux.push(
-      `Clients ${NOMS[canal] ?? canal} : nouvelle version (${k.enRetard} changement${k.enRetard > 1 ? "s" : ""}), ${k.aMettreAJour.length} client${k.aMettreAJour.length > 1 ? "s" : ""} à mettre à jour (${k.aMettreAJour.slice(0, 8).join(", ")}${k.aMettreAJour.length > 8 ? "…" : ""}).\n${liste(k.changements)}`,
+      `**Clients ${NOMS[canal] ?? canal}** · ${pluriel(k.enRetard, "changement")} · ${pluriel(k.aMettreAJour.length, "client")} à mettre à jour\n${liste(k.changements)}`,
     );
   }
   const pf = e.plateforme?.nouveautes;
   if (pf?.enRetard > 0 && pf.dernier && prevenu.plateforme !== pf.dernier) {
     nouveau.plateforme = pf.dernier;
-    morceaux.push(`Plateforme (panel, connexion, outils) : ${pf.enRetard} changement${pf.enRetard > 1 ? "s" : ""}.\n${liste(pf.changements ?? [])}`);
+    morceaux.push(`**Plateforme** · ${pluriel(pf.enRetard, "changement")}\n${liste(pf.changements ?? [])}`);
   }
   if (r.vitrine?.enRetard > 0 && prevenu.vitrine !== r.vitrine.disponible.commit) {
     nouveau.vitrine = r.vitrine.disponible.commit;
-    morceaux.push(`Site vitrine : ${r.vitrine.enRetard} changement${r.vitrine.enRetard > 1 ? "s" : ""}.\n${liste(r.vitrine.changements)}`);
+    morceaux.push(`**Site vitrine** · ${pluriel(r.vitrine.enRetard, "changement")}\n${liste(r.vitrine.changements)}`);
   }
   let envoi = null;
   if (morceaux.length) {
@@ -284,8 +285,9 @@ export async function verifier(entree, alerter) {
     // Coupé ou non : réglé dans le panel, Notifications → Réglages (type « Nouvelle version »).
     envoi = await alerter(
       "maj",
-      "🆕 Mise à jour disponible",
-      `${morceaux.join("\n\n")}\n\nRien n'est installé tout seul : c'est toi qui lances la mise à jour depuis le panel (Accueil → Mises à jour).`,
+      "🆕 Nouvelle version disponible",
+      morceaux.join("\n\n").replace(/\*\*/g, ""),
+      { champs: { resume: morceaux.join("\n\n") } },
     );
   }
   return { ...r, prevenu: morceaux.length, envoi };
