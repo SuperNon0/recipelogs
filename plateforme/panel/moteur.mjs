@@ -797,7 +797,8 @@ createServer(async (req, res) => {
       }
       // Jamais la clé dans le journal : seulement ses 4 derniers caractères.
       const retiree = corps?.cle === null;
-      await noter(qui, retiree ? "ia-cle-retiree" : "ia-cle", "plateforme", { ok: true, sortie: r.avertissement ?? "" }, retiree ? {} : { fin: String(corps.cle).trim().slice(-4) });
+      const tapee = typeof corps?.cle === "string" ? corps.cle.trim() : "";
+      await noter(qui, retiree ? "ia-cle-retiree" : "ia-cle", "plateforme", { ok: true, sortie: r.avertissement ?? "" }, retiree ? {} : { ia: `${corps?.fournisseur ?? "anthropic"} ${corps?.modele ?? ""}`.trim(), ...(tapee ? { fin: tapee.slice(-4) } : {}) });
       return repondre(res, 200, { ...(await resumeIA(DONNEES)), avertissement: r.avertissement });
     }
     if (req.method === "POST" && url.pathname === "/ia/factures") {

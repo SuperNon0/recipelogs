@@ -943,8 +943,8 @@ const NOMS_ACTIONS = {
   "maintenance-annulee": "a annulé la maintenance :",
   "ia-quota": "a changé les lectures par IA de",
   "ia-factures": "a changé les factures en photo de",
-  "ia-cle": "a changé la clé Claude de la",
-  "ia-cle-retiree": "a retiré la clé Claude de la",
+  "ia-cle": "a changé l'IA de la",
+  "ia-cle-retiree": "a retiré la clé d'IA de la",
   vente: "a changé les tarifs et textes légaux de la",
   preavis: "a envoyé le préavis de maintenance :",
   bandeau: "a mis un bandeau :",
@@ -959,7 +959,7 @@ function afficherJournal() {
   $("#journal").innerHTML = JOURNAL.slice(0, 40)
     .map((l, i) => {
       const d = l.details ?? {};
-      const plus = d.fin !== undefined ? ` (…${e(d.fin)})` : d.texte !== undefined ? ` (${d.texte ? `« ${e(d.texte)} »` : "retiré"})` : d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined || d.mcpCle !== undefined ? ` (${[d.mcp !== undefined ? `MCP ${d.mcp ? "permis" : "coupé"}` : "", d.mcpCle !== undefined ? `clé secrète ${d.mcpCle ? "permise" : "coupée"}` : ""].filter(Boolean).join(", ")})` : "";
+      const plus = d.ia !== undefined ? ` (${e(d.ia)}${d.fin ? `, clé …${e(d.fin)}` : ""})` : d.fin !== undefined ? ` (…${e(d.fin)})` : d.texte !== undefined ? ` (${d.texte ? `« ${e(d.texte)} »` : "retiré"})` : d.sauvegarde ? ` (${e(dateSauv(d.sauvegarde).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))})` : d.email ? ` (${e(d.email)})` : d.max !== undefined ? ` (${d.max || "pas de plafond"})` : d.jours !== undefined ? ` (${d.jours ? `${d.jours} j` : "fin"})` : d.mcp !== undefined || d.mcpCle !== undefined ? ` (${[d.mcp !== undefined ? `MCP ${d.mcp ? "permis" : "coupé"}` : "", d.mcpCle !== undefined ? `clé secrète ${d.mcpCle ? "permise" : "coupée"}` : ""].filter(Boolean).join(", ")})` : "";
       return `<div class="ligne"><time>${heureFr(l.date)}</time><span class="qui">${e(l.qui)}</span>
         <span>${e(NOMS_ACTIONS[l.action] ?? l.action)} <b>${e(l.client)}</b>${plus} ${l.ok ? "" : `<span class="etiquette ko">échec</span>`}</span>
         <button type="button" data-journal="${i}">Détails</button></div>`;
@@ -1850,12 +1850,12 @@ function afficherIA() {
     })
     .join("");
   zone.innerHTML = `<div class="barre serree">
-      <span class="etiquette ${IA.cle ? "ok" : "pause"}">${IA.cle ? `Clé Claude de la plateforme réglée${IA.cleInfo?.fin ? ` (${e(IA.cleInfo.fin)})` : IA.cleInfo?.source === "installation" ? " (à l'installation)" : ""}` : "Pas de clé Claude : les clients doivent mettre la leur"}</span>
-      <button class="btn${IA.cle ? "" : " principal"}" type="button" id="ia-cle">${IA.cle ? "Changer la clé" : "Mettre une clé Claude"}</button>
+      <span class="etiquette ${IA.cle ? "ok" : "pause"}">${IA.cle ? `IA de la plateforme : ${e(nomModeleIA(IA.cleInfo))}${IA.cleInfo?.fin ? ` (clé ${e(IA.cleInfo.fin)})` : IA.cleInfo?.source === "installation" ? " (clé de l'installation)" : ""}` : "Pas de clé d'IA : les clients doivent mettre la leur"}</span>
+      <button class="btn${IA.cle ? "" : " principal"}" type="button" id="ia-cle">${IA.cle ? "Changer l'IA ou la clé" : "Mettre une clé d'IA"}</button>
       <span class="sub">Par défaut : <b>${nombreFr(defaut)}</b> lectures par mois, <b>${nombreFr(fDef.attente)}</b> factures en attente de <b>${nombreFr(fDef.pages)}</b> pages au plus</span>
       <button class="btn" type="button" id="ia-defaut">Changer le défaut</button>
       <button class="aide" type="button" data-aide="ia-a" aria-label="Aide">?</button></div>
-    <p class="texte-aide" id="ia-a">Dans leur RecipeLog, tes clients prennent une facture en photo ou en PDF et l'IA la recopie en lignes de prix à vérifier. Avec ta clé Claude (bouton « Mettre une clé Claude » ou « Changer la clé »), chaque lecture compte dans leur quota du mois, remis à zéro le 1er. 0 = lecture par IA coupée pour ce client (il peut toujours mettre sa propre clé Claude, ChatGPT ou Gemini dans ses réglages : elle ne passe pas par toi et ne compte pas ici). Le coût est une estimation au prix de Claude Opus 5.5 (4 $ par million de jetons lus, 20 $ par million écrits). Colonne « Factures en photo » : avec « Nouvelle facture », le client prend une facture en photo depuis son téléphone et peut la garder « à traiter » pour plus tard ; le premier nombre dit combien peuvent attendre en même temps (0 = fonction coupée), le second combien de pages (photos) par facture. Ces photos prennent de la place sur la machine jusqu'à ce qu'elles soient lues.</p>
+    <p class="texte-aide" id="ia-a">Dans leur RecipeLog, tes clients prennent une facture en photo ou en PDF et l'IA la recopie en lignes de prix à vérifier. Avec ta clé d'IA (Claude, Gemini ou ChatGPT, bouton « Mettre une clé d'IA » ou « Changer l'IA ou la clé »), chaque lecture compte dans leur quota du mois, remis à zéro le 1er. 0 = lecture par IA coupée pour ce client (il peut toujours mettre sa propre clé Claude, ChatGPT ou Gemini dans ses réglages : elle ne passe pas par toi et ne compte pas ici). Le coût est une estimation, au prix du modèle utilisé au moment de chaque lecture (réglé dans « Changer l'IA ou la clé ») ; les lectures d'avant ce réglage sont estimées au prix de Claude Opus 5.5. Colonne « Factures en photo » : avec « Nouvelle facture », le client prend une facture en photo depuis son téléphone et peut la garder « à traiter » pour plus tard ; le premier nombre dit combien peuvent attendre en même temps (0 = fonction coupée), le second combien de pages (photos) par facture. Ces photos prennent de la place sur la machine jusqu'à ce qu'elles soient lues.</p>
     <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Lectures ce mois-ci (${e(IA.mois)})</th><th>Quota</th><th>Factures en photo</th><th>Jetons lus / écrits</th><th>Coût estimé</th><th>Mois dernier</th><th></th></tr></thead>
     <tbody>${lignes || `<tr><td colspan="8">Aucun client.</td></tr>`}</tbody>
     <tfoot><tr><td>Total</td><td>${nombreFr(total.lectures)}</td><td></td><td></td><td></td><td>${dollars(total.cout)}</td><td></td><td></td></tr></tfoot></table></div>`;
@@ -1868,47 +1868,110 @@ function afficherIA() {
   );
 }
 
-// Clé Claude de la plateforme : on la tape, le moteur l'essaie chez Anthropic puis la garde.
-// Elle ne revient jamais dans le navigateur (seulement ses 4 derniers caractères).
+// IA de la plateforme : choix de l'IA (Claude, Gemini, ChatGPT), du modèle et de la clé.
+// Le moteur essaie la clé et le modèle chez le fournisseur avant de les garder. La clé ne
+// revient jamais dans le navigateur (seulement ses 4 derniers caractères).
+function nomModeleIA(info) {
+  if (!info?.fournisseur) return "";
+  const f = IA.proposees?.[info.fournisseur];
+  const m = f?.modeles.find((x) => x.id === info.modele);
+  return m ? m.nom : `${f?.nom.split(" ")[0] ?? info.fournisseur} ${info.modele}`;
+}
+const prixFr = (n) => Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
+
 function fenetreCleIA() {
   const info = IA.cleInfo ?? { source: null };
+  const P = IA.proposees ?? {};
   const depuis = info.depuis ? new Date(info.depuis).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
   const actuelle =
     info.source === "panel"
-      ? `<p class="sub">Clé actuelle : <b>${e(info.fin)}</b>${depuis ? `, mise le ${e(depuis)}` : ""}.${info.installationAussi ? " Si tu la retires, la clé mise à l'installation reprend." : ""}</p>`
+      ? `<p class="sub">En ce moment : <b>${e(nomModeleIA(info))}</b>, clé <b>${e(info.fin)}</b>${depuis ? `, mise le ${e(depuis)}` : ""}.${info.installationAussi ? " Si tu la retires, la clé Claude mise à l'installation reprend." : ""}</p>`
       : info.source === "installation"
-        ? `<p class="sub">Clé actuelle : celle mise à l'installation (IA_ANTHROPIC_CLE). Une clé mise ici passe avant elle.</p>`
+        ? `<p class="sub">En ce moment : la clé Claude mise à l'installation (IA_ANTHROPIC_CLE). Ce que tu règles ici passe avant elle.</p>`
         : `<p class="sub">Aucune clé pour l'instant : seuls les clients qui ont mis leur propre clé peuvent lire leurs factures par IA.</p>`;
+  let four = info.fournisseur && P[info.fournisseur] ? info.fournisseur : "anthropic";
+  const choixIA = Object.entries(P)
+    .map(([id, f]) => `<label class="choix-ia"><input type="radio" name="ia-four" value="${id}" ${id === four ? "checked" : ""}> ${e(f.nom)}</label>`)
+    .join("");
   ouvrir(
-    "Clé Claude de la plateforme",
+    "IA de la plateforme",
     `<form id="f-cle" novalidate autocomplete="off">
       ${actuelle}
-      <div class="champ"><label for="ia-cle-champ">Nouvelle clé ${aide("ia-a-cle", "La clé d'API Claude qui sert à lire les factures de tous tes clients (ceux qui n'ont pas mis leur propre clé). Tu la crées sur console.anthropic.com → API Keys ; elle commence par « sk-ant- ». Les lectures sont payées sur ton compte Anthropic : garde un œil sur le crédit là-bas. Avant de la garder, le panel l'essaie chez Anthropic (gratuit). Elle est rangée sur le serveur, lisible par la passerelle seule, et ne s'affiche plus jamais en entier : seulement ses 4 derniers caractères. Seul Claude marche ici, car l'appli de tes clients parle à Claude ; ChatGPT et Gemini restent possibles avec la propre clé d'un client, dans ses réglages.")}
-        <input id="ia-cle-champ" type="password" spellcheck="false" autocapitalize="off" autocomplete="new-password" placeholder="sk-ant-…"></div>
+      <div class="champ"><label>IA ${aide("ia-a-four", "L'IA qui lit les factures de tous tes clients qui n'ont pas mis leur propre clé. Les trois marchent avec les photos et les PDF. Les lectures sont payées sur ton compte chez ce fournisseur : mets-y une limite de dépense. Le moins cher aujourd'hui : Claude Haiku 5.5 (environ 0,1 $ par million de jetons lus), puis Gemini 2.5 Flash-Lite et GPT-5 nano. Une facture d'une page fait de l'ordre de 2 000 à 5 000 jetons lus. Essaie une vraie facture après avoir changé : les modèles les moins chers se trompent plus souvent sur une photo floue.")}
+        <div class="choix-ia-liste">${choixIA}</div></div>
+      <div class="champ"><label for="ia-modele">Modèle ${aide("ia-a-mod", "Choisis dans la liste, ou écris le nom exact d'un autre modèle du même fournisseur. Le panel vérifie chez le fournisseur qu'il existe avant de le garder.")}
+        <select id="ia-modele"></select>
+        <input id="ia-modele-autre" type="text" spellcheck="false" autocapitalize="off" placeholder="nom exact du modèle" hidden></div>
+      <div class="champ"><label for="ia-cle-champ">Clé <span id="ia-cle-nom"></span> ${aide("ia-a-cle", "La clé d'API du fournisseur choisi. Claude : platform.claude.com → API keys (commence par « sk-ant- »). Gemini : aistudio.google.com → Get API key (commence par « AIza »). ChatGPT : platform.openai.com → API keys (commence par « sk- »). Elle est essayée avant d'être gardée, rangée sur le serveur (lisible par la passerelle seule) et ne s'affiche plus jamais en entier. Laisse vide pour garder la clé déjà mise et changer seulement de modèle.")}
+        <input id="ia-cle-champ" type="password" spellcheck="false" autocapitalize="off" autocomplete="new-password">
+        <p class="sub"><a id="ia-cle-ou" target="_blank" rel="noopener">Où trouver cette clé ↗</a></p></div>
+      <div class="champ"><label>Prix (dollars par million de jetons) ${aide("ia-a-prix", "Sert seulement à estimer le coût dans le tableau. Il est rempli avec le prix connu du modèle choisi ; vérifie-le sur la page des prix du fournisseur et corrige-le s'il a changé.")}
+        <div class="deux"><div class="suffixe"><input id="ia-prix-e" type="number" min="0" step="0.01"><span>lus</span></div><div class="suffixe"><input id="ia-prix-s" type="number" min="0" step="0.01"><span>écrits</span></div></div></div>
       <p class="erreur" id="ia-cle-erreur"></p>
       <div class="pied">${info.source === "panel" ? `<button class="btn danger" type="button" id="ia-cle-retirer">Retirer la clé</button>` : ""}<button class="btn principal" type="submit" id="ia-cle-ok">Essayer et enregistrer</button></div>
     </form>`,
     charger,
   );
+  const sel = $("#ia-modele");
+  const autre = $("#ia-modele-autre");
+  const remplirPrix = () => {
+    const m = P[four]?.modeles.find((x) => x.id === sel.value);
+    const garde = info.source === "panel" && four === info.fournisseur && sel.value === info.modele && info.prix ? info.prix : null;
+    const p = garde ?? m?.prix ?? null;
+    $("#ia-prix-e").value = p ? p.entree : "";
+    $("#ia-prix-s").value = p ? p.sortie : "";
+  };
+  const remplir = () => {
+    const f = P[four];
+    const actuelMod = info.fournisseur === four ? info.modele : null;
+    const connu = f.modeles.some((m) => m.id === actuelMod);
+    sel.innerHTML =
+      f.modeles.map((m) => `<option value="${e(m.id)}">${e(m.nom)} : ${e(m.note)} (${prixFr(m.prix.entree)} $ / ${prixFr(m.prix.sortie)} $)</option>`).join("") +
+      `<option value="">Autre modèle…</option>`;
+    sel.value = actuelMod && connu ? actuelMod : actuelMod ? "" : f.modeles[0].id;
+    autre.hidden = sel.value !== "";
+    autre.value = actuelMod && !connu ? actuelMod : "";
+    $("#ia-cle-nom").textContent = f.nom.split(" ")[0];
+    $("#ia-cle-ou").href = f.ou;
+    const memeIA = info.source === "panel" && info.fournisseur === four;
+    $("#ia-cle-champ").value = "";
+    $("#ia-cle-champ").placeholder = memeIA ? `vide = garder la clé ${info.fin}` : four === "anthropic" ? "sk-ant-…" : four === "openai" ? "sk-…" : "AIza…";
+    remplirPrix();
+  };
+  remplir();
+  $("#f-cle").querySelectorAll("[name=ia-four]").forEach((r) =>
+    r.addEventListener("change", () => {
+      four = r.value;
+      remplir();
+    }),
+  );
+  sel.addEventListener("change", () => {
+    autre.hidden = sel.value !== "";
+    remplirPrix();
+  });
   const fini = (r, texte) => {
     IA = r;
-    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">${e(texte)}</p>${r.avertissement ? `<p class="sub">${e(r.avertissement)}</p>` : ""}<p class="sub">Pris en compte tout de suite, sans redémarrer.</p>`;
+    $("#fenetre-corps").innerHTML = `<p class="etiquette ok">${e(texte)}</p>${r.avertissement ? `<p class="sub">${e(r.avertissement)}</p>` : ""}<p class="sub">Pris en compte tout de suite, sans redémarrer.${r.cleInfo?.fournisseur && r.cleInfo.fournisseur !== "anthropic" ? " Les sites de tes clients doivent être à jour pour lire avec cette IA." : ""}</p>`;
   };
   $("#f-cle").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const cle = $("#ia-cle-champ").value.trim();
-    if (!cle.startsWith("sk-ant-")) return ($("#ia-cle-erreur").textContent = "Une clé Claude commence par « sk-ant- ».");
+    const modele = sel.value || autre.value.trim();
+    if (!modele) return ($("#ia-cle-erreur").textContent = "Écris le nom du modèle.");
+    const pe = $("#ia-prix-e").value.trim();
+    const ps = $("#ia-prix-s").value.trim();
+    const prix = pe !== "" && ps !== "" ? { entree: Number(pe), sortie: Number(ps) } : null;
     $("#ia-cle-ok").disabled = true;
-    $("#ia-cle-erreur").textContent = "Essai de la clé chez Anthropic…";
+    $("#ia-cle-erreur").textContent = "Essai de la clé et du modèle…";
     let r;
     try {
-      r = await api("POST", "/ia/cle", { cle });
+      r = await api("POST", "/ia/cle", { fournisseur: four, modele, cle, prix });
     } catch {
       r = { message: "Le panel ne répond pas. Réessaie." };
     }
     $("#ia-cle-ok").disabled = false;
     if (!r.usage) return ($("#ia-cle-erreur").textContent = r.message || "Échec.");
-    fini(r, "Clé enregistrée");
+    fini(r, "Enregistré");
   });
   const retirer = $("#ia-cle-retirer");
   if (retirer)

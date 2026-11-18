@@ -80,7 +80,7 @@ const reponseClaude = {
 let amont: Server;
 let relais: Server;
 let dossier: string;
-let recu: { headers: IncomingMessage["headers"]; corps: Record<string, unknown> } | null = null;
+let recu: { url: string; headers: IncomingMessage["headers"]; corps: Record<string, unknown> } | null = null;
 let urlRelais = "";
 
 const ecouter = (s: Server) => new Promise<number>((ok) => s.listen(0, "127.0.0.1", () => ok((s.address() as AddressInfo).port)));
@@ -89,7 +89,16 @@ beforeAll(async () => {
   amont = createServer(async (req, res) => {
     let t = "";
     for await (const m of req) t += m;
-    recu = { headers: req.headers, corps: JSON.parse(t) };
+    recu = { url: req.url ?? "", headers: req.headers, corps: JSON.parse(t) };
+    const texteDoc = reponseClaude.content[0].text;
+    if (req.url?.includes(":generateContent")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      return void res.end(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: texteDoc }] } }], usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 200, thoughtsTokenCount: 50 } }));
+    }
+    if (req.url === "/v1/responses") {
+      res.writeHead(200, { "content-type": "application/json" });
+      return void res.end(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: texteDoc }] }], usage: { input_tokens: 900, output_tokens: 100 } }));
+    }
     if (recu.corps.stream) {
       // Lecture en continu : les mêmes événements que la vraie API.
       const { content, usage, stop_reason, ...debut } = reponseClaude;
@@ -114,11 +123,16 @@ beforeAll(async () => {
   process.env.IA_DIR = dossier;
   process.env.IA_ANTHROPIC_CLE = "sk-ant-plateforme";
   process.env.IA_ANTHROPIC_URL = `http://127.0.0.1:${pAmont}`;
+  process.env.IA_OPENAI_URL = `http://127.0.0.1:${pAmont}`;
+  process.env.IA_GEMINI_URL = `http://127.0.0.1:${pAmont}`;
   process.env.IA_QUOTA_DEFAUT = "2";
   const ia = await import("../plateforme/passerelle/ia.mjs");
   relais = createServer((req, res) => {
     const url = new URL(req.url!, "http://x");
     if (url.pathname === "/v1/ia/anthropic/v1/messages") return void ia.relayer("maison", req, res, url.search);
+    if (url.pathname === "/v1/ia/openai/v1/responses") return void ia.relayerAutre("maison", req, res, "openai");
+    const g = url.pathname.match(/^\/v1\/ia\/gemini\/v1beta\/models\/([A-Za-z0-9._-]+):generateContent$/);
+    if (g) return void ia.relayerAutre("maison", req, res, "gemini", g[1]);
     res.writeHead(404).end();
   });
   urlRelais = `http://127.0.0.1:${await ecouter(relais)}/v1/ia/anthropic`;
@@ -147,7 +161,7 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(recu!.corps.stream).toBe(true);
     expect(recu!.corps.max_tokens).toBe(64000);
     const usage = JSON.parse(readFileSync(join(dossier, "usage", "maison.json"), "utf8"));
-    expect(Object.values(usage)[0]).toEqual({ lectures: 1, entree: 1200, sortie: 300 });
+    expect(Object.values(usage)[0]).toEqual({ lectures: 1, entree: 1200, sortie: 300, cout: 0.0108 });
   });
 
   it("refuse au-delà du quota du mois, avec un message pour le client", async () => {
@@ -174,6 +188,47 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(recu!.headers["x-api-key"]).toBe("sk-ant-plateforme");
   });
 
+  it("Claude Haiku choisi dans le panel : le modèle est remplacé et le secours retiré", async () => {
+    writeFileSync(join(dossier, "cle.json"), JSON.stringify({ fournisseur: "anthropic", modele: "claude-haiku-5-5", cle: "sk-ant-du-panel", prix: { entree: 0.1, sortie: 0.5 } }));
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    expect(r.ok).toBe(true);
+    expect(recu!.corps.model).toBe("claude-haiku-5-5");
+    expect(recu!.corps.fallbacks).toBeUndefined();
+    expect(String(recu!.headers["anthropic-beta"] ?? "")).not.toContain("server-side-fallback");
+    rmSync(join(dossier, "cle.json"));
+  });
+
+  it("Gemini et ChatGPT avec la clé de la plateforme : relayés, comptés avec leur prix", async () => {
+    const urlBase = urlRelais.replace(/\/anthropic$/, "");
+    const doc = "data:application/pdf;base64,JVBERi0=";
+    writeFileSync(join(dossier, "cle.json"), JSON.stringify({ fournisseur: "gemini", modele: "gemini-2.5-flash", cle: "AIzaCleDeGoogle", prix: { entree: 0.3, sortie: 2.5 } }));
+    const avant = JSON.parse(readFileSync(join(dossier, "usage", "maison.json"), "utf8"));
+    const lecturesAvant = (Object.values(avant)[0] as { lectures: number }).lectures;
+    const corpsG = { contents: [{ role: "user", parts: [{ inline_data: { mime_type: "application/pdf", data: "JVBERi0=" } }, { text: "lis" }] }], generationConfig: { responseMimeType: "application/json" } };
+    let r = await fetch(`${urlBase}/gemini/v1beta/models/gemini-2.5-flash:generateContent`, { method: "POST", body: JSON.stringify(corpsG) });
+    expect(r.status).toBe(200);
+    expect(recu!.headers["x-goog-api-key"]).toBe("AIzaCleDeGoogle");
+    // Autre modèle que celui du panel, ou ancienne appli qui appelle Claude : refusé.
+    r = await fetch(`${urlBase}/gemini/v1beta/models/gemini-2.5-pro:generateContent`, { method: "POST", body: JSON.stringify(corpsG) });
+    expect(r.status).toBe(400);
+    const claude = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    expect(claude).toMatchObject({ ok: false, code: "ia_changee" });
+    // Outil ou consigne système : refusés.
+    r = await fetch(`${urlBase}/gemini/v1beta/models/gemini-2.5-flash:generateContent`, { method: "POST", body: JSON.stringify({ ...corpsG, tools: [{}] }) });
+    expect(r.status).toBe(400);
+
+    writeFileSync(join(dossier, "cle.json"), JSON.stringify({ fournisseur: "openai", modele: "gpt-5-mini", cle: "sk-cle-openai", prix: { entree: 0.25, sortie: 2 } }));
+    const corpsO = { model: "gpt-5-mini", input: [{ role: "user", content: [{ type: "input_file", filename: "f.pdf", file_data: doc }, { type: "input_text", text: "lis" }] }], text: { format: { type: "json_schema", name: "document", schema: {}, strict: true } } };
+    r = await fetch(`${urlBase}/openai/v1/responses`, { method: "POST", body: JSON.stringify(corpsO) });
+    expect(r.status).toBe(200);
+    expect(recu!.headers.authorization).toBe("Bearer sk-cle-openai");
+    const u = JSON.parse(readFileSync(join(dossier, "usage", "maison.json"), "utf8"));
+    const m = Object.values(u)[0] as { lectures: number; cout: number };
+    expect(m.lectures).toBe(lecturesAvant + 2);
+    expect(m.cout).toBeGreaterThan(0);
+    rmSync(join(dossier, "cle.json"));
+  });
+
   it("refuse une demande qui n'est pas une lecture", async () => {
     const { controler } = await import("../plateforme/passerelle/ia.mjs");
     const ok = { model: "claude-opus-5-5", max_tokens: 16000, messages: [{ role: "user", content: [{ type: "text", text: "x" }] }] };
@@ -185,7 +240,7 @@ describe("lecture avec la clé de la plateforme", () => {
   });
 });
 
-describe("clé Claude réglée dans le panel", () => {
+describe("IA de la plateforme réglée dans le panel", () => {
   const cleOk = "sk-ant-api03-" + "a".repeat(40) + "WXYZ";
   const faux = (statut: number) => (async () => new Response("{}", { status: statut })) as unknown as typeof fetch;
 
@@ -193,14 +248,33 @@ describe("clé Claude réglée dans le panel", () => {
     const d = mkdtempSync(join(tmpdir(), "panel-"));
     const ia = await import("../plateforme/panel/ia.mjs");
     expect((await ia.resume(d)).cle).toBe(false);
-    expect(await ia.reglerCle(d, { cle: cleOk }, faux(200))).toEqual({ avertissement: null });
+    expect(await ia.reglerCle(d, { fournisseur: "anthropic", modele: "claude-haiku-5-5", cle: cleOk }, faux(200))).toEqual({ avertissement: null });
     expect(statSync(join(d, "ia", "cle.json")).mode & 0o777).toBe(0o600);
     const r = await ia.resume(d);
     expect(r.cle).toBe(true);
-    expect(r.cleInfo).toMatchObject({ source: "panel", fin: "sk-ant-…WXYZ" });
+    expect(r.cleInfo).toMatchObject({ source: "panel", fournisseur: "anthropic", modele: "claude-haiku-5-5", fin: "…WXYZ" });
     expect(JSON.stringify(r)).not.toContain(cleOk);
     await ia.reglerCle(d, { cle: null });
     expect((await ia.resume(d)).cle).toBe(false);
+  });
+
+  it("Gemini : modèle inconnu refusé, changer de modèle sans retaper la clé", async () => {
+    const d = mkdtempSync(join(tmpdir(), "panel-"));
+    const ia = await import("../plateforme/panel/ia.mjs");
+    const cleG = "AIza" + "b".repeat(35);
+    await expect(ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-9", cle: cleG }, faux(404))).rejects.toThrow(/n'existe pas/);
+    let vu = "";
+    const espion = (async (url: string) => {
+      vu = url;
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.6-flash", cle: cleG }, espion);
+    expect(vu).toContain("/v1beta/models/gemini-3.6-flash");
+    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.8-flash", cle: "" }, faux(200));
+    const f = JSON.parse(readFileSync(join(d, "ia", "cle.json"), "utf8"));
+    expect(f).toMatchObject({ fournisseur: "gemini", modele: "gemini-3.8-flash", cle: cleG, prix: { entree: 0.75, sortie: 3.75 } });
+    // Autre IA sans clé : refusé (la clé Gemini ne sert pas pour ChatGPT).
+    await expect(ia.reglerCle(d, { fournisseur: "openai", modele: "gpt-5-mini", cle: "" }, faux(200))).rejects.toThrow(/Colle la clé/);
   });
 
   it("refuse une clé fausse ou refusée par Anthropic, garde une clé non essayée avec un avertissement", async () => {
