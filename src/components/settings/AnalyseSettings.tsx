@@ -10,11 +10,27 @@ import type { ModeAnalyse, ModesAnalyse } from "@/lib/ia/analyse";
  * (factures, mercuriales). Le choix n'apparaît que si l'offre comprend les
  * deux (réglé par RecipeLog dans le panel) ; sinon on dit lequel s'applique.
  */
-export function AnalyseSettings({ initial }: { initial: ModesAnalyse }) {
+export function AnalyseSettings({
+  initial,
+  quota = null,
+}: {
+  initial: ModesAnalyse;
+  /** RecipeLog en ligne : les lectures par IA du mois (ou « injoignable »). null : installé chez soi. */
+  quota?: { disponible: boolean; limite: number; utilise: number } | "injoignable" | null;
+}) {
   const [m, setM] = useState(initial);
   const [msg, setMsg] = useState<{ ok: boolean; texte: string } | null>(null);
   const [pending, start] = useTransition();
   const deux = m.ia && m.mcp;
+  // Où en est l'IA de RecipeLog, affiché sous « Analyser par l'IA ».
+  const etatIA =
+    quota === null
+      ? null
+      : quota === "injoignable"
+        ? "RecipeLog ne répond pas pour l'instant"
+        : !quota.disponible
+          ? "Pas encore ouverte : demande-la à RecipeLog"
+          : `${quota.utilise} lecture(s) utilisée(s) sur ${quota.limite} ce mois-ci`;
 
   function choisir(prefere: ModeAnalyse) {
     setMsg(null);
@@ -36,7 +52,8 @@ export function AnalyseSettings({ initial }: { initial: ModesAnalyse }) {
             L&apos;IA : elle la lit tout de suite et tu vérifies les lignes. Claude (MCP) : elle attend dans « À traiter », puis tu demandes à
             Claude, avec le connecteur RecipeLog, de la remplir ; ça n&apos;utilise pas de lecture par IA. Les deux boutons restent proposés à
             chaque dépôt : ce réglage choisit celui mis en avant.
-            {!deux && " Ton offre n'en comprend qu'un : c'est RecipeLog qui le règle."}
+            {quota !== null && " Sur RecipeLog en ligne, l'IA est fournie par RecipeLog avec un nombre de lectures par mois."}
+            {!deux && " Ton offre n'en comprend qu'un (ou aucun) : c'est RecipeLog qui le règle."}
           </Help>
         </legend>
         {deux ? (
@@ -45,7 +62,10 @@ export function AnalyseSettings({ initial }: { initial: ModesAnalyse }) {
               <input type="radio" name="analyse" checked={m.prefere === "ia"} onChange={() => choisir("ia")} />
               <span>
                 <b>Analyser par l&apos;IA</b>
-                <small>L&apos;IA lit le document tout de suite, tu vérifies</small>
+                <small>
+                  L&apos;IA lit le document tout de suite, tu vérifies
+                  {etatIA && <> · {etatIA}</>}
+                </small>
               </span>
             </label>
             <label className="ia-mode">
@@ -60,7 +80,9 @@ export function AnalyseSettings({ initial }: { initial: ModesAnalyse }) {
           <p className="sub" style={{ margin: 0 }}>
             {m.mcp
               ? "Ton offre : Claude (MCP). Tes documents attendent « à traiter » et Claude les remplit par le connecteur RecipeLog."
-              : "Ton offre : analyse par l'IA. Tes documents sont lus par l'IA, puis tu vérifies les lignes."}
+              : m.ia
+                ? `Ton offre : analyse par l'IA. Tes documents sont lus par l'IA, puis tu vérifies les lignes.${etatIA ? ` (${etatIA})` : ""}`
+                : "Ton offre ne comprend pas la lecture des documents : les factures et les prix se saisissent à la main, les mercuriales Excel ou CSV restent lisibles."}
           </p>
         )}
       </fieldset>

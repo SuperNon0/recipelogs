@@ -25,6 +25,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       "« À traiter » (page Factures) et « Mercuriales à traiter » (fiche du fournisseur) rappellent quoi dire à Claude, et « Analyser par l'IA » n'apparaît que si l'IA est comprise",
       "Claude (connecteur RecipeLog) : « analyse ma mercuriale à traiter ». Il la trouve, la lit page par page et enregistre chaque prix chez le bon fournisseur ; elle quitte ensuite la liste",
     ],
+    fixes: [
+      "Réglages → Lecture des factures : sur RecipeLog en ligne, le bloc « Lecture par IA / D'où vient l'IA ? » a disparu. Il ne reste que le choix IA ou Claude, avec les lectures du mois (ou « pas encore ouverte ») sous « Analyser par l'IA »",
+    ],
     migrations: ["Les documents à traiter savent s'ils sont une facture ou une mercuriale : fait tout seul à la mise à jour"],
   },
   {

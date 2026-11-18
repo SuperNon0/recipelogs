@@ -7,7 +7,7 @@ import type { FournisseurIA, ModeIA, ReglagesIAPublic } from "@/lib/ia/reglages"
 
 type Infos = { id: FournisseurIA; nom: string; modele: string; ouObtenir: string };
 
-/** Réglages → Lecture des factures : d'où vient l'IA, et la clé du client s'il met la sienne. */
+/** Réglages → Lecture des factures, RecipeLog installé chez soi : la clé d'IA du client (ou coupée). Pas affiché sur RecipeLog en ligne. */
 export function AiSettings({
   initial,
   quota,
