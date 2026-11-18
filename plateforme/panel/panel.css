@@ -611,7 +611,7 @@ pre.pf-log { margin: 0; padding: 12px; border-top: 1px solid var(--line); backgr
 .nt-ic.t-panne, .nt-ic.t-sauvegarde, .nt-ic.t-disque { background: var(--danger-dim); color: var(--danger); }
 .nt-ic.t-support, .nt-ic.t-vitrine { background: var(--prog-dim); color: var(--prog); }
 .nt-ic.t-essai, .nt-ic.t-maintenance, .nt-ic.t-demo { background: var(--warn-dim); color: var(--warn); }
-.nt-ic.t-maj, .nt-ic.t-test { background: var(--ok-dim); color: var(--ok); }
+.nt-ic.t-maj, .nt-ic.t-test, .nt-ic.ok { background: var(--ok-dim); color: var(--ok); }
 @media (max-width: 639px) {
   .notif { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px 12px; }
   .notif .actions { grid-column: 1 / -1; justify-content: flex-end; }

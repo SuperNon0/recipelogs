@@ -835,7 +835,7 @@ createServer(async (req, res) => {
       return repondre(res, 200, await actionTicket(qui, morceaux[1], morceaux[2], morceaux[3], await lireCorps(req)));
     }
     if (req.method === "POST" && (url.pathname === "/alertes/essai" || url.pathname === "/notifications/essai")) {
-      const r = await alerter("test", "🔔 Essai de notification RecipeLog", `Envoyé depuis le panel par ${qui}. Si tu lis ceci, les notifications marchent.`);
+      const r = await alerter("test", "🔔 Essai de notification", `Envoyé depuis le panel par ${qui}. Les notifications marchent.`, { champs: { qui } });
       const discord = r.canaux.discord === null ? "pas réglé (mets l'adresse de BotPanel dans les réglages des notifications)" : r.canaux.discord === true ? "envoyé ✅" : `échec ❌ (${r.canaux.discord})`;
       const lignes = [`Discord (BotPanel) : ${discord}`, `Panel : ${r.canaux.panel === true ? "ajoutée ✅" : "pas gardée"}`];
       const ok = r.canaux.discord === true;
@@ -936,7 +936,12 @@ async function essais() {
   if (r.sortie) {
     await noter("automatique", "fin-essai", "-", r);
     const finis = String(r.sortie).split("\n").map((l) => l.match(/Essai de (\S+) terminé le (\S+) :/)).filter(Boolean);
-    if (finis.length) void alerter("essai", "⏳ Fin d'essai", `${finis.map((m) => `${m[1]} (essai fini le ${m[2]})`).join(", ")} : site mis en pause. Panel → Clients pour le réactiver s'il s'abonne.`);
+    if (finis.length) {
+      const clients = finis.map((m) => m[1]).join(", ");
+      void alerter("essai", `⏳ Fin d'essai : ${clients}`, "Site mis en pause. Réactive-le dans le panel s'il s'abonne.", {
+        champs: { clients, fin: finis.map((m) => m[2].split("-").reverse().join("/")).join(", ") },
+      });
+    }
   }
 }
 setTimeout(() => essais().catch((e) => console.error("Essais :", e.message)), 60 * 1000);
@@ -1006,8 +1011,9 @@ async function tourPlanning() {
     await ecrirePlanning(fait);
     await noter("automatique", "sauvegardes-nuit", "tous", { ok: !rates.length, sortie: lignes.join("\n") }, { essai: s.n });
     if (rates.length) {
-      const suite = s.n < 3 ? "Nouvel essai dans une heure." : "Trois essais ratés cette nuit : regarde le journal du panel (souvent : disque plein).";
-      void alerter("sauvegarde", "🔴 Sauvegarde de la nuit ratée", `Pas sauvegardé : ${rates.map((n) => (n === PLATEFORME ? "la plateforme" : n)).join(", ")}. ${suite}`);
+      const suite = s.n < 3 ? "Nouvel essai dans une heure." : "3 essais ratés cette nuit : regarde le journal du panel (souvent : disque plein).";
+      const qui = rates.map((n) => (n === PLATEFORME ? "plateforme" : n)).join(", ");
+      void alerter("sauvegarde", "💾 Sauvegarde de la nuit ratée", `${qui}. ${suite}`, { champs: { quoi: "Sauvegarde de la nuit ratée", clients: qui, essai: `${s.n} sur 3` } });
     }
   }
 
@@ -1022,7 +1028,7 @@ async function tourPlanning() {
     }
     if (vieux.length) {
       await noter("automatique", "sauvegardes-controle", "tous", { ok: false, sortie: `Pas de sauvegarde depuis plus de 36 heures : ${vieux.join(", ")}.` });
-      void alerter("sauvegarde", "🔴 Clients sans sauvegarde récente", `Pas de sauvegarde depuis plus de 36 heures : ${vieux.join(", ")}. Regarde le journal du panel.`);
+      void alerter("sauvegarde", "💾 Pas de sauvegarde depuis 36 h", `${vieux.join(", ")}. Regarde le journal du panel.`, { champs: { quoi: "Pas de sauvegarde depuis 36 h", clients: vieux.join(", "), essai: "—" } });
     }
   }
 
@@ -1039,7 +1045,7 @@ async function tourPlanning() {
     const demos = (await clientsBruts()).filter((c) => c.demo).map((c) => c.nom);
     const r = await unParUn(() => outilLong(["demo-remettre", "--toutes"]), demos, "remise à zéro des démos");
     if (r.sortie) await noter("automatique", "demo-remettre", "démos", r);
-    if (!r.ok) void alerter("demo", "⚠️ Démo non remise à zéro", fin(r));
+    if (!r.ok) void alerter("demo", "🎭 Démo pas remise à zéro", fin(r), { champs: { erreur: String(fin(r)).slice(0, 300) } });
   }
 
   // --- test de restauration de la semaine
@@ -1059,7 +1065,7 @@ async function tourPlanning() {
       }
     }
     await noter("automatique", "test-sauvegardes", "tous", { ok: !rates.length, sortie: lignes.join("\n") });
-    if (rates.length) void alerter("sauvegarde", "🔴 Test de restauration raté", `Ces sauvegardes ne se restaurent pas : ${rates.join(", ")}. Regarde le journal du panel.`);
+    if (rates.length) void alerter("sauvegarde", "💾 Test de restauration raté", `${rates.join(", ")} : ces sauvegardes ne se restaurent pas. Regarde le journal du panel.`, { champs: { quoi: "Test de restauration raté", clients: rates.join(", "), essai: "—" } });
   }
 }
 // Un seul tour à la fois : des sauvegardes longues (plus de 5 minutes) ne se chevauchent pas.
@@ -1107,7 +1113,11 @@ async function surveiller() {
       ticketsVus.add(`${t.id}:${t.messages.length}`);
       if (!ticketsInitialises) continue; // au démarrage : pas de rafale pour les anciennes
       const dernier = t.messages.at(-1);
-      void alerter("support", `📩 ${t.messages.length > 1 ? "Nouveau message" : "Nouvelle demande"} de ${t.client}`, `${t.email} : ${String(dernier?.texte ?? "").slice(0, 300)}`);
+      const nature = t.messages.length > 1 ? "Nouveau message" : "Nouvelle demande";
+      const extrait = String(dernier?.texte ?? "").replace(/\s+/g, " ").trim();
+      void alerter("support", `📩 ${nature} de ${t.client}`, `${t.email} : ${extrait.slice(0, 300)}`, {
+        champs: { nature, client: t.client, email: t.email, extrait: extrait.length > 280 ? `${extrait.slice(0, 280)}…` : extrait },
+      });
     }
     ticketsInitialises = true;
   } catch (e) {
@@ -1122,7 +1132,11 @@ async function surveiller() {
         demandesVues.add(d.cle);
         if (!demandesInitialisees) continue; // au démarrage : pas de rafale pour les anciennes
         const qui = [d.nom, d.etab, d.email].filter(Boolean).join(" · ");
-        void alerter("vitrine", "🌐 Nouvelle demande sur la vitrine", `${qui}${d.msg ? ` : ${String(d.msg).slice(0, 300)}` : ""}\nPanel → Site vitrine pour créer le client.`);
+        const nature = d.type === "question" ? "Question" : "Demande d'essai";
+        const extrait = String(d.msg ?? "").replace(/\s+/g, " ").trim();
+        void alerter("vitrine", `🌐 ${nature} sur la vitrine`, `${qui}${extrait ? ` : ${extrait.slice(0, 300)}` : ""}`, {
+          champs: { nature, nom: d.nom, etab: d.etab, email: d.email, extrait: extrait.length > 280 ? `${extrait.slice(0, 280)}…` : extrait },
+        });
       }
       demandesInitialisees = true;
     } catch (e) {

@@ -44,6 +44,13 @@ describe("notifications du panel (Discord par BotPanel + cloche)", () => {
     expect(recus.at(-1)).toMatchObject({ id: "recipelog_support", vars: { titre: "📩 Nouvelle demande de maison", texte: "chef@maison.fr : bonjour", type: "support" } });
   });
 
+  it("envoie les infos rangées et le retour à la normale sur <slug>_ok", async () => {
+    await n.notifier("panne", "✅ maison est revenu", "Panne de 3 min.", { niveau: "ok", champs: { qui: "maison", duree: "3 min", vide: "", "Pas-bon": "x" } });
+    expect(recus.at(-1)).toMatchObject({ id: "recipelog_panne_ok", vars: { qui: "maison", duree: "3 min", vide: "—", titre: "✅ maison est revenu" } });
+    expect(recus.at(-1)?.vars).not.toHaveProperty("Pas-bon");
+    expect((await n.resume()).liste[0].niveau).toBe("ok");
+  });
+
   it("respecte les cases Discord / Panel et dit pourquoi BotPanel a refusé", async () => {
     await n.regler({ types: { disque: { discord: false }, demo: { panel: false }, maj: { slug: "inconnu" } } });
     const avant = recus.length;

@@ -338,7 +338,8 @@ Dans BotPanel → **Notifications** → **+ Nouveau**, une notification par sort
 
 | Slug | Pour |
 |---|---|
-| `recipelog_panne` | site ou service en panne, puis revenu |
+| `recipelog_panne` | site ou service en panne (rouge) |
+| `recipelog_panne_ok` | site ou service revenu (vert) |
 | `recipelog_disque` | disque presque plein |
 | `recipelog_sauvegarde` | sauvegarde ratée, client sans sauvegarde, test de restauration raté |
 | `recipelog_support` | nouvelle demande ou nouveau message de support |
@@ -350,7 +351,12 @@ Dans BotPanel → **Notifications** → **+ Nouveau**, une notification par sort
 | `recipelog_test` | le bouton « Tester » du panel |
 
 Dans chacune : titre `{var:titre}`, message `{var:texte}` (et si tu veux un bouton ou un
-lien : `{var:lien}`, l'adresse du panel). Le salon, la couleur et le mode (direct, fil,
+lien : `{var:lien}`, l'adresse du panel). Chaque sorte envoie aussi des infos rangées, à
+mettre en **champs** dans l'embed : panne `qui`, `genre`, `depuis`, `conseil` (retour :
+`qui`, `genre`, `duree`) · disque `pourcent`, `libre`, `etat` · sauvegarde `quoi`,
+`clients`, `essai` · support `nature`, `client`, `email`, `extrait` · vitrine `nature`,
+`nom`, `etab`, `email`, `extrait` · essai `clients`, `fin` · nouvelle version `resume` ·
+maintenance `quand`, `pour` · démo `erreur` · essai du panel `qui`. Le salon, la couleur et le mode (direct, fil,
 forum) se choisissent dans BotPanel. Tu peux aussi donner le même slug à plusieurs sortes
 dans le panel (Réglages → « Noms des notifications dans BotPanel ») pour tout regrouper.
 

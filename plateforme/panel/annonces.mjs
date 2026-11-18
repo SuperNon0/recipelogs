@@ -273,7 +273,7 @@ export async function tour(ctx) {
         const rien = l.envoyes === 0 && (l.echecs > 0 || l.illisibles > 0);
         // Personne n'a rien reçu (connexion ou envoi d'emails en panne) : on réessaie aux tours suivants, 5 fois au plus.
         if (rien && essais < 5) await marquer(false, essais);
-        if (rien && essais >= 5) await ctx.alerter?.("maintenance", "⚠️ Préavis de maintenance non envoyé", `Aucun email de préavis n'a pu partir pour la maintenance ${plage(m)} (${pour}). Regarde Maintenance → Journal des envois dans le panel.`);
+        if (rien && essais >= 5) await ctx.alerter?.("maintenance", "🛠️ Préavis de maintenance pas envoyé", `Aucun email n'est parti (5 essais). Regarde Maintenance → Journal des envois.`, { champs: { quand: plage(m), pour } });
         if (!rien || essais >= 5) await ctx.noter("automatique", "preavis", pour, { ok: l.echecs === 0 && !rien, sortie: `${l.envoyes} email(s) de préavis envoyé(s), ${l.echecs} échec(s).\n${l.details.join("\n")}` });
       })
       .catch((e) => console.error("Préavis :", e.message));
