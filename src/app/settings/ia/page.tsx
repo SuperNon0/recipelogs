@@ -26,9 +26,15 @@ export default async function AiSettingsPage() {
         <h1>Lecture des factures</h1>
         <p className="sub">Une photo ou un PDF de facture ou de mercuriale devient des lignes de prix, lues par l&apos;IA ou par Claude</p>
       </div>
-      <AnalyseSettings initial={modes} />
-      <h2 className="sect-title" style={{ marginTop: 18 }}>Lecture par IA</h2>
-      <AiSettings initial={reglages} quota={quota} fournisseurs={FOURNISSEURS_IA} iaPlateforme={modes.panel !== "mcp"} />
+      <AnalyseSettings initial={modes} quota={reglages.plateforme ? (quota ?? "injoignable") : null} />
+      {/* RecipeLog en ligne : l'IA vient de RecipeLog et le panel l'ouvre ou la coupe, rien d'autre à régler.
+          Installé chez soi : le client met sa propre clé d'IA. */}
+      {!reglages.plateforme && !reglages.demo && (
+        <>
+          <h2 className="sect-title" style={{ marginTop: 18 }}>Ta clé d&apos;IA</h2>
+          <AiSettings initial={reglages} quota={null} fournisseurs={FOURNISSEURS_IA} />
+        </>
+      )}
     </div>
   );
 }

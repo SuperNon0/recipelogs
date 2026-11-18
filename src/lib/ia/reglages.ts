@@ -38,8 +38,9 @@ export async function getReglagesIA(): Promise<ReglagesIA> {
   const fournisseur = estFournisseur(v.fournisseur) ? v.fournisseur : "anthropic";
   let mode: ModeIA = v.mode === "cle" || v.mode === "off" || v.mode === "plateforme" ? v.mode : surPlateforme() ? "plateforme" : "off";
   if (mode === "plateforme" && !surPlateforme()) mode = "off";
-  // RecipeLog en ligne : pas de clé d'IA du client pour l'instant (Noë, 18/11/2026), seulement celle de la plateforme.
-  if (mode === "cle" && surPlateforme()) mode = "plateforme";
+  // RecipeLog en ligne : pas de clé d'IA du client (Noë, 18/11/2026), seulement celle de la plateforme,
+  // et c'est le panel (« Analyse des documents ») qui ouvre ou coupe l'IA, plus le client.
+  if (surPlateforme()) mode = "plateforme";
   if (isDemo()) mode = "off";
   return {
     mode,
