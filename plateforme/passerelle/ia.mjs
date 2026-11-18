@@ -7,6 +7,7 @@
 //   Claude  : POST /v1/ia/anthropic/v1/messages                     (SDK Anthropic)
 //   ChatGPT : POST /v1/ia/openai/v1/responses
 //   Gemini  : POST /v1/ia/gemini/v1beta/models/<modèle>:generateContent
+//             ou :streamGenerateContent?alt=sse (en continu : une longue lecture n'est pas coupée)
 //
 // Fichiers (dossier /ia, partagé avec le moteur du panel) :
 //   reglages.json        écrit par le panel : { defaut: 30, clients: { maison: 100 },
@@ -386,8 +387,9 @@ export function controlerGemini(corps) {
  * @param {import("node:http").ServerResponse} res
  * @param {"openai" | "gemini"} fournisseur
  * @param {string | null} [modeleChemin]
+ * @param {boolean} [flux] Gemini en continu (streamGenerateContent?alt=sse)
  */
-export async function relayerAutre(client, req, res, fournisseur, modeleChemin = null) {
+export async function relayerAutre(client, req, res, fournisseur, modeleChemin = null, flux = false) {
   const conf = await configActuelle();
   if (!conf) return refuser(res, 503, "ia_indisponible", "La lecture par IA n'est pas encore ouverte sur la plateforme.");
   if (conf.fournisseur !== fournisseur) return mauvaiseIA(res, client, conf);
@@ -404,7 +406,9 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
   if (!(await reserver(client, res))) return;
   try {
     const amont = await fetch(
-      fournisseur === "openai" ? `${AMONT_OPENAI}/v1/responses` : `${AMONT_GEMINI}/v1beta/models/${encodeURIComponent(conf.modele)}:generateContent`,
+      fournisseur === "openai"
+        ? `${AMONT_OPENAI}/v1/responses`
+        : `${AMONT_GEMINI}/v1beta/models/${encodeURIComponent(conf.modele)}:${flux ? "streamGenerateContent?alt=sse" : "generateContent"}`,
       {
         method: "POST",
         headers: { "content-type": "application/json", ...(fournisseur === "openai" ? { authorization: `Bearer ${conf.cle}` } : { "x-goog-api-key": conf.cle }) },
@@ -412,6 +416,52 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
         signal: AbortSignal.timeout(DELAI_FLUX_MS),
       },
     );
+    // Gemini en continu : la réponse est transmise au fil de l'eau ; chaque morceau porte
+    // la consommation jusque-là (usageMetadata) et le dernier la raison de fin.
+    if (flux && amont.ok && amont.body) {
+      res.writeHead(200, { "Content-Type": amont.headers.get("content-type") || "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
+      const decodeur = new TextDecoder();
+      let reste = "";
+      let u = {};
+      let fin = null;
+      const lire = (bloc) => {
+        for (const l of bloc.split("\n")) {
+          if (!l.startsWith("data:")) continue;
+          try {
+            const j = JSON.parse(l.slice(5));
+            if (j.usageMetadata) u = j.usageMetadata;
+            if (j.candidates?.[0]?.finishReason) fin = j.candidates[0].finishReason;
+          } catch {
+            /* morceau illisible : transmis quand même */
+          }
+        }
+      };
+      try {
+        for await (const m of amont.body) {
+          res.write(m);
+          reste += decodeur.decode(m, { stream: true }).replace(/\r/g, "");
+          let i;
+          while ((i = reste.indexOf("\n\n")) >= 0) {
+            lire(reste.slice(0, i));
+            reste = reste.slice(i + 2);
+          }
+        }
+        if (reste) lire(reste);
+      } catch (e) {
+        console.error(`IA : lecture de ${client} coupée en route (${e.message})`);
+        res.destroy();
+        return;
+      }
+      if (fin === "STOP") {
+        await compter(client, u.promptTokenCount ?? 0, (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0), conf.prix).catch((e) =>
+          console.error(`IA : usage de ${client} non noté (${e.message})`),
+        );
+      } else {
+        console.error(`IA : lecture de ${client} non comptée (fin : ${fin ?? "inconnue"}).`);
+      }
+      res.end();
+      return;
+    }
     const texte = await amont.text();
     if (amont.ok) {
       let j = {};

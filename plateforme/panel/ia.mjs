@@ -35,9 +35,9 @@ export const IA_PROPOSEES = {
     nom: "Gemini (Google)",
     ou: "https://aistudio.google.com/apikey",
     modeles: [
-      { id: "gemini-2.5-flash", nom: "Gemini 2.5 Flash", note: "pas cher, bon sur les photos", prix: { entree: 0.3, sortie: 2.5 } },
-      { id: "gemini-2.5-flash-lite", nom: "Gemini 2.5 Flash-Lite", note: "le moins cher de Google", prix: { entree: 0.1, sortie: 0.4 } },
-      { id: "gemini-2.5-pro", nom: "Gemini 2.5 Pro", note: "plus précis", prix: { entree: 1.25, sortie: 10 } },
+      // Les modèles Gemini 2.5 sont en fin de vie chez Google (2026) : Gemini 3.8 Flash est le modèle stable actuel.
+      // Prix de lancement jusqu'au 31/12/2026 (1,50 / 7,50 $ ensuite, d'après les annonces) : à corriger dans le panel le moment venu.
+      { id: "gemini-3.8-flash", nom: "Gemini 3.8 Flash", note: "bon sur les photos et les PDF", prix: { entree: 0.75, sortie: 3.75 } },
     ],
   },
   openai: {

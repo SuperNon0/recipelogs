@@ -50,8 +50,9 @@ async function traiter(req, res) {
   if (chemin === "/v1/ia/quota" && req.method === "GET") return repondre(res, 200, await quota(nom));
   if (chemin === "/v1/ia/anthropic/v1/messages" && req.method === "POST") return relayer(nom, req, res, url.search);
   if (chemin === "/v1/ia/openai/v1/responses" && req.method === "POST") return relayerAutre(nom, req, res, "openai");
-  const g = chemin.match(/^\/v1\/ia\/gemini\/v1beta\/models\/([A-Za-z0-9._-]{1,100}):generateContent$/);
-  if (g && req.method === "POST") return relayerAutre(nom, req, res, "gemini", g[1]);
+  // Gemini : en un bloc (generateContent) ou en continu (streamGenerateContent?alt=sse, longues mercuriales).
+  const g = chemin.match(/^\/v1\/ia\/gemini\/v1beta\/models\/([A-Za-z0-9._-]{1,100}):(generateContent|streamGenerateContent)$/);
+  if (g && req.method === "POST") return relayerAutre(nom, req, res, "gemini", g[1], g[2] === "streamGenerateContent");
   // Support : « Signaler un problème » depuis l'appli (le client est celui de la clé).
   if (chemin === "/v1/support" && req.method === "POST") return repondre(res, 201, { demande: await creerDemande(nom, await lireJson(req)) });
   if (chemin === "/v1/support" && req.method === "GET") return repondre(res, 200, { demandes: await listerDemandes(nom, url.searchParams.get("email") ?? "") });

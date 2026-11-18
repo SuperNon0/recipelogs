@@ -268,11 +268,11 @@ describe("IA de la plateforme réglée dans le panel", () => {
       vu = url;
       return new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
-    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-2.5-flash", cle: cleG }, espion);
-    expect(vu).toContain("/v1beta/models/gemini-2.5-flash");
-    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-2.5-flash-lite", cle: "" }, faux(200));
+    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.6-flash", cle: cleG }, espion);
+    expect(vu).toContain("/v1beta/models/gemini-3.6-flash");
+    await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.8-flash", cle: "" }, faux(200));
     const f = JSON.parse(readFileSync(join(d, "ia", "cle.json"), "utf8"));
-    expect(f).toMatchObject({ fournisseur: "gemini", modele: "gemini-2.5-flash-lite", cle: cleG, prix: { entree: 0.1, sortie: 0.4 } });
+    expect(f).toMatchObject({ fournisseur: "gemini", modele: "gemini-3.8-flash", cle: cleG, prix: { entree: 0.75, sortie: 3.75 } });
     // Autre IA sans clé : refusé (la clé Gemini ne sert pas pour ChatGPT).
     await expect(ia.reglerCle(d, { fournisseur: "openai", modele: "gpt-5-mini", cle: "" }, faux(200))).rejects.toThrow(/Colle la clé/);
   });
