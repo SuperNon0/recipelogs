@@ -47,8 +47,23 @@ export async function limitesFactures(): Promise<LimitesFactures> {
   return { attente: q.quota.factures.attente, pages: Math.min(PAGES_MAX_ABSOLU, Math.max(1, q.quota.factures.pages)) };
 }
 
+/** Ce qui attend : une facture, ou une mercuriale (liste de prix) d'un fournisseur. */
+export type PendingKind = "facture" | "mercuriale";
+
+/**
+ * Une mercuriale fait souvent plus de pages qu'une facture (13 pages chez
+ * Soframa) : elle peut toujours en avoir jusqu'au plafond absolu.
+ */
+export function pagesMax(kind: PendingKind, limites: LimitesFactures): number {
+  return kind === "mercuriale" ? PAGES_MAX_ABSOLU : limites.pages;
+}
+
 export type PendingInvoiceItem = {
   id: number;
+  kind: PendingKind;
+  /** Mercuriale : son fournisseur (null s'il a été supprimé). */
+  supplierId: number | null;
+  supplierName: string | null;
   pages: number;
   pdf: boolean;
   note: string | null;
@@ -57,8 +72,13 @@ export type PendingInvoiceItem = {
   createdAt: string;
 };
 
-const versItem = (p: { id: number; files: string[]; note: string | null; addedBy: string | null; lastError: string | null; createdAt: Date }): PendingInvoiceItem => ({
+type Ligne = { id: number; kind: string; supplierId: number | null; files: string[]; note: string | null; addedBy: string | null; lastError: string | null; createdAt: Date };
+
+const versItem = (p: Ligne, noms: Map<number, string> = new Map()): PendingInvoiceItem => ({
   id: p.id,
+  kind: p.kind === "mercuriale" ? "mercuriale" : "facture",
+  supplierId: p.supplierId != null && noms.has(p.supplierId) ? p.supplierId : null,
+  supplierName: p.supplierId != null ? (noms.get(p.supplierId) ?? null) : null,
   pages: p.files.length,
   pdf: p.files.length === 1 && extname(p.files[0]).toLowerCase() === ".pdf",
   note: p.note,
@@ -67,20 +87,34 @@ const versItem = (p: { id: number; files: string[]; note: string | null; addedBy
   createdAt: p.createdAt.toISOString(),
 });
 
-export async function listPendingInvoices(): Promise<PendingInvoiceItem[]> {
-  const rows = await prisma.pendingInvoice.findMany({ orderBy: { createdAt: "asc" } });
-  return rows.map(versItem);
+async function nomsFournisseurs(rows: Ligne[]): Promise<Map<number, string>> {
+  const ids = [...new Set(rows.map((r) => r.supplierId).filter((x): x is number => x != null))];
+  if (!ids.length) return new Map();
+  const s = await prisma.supplier.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+  return new Map(s.map((x) => [x.id, x.name]));
+}
+
+/** Tout ce qui attend, ou seulement les factures, ou les mercuriales (d'un fournisseur). */
+export async function listPendingInvoices(filtre: { kind?: PendingKind; supplierId?: number } = {}): Promise<PendingInvoiceItem[]> {
+  const rows = await prisma.pendingInvoice.findMany({
+    where: { ...(filtre.kind ? { kind: filtre.kind } : {}), ...(filtre.supplierId ? { supplierId: filtre.supplierId } : {}) },
+    orderBy: { createdAt: "asc" },
+  });
+  const noms = await nomsFournisseurs(rows);
+  return rows.map((r) => versItem(r, noms));
 }
 
 export async function getPendingInvoice(id: number): Promise<PendingInvoiceItem | null> {
   const p = await prisma.pendingInvoice.findUnique({ where: { id } });
-  return p ? versItem(p) : null;
+  return p ? versItem(p, await nomsFournisseurs([p])) : null;
 }
 
 /** Vérifie les pages envoyées et rend leur extension (erreur en français sinon). */
-export function verifierPages(pages: Buffer[], limites: LimitesFactures): string[] {
-  if (pages.length === 0) throw new Error("Ajoute au moins une photo de la facture.");
-  if (pages.length > limites.pages) throw new Error(`${limites.pages} page${limites.pages > 1 ? "s" : ""} au plus par facture.`);
+export function verifierPages(pages: Buffer[], limites: LimitesFactures, kind: PendingKind = "facture"): string[] {
+  const quoi = kind === "mercuriale" ? "mercuriale" : "facture";
+  const max = pagesMax(kind, limites);
+  if (pages.length === 0) throw new Error(`Ajoute au moins une photo de la ${quoi}.`);
+  if (pages.length > max) throw new Error(`${max} page${max > 1 ? "s" : ""} au plus par ${quoi}.`);
   const exts = pages.map((b, i) => {
     if (b.length === 0) throw new Error(`La page ${i + 1} est vide.`);
     if (b.length > INVOICE_MAX_BYTES) throw new Error(`La page ${i + 1} est trop lourde (${Math.round(INVOICE_MAX_BYTES / 1024 / 1024)} Mo au plus).`);
@@ -94,16 +128,32 @@ export function verifierPages(pages: Buffer[], limites: LimitesFactures): string
 }
 
 /** Garde les pages sur le site. Refuse si la liste « À traiter » est pleine. */
-export async function createPendingInvoice(input: { pages: Buffer[]; note?: string | null; addedBy?: string | null }): Promise<PendingInvoiceItem> {
+export async function createPendingInvoice(input: {
+  pages: Buffer[];
+  note?: string | null;
+  addedBy?: string | null;
+  kind?: PendingKind;
+  supplierId?: number | null;
+}): Promise<PendingInvoiceItem> {
+  const kind: PendingKind = input.kind === "mercuriale" ? "mercuriale" : "facture";
   const limites = await limitesFactures();
-  if (limites.attente === 0) throw new Error("Les factures à traiter ne sont pas ouvertes sur ton offre. Demande-les à RecipeLog.");
-  const exts = verifierPages(input.pages, limites);
+  if (limites.attente === 0) throw new Error("Les documents à traiter ne sont pas ouverts sur ton offre. Demande-les à RecipeLog.");
+  let supplierId: number | null = null;
+  if (kind === "mercuriale") {
+    const s = input.supplierId ? await prisma.supplier.findUnique({ where: { id: input.supplierId }, select: { id: true } }) : null;
+    if (!s) throw new Error("Fournisseur introuvable.");
+    supplierId = s.id;
+  }
+  const exts = verifierPages(input.pages, limites, kind);
+  // Factures et mercuriales partagent la même place « À traiter ».
   const deja = await prisma.pendingInvoice.count();
   if (deja >= limites.attente) {
-    throw new Error(`Tu as déjà ${deja} facture${deja > 1 ? "s" : ""} à traiter (${limites.attente} au plus). Analyse ou supprime celles qui attendent, puis réessaie.`);
+    throw new Error(
+      `Tu as déjà ${deja} document${deja > 1 ? "s" : ""} à traiter (factures et mercuriales, ${limites.attente} au plus). Analyse ou supprime ceux qui attendent, puis réessaie.`,
+    );
   }
   const p = await prisma.pendingInvoice.create({
-    data: { files: [], note: input.note?.trim().slice(0, 500) || null, addedBy: input.addedBy?.slice(0, 200) || null },
+    data: { files: [], kind, supplierId, note: input.note?.trim().slice(0, 500) || null, addedBy: input.addedBy?.slice(0, 200) || null },
   });
   const files: string[] = [];
   try {
@@ -116,7 +166,8 @@ export async function createPendingInvoice(input: { pages: Buffer[]; note?: stri
       await writeFile(abs, input.pages[i]);
       files.push(rel);
     }
-    return versItem(await prisma.pendingInvoice.update({ where: { id: p.id }, data: { files } }));
+    const fait = await prisma.pendingInvoice.update({ where: { id: p.id }, data: { files } });
+    return versItem(fait, await nomsFournisseurs([fait]));
   } catch (e) {
     for (const f of files) await removeInvoiceFile(f);
     await prisma.pendingInvoice.delete({ where: { id: p.id } }).catch(() => {});
@@ -172,13 +223,16 @@ export async function photosEnPdf(pages: { bytes: Buffer; type: string }[]): Pro
 }
 
 /** Le document à lire ou à joindre : la page seule, ou un PDF qui réunit toutes les photos. */
-export async function pendingDocument(id: number): Promise<{ data: Buffer; mime: string; nom: string }> {
+export async function pendingDocument(id: number): Promise<{ data: Buffer; mime: string; nom: string; kind: PendingKind; supplierId: number | null }> {
   const pages = await lirePages(id);
+  const p = await prisma.pendingInvoice.findUnique({ where: { id }, select: { kind: true, supplierId: true } });
+  const kind: PendingKind = p?.kind === "mercuriale" ? "mercuriale" : "facture";
+  const supplierId = p?.supplierId ?? null;
   if (pages.length === 1) {
     const ext = Object.entries(INVOICE_MIME).find(([, m]) => m === pages[0].type)?.[0] ?? ".jpg";
-    return { data: pages[0].bytes, mime: pages[0].type, nom: `facture-${id}${ext}` };
+    return { data: pages[0].bytes, mime: pages[0].type, nom: `${kind}-${id}${ext}`, kind, supplierId };
   }
-  return { data: await photosEnPdf(pages), mime: "application/pdf", nom: `facture-${id}.pdf` };
+  return { data: await photosEnPdf(pages), mime: "application/pdf", nom: `${kind}-${id}.pdf`, kind, supplierId };
 }
 
 export async function setPendingError(id: number, message: string | null) {

@@ -89,8 +89,9 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
   try {
     const attenteId = Number(fd.get("attenteId")) || null;
     let fichier: { data: Buffer; mime: string; nom: string };
+    let attente: Awaited<ReturnType<typeof pendingDocument>> | null = null;
     if (attenteId) {
-      fichier = await pendingDocument(attenteId);
+      fichier = attente = await pendingDocument(attenteId);
     } else {
       const f = fd.get("fichier");
       if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
@@ -100,8 +101,9 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
       if (!mime || !fichierAccepte(mime)) return { ok: false, error: "Envoie un PDF ou une photo (JPG, PNG ou WebP)." };
       fichier = { data, mime, nom: f.name };
     }
-    const type: TypeLecture = attenteId ? "facture" : fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
-    const fournisseurId = Number(fd.get("fournisseurId")) || null;
+    // Un document « à traiter » sait lui-même s'il est une facture ou une mercuriale (et de quel fournisseur).
+    const type: TypeLecture = attente ? attente.kind : fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
+    const fournisseurId = (attente ? attente.supplierId : null) ?? (Number(fd.get("fournisseurId")) || null);
 
     const reglages = await getReglagesIA();
     if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures par IA)." };
@@ -257,7 +259,14 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
 }
 
 /** Mercuriale : les prix entrent dans l'historique du fournisseur, à la date choisie, sans compter comme une facture. */
-export async function enregistrerMercuriale(input: { fournisseurId: number; date: string; nomFichier: string; lignes: LigneLue[] }): Promise<{ ok: true; resume: PurchaseOrderSummary } | Erreur> {
+/** attenteId : la mercuriale venait de « À traiter » ; son fichier est joint et elle quitte la liste. */
+export async function enregistrerMercuriale(input: {
+  fournisseurId: number;
+  date: string;
+  nomFichier: string;
+  lignes: LigneLue[];
+  attenteId?: number | null;
+}): Promise<{ ok: true; resume: PurchaseOrderSummary; fichierJoint: boolean | null } | Erreur> {
   await requireAccess("costs.edit");
   try {
     const s = await prisma.supplier.findUnique({ where: { id: Number(input.fournisseurId) || 0 }, select: { name: true } });
@@ -273,8 +282,9 @@ export async function enregistrerMercuriale(input: { fournisseurId: number; date
       keepFamily: true,
       lines: versLignes(doc.lignes),
     });
+    const fichierJoint = input.attenteId ? await finishPendingInvoice(Number(input.attenteId), resume.facture_id) : null;
     refresh();
-    return { ok: true, resume };
+    return { ok: true, resume, fichierJoint };
   } catch (e) {
     return erreur(e);
   }

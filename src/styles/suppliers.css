@@ -1241,3 +1241,7 @@ a.sold-row:hover {
     color: var(--muted);
   }
 }
+/* Troisième tuile (« Tableau Excel ou CSV ») : toute la largeur. */
+.nf-tuile-large {
+  grid-column: 1 / -1;
+}

@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.25",
+    date: "2026-11-18",
+    title: "Mercuriales scannées pour Claude",
+    summary:
+      "Scanne une mercuriale ou choisis son PDF depuis la fiche du fournisseur. Fais-la lire tout de suite par l'IA, ou garde-la « à traiter » et demande à Claude de l'analyser.",
+    features: [
+      "Fiche d'un fournisseur → « Importer une mercuriale » : scanner avec l'appareil photo (une photo par page, jusqu'à 20), choisir un PDF ou des photos, ou un tableau Excel / CSV (lu directement, comme avant)",
+      "Puis « Enregistrer et analyser » (l'IA lit les prix, tu vérifies) ou « Enregistrer pour Claude » : la mercuriale attend dans « Mercuriales à traiter », sur la fiche du fournisseur",
+      "Claude (connecteur RecipeLog) : « analyse ma mercuriale à traiter ». Il la trouve, la lit page par page et enregistre chaque prix chez le bon fournisseur ; elle quitte ensuite la liste",
+    ],
+    migrations: ["Les documents à traiter savent s'ils sont une facture ou une mercuriale : fait tout seul à la mise à jour"],
+  },
+  {
     version: "V2.24",
     date: "2026-11-18",
     title: "Commandes fournisseurs et produits vendus",

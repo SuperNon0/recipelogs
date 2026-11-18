@@ -23,7 +23,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const [orders, suppliers, aTraiter, limites] = await Promise.all([
     listPurchaseOrders({ from, to, supplierId }),
     prisma.supplier.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    peutModifier ? listPendingInvoices() : Promise.resolve([]),
+    peutModifier ? listPendingInvoices({ kind: "facture" }) : Promise.resolve([]),
     peutModifier ? limitesFactures() : Promise.resolve(null),
   ]);
   const total = orders.reduce((s, o) => s + (o.total ?? 0), 0);

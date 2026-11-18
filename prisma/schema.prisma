@@ -269,6 +269,12 @@ model PendingInvoice {
    * Message de la dernière lecture par IA qui a échoué.
    */
   lastError String?  @map("last_error")
+  /**
+   * « facture » (bouton « Nouvelle facture ») ou « mercuriale » (liste de prix
+   * déposée depuis la fiche d'un fournisseur, avec son fournisseur).
+   */
+  kind       String   @default("facture")
+  supplierId Int?     @map("supplier_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("pending_invoices")
