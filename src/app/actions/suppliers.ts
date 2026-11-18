@@ -26,6 +26,7 @@ import {
   type SearchableProduct,
 } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, invoiceExt, removeInvoiceFile, saveInvoiceFile } from "@/lib/invoiceFiles";
+import { deballerFichier } from "@/lib/envoiFichier";
 
 const refresh = () => revalidatePath("/", "layout");
 const fail = (e: unknown): ActionResult => ({ ok: false, error: e instanceof Error ? e.message : "Erreur inattendue." });
@@ -184,7 +185,7 @@ export async function deleteInvoice(id: number): Promise<ActionResult> {
 /** Joint (ou remplace) la photo ou le PDF d'une facture. */
 export async function uploadInvoiceFile(id: number, fd: FormData): Promise<ActionResult> {
   await requireAccess("costs.edit");
-  const file = fd.get("file");
+  const file = deballerFichier(fd.get("file"));
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Aucun fichier." };
   if (file.size > INVOICE_MAX_BYTES) return { ok: false, error: "Fichier trop lourd." };
   const ext = invoiceExt(file.name, file.type);

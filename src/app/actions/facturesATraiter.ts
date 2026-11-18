@@ -14,6 +14,7 @@ import {
 } from "@/lib/pendingInvoices";
 import { prisma } from "@/lib/prisma";
 import { INVOICE_MAX_BYTES } from "@/lib/invoiceFiles";
+import { deballerFichiers } from "@/lib/envoiFichier";
 import { etatLectureIA, type EtatIA } from "./ia";
 import { modesAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
 
@@ -54,7 +55,7 @@ export async function etatNouvelleFacture(): Promise<EtatNouvelleFacture> {
 export async function ajouterFactureATraiter(fd: FormData): Promise<{ ok: true; facture: PendingInvoiceItem } | Erreur> {
   const viewer = await requireAccess("costs.edit");
   try {
-    const fichiers = fd.getAll("pages").filter((f): f is File => f instanceof File && f.size > 0);
+    const fichiers = deballerFichiers(fd.getAll("pages"));
     const pages = await Promise.all(fichiers.map(async (f) => Buffer.from(await f.arrayBuffer())));
     const modes = await modesAnalyse();
     if (!modes.ia && !modes.mcp) return { ok: false, error: "La lecture des documents n'est pas comprise dans ton offre : saisis-les à la main." };

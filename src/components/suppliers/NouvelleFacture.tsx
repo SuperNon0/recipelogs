@@ -7,6 +7,7 @@ import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 import { AiReaderModal, type FactureATraiter } from "./AiReader";
 import { estPdf, preparerPhoto } from "@/lib/photoFacture";
+import { emballerFichier } from "@/lib/envoiFichier";
 import type { PendingInvoiceItem } from "@/lib/pendingInvoices";
 import type { ModesAnalyse } from "@/lib/ia/analyse";
 import {
@@ -27,8 +28,11 @@ import {
 
 type Page = { file: File; url: string | null };
 
-/** Poids maximum d'un envoi (toutes les pages) : suit next.config.ts (40 Mo), avec une marge. */
-const ENVOI_MAX = 38 * 1024 * 1024;
+/**
+ * Poids maximum d'un envoi (toutes les pages). Envoyé en base64 (un tiers de
+ * plus), il doit tenir sous la limite de next.config.ts (40 Mo).
+ */
+const ENVOI_MAX = 28 * 1024 * 1024;
 const mo = (o: number) => `${(o / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
 type Fournisseur = { id: number; name: string };
 
@@ -177,7 +181,8 @@ function NouvelleFactureModal({
       if (total > ENVOI_MAX) {
         return setErreur(`Ces pages pèsent ${mo(total)} en tout : ${mo(ENVOI_MAX)} au plus par envoi. Envoie ${la} en deux fois.`);
       }
-      for (const f of prets) fd.append("pages", f);
+      // En base64 : sinon le pare-feu de Cloudflare bloque certains PDF (src/lib/envoiFichier.ts).
+      for (const f of prets) fd.append("pages", await emballerFichier(f));
       if (note.trim()) fd.set("note", note.trim());
       if (merc && fournisseur) {
         fd.set("type", "mercuriale");
