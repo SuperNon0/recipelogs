@@ -37,9 +37,15 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_LAST_PR: prs[0] ? String(prs[0].number) : "",
   },
   experimental: {
+    // Une mercuriale de 20 pages en photos dépasse vite 10 Mo au total.
+    // Les deux limites doivent suivre : sans middlewareClientMaxBodySize,
+    // Next.js coupe tout envoi de plus de 10 Mo (src/middleware.ts) et le
+    // navigateur affiche « L'envoi n'a pas marché ». Chaque fichier reste
+    // limité à 10 Mo (UPLOAD_MAX_BYTES, src/lib/invoiceFiles.ts).
     serverActions: {
-      bodySizeLimit: "12mb",
+      bodySizeLimit: "40mb",
     },
+    middlewareClientMaxBodySize: "40mb",
   },
   images: {
     remotePatterns: [],

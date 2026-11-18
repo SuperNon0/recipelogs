@@ -26,6 +26,10 @@ import {
  */
 
 type Page = { file: File; url: string | null };
+
+/** Poids maximum d'un envoi (toutes les pages) : suit next.config.ts (40 Mo), avec une marge. */
+const ENVOI_MAX = 38 * 1024 * 1024;
+const mo = (o: number) => `${(o / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
 type Fournisseur = { id: number; name: string };
 
 /**
@@ -154,7 +158,26 @@ function NouvelleFactureModal({
     setOccupe(analyser ? "analyser" : "garder");
     try {
       const fd = new FormData();
-      for (const p of pages) fd.append("pages", await preparerPhoto(p.file));
+      const prets = await Promise.all(pages.map((p) => preparerPhoto(p.file)));
+      // Trop lourd : on le dit tout de suite, au lieu d'un envoi qui échoue.
+      const max = etat?.octetsMax ?? 10 * 1024 * 1024;
+      const lourd = prets.findIndex((f) => f.size > max);
+      if (lourd >= 0) {
+        const f = prets[lourd];
+        const quoi = estPdf(f) ? "Ce PDF" : prets.length > 1 ? `La photo ${lourd + 1}` : "Cette photo";
+        return setErreur(
+          `${quoi} pèse ${mo(f.size)} : ${mo(max)} au plus. ${
+            estPdf(f)
+              ? "Enregistre-le en plus léger (« Réduire la taille du fichier » ou « Enregistrer en PDF optimisé ») ou envoie-le en photos, une par page."
+              : "Reprends la photo ou choisis-en une plus légère."
+          }`,
+        );
+      }
+      const total = prets.reduce((n, f) => n + f.size, 0);
+      if (total > ENVOI_MAX) {
+        return setErreur(`Ces pages pèsent ${mo(total)} en tout : ${mo(ENVOI_MAX)} au plus par envoi. Envoie ${la} en deux fois.`);
+      }
+      for (const f of prets) fd.append("pages", f);
       if (note.trim()) fd.set("note", note.trim());
       if (merc && fournisseur) {
         fd.set("type", "mercuriale");
@@ -166,7 +189,7 @@ function NouvelleFactureModal({
       if (analyser) onAnalyser({ id: r.facture.id, pages: r.facture.pages, pdf: r.facture.pdf });
       else setGardee(true);
     } catch {
-      setErreur("L'envoi n'a pas marché (connexion coupée ?). Réessaie.");
+      setErreur("L'envoi n'a pas marché : la connexion a coupé pendant l'envoi. Vérifie le réseau et réessaie. Si ça recommence, envoie moins de pages à la fois.");
     } finally {
       setOccupe(null);
     }
