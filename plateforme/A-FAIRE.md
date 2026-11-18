@@ -363,16 +363,19 @@ Sans cette étape, tes clients peuvent déjà lire leurs factures avec **leur pr
 **fournir** l'IA, avec un nombre de lectures par mois :
 
 ### ☐ G1. Créer une clé Anthropic
-1. Sur **https://platform.claude.com**, connecte-toi, puis **Billing** : ajoute un moyen de
+1. (Pour Claude ; pour Gemini : https://aistudio.google.com/apikey ; pour ChatGPT : https://platform.openai.com/api-keys.)
+   Sur **https://platform.claude.com**, connecte-toi, puis **Billing** : ajoute un moyen de
    paiement et quelques dollars de crédit (une facture coûte de l'ordre de quelques centimes).
    Mets une **limite de dépense mensuelle** (Limits) pour ne jamais avoir de surprise.
 2. **API keys → Create key** (nom : « RecipeLog plateforme ») et copie la clé (`sk-ant-…`).
 
 ### ☐ G2. La mettre dans le panel
-Panel → **Factures par IA** → **Mettre une clé Claude**, colle la clé, puis **Essayer et
-enregistrer**. Le panel l'essaie chez Anthropic avant de la garder, et l'étiquette devient
-« Clé Claude de la plateforme réglée (sk-ant-…abcd) ». Pris en compte tout de suite, sans
-redémarrer. **Changer la clé** pour en mettre une autre, ou la retirer.
+Panel → **Factures par IA** → **Mettre une clé d'IA** : choisis l'IA (**Claude**, **Gemini** ou
+**ChatGPT**), le modèle, colle la clé, puis **Essayer et enregistrer**. Le panel essaie la clé et le
+modèle chez le fournisseur avant de les garder. Pris en compte tout de suite, sans redémarrer.
+**Changer l'IA ou la clé** pour changer de modèle (sans retaper la clé), d'IA, ou la retirer.
+Le moins cher : Claude Haiku 5.5, puis Gemini 2.5 Flash-Lite / GPT-5 nano. Pour Gemini ou
+ChatGPT, les sites des clients doivent être à jour (version qui connaît ces IA).
 
 (Ancienne façon, toujours possible en secours : `IA_ANTHROPIC_CLE=sk-ant-…` dans
 `/srv/recipelog/.env` puis `recipelog-plateforme appliquer`. Une clé mise dans le panel passe

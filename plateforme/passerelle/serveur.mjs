@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { ErreurPasserelle, clientParCle, equipe, inviter, retirer, renvoyer } from "./authentik.mjs";
 import { annoncesPour } from "./annonces.mjs";
 import { ajouterMessage, creerDemande, listerDemandes, marquerLu } from "./support.mjs";
-import { noterEtat, quota, relayer } from "./ia.mjs";
+import { noterEtat, quota, relayer, relayerAutre } from "./ia.mjs";
 
 const PORT = Number(process.env.PORT || 8000);
 
@@ -49,6 +49,9 @@ async function traiter(req, res) {
   // Lecture des factures par IA (lot 7) : quota du mois, et relais vers Claude avec la clé de la plateforme.
   if (chemin === "/v1/ia/quota" && req.method === "GET") return repondre(res, 200, await quota(nom));
   if (chemin === "/v1/ia/anthropic/v1/messages" && req.method === "POST") return relayer(nom, req, res, url.search);
+  if (chemin === "/v1/ia/openai/v1/responses" && req.method === "POST") return relayerAutre(nom, req, res, "openai");
+  const g = chemin.match(/^\/v1\/ia\/gemini\/v1beta\/models\/([A-Za-z0-9._-]{1,100}):generateContent$/);
+  if (g && req.method === "POST") return relayerAutre(nom, req, res, "gemini", g[1]);
   // Support : « Signaler un problème » depuis l'appli (le client est celui de la clé).
   if (chemin === "/v1/support" && req.method === "POST") return repondre(res, 201, { demande: await creerDemande(nom, await lireJson(req)) });
   if (chemin === "/v1/support" && req.method === "GET") return repondre(res, 200, { demandes: await listerDemandes(nom, url.searchParams.get("email") ?? "") });
