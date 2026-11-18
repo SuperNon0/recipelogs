@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { emballerFichier } from "@/lib/envoiFichier";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Pencil, Trash2, X } from "lucide-react";
@@ -29,9 +30,10 @@ export function InvoiceDetail({ order }: { order: Order }) {
   const linesTotal = order.lines.reduce((s, l) => s + (l.amount ?? 0), 0);
 
   const upload = (file: File) => {
-    const fd = new FormData();
-    fd.append("file", file);
     start(async () => {
+      const fd = new FormData();
+      // En base64 : sinon le pare-feu de Cloudflare bloque certains PDF (src/lib/envoiFichier.ts).
+      fd.append("file", await emballerFichier(file));
       const r = await uploadInvoiceFile(order.id, fd);
       setError(r.ok ? null : r.error);
       router.refresh();

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { emballerFichier } from "@/lib/envoiFichier";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertTriangle, FileUp, Loader2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
@@ -125,7 +126,7 @@ export function AiReaderModal({
     if (fichier && type === "mercuriale" && tableur(fichier)) {
       setOccupe(true);
       const fd = new FormData();
-      fd.set("fichier", fichier);
+      fd.set("fichier", await emballerFichier(fichier));
       const r = await lireTableurMercuriale(fd);
       setOccupe(false);
       if (!r.ok) return setErreur(r.error);
@@ -133,7 +134,7 @@ export function AiReaderModal({
     }
     const fd = new FormData();
     if (attente) fd.set("attenteId", String(attente.id));
-    else if (fichier) fd.set("fichier", fichier);
+    else if (fichier) fd.set("fichier", await emballerFichier(fichier));
     fd.set("type", type);
     if (fournisseur) fd.set("fournisseurId", String(fournisseur.id));
     setOccupe(true);
@@ -228,7 +229,7 @@ export function AiReaderModal({
               if (nouveauFournisseur) fd.set("nouveauFournisseur", "1");
               if (note) fd.set("note", note);
               if (attente) fd.set("attenteId", String(attente.id));
-              else if (fichier && !tableur(fichier)) fd.set("fichier", fichier);
+              else if (fichier && !tableur(fichier)) fd.set("fichier", await emballerFichier(fichier));
               const r = await enregistrerFactureLue(fd);
               if (!r.ok) return r.error;
               setEtape({ e: "fini", resume: r.resume, fichierJoint: r.fichierJoint });

@@ -18,6 +18,7 @@ import {
 import { lancer, suivre } from "@/lib/ia/travaux";
 import { recordPurchaseOrder, type PurchaseOrderSummary } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, attachInvoiceFile, sniffInvoiceExt } from "@/lib/invoiceFiles";
+import { deballerFichier } from "@/lib/envoiFichier";
 import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
 import { articleKey } from "@/lib/suppliers";
 import { lireTableur } from "@/lib/mercurialeFichier";
@@ -98,7 +99,7 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
     if (attenteId) {
       fichier = attente = await pendingDocument(attenteId);
     } else {
-      const f = fd.get("fichier");
+      const f = deballerFichier(fd.get("fichier"));
       if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
       if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: `Fichier trop lourd (${Math.round(INVOICE_MAX_BYTES / 1024 / 1024)} Mo au plus).` };
       const data = Buffer.from(await f.arrayBuffer());
@@ -244,7 +245,7 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
       lines: versLignes(doc.lignes),
     });
     let fichierJoint = false;
-    const f = fd.get("fichier");
+    const f = deballerFichier(fd.get("fichier"));
     const attenteId = Number(fd.get("attenteId")) || null;
     if (attenteId) {
       fichierJoint = await finishPendingInvoice(attenteId, resume.facture_id);
@@ -299,7 +300,7 @@ export async function enregistrerMercuriale(input: {
 export async function lireTableurMercuriale(fd: FormData): Promise<{ ok: true; lignes: string[][]; entete: number; colonnes: ReturnType<typeof devinerColonnes> } | Erreur> {
   await requireAccess("costs.edit");
   try {
-    const f = fd.get("fichier");
+    const f = deballerFichier(fd.get("fichier"));
     if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
     if (f.size > INVOICE_MAX_BYTES) return { ok: false, error: "Fichier trop lourd." };
     const lignes = await lireTableur(f.name, Buffer.from(await f.arrayBuffer()));
