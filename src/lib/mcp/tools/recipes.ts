@@ -19,6 +19,7 @@ import {
   duplicateRecipe,
   setRecipeSaleCoef,
   setRecipeSalePrice,
+  setRecipeSold,
   updateRecipe,
 } from "@/app/actions/recipes";
 import { addSubRecipe, removeSubRecipe } from "@/app/actions/subRecipes";
@@ -66,6 +67,7 @@ const recipeFields = {
   coef_vente: z.number().positive().max(100).optional(),
   prix_vente: z.number().min(0.01).max(100_000).nullable().optional(),
   tva_vente: z.number().min(0).max(50).optional(),
+  produit_vendu: z.boolean().optional(),
   moule: z
     .object({ forme: z.enum(["cercle", "cadre", "carre"]), a: z.number().min(1).max(1000), b: z.number().min(1).max(1000).optional(), h: z.number().min(1).max(1000).optional() })
     // Sans largeur, le cadre serait effacé en silence.
@@ -90,6 +92,7 @@ const recipeFieldsJs = {
   coef_vente: js.num(`Coefficient de vente : prix conseillé = coût matière × coef (${DEFAULT_SALE_COEF} par défaut)`),
   prix_vente: js.num("Prix de vente réel du produit fini en € : par pièce si la recette a un rendement, sinon la recette entière. null pour l'enlever. Sert à calculer la marge"),
   tva_vente: js.num(`TVA comprise dans prix_vente, en % (${DEFAULT_SALE_VAT} par défaut, 10 sur place, 0 si le prix est HT)`),
+  produit_vendu: js.bool("Case « Produit vendu » : la recette apparaît dans la page Produits vendus avec sa marge (voir produits_vendus)"),
   moule: {
     type: ["object", "null"],
     description: "Moule d'origine de la recette, en cm : cercle (a = diamètre), carre (a = côté) ou cadre (a × b), hauteur h facultative. null pour aucun.",
@@ -119,6 +122,7 @@ type RecipeValues = {
   coef_vente?: number;
   prix_vente?: number | null;
   tva_vente?: number;
+  produit_vendu?: boolean;
   moule?: { forme: "cercle" | "cadre" | "carre"; a: number; b?: number; h?: number } | null;
 };
 
@@ -302,6 +306,7 @@ export const RECIPE_TOOLS: McpTool[] = [
               }
             : null,
         vente: saleInfo(),
+        produit_vendu: r.sold,
         ingredients: (snap?.ingredients ?? []).map((i, idx) => ({
           id: r.ingredients[idx]?.id,
           nom: i.name,
@@ -344,6 +349,7 @@ export const RECIPE_TOOLS: McpTool[] = [
       if (a.coef_vente !== undefined && newId) await runAction(() => setRecipeSaleCoef(newId, a.coef_vente!));
       if ((a.prix_vente !== undefined || a.tva_vente !== undefined) && newId)
         await runAction(() => setRecipeSalePrice(newId, a.prix_vente ?? null, a.tva_vente ?? DEFAULT_SALE_VAT));
+      if (a.produit_vendu !== undefined && newId) await runAction(() => setRecipeSold(newId, a.produit_vendu!));
       return text({ creee: a.nom, id: newId });
     },
   },
@@ -386,6 +392,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         const vat = a.tva_vente ?? (r.saleVat != null ? Number(r.saleVat) : DEFAULT_SALE_VAT);
         await runAction(() => setRecipeSalePrice(a.id, price, vat));
       }
+      if (a.produit_vendu !== undefined) await runAction(() => setRecipeSold(a.id, a.produit_vendu!));
       return text({ modifiee: next.nom, id: a.id, champs: Object.keys(a).filter((k) => k !== "id") });
     },
   },

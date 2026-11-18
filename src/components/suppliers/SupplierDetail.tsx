@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
@@ -13,6 +14,10 @@ import { ProductHistoryModal } from "./ProductHistoryModal";
 import { InvoiceList } from "./InvoiceList";
 import { DeleteSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
 import { AiReaderButton } from "./AiReader";
+import { GroupProductsModal } from "./GroupProducts";
+import { articleKey } from "@/lib/suppliers";
+
+const PAGE = 150;
 
 type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 
@@ -22,10 +27,20 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
   const router = useRouter();
   const editable = can("costs.edit");
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [modal, setModal] = useState<"edit" | "delete" | "product" | null>(null);
+  const [modal, setModal] = useState<"edit" | "delete" | "product" | "group" | null>(null);
+  const [query, setQuery] = useState("");
+  const [shown, setShown] = useState(PAGE);
   // Les variantes d'un même article (« Fraise France », « Fraise Espagne ») tiennent sur une ligne.
   const groups = useMemo(() => groupByArticle(supplier.products), [supplier.products]);
   const open = groups.find((g) => g.key === openKey);
+  // Recherche dans les noms, les articles et les références : utile avec une mercuriale de plusieurs centaines de produits.
+  const words = articleKey(query).split(" ").filter(Boolean);
+  const filtered = words.length
+    ? groups.filter((g) => {
+        const hay = articleKey([g.article, ...g.products.map((p) => `${p.name} ${p.reference ?? ""}`)].join(" "));
+        return words.every((w) => hay.includes(w));
+      })
+    : groups;
   const total = supplier.orders.reduce((s, o) => s + (o.total ?? 0), 0);
 
   return (
@@ -34,6 +49,9 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         <h1>{supplier.name}</h1>
         {editable && (
           <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href={`/fournisseurs/${supplier.id}/commande`} className="fl-btn fl-btn-primary">
+              <ShoppingCart size={15} /> Passer une commande
+            </Link>
             <AiReaderButton type="mercuriale" fournisseur={{ id: supplier.id, name: supplier.name }} />
             <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("edit")}>
               <Pencil size={15} /> Modifier
@@ -58,18 +76,53 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
           (nom, contenance, nom pour comparer) ou le supprimer. « Ajouter un produit » crée un produit à la main, sans facture.
         </Help>
         {editable && (
-          <button type="button" className="fl-btn fl-btn-secondary" style={{ marginLeft: "auto" }} onClick={() => setModal("product")}>
-            <Plus size={15} /> Ajouter un produit
-          </button>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("group")}>
+              <Layers size={15} /> Regrouper
+            </button>
+            <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("product")}>
+              <Plus size={15} /> Ajouter un produit
+            </button>
+          </span>
         )}
       </div>
+      {groups.length > 8 && (
+        <div className="sup-detail-tools">
+          <div className="sup-search">
+            <Search size={15} style={{ color: "var(--muted)", flex: "none" }} />
+            <input
+              className="fl-input"
+              value={query}
+              placeholder={`Chercher parmi ${groups.length} articles`}
+              aria-label="Chercher un produit"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShown(PAGE);
+              }}
+            />
+            {query && (
+              <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Effacer la recherche" onClick={() => setQuery("")}>
+                <X size={15} />
+              </button>
+            )}
+          </div>
+          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-ghost">
+            <History size={15} /> Commandes
+          </Link>
+        </div>
+      )}
       <div className="fl-list">
         {groups.length === 0 && (
           <div className="fl-row" style={{ color: "var(--muted)" }}>
             Aucun produit pour l&apos;instant.{editable ? " Touche « Ajouter un produit »." : ""}
           </div>
         )}
-        {groups.map((g) => {
+        {words.length > 0 && filtered.length === 0 && (
+          <div className="fl-row" style={{ color: "var(--muted)" }}>
+            Aucun produit ne correspond.
+          </div>
+        )}
+        {filtered.slice(0, shown).map((g) => {
           const p = g.products[0];
           const several = g.products.length > 1;
           const base = g.products.find((x) => x.base?.chosen)?.base ?? g.products.find((x) => x.base)?.base;
@@ -105,6 +158,12 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         })}
       </div>
 
+      {filtered.length > shown && (
+        <button type="button" className="fl-btn fl-btn-ghost" style={{ marginTop: 8 }} onClick={() => setShown((n) => n + PAGE)}>
+          Afficher la suite ({filtered.length - shown})
+        </button>
+      )}
+
       <div className="sect-title" style={{ marginTop: 20 }}>
         <h2>Factures</h2>
       </div>
@@ -118,6 +177,13 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         <DeleteSupplierModal id={supplier.id} onClose={() => setModal(null)} onDeleted={() => router.push("/fournisseurs/liste")} />
       )}
       {modal === "product" && <ProductFormModal supplierId={supplier.id} onClose={() => setModal(null)} />}
+      {modal === "group" && (
+        <GroupProductsModal
+          supplierId={supplier.id}
+          products={supplier.products.map((p) => ({ id: p.id, name: p.name, article: p.article }))}
+          onClose={() => setModal(null)}
+        />
+      )}
     </>
   );
 }

@@ -152,13 +152,9 @@ export async function chooseProductForIngredient(baseId: number, productId: numb
       select: { id: true, baseId: true, price: true, priceUnit: true },
     });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId !== baseId) {
-      // Le produit change d'ingrédient : l'ancien ne le suit plus (il garde son dernier prix).
-      if (product.baseId != null) {
-        await tx.ingredientBase.updateMany({ where: { id: product.baseId, chosenProductId: productId }, data: { chosenProductId: null } });
-      }
-      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
-    }
+    // Plusieurs ingrédients peuvent suivre le même produit (« Crème 35 % à froid » et « Crème 35 % à
+    // chaud » sur « Crème 35 % brique 1 L ») : l'ingrédient qui le suivait déjà le garde.
+    if (product.baseId == null) await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
     await tx.ingredientBase.update({ where: { id: baseId }, data: { chosenProductId: productId } });
     await applyProductPrice(tx, baseId, product, base.prices[0]);
   });
@@ -172,14 +168,15 @@ export async function linkProductToIngredient(productId: number, baseId: number 
   await prisma.$transaction(async (tx) => {
     const product = await tx.supplierProduct.findUnique({ where: { id: productId }, select: { id: true, baseId: true } });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId && product.baseId !== baseId) {
-      await tx.ingredientBase.updateMany({
-        where: { id: product.baseId, chosenProductId: productId },
-        data: { chosenProductId: null },
-      });
+    if (baseId == null) {
+      // Détacher : plus aucun ingrédient ne suit ce produit (ils gardent leur dernier prix).
+      await tx.ingredientBase.updateMany({ where: { chosenProductId: productId }, data: { chosenProductId: null } });
+      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId: null } });
+      return;
     }
+    // Les autres ingrédients qui suivent déjà ce produit le gardent : un produit peut servir à plusieurs ingrédients.
     await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
-    if (baseId != null) await autoChoose(tx, baseId, productId);
+    await autoChoose(tx, baseId, productId);
   });
 }
 
@@ -212,6 +209,8 @@ export type PurchaseLineInput = {
   lineTotal?: number | null;
   /** Ingrédient des recettes (id ou nom exact) auquel relier le produit. */
   ingredient?: number | string | null;
+  /** Ce qu'on commande : « carton », « sac »… */
+  packName?: string | null;
 };
 
 export type PurchaseOrderInput = {
@@ -251,8 +250,12 @@ export type PurchaseOrderSummary = {
 const fmtPrice = (p: number, u: string) => `${p.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €/${u}`;
 
 /** Évite une écriture quand la ligne n'apporte rien de nouveau sur le produit (cas courant d'une mercuriale relue). */
-function changeQuelqueChose(p: { reference: string | null; article: string | null; family: string | null; packSize: Prisma.Decimal | null }, d: { reference?: string; article?: string; family?: string; packSize?: number }): boolean {
+function changeQuelqueChose(
+  p: { reference: string | null; article: string | null; family: string | null; packSize: Prisma.Decimal | null; packName: string | null },
+  d: { reference?: string; article?: string; family?: string; packSize?: number; packName?: string },
+): boolean {
   return (
+    (d.packName !== undefined && d.packName !== p.packName) ||
     (d.reference !== undefined && d.reference !== p.reference) ||
     (d.article !== undefined && d.article !== p.article) ||
     (d.family !== undefined && d.family !== p.family) ||
@@ -374,6 +377,7 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           ...(l.article?.trim() ? { article: l.article.trim() } : {}),
           ...(l.family?.trim() ? { family: l.family.trim() } : {}),
           ...(l.packSize != null && l.packSize > 0 ? { packSize: l.packSize } : {}),
+          ...(l.packName?.trim() ? { packName: l.packName.trim().slice(0, 40) } : {}),
         };
         if (!product) {
           product = await tx.supplierProduct.create({
@@ -668,6 +672,8 @@ export type ProductInput = {
   unit?: PriceUnit;
   /** Contenance d'un colis dans l'unité (25 pour un sac de 25 kg). */
   packSize?: number | null;
+  /** Ce qu'on commande : « carton », « sac »… (null = deviné d'après le nom). */
+  packName?: string | null;
 };
 
 async function productNameFree(tx: Tx, supplierId: number, name: string, exceptId?: number) {
@@ -699,6 +705,7 @@ export async function createProduct(
         family: cleanText(input.family, 80),
         priceUnit: unit,
         packSize: input.packSize != null && input.packSize > 0 ? input.packSize : null,
+        packName: cleanText(input.packName, 40),
       },
       select: { id: true, name: true },
     });
@@ -726,6 +733,7 @@ export async function updateProduct(id: number, input: ProductInput) {
     if (input.article !== undefined) data.article = cleanText(input.article, 200);
     if (input.family !== undefined) data.family = cleanText(input.family, 80);
     if (input.packSize !== undefined) data.packSize = input.packSize != null && input.packSize > 0 ? input.packSize : null;
+    if (input.packName !== undefined) data.packName = cleanText(input.packName, 40);
     if (input.unit !== undefined && input.unit !== p.priceUnit) {
       if (!isPriceUnit(input.unit)) throw new Error("Unité inconnue (kg, L ou pièce).");
       if (p._count.lines > 0) throw new Error("L'unité ne change plus : ce produit a déjà des prix. Supprime ses prix d'abord.");
@@ -735,6 +743,24 @@ export async function updateProduct(id: number, input: ProductInput) {
     // Un nouvel article peut regrouper ce produit avec d'autres variantes.
     if (input.article !== undefined) await followArticles(tx, p.supplierId, [id]);
   });
+}
+
+/**
+ * Range plusieurs produits d'un fournisseur sous un même article (« Croissant »
+ * pour pur beurre, beurre, margarine). article vide : chacun reprend son nom.
+ */
+export async function groupProducts(supplierId: number, productIds: number[], article: string | null): Promise<number> {
+  const name = cleanText(article, 200);
+  const ids = [...new Set(productIds)].slice(0, 2000);
+  if (!ids.length) return 0;
+  return prisma.$transaction(
+    async (tx) => {
+      const { count } = await tx.supplierProduct.updateMany({ where: { supplierId, id: { in: ids } }, data: { article: name } });
+      await followArticles(tx, supplierId, ids);
+      return count;
+    },
+    { timeout: 60_000 },
+  );
 }
 
 /**
@@ -893,6 +919,7 @@ const productSelect = {
   article: true,
   family: true,
   packSize: true,
+  packName: true,
   price: true,
   priceUnit: true,
   priceDate: true,
@@ -951,6 +978,7 @@ function toComparisonProduct(p: ProductRow) {
     ...product,
     reference: p.reference,
     packSize: num(p.packSize),
+    packName: p.packName,
     base: p.base ? { id: p.base.id, name: p.base.name, chosen: p.base.chosenProductId === p.id } : null,
     history,
   };

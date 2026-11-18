@@ -551,6 +551,8 @@ button.cost-line:hover {
   min-width: 0;
 }
 .ia-ligne {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -809,4 +811,433 @@ button.cost-line:hover {
   height: auto;
   border-radius: 8px;
   border: 1px solid var(--border);
+}
+
+/* ─────────────────────────────────────────────
+   Passer une commande
+   ───────────────────────────────────────────── */
+
+.ord-page {
+  padding-bottom: 96px;
+}
+
+.ord-tools {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 10px;
+  background: var(--bg);
+}
+
+.ord-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.ord-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.ord-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.ord-family {
+  padding: 10px 14px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.ord-group:first-child .ord-family {
+  border-top: 0;
+}
+
+.ord-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px 9px 14px;
+  border-top: 1px solid var(--border);
+  /* Seules les lignes à l'écran sont dessinées : une longue mercuriale reste fluide. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
+}
+.ord-group:first-child > .ord-row:first-child {
+  border-top: 0;
+}
+.ord-row[data-on] {
+  background: var(--accent-dim);
+}
+.ord-row[data-variant] {
+  padding-left: 34px;
+}
+
+.ord-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.ord-name b {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.ord-name small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ord-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--soft);
+  cursor: pointer;
+  font: inherit;
+}
+.ord-toggle > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ord-qty {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ord-n {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ord-n[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ord-units {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-left: 2px;
+}
+.ord-u {
+  height: 34px;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--soft);
+  font-size: 12.5px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ord-u + .ord-u {
+  border-left: 1px solid var(--border);
+}
+.ord-u[aria-pressed="true"] {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+.ord-u-one {
+  min-width: 44px;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding-left: 4px;
+}
+
+.ord-more {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ord-bar {
+  position: fixed;
+  z-index: 46;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+}
+.ord-bar-tx {
+  flex: 1 1 auto;
+  display: grid;
+  min-width: 0;
+}
+.ord-bar-tx small {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (min-width: 900px) {
+  .ord-bar {
+    left: var(--sidebar-w);
+    bottom: 0;
+    padding: 12px 36px;
+  }
+}
+
+/* Petits écrans : le nom au-dessus, les boutons dessous, alignés à droite. */
+@media (max-width: 560px) {
+  .ord-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    contain-intrinsic-size: auto 92px;
+  }
+  .ord-name {
+    flex-basis: 100%;
+  }
+  .ord-qty {
+    width: 100%;
+  }
+}
+
+.ord-review {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ord-review-row {
+  display: grid;
+  grid-template-columns: minmax(78px, auto) 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.ord-review-row:first-child {
+  border-top: 0;
+}
+.ord-review-row small {
+  color: var(--muted);
+}
+.ord-review-price {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ord-review-total {
+  padding: 9px 10px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  background: var(--surface);
+}
+
+.ord-field {
+  display: grid;
+  gap: 4px;
+}
+.ord-field .fl-label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ord-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ord-text {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 12px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.ord-ok {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.ord-suppliers {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Fiche fournisseur : recherche et regroupement */
+.sup-detail-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.fl-list .fl-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
+}
+.grp-sugg {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.grp-sugg label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* ─────────────────────────────────────────────
+   Produits vendus
+   ───────────────────────────────────────────── */
+
+.sold-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sold-kpis .fl-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+.sold-kpis .kpi-l {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sold-kpis b {
+  font-size: 20px;
+}
+
+.sold-list {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--card);
+}
+.sold-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 100px 90px 80px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}
+.sold-row:first-child {
+  border-top: 0;
+}
+a.sold-row:hover {
+  background: var(--surface);
+}
+.sold-row > .num {
+  text-align: right;
+  display: grid;
+  font-weight: 600;
+}
+.sold-row small {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sold-head {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface);
+}
+.sold-head > span:not(:first-child) {
+  text-align: right;
+}
+.sold-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sold-warn {
+  color: var(--accent-3);
+}
+@media (max-width: 640px) {
+  .sold-head {
+    display: none;
+  }
+  .sold-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 6px;
+  }
+  .sold-name {
+    grid-column: 1 / -1;
+  }
+  .sold-row > .num {
+    text-align: left;
+  }
+  .sold-row > .num::before {
+    content: attr(data-l);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+  }
 }

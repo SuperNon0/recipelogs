@@ -2307,6 +2307,21 @@ button.fl-row:hover {
   font-size: 12.5px;
 }
 
+.cost-sold {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.cost-sold input {
+  width: 18px;
+  height: 18px;
+}
+
 .cost-sale-err {
   grid-column: 1 / -1;
   font-size: 12.5px;

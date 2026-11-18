@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Scale, Users, Euro, Receipt, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Scale, Users, Euro, Receipt, ShoppingCart, BadgeEuro, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -143,6 +143,18 @@ export default async function SettingsPage() {
                   icon={Receipt}
                   title="Factures"
                   sub={`${plural(invoiceCount, "facture")} · envoyées à Claude, avec tout l'historique des prix`}
+                />
+                <Row
+                  href="/fournisseurs/commandes"
+                  icon={ShoppingCart}
+                  title="Commandes fournisseurs"
+                  sub="passer une commande en quelques touches · texte pour le commercial et PDF gardés"
+                />
+                <Row
+                  href="/produits-vendus"
+                  icon={BadgeEuro}
+                  title="Produits vendus"
+                  sub="la marge de chaque produit coché « Produit vendu »"
                 />
               </>
             )}

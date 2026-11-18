@@ -27,7 +27,7 @@ import {
   toggleSubRecipeLock,
   updateSubRecipe,
 } from "@/app/actions/subRecipes";
-import { applyMultiplierToRecipe, setRecipeSaleCoef, setRecipeSalePrice } from "@/app/actions/recipes";
+import { applyMultiplierToRecipe, setRecipeSaleCoef, setRecipeSalePrice, setRecipeSold } from "@/app/actions/recipes";
 import { MOLD_PRESETS, moldCoef, moldLabel, moldsFilled, type Mold } from "@/lib/mold";
 import { MoldPicker } from "./MoldPicker";
 import { DEFAULT_SALE_COEF, DEFAULT_SALE_VAT, SALE_VATS, costOf, formatEuro, formatVat, saleMargin, type IngredientPrice } from "@/lib/cost";
@@ -125,6 +125,7 @@ export function RecipeBody({
   saleCoef,
   salePrice,
   saleVat,
+  sold,
   onScaleChange,
 }: {
   recipeId: number;
@@ -138,6 +139,7 @@ export function RecipeBody({
   /** Prix de vente enregistré (produit fini) et TVA comprise dedans. */
   salePrice?: number | null;
   saleVat?: number | null;
+  sold?: boolean;
   /** Prévient la fiche quand le multiplicateur change (étapes). */
   onScaleChange?: (s: RecipeScale) => void;
 }) {
@@ -442,6 +444,7 @@ export function RecipeBody({
         initialCoef={saleCoef ?? DEFAULT_SALE_COEF}
         initialPrice={salePrice ?? null}
         initialVat={saleVat ?? DEFAULT_SALE_VAT}
+        initialSold={!!sold}
         canEditCoef={can("costs.edit")}
       />}
 
@@ -653,6 +656,7 @@ function CostCard({
   initialCoef,
   initialPrice,
   initialVat,
+  initialSold,
   canEditCoef,
 }: {
   recipeId: number;
@@ -663,6 +667,7 @@ function CostCard({
   initialCoef: number;
   initialPrice: number | null;
   initialVat: number;
+  initialSold: boolean;
   /** Permission « Modifier les prix » : sinon le coefficient se lit sans se changer. */
   canEditCoef: boolean;
 }) {
@@ -691,6 +696,7 @@ function CostCard({
       scale={scale}
       initialPrice={initialPrice}
       initialVat={initialVat}
+      initialSold={initialSold}
       canEdit={canEditCoef}
     />
   );
@@ -797,6 +803,7 @@ function SalePriceBlock({
   scale,
   initialPrice,
   initialVat,
+  initialSold,
   canEdit,
 }: {
   recipeId: number;
@@ -807,8 +814,10 @@ function SalePriceBlock({
   scale: number;
   initialPrice: number | null;
   initialVat: number;
+  initialSold: boolean;
   canEdit: boolean;
 }) {
+  const [sold, setSold] = useState(initialSold);
   const [priceInput, setPriceInput] = useState(initialPrice != null ? initialPrice.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
   const [saved, setSaved] = useState<{ price: number | null; vat: number }>({ price: initialPrice, vat: initialVat });
   const [vat, setVat] = useState(initialVat);
@@ -900,6 +909,29 @@ function SalePriceBlock({
           <span className="cost-sale-tva"> (TVA {formatEuro(vatPart)})</span>
         </div>
       )}
+      <label className="cost-sold">
+        <input
+          type="checkbox"
+          checked={sold}
+          disabled={!canEdit}
+          onChange={(e) => {
+            const v = e.target.checked;
+            setSold(v);
+            startTransition(async () => {
+              const r = await setRecipeSold(recipeId, v);
+              if (!r.ok) {
+                setSold(!v);
+                setError(r.error);
+              }
+            });
+          }}
+        />
+        Produit vendu
+        <Help title="Produit vendu" example="Tes croissants vendus 1,30 € : coche la case, ils apparaissent dans Réglages → Produits vendus avec leur marge.">
+          Coche cette case si tu vends ce produit fini. Il apparaît alors dans la page « Produits vendus » (Réglages), avec tous tes
+          autres produits vendus : coût de revient, prix de vente et marge de chacun, en euros et en %.
+        </Help>
+      </label>
       {error && <div className="cost-sale-err">{error}</div>}
       {m && (
         <>

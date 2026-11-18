@@ -17,33 +17,49 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model Recipe {
-  accountViews AccountRecipeView[]
-  id         Int      @id @default(autoincrement())
-  name       String   @db.VarChar(200)
-  photoPath  String?  @map("photo_path")
-  source     String?  @db.Text
-  notesTips  String?  @map("notes_tips") @db.Text
-  favorite   Boolean  @default(false)
-  rating     Int?
-  folderId       Int?     @map("folder_id")
-  nameNormalized String?  @map("name_normalized")
-  /** Rendement à ×1 : nombre de pièces (ou de parts, de cadres…) et leur nom. */
-  yieldCount     Int?     @map("yield_count")
-  yieldLabel     String?  @map("yield_label") @db.VarChar(80)
-  /** Coefficient prix de vente / coût matière (null = ×4 par défaut). */
-  saleCoef       Decimal? @map("sale_coef") @db.Decimal(6, 2)
-  /** Prix de vente (produit fini) : par pièce si la recette a un rendement, sinon la recette entière. */
-  salePrice      Decimal? @map("sale_price") @db.Decimal(10, 2)
-  /** TVA comprise dans le prix de vente, en % (null = 5,5 %, 0 = prix HT). */
-  saleVat        Decimal? @map("sale_vat") @db.Decimal(4, 2)
-  /** Moule d'origine (lib/mold.ts) : { shape, a, b?, h? } en cm, null = non renseigné. */
+  accountViews   AccountRecipeView[]
+  id             Int                 @id @default(autoincrement())
+  name           String              @db.VarChar(200)
+  photoPath      String?             @map("photo_path")
+  source         String?             @db.Text
+  notesTips      String?             @map("notes_tips") @db.Text
+  favorite       Boolean             @default(false)
+  rating         Int?
+  folderId       Int?                @map("folder_id")
+  nameNormalized String?             @map("name_normalized")
+  /**
+   * Rendement à ×1 : nombre de pièces (ou de parts, de cadres…) et leur nom.
+   */
+  yieldCount     Int?                @map("yield_count")
+  yieldLabel     String?             @map("yield_label") @db.VarChar(80)
+  /**
+   * Coefficient prix de vente / coût matière (null = ×4 par défaut).
+   */
+  saleCoef       Decimal?            @map("sale_coef") @db.Decimal(6, 2)
+  /**
+   * Prix de vente (produit fini) : par pièce si la recette a un rendement, sinon la recette entière.
+   */
+  salePrice      Decimal?            @map("sale_price") @db.Decimal(10, 2)
+  /**
+   * TVA comprise dans le prix de vente, en % (null = 5,5 %, 0 = prix HT).
+   */
+  saleVat        Decimal?            @map("sale_vat") @db.Decimal(4, 2)
+  /**
+   * Case « Produit vendu » : la recette apparaît dans la page Produits vendus (marge).
+   */
+  sold           Boolean             @default(false)
+  /**
+   * Moule d'origine (lib/mold.ts) : { shape, a, b?, h? } en cm, null = non renseigné.
+   */
   mold           Json?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  /** Dernière ouverture de la fiche (page Historique). Écrite en SQL brut pour ne pas toucher updatedAt. */
-  lastViewedAt   DateTime? @map("last_viewed_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  /**
+   * Dernière ouverture de la fiche (page Historique). Écrite en SQL brut pour ne pas toucher updatedAt.
+   */
+  lastViewedAt   DateTime?           @map("last_viewed_at")
 
-  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   stepsBlock  StepsBlock?
   ingredients Ingredient[]
@@ -57,7 +73,7 @@ model Recipe {
   variantSources Variant[] @relation("VariantSource")
   variantTargets Variant[] @relation("VariantTarget")
 
-  cookbookEntries    CookbookRecipe[]
+  cookbookEntries     CookbookRecipe[]
   shoppingListRecipes ShoppingListRecipe[]
   shoppingListItems   ShoppingListItem[]
   productionItem      ProductionItem?
@@ -67,6 +83,7 @@ model Recipe {
   @@index([favorite])
   @@index([folderId])
   @@index([nameNormalized])
+  @@index([sold])
   @@map("recipes")
 }
 
@@ -92,32 +109,44 @@ model StepsBlock {
 }
 
 model IngredientBase {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  defaultUnit String   @default("g") @map("default_unit")
-  category    String?  // "base" | "fruit" | "preparation" | null = à classer
-  /** Poids d'une pièce en grammes (œuf ≈ 50 g) : les pièces comptent alors dans la masse. */
-  pieceG      Decimal? @map("piece_g") @db.Decimal(10, 3)
-  /** Allergènes INCO cochés (clés de lib/allergens.ts : "gluten", "lait"…). */
-  allergens   String[] @default([])
-  /** Prix d'achat (€) par `priceUnit` : "kg", "L" ou "pièce". */
-  price       Decimal? @db.Decimal(10, 4)
-  priceUnit   String?  @map("price_unit")
-  /** Produit fournisseur dont le prix est utilisé (le prix ci-dessus suit alors ce produit). */
-  chosenProductId Int? @map("chosen_product_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  defaultUnit     String   @default("g") @map("default_unit")
+  category        String? // "base" | "fruit" | "preparation" | null = à classer
+  /**
+   * Poids d'une pièce en grammes (œuf ≈ 50 g) : les pièces comptent alors dans la masse.
+   */
+  pieceG          Decimal? @map("piece_g") @db.Decimal(10, 3)
+  /**
+   * Allergènes INCO cochés (clés de lib/allergens.ts : "gluten", "lait"…).
+   */
+  allergens       String[] @default([])
+  /**
+   * Prix d'achat (€) par `priceUnit` : "kg", "L" ou "pièce".
+   */
+  price           Decimal? @db.Decimal(10, 4)
+  priceUnit       String?  @map("price_unit")
+  /**
+   * Produit fournisseur dont le prix est utilisé (le prix ci-dessus suit alors ce produit).
+   */
+  chosenProductId Int?     @map("chosen_product_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
-  usages Ingredient[]
-  prices IngredientPrice[]
-  /** Produits fournisseurs reliés à cet ingrédient (choix possibles). */
+  usages        Ingredient[]
+  prices        IngredientPrice[]
+  /**
+   * Produits fournisseurs reliés à cet ingrédient (choix possibles).
+   */
   products      SupplierProduct[] @relation("LinkedProducts")
   chosenProduct SupplierProduct?  @relation("ChosenProduct", fields: [chosenProductId], references: [id], onDelete: SetNull)
 
   @@map("ingredients_base")
 }
 
-/** Historique des prix d'achat d'un ingrédient (une ligne par changement). */
+/**
+ * Historique des prix d'achat d'un ingrédient (une ligne par changement).
+ */
 model IngredientPrice {
   id        Int      @id @default(autoincrement())
   baseId    Int      @map("base_id")
@@ -131,7 +160,9 @@ model IngredientPrice {
   @@map("ingredient_prices")
 }
 
-/** Fournisseur (Metro, Promocash, Valrhona…). Créé tout seul au premier bon de commande. */
+/**
+ * Fournisseur (Metro, Promocash, Valrhona…). Créé tout seul au premier bon de commande.
+ */
 model Supplier {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -139,8 +170,9 @@ model Supplier {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  products SupplierProduct[]
-  orders   PurchaseOrder[]
+  products  SupplierProduct[]
+  orders    PurchaseOrder[]
+  commandes SupplierOrder[]
 
   @@map("suppliers")
 }
@@ -154,31 +186,46 @@ model SupplierProduct {
   supplierId Int       @map("supplier_id")
   name       String
   reference  String?
-  /** Nom commun pour comparer entre fournisseurs (« Chocolat noir 64 % »). */
+  /**
+   * Nom commun pour comparer entre fournisseurs (« Chocolat noir 64 % »).
+   */
   article    String?
-  /** Famille du tableau comparatif (Chocolat, Crèmerie, Emballages…). */
+  /**
+   * Famille du tableau comparatif (Chocolat, Crèmerie, Emballages…).
+   */
   family     String?
-  /** Contenance d'un colis dans `priceUnit` (25 pour un sac de 25 kg). */
+  /**
+   * Contenance d'un colis dans `priceUnit` (25 pour un sac de 25 kg).
+   */
   packSize   Decimal?  @map("pack_size") @db.Decimal(12, 4)
+  /**
+   * Ce qu'on commande : « carton », « sac », « seau »… (null = deviné d'après le nom).
+   */
+  packName   String?   @map("pack_name")
   price      Decimal?  @db.Decimal(12, 4)
   priceUnit  String    @default("kg") @map("price_unit")
   priceDate  DateTime? @map("price_date") @db.Date
-  /** Ingrédient des recettes auquel ce produit correspond. */
+  /**
+   * Ingrédient des recettes auquel ce produit correspond.
+   */
   baseId     Int?      @map("base_id")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  base     IngredientBase?     @relation("LinkedProducts", fields: [baseId], references: [id], onDelete: SetNull)
-  chosenBy IngredientBase[]    @relation("ChosenProduct")
-  lines    PurchaseOrderLine[]
+  supplier   Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  base       IngredientBase?     @relation("LinkedProducts", fields: [baseId], references: [id], onDelete: SetNull)
+  chosenBy   IngredientBase[]    @relation("ChosenProduct")
+  lines      PurchaseOrderLine[]
+  orderLines SupplierOrderLine[]
 
   @@unique([supplierId, name])
   @@index([baseId])
   @@map("supplier_products")
 }
 
-/** Bon de commande ou facture d'un fournisseur. */
+/**
+ * Bon de commande ou facture d'un fournisseur.
+ */
 model PurchaseOrder {
   id         Int      @id @default(autoincrement())
   supplierId Int      @map("supplier_id")
@@ -186,9 +233,13 @@ model PurchaseOrder {
   number     String?
   total      Decimal? @db.Decimal(12, 2)
   note       String?
-  /** Photo ou PDF de la facture, dans le dossier d'upload (factures/…). */
+  /**
+   * Photo ou PDF de la facture, dans le dossier d'upload (factures/…).
+   */
   filePath   String?  @map("file_path")
-  /** Prix tapé à la main sur le site (pas une vraie facture : absent de la liste des factures). */
+  /**
+   * Prix tapé à la main sur le site (pas une vraie facture : absent de la liste des factures).
+   */
   manual     Boolean  @default(false)
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -205,30 +256,46 @@ model PurchaseOrder {
  */
 model PendingInvoice {
   id        Int      @id @default(autoincrement())
-  /** Pages (photos JPG/PNG/WebP, ou un seul PDF) dans le dossier d'upload : factures/a-traiter/… */
+  /**
+   * Pages (photos JPG/PNG/WebP, ou un seul PDF) dans le dossier d'upload : factures/a-traiter/…
+   */
   files     String[]
   note      String?
-  /** Qui l'a ajoutée (nom ou e-mail du compte), pour la liste. */
+  /**
+   * Qui l'a ajoutée (nom ou e-mail du compte), pour la liste.
+   */
   addedBy   String?  @map("added_by")
-  /** Message de la dernière lecture par IA qui a échoué. */
+  /**
+   * Message de la dernière lecture par IA qui a échoué.
+   */
   lastError String?  @map("last_error")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("pending_invoices")
 }
 
-/** Ligne d'un bon : un produit, combien, à quel prix. */
+/**
+ * Ligne d'un bon : un produit, combien, à quel prix.
+ */
 model PurchaseOrderLine {
   id        Int      @id @default(autoincrement())
   orderId   Int      @map("order_id")
   productId Int      @map("product_id")
-  /** Nombre de colis (ou d'unités) achetés. */
+  /**
+   * Nombre de colis (ou d'unités) achetés.
+   */
   quantity  Decimal? @db.Decimal(12, 3)
-  /** Contenance à la date de la facture ; null si historique inconnu. */
+  /**
+   * Contenance à la date de la facture ; null si historique inconnu.
+   */
   packSize  Decimal? @map("pack_size") @db.Decimal(12, 4)
-  /** Prix d'un colis, en €. */
+  /**
+   * Prix d'un colis, en €.
+   */
   packPrice Decimal? @map("pack_price") @db.Decimal(12, 4)
-  /** Prix ramené à l'unité de prix du produit (€ par kg, L ou pièce). */
+  /**
+   * Prix ramené à l'unité de prix du produit (€ par kg, L ou pièce).
+   */
   unitPrice Decimal  @map("unit_price") @db.Decimal(12, 4)
   priceUnit String   @map("price_unit")
   lineTotal Decimal? @map("line_total") @db.Decimal(12, 2)
@@ -269,16 +336,16 @@ enum CalcMode {
 }
 
 model SubRecipe {
-  id         Int      @id @default(autoincrement())
-  parentId   Int      @map("parent_id")
-  childId    Int      @map("child_id")
-  label      String
-  calcMode   CalcMode @default(coefficient) @map("calc_mode")
-  calcValue  Decimal  @default(1) @map("calc_value") @db.Decimal(12, 4)
-  pivotIngredientId Int? @map("pivot_ingredient_id")
-  isLocked   Boolean  @default(false) @map("is_locked")
-  isExact    Boolean  @default(false) @map("is_exact")
-  position   Int      @default(0)
+  id                Int      @id @default(autoincrement())
+  parentId          Int      @map("parent_id")
+  childId           Int      @map("child_id")
+  label             String
+  calcMode          CalcMode @default(coefficient) @map("calc_mode")
+  calcValue         Decimal  @default(1) @map("calc_value") @db.Decimal(12, 4)
+  pivotIngredientId Int?     @map("pivot_ingredient_id")
+  isLocked          Boolean  @default(false) @map("is_locked")
+  isExact           Boolean  @default(false) @map("is_exact")
+  position          Int      @default(0)
 
   parent Recipe @relation("SubRecipeParent", fields: [parentId], references: [id], onDelete: Cascade)
   child  Recipe @relation("SubRecipeChild", fields: [childId], references: [id], onDelete: Restrict)
@@ -430,16 +497,18 @@ model Cookbook {
 }
 
 model CookbookRecipe {
-  id                Int                 @id @default(autoincrement())
-  cookbookId        Int                 @map("cookbook_id")
-  recipeId          Int                 @map("recipe_id")
-  position          Int                 @default(0)
-  linkMode          LinkMode            @default(linked) @map("link_mode")
-  snapshotData      Json?               @map("snapshot_data")
-  snapshotDate      DateTime?           @map("snapshot_date")
-  subrecipeMode     SubRecipeRenderMode @default(single) @map("subrecipe_mode")
-  /** Si non vide, déclenche un titre de section au-dessus de cette entrée. */
-  sectionTitle      String?             @map("section_title")
+  id            Int                 @id @default(autoincrement())
+  cookbookId    Int                 @map("cookbook_id")
+  recipeId      Int                 @map("recipe_id")
+  position      Int                 @default(0)
+  linkMode      LinkMode            @default(linked) @map("link_mode")
+  snapshotData  Json?               @map("snapshot_data")
+  snapshotDate  DateTime?           @map("snapshot_date")
+  subrecipeMode SubRecipeRenderMode @default(single) @map("subrecipe_mode")
+  /**
+   * Si non vide, déclenche un titre de section au-dessus de cette entrée.
+   */
+  sectionTitle  String?             @map("section_title")
 
   cookbook Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
   recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
@@ -497,7 +566,9 @@ model ShoppingListItem {
   shoppingListId Int      @map("shopping_list_id")
   name           String
   quantityG      Decimal? @map("quantity_g") @db.Decimal(10, 3)
-  /** null = grammes. */
+  /**
+   * null = grammes.
+   */
   unit           String?
   recipeId       Int?     @map("recipe_id")
   checked        Boolean  @default(false)
@@ -532,14 +603,14 @@ model ShoppingListRecipe {
  * (« 60 éclairs »), sinon multiplicateur (×2). Une seule fiche en cours.
  */
 model ProductionItem {
-  id        Int      @id @default(autoincrement())
-  recipeId  Int      @unique @map("recipe_id")
-  amount    Decimal  @db.Decimal(12, 3)
+  id         Int      @id @default(autoincrement())
+  recipeId   Int      @unique @map("recipe_id")
+  amount     Decimal  @db.Decimal(12, 3)
   /// Rendement de la recette au moment de l'ajout : `amount` est alors un nombre
   /// de pièces ; null = `amount` est un multiplicateur.
-  yieldCount Int?    @map("yield_count")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
+  yieldCount Int?     @map("yield_count")
+  position   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
 
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
@@ -556,12 +627,12 @@ enum ShareEntityType {
 }
 
 model ShareToken {
-  id         Int              @id @default(autoincrement())
-  token      String           @unique
-  entityType ShareEntityType  @map("entity_type")
-  entityId   Int              @map("entity_id")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  revokedAt  DateTime?        @map("revoked_at")
+  id         Int             @id @default(autoincrement())
+  token      String          @unique
+  entityType ShareEntityType @map("entity_type")
+  entityId   Int             @map("entity_id")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  revokedAt  DateTime?       @map("revoked_at")
 
   @@index([entityType, entityId])
   @@map("share_tokens")
@@ -587,15 +658,23 @@ enum AccountStatus {
   blocked
 }
 
-/** Rôle créé par l'administrateur (Apprenti, Chef…) : un nom et des permissions cochées. */
+/**
+ * Rôle créé par l'administrateur (Apprenti, Chef…) : un nom et des permissions cochées.
+ */
 model Role {
   id          Int      @id @default(autoincrement())
   name        String   @unique @db.VarChar(60)
-  /** Clés des permissions cochées (liste dans src/lib/auth/permissions.ts). */
+  /**
+   * Clés des permissions cochées (liste dans src/lib/auth/permissions.ts).
+   */
   permissions String[] @default([])
-  /** Sans la permission « Voir toutes les recettes » : ids des catégories dont le rôle voit les recettes. */
+  /**
+   * Sans la permission « Voir toutes les recettes » : ids des catégories dont le rôle voit les recettes.
+   */
   categoryIds Int[]    @default([]) @map("category_ids")
-  /** Rôle Administrateur intégré : toutes les permissions, ni modifiable ni supprimable. */
+  /**
+   * Rôle Administrateur intégré : toutes les permissions, ni modifiable ni supprimable.
+   */
   isAdmin     Boolean  @default(false) @map("is_admin")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -606,14 +685,16 @@ model Role {
 
 model Account {
   recipeViews AccountRecipeView[]
-  id          Int           @id @default(autoincrement())
-  email       String        @unique
-  /** Rôle donné à l'acceptation (null tant que la demande est en attente). */
-  roleId      Int?          @map("role_id")
-  status      AccountStatus @default(pending)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  approvedAt  DateTime?     @map("approved_at")
-  lastSeenAt  DateTime?     @map("last_seen_at")
+  id          Int                 @id @default(autoincrement())
+  email       String              @unique
+  /**
+   * Rôle donné à l'acceptation (null tant que la demande est en attente).
+   */
+  roleId      Int?                @map("role_id")
+  status      AccountStatus       @default(pending)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  approvedAt  DateTime?           @map("approved_at")
+  lastSeenAt  DateTime?           @map("last_seen_at")
 
   role Role? @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
@@ -621,7 +702,9 @@ model Account {
   @@map("accounts")
 }
 
-/** Journal des comptes : qui a accepté, refusé, bloqué, changé un rôle, « vu comme ». */
+/**
+ * Journal des comptes : qui a accepté, refusé, bloqué, changé un rôle, « vu comme ».
+ */
 model AuditLog {
   id          Int      @id @default(autoincrement())
   at          DateTime @default(now())
@@ -635,14 +718,77 @@ model AuditLog {
 }
 
 model AccountRecipeView {
-  accountId Int @map("account_id")
-  recipeId  Int @map("recipe_id")
+  accountId Int      @map("account_id")
+  recipeId  Int      @map("recipe_id")
   viewedAt  DateTime @default(now()) @map("viewed_at")
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  recipe  Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 
   @@id([accountId, recipeId])
   @@index([accountId, viewedAt(sort: Desc)])
   @@map("account_recipe_views")
+}
+
+/// Commande passée à un fournisseur (bouton « Passer une commande ») : texte pour le commercial et PDF.
+model SupplierOrder {
+  id           Int       @id @default(autoincrement())
+  supplierId   Int       @map("supplier_id")
+  /**
+   * Jour de la commande.
+   */
+  date         DateTime  @db.Date
+  /**
+   * Livraison souhaitée, si elle est donnée.
+   */
+  deliveryDate DateTime? @map("delivery_date") @db.Date
+  /**
+   * Lieu de livraison (boutique, labo…).
+   */
+  place        String?
+  note         String?
+  /**
+   * Qui l'a passée (nom ou e-mail du compte).
+   */
+  addedBy      String?   @map("added_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  lines    SupplierOrderLine[]
+
+  @@index([supplierId, date(sort: Desc)])
+  @@index([date(sort: Desc)])
+  @@map("supplier_orders")
+}
+
+/// Ligne d'une commande : un produit, ou un article entier (« Croissant ») sans variante choisie.
+model SupplierOrderLine {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  /**
+   * Produit commandé ; null pour un article commandé sans choisir la variante.
+   */
+  productId Int?     @map("product_id")
+  /**
+   * Nom au moment de la commande (le produit peut être renommé ou supprimé ensuite).
+   */
+  label     String
+  reference String?
+  quantity  Decimal  @db.Decimal(12, 3)
+  /**
+   * « carton », « sac », « kg », « pièce »…
+   */
+  unit      String
+  /**
+   * Prix estimé d'une unité commandée au moment de la commande, en € HT.
+   */
+  unitPrice Decimal? @map("unit_price") @db.Decimal(12, 4)
+  position  Int      @default(0)
+
+  order   SupplierOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product SupplierProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("supplier_order_lines")
 }

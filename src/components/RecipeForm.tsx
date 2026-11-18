@@ -26,6 +26,7 @@ import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { recipeMass } from "@/lib/massAdjust";
 import { formatG } from "@/lib/format";
 import { Help } from "@/components/ui/Help";
+import { useCan } from "@/components/auth/Permissions";
 import { MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
@@ -74,6 +75,8 @@ export type RecipeFormInitial = {
   folderId?: number | null;
   yieldCount?: number | null;
   yieldLabel?: string | null;
+  /** Case « Produit vendu » (page Produits vendus). */
+  sold?: boolean;
   mold?: Mold | null;
   ingredients?: { name: string; quantityG: number; quantityGMax?: number | null; unit?: string }[];
   subRecipes?: ExistingSubRecipe[];
@@ -140,6 +143,7 @@ export function RecipeForm({
   };
 
   const markDirty = useCallback(() => setDirty(true), []);
+  const canSell = useCan()("costs.edit");
   const [mold, setMold] = useState<Mold | null>(initial?.mold ?? null);
   const existingSubs = initial?.subRecipes ?? [];
   const [pendingSubs, setPendingSubs] = useState<(PickedSubRecipe & { key: number })[]>([]);
@@ -385,6 +389,24 @@ export function RecipeForm({
             />
           </div>
         </Field>
+
+        {canSell && (
+          <div className="rf-sold">
+            <input type="hidden" name="soldShown" value="1" />
+            <label>
+              <input type="checkbox" name="sold" defaultChecked={!!initial?.sold} onChange={markDirty} />
+              Produit vendu
+            </label>
+            <Help
+              title="Produit vendu"
+              example="Croissant acheté congelé 0,39 € + 5 g de dorure : coût 0,42 €. Vendu 1,30 € : coche « Produit vendu », il apparaît dans Réglages → Produits vendus avec sa marge."
+            >
+              Coche cette case pour un produit fini que tu vends. Il apparaît alors dans la page « Produits vendus » (dans les Réglages),
+              qui montre pour chaque produit le coût de revient, le prix de vente et la marge en euros et en %. Le prix de vente se tape
+              sur la fiche de la recette, dans la carte du coût.
+            </Help>
+          </div>
+        )}
 
         <Field
           label="Moule d'origine"

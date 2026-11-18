@@ -3,6 +3,7 @@
 import { requireVisibleRecipe } from "@/lib/auth/visibility";
 
 import { requireAccess } from "@/lib/auth/guard";
+import { viewerCan, type Viewer } from "@/lib/auth/viewer";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -68,6 +69,7 @@ function parseForm(formData: FormData) {
   const yieldRaw = String(formData.get("yieldCount") ?? "").trim();
   raw.yieldCount = yieldRaw ? Math.round(Number(yieldRaw.replace(",", "."))) || null : null;
   raw.yieldLabel = String(formData.get("yieldLabel") ?? "");
+  if (formData.get("soldShown") === "1") raw.sold = formData.get("sold") === "on";
   const mold = parseMold(formData.get("mold"));
 
   const names = formData.getAll("ingredientName").map((v) => String(v));
@@ -92,6 +94,11 @@ function parseForm(formData: FormData) {
 }
 
 /** parseForm avec un message d'erreur lisible (création ET modification). */
+/** La case « Produit vendu » ne compte que pour qui peut modifier les prix. */
+function soldAllowed<T extends { sold?: boolean }>(viewer: Viewer, data: T): T {
+  return data.sold !== undefined && !viewerCan(viewer, "costs.edit") ? { ...data, sold: undefined } : data;
+}
+
 function parseFormOrThrow(formData: FormData): ReturnType<typeof parseForm> {
   try {
     return parseForm(formData);
@@ -184,6 +191,7 @@ function insertRecipe(tx: Prisma.TransactionClient, data: RecipeData) {
       yieldCount: data.yieldCount ?? null,
       yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
       mold: data.mold ?? Prisma.DbNull,
+      ...(data.sold !== undefined ? { sold: data.sold } : {}),
       ingredients: {
         create: data.ingredients.map((ing, idx) => ({
           name: ing.name,
@@ -209,8 +217,8 @@ function insertRecipe(tx: Prisma.TransactionClient, data: RecipeData) {
 }
 
 export async function createRecipe(formData: FormData) {
-  await requireAccess("recipes.edit");
-  const data = parseFormOrThrow(formData);
+  const viewer = await requireAccess("recipes.edit");
+  const data = soldAllowed(viewer, parseFormOrThrow(formData));
   const subs = await parsePendingSubRecipes(formData, null);
   if (data.ingredients.length === 0 && subs.length === 0) throw new Error(NO_INGREDIENT);
 
@@ -234,10 +242,10 @@ export async function createRecipe(formData: FormData) {
 export async function createRecipeInline(
   formData: FormData,
 ): Promise<{ ok: true; id: number; name: string } | { ok: false; error: string }> {
-  await requireAccess("recipes.edit");
+  const viewer = await requireAccess("recipes.edit");
   let data: RecipeData;
   try {
-    data = parseFormOrThrow(formData);
+    data = soldAllowed(viewer, parseFormOrThrow(formData));
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Formulaire invalide." };
   }
@@ -251,9 +259,9 @@ export async function createRecipeInline(
 }
 
 export async function updateRecipe(id: number, formData: FormData) {
-  await requireAccess("recipes.edit");
+  const viewer = await requireAccess("recipes.edit");
   await requireVisibleRecipe(id);
-  const data = parseFormOrThrow(formData);
+  const data = soldAllowed(viewer, parseFormOrThrow(formData));
   const subs = await parsePendingSubRecipes(formData, id);
   if (data.ingredients.length === 0 && subs.length === 0) {
     const existing = await prisma.subRecipe.count({ where: { parentId: id } });
@@ -282,6 +290,7 @@ export async function updateRecipe(id: number, formData: FormData) {
         yieldCount: data.yieldCount ?? null,
         yieldLabel: data.yieldCount ? data.yieldLabel || null : null,
         mold: data.mold ?? Prisma.DbNull,
+        ...(data.sold !== undefined ? { sold: data.sold } : {}),
       },
     });
 
@@ -547,6 +556,17 @@ export async function setRecipeSalePrice(
   });
   if (!count) return { ok: false, error: "Recette introuvable." };
   revalidatePath(`/recipes/${id}`);
+  return { ok: true };
+}
+
+/** Case « Produit vendu » : la recette apparaît (ou plus) dans la page Produits vendus. */
+export async function setRecipeSold(id: number, sold: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAccess("costs.edit");
+  await requireVisibleRecipe(id);
+  const { count } = await prisma.recipe.updateMany({ where: { id }, data: { sold: !!sold } });
+  if (!count) return { ok: false, error: "Recette introuvable." };
+  revalidatePath(`/recipes/${id}`);
+  revalidatePath("/produits-vendus");
   return { ok: true };
 }
 
