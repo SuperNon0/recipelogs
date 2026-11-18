@@ -381,6 +381,11 @@ export function controlerGemini(corps) {
 /**
  * POST /v1/ia/openai/v1/responses et /v1/ia/gemini/v1beta/models/<modèle>:generateContent.
  * fournisseur : "openai" | "gemini" ; modeleChemin : le modèle écrit dans l'adresse (Gemini).
+ * @param {string} client
+ * @param {import("node:http").IncomingMessage} req
+ * @param {import("node:http").ServerResponse} res
+ * @param {"openai" | "gemini"} fournisseur
+ * @param {string | null} [modeleChemin]
  */
 export async function relayerAutre(client, req, res, fournisseur, modeleChemin = null) {
   const conf = await configActuelle();
