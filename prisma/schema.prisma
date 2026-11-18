@@ -743,9 +743,10 @@ model SupplierOrder {
    */
   deliveryDate DateTime? @map("delivery_date") @db.Date
   /**
-   * Lieu de livraison (boutique, labo…).
+   * Signature de la commande (nom de l'entreprise, « Maison Chanka »).
+   * La colonne s'appelait « place » (lieu de livraison) : on garde son nom.
    */
-  place        String?
+  signature    String?   @map("place")
   note         String?
   /**
    * Qui l'a passée (nom ou e-mail du compte).

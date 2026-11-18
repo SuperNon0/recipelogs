@@ -37,7 +37,7 @@ export type CatalogProduct = {
 export async function loadOrderCatalog(supplierId: number) {
   const s = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true, name: true } });
   if (!s) return null;
-  const [products, recent, lastPlace] = await Promise.all([
+  const [products, recent, signature] = await Promise.all([
     prisma.supplierProduct.findMany({
       where: { supplierId },
       orderBy: { name: "asc" },
@@ -49,7 +49,7 @@ export async function loadOrderCatalog(supplierId: number) {
       take: 10,
       select: { date: true, lines: { select: { productId: true, label: true, quantity: true, unit: true } } },
     }),
-    prisma.supplierOrder.findFirst({ where: { place: { not: null } }, orderBy: { id: "desc" }, select: { place: true } }),
+    getOrderSignature(),
   ]);
   const lastByProduct = new Map<number, { quantity: number; unit: string; date: string }>();
   const lastByArticle = new Map<string, { quantity: number; unit: string; date: string }>();
@@ -83,8 +83,22 @@ export async function loadOrderCatalog(supplierId: number) {
     supplier: s,
     products: catalog,
     lastArticles: Object.fromEntries(lastByArticle),
-    lastPlace: lastPlace?.place ?? null,
+    signature,
   };
+}
+
+const SIGNATURE_KEY = "orderSignature";
+
+/** Nom de l'entreprise qui signe les commandes (« Maison Chanka »), réglé une fois. */
+export async function getOrderSignature(): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { key: SIGNATURE_KEY } });
+  return typeof row?.value === "string" && row.value.trim() ? row.value.trim() : null;
+}
+
+export async function setOrderSignature(v: string | null): Promise<void> {
+  const value = v?.trim().slice(0, 200) ?? "";
+  if (!value) await prisma.setting.deleteMany({ where: { key: SIGNATURE_KEY } });
+  else await prisma.setting.upsert({ where: { key: SIGNATURE_KEY }, update: { value }, create: { key: SIGNATURE_KEY, value } });
 }
 
 export type OrderCatalog = NonNullable<Awaited<ReturnType<typeof loadOrderCatalog>>>;
@@ -105,7 +119,8 @@ export async function createSupplierOrder(input: {
   supplierId: number;
   date?: string | null;
   deliveryDate?: string | null;
-  place?: string | null;
+  /** Absente : la signature des réglages. Donnée : elle devient celle des prochaines commandes. */
+  signature?: string | null;
   note?: string | null;
   addedBy?: string | null;
   lines: SupplierOrderLineInput[];
@@ -141,12 +156,18 @@ export async function createSupplierOrder(input: {
     }
   });
   const today = isoDay(new Date());
+  let signature: string | null;
+  if (input.signature === undefined) signature = await getOrderSignature();
+  else {
+    signature = clean(input.signature, 200);
+    await setOrderSignature(signature);
+  }
   const order = await prisma.supplierOrder.create({
     data: {
       supplierId: input.supplierId,
       date: parseDay(input.date || today),
       deliveryDate: input.deliveryDate ? parseDay(input.deliveryDate) : null,
-      place: clean(input.place, 200),
+      signature,
       note: clean(input.note, 2000),
       addedBy: clean(input.addedBy, 200),
       lines: { createMany: { data } },
@@ -165,7 +186,7 @@ export async function listSupplierOrders(filter: { supplierId?: number | null; t
       id: true,
       date: true,
       deliveryDate: true,
-      place: true,
+      signature: true,
       supplier: { select: { id: true, name: true } },
       lines: { select: { quantity: true, unitPrice: true } },
     },
@@ -176,7 +197,7 @@ export async function listSupplierOrders(filter: { supplierId?: number | null; t
       id: o.id,
       date: isoDay(o.date),
       deliveryDate: o.deliveryDate ? isoDay(o.deliveryDate) : null,
-      place: o.place,
+      signature: o.signature,
       supplier: o.supplier.name,
       supplierId: o.supplier.id,
       lines: o.lines.length,
@@ -194,7 +215,7 @@ export async function loadSupplierOrder(id: number) {
       id: true,
       date: true,
       deliveryDate: true,
-      place: true,
+      signature: true,
       note: true,
       addedBy: true,
       createdAt: true,
@@ -220,7 +241,7 @@ export async function loadSupplierOrder(id: number) {
     id: o.id,
     date: isoDay(o.date),
     deliveryDate: o.deliveryDate ? isoDay(o.deliveryDate) : null,
-    place: o.place,
+    signature: o.signature,
     note: o.note,
     addedBy: o.addedBy,
     createdAt: o.createdAt.toISOString(),
@@ -231,7 +252,7 @@ export async function loadSupplierOrder(id: number) {
     /** Lignes sans prix connu : l'estimation ne les compte pas. */
     unpriced: lines.filter((l) => l.unitPrice == null).length,
   };
-  return { ...order, text: orderText({ supplier: order.supplier, place: order.place, deliveryDate: order.deliveryDate, note: order.note, lines }) };
+  return { ...order, text: orderText({ supplier: order.supplier, signature: order.signature, deliveryDate: order.deliveryDate, note: order.note, lines }) };
 }
 
 export type SupplierOrderDetail = NonNullable<Awaited<ReturnType<typeof loadSupplierOrder>>>;

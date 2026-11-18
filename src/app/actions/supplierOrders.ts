@@ -17,7 +17,7 @@ function auteur(viewer: Viewer): string | null {
 export async function enregistrerCommande(input: {
   supplierId: number;
   deliveryDate?: string | null;
-  place?: string | null;
+  signature?: string | null;
   note?: string | null;
   lines: SupplierOrderLineInput[];
 }): Promise<{ ok: true; id: number } | Erreur> {
@@ -27,7 +27,7 @@ export async function enregistrerCommande(input: {
     const order = await createSupplierOrder({
       supplierId: Number(input.supplierId) || 0,
       deliveryDate: day(input.deliveryDate),
-      place: typeof input.place === "string" ? input.place : null,
+      signature: typeof input.signature === "string" ? input.signature : null,
       note: typeof input.note === "string" ? input.note : null,
       addedBy: auteur(viewer),
       lines: (Array.isArray(input.lines) ? input.lines : []).map((l) => ({

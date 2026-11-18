@@ -77,7 +77,8 @@ const frDate = (iso: string) => {
 /** Texte à coller dans un message au commercial. */
 export function orderText(o: {
   supplier: string;
-  place?: string | null;
+  /** Nom de l'entreprise qui signe le message (« Maison Chanka »). */
+  signature?: string | null;
   deliveryDate?: string | null;
   note?: string | null;
   lines: OrderTextLine[];
@@ -85,10 +86,10 @@ export function orderText(o: {
   const head = [
     "Bonjour,",
     "",
-    `Voici ma commande${o.place?.trim() ? ` pour ${o.place.trim()}` : ""}${o.deliveryDate ? `, à livrer le ${frDate(o.deliveryDate)}` : ""} :`,
+    `Voici ma commande${o.deliveryDate ? `, à livrer le ${frDate(o.deliveryDate)}` : ""} :`,
   ];
   const lines = o.lines.map((l) => `- ${qtyLabel(l.quantity, l.unit)} : ${l.label}${l.reference?.trim() ? ` (réf. ${l.reference.trim()})` : ""}`);
-  const tail = [...(o.note?.trim() ? ["", o.note.trim()] : []), "", "Merci !"];
+  const tail = [...(o.note?.trim() ? ["", o.note.trim()] : []), "", "Merci !", ...(o.signature?.trim() ? [o.signature.trim()] : [])];
   return [...head, ...lines, ...tail].join("\n");
 }
 

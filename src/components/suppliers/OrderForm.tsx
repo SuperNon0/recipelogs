@@ -268,7 +268,7 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
           supplier={supplier}
           lines={lines}
           total={total}
-          defaultPlace={catalog.lastPlace}
+          defaultSignature={catalog.signature}
           onRemove={(k) => setPick(k, null)}
           onClose={() => setReview(false)}
           onSaved={() => setPicks({})}
@@ -374,7 +374,7 @@ function ReviewModal({
   supplier,
   lines,
   total,
-  defaultPlace,
+  defaultSignature,
   onRemove,
   onClose,
   onSaved,
@@ -382,12 +382,12 @@ function ReviewModal({
   supplier: { id: number; name: string };
   lines: Line[];
   total: number;
-  defaultPlace: string | null;
+  defaultSignature: string | null;
   onRemove: (key: string) => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [place, setPlace] = useState(defaultPlace ?? "");
+  const [signature, setSignature] = useState(defaultSignature ?? "");
   const [delivery, setDelivery] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -396,35 +396,20 @@ function ReviewModal({
   const [copiedOnly, setCopiedOnly] = useState(false);
   const canShare = useCanShare();
 
-  useEffect(() => {
-    if (defaultPlace) return;
-    try {
-      const p = localStorage.getItem("recipelog-commande-lieu");
-      if (p) setPlace(p);
-    } catch {
-      /* rien */
-    }
-  }, [defaultPlace]);
-
-  const text = orderText({ supplier: supplier.name, place, deliveryDate: delivery || null, note, lines });
+  const text = orderText({ supplier: supplier.name, signature, deliveryDate: delivery || null, note, lines });
 
   async function save() {
     setBusy(true);
     setError(null);
     const r = await enregistrerCommande({
       supplierId: supplier.id,
-      place,
+      signature,
       deliveryDate: delivery || null,
       note,
       lines: lines.map((l) => ({ productId: l.productId, label: l.productId ? null : l.label, quantity: l.quantity, unit: l.unit })),
     });
     setBusy(false);
     if (!r.ok) return setError(r.error);
-    try {
-      if (place.trim()) localStorage.setItem("recipelog-commande-lieu", place.trim());
-    } catch {
-      /* rien */
-    }
     const copied = await copyText(text);
     setSaved({ id: r.id, text, copied });
     onSaved();
@@ -484,12 +469,13 @@ function ReviewModal({
         </div>
         <label className="ord-field">
           <span className="fl-label">
-            Lieu de livraison
-            <Help title="Lieu de livraison" example="Boutique rue Nationale, ou Labo.">
-              Où le fournisseur doit livrer. Il est écrit dans le message et sur le PDF, et repris tout seul à la prochaine commande.
+            Signature
+            <Help title="Signature" example="Maison Chanka">
+              Le nom de ton entreprise, écrit à la fin du message (après « Merci ! ») et en haut du PDF. Tape-le une fois : il est
+              gardé pour toutes les commandes suivantes, et tu peux le changer ici quand tu veux. Laisse vide pour ne rien signer.
             </Help>
           </span>
-          <input className="fl-input" value={place} maxLength={200} placeholder="Boutique, labo…" onChange={(e) => setPlace(e.target.value)} />
+          <input className="fl-input" value={signature} maxLength={200} placeholder="Maison Chanka" onChange={(e) => setSignature(e.target.value)} />
         </label>
         <label className="ord-field">
           <span className="fl-label">
