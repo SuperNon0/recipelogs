@@ -177,6 +177,16 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("« Claude (MCP) seulement » dans le panel : aucune lecture relayée, quota à 0", async () => {
+    writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 }, analyse: { defaut: "les-deux", clients: { maison: "mcp" } } }));
+    const ia = await import("../plateforme/passerelle/ia.mjs");
+    expect(await ia.quota("maison")).toMatchObject({ disponible: false, limite: 0, analyse: "mcp" });
+    expect(await ia.quota("autre")).toMatchObject({ analyse: "les-deux" });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    expect(r).toMatchObject({ ok: false, code: "quota_ia" });
+    writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 } }));
+  });
+
   it("la clé mise dans le panel passe avant celle de l'installation, tout de suite", async () => {
     writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 100 } }));
     writeFileSync(join(dossier, "cle.json"), JSON.stringify({ cle: "sk-ant-du-panel", depuis: "2026-11-17T00:00:00Z" }));
@@ -243,6 +253,21 @@ describe("lecture avec la clé de la plateforme", () => {
 describe("IA de la plateforme réglée dans le panel", () => {
   const cleOk = "sk-ant-api03-" + "a".repeat(40) + "WXYZ";
   const faux = (statut: number) => (async () => new Response("{}", { status: statut })) as unknown as typeof fetch;
+
+  it("règle l'analyse des documents par client (IA, Claude (MCP) ou les deux)", async () => {
+    const d = mkdtempSync(join(tmpdir(), "panel-"));
+    const ia = await import("../plateforme/panel/ia.mjs");
+    expect((await ia.resume(d)).analyse).toEqual({ defaut: "les-deux", clients: {} });
+    await ia.reglerFactures(d, { client: "maison", attente: null, pages: null, analyse: "mcp" });
+    await ia.reglerFactures(d, { client: "*", attente: 30, pages: 10, analyse: "ia" });
+    expect((await ia.resume(d)).analyse).toEqual({ defaut: "ia", clients: { maison: "mcp" } });
+    // Un ancien panel (sans analyse) ne touche pas au réglage ; null = revenir au défaut.
+    await ia.reglerFactures(d, { client: "maison", attente: 5, pages: null });
+    expect((await ia.resume(d)).analyse.clients).toEqual({ maison: "mcp" });
+    await ia.reglerFactures(d, { client: "maison", attente: null, pages: null, analyse: null });
+    expect((await ia.resume(d)).analyse.clients).toEqual({});
+    await expect(ia.reglerFactures(d, { client: "maison", analyse: "tout" })).rejects.toThrow(/Analyse/);
+  });
 
   it("essaie la clé, la garde en 600 et ne montre que la fin", async () => {
     const d = mkdtempSync(join(tmpdir(), "panel-"));

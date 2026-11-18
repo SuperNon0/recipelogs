@@ -122,6 +122,10 @@ export async function resume(donnees) {
       defaut: { attente: reglages.factures?.defaut?.attente ?? null, pages: reglages.factures?.defaut?.pages ?? null },
       clients: reglages.factures?.clients && typeof reglages.factures.clients === "object" ? reglages.factures.clients : {},
     },
+    analyse: {
+      defaut: MODES_ANALYSE.includes(reglages.analyse?.defaut) ? reglages.analyse.defaut : "les-deux",
+      clients: reglages.analyse?.clients && typeof reglages.analyse.clients === "object" ? reglages.analyse.clients : {},
+    },
     usage,
   };
 }
@@ -134,6 +138,12 @@ async function ecrireReglages(donnees, r) {
   await writeFile(tmp, JSON.stringify(r, null, 1), { mode: 0o644 });
   await rename(tmp, f);
 }
+
+/**
+ * Comment le client fait lire ses factures et mercuriales : « ia » (IA de la plateforme),
+ * « mcp » (Claude par le connecteur RecipeLog) ou « les-deux » (il choisit dans son RecipeLog).
+ */
+export const MODES_ANALYSE = ["les-deux", "ia", "mcp"];
 
 /** Factures prises en photo (« Nouvelle facture ») : nombre en attente et pages par facture. null = suivre le défaut. */
 export async function reglerFactures(donnees, corps) {
@@ -148,7 +158,18 @@ export async function reglerFactures(donnees, corps) {
   const pages = verifier(corps?.pages, 20, "Pages par facture");
   if (pages === 0) throw new RefusIA("Pages par facture : 1 au moins (mets 0 en attente pour couper la fonction).");
   if (client === "*" && (attente === null || pages === null)) throw new RefusIA("Donne les deux nombres par défaut.");
+  // analyse absent : ne pas y toucher (ancien panel) ; null : suivre le défaut.
+  const analyse = corps?.analyse;
+  if (analyse !== undefined && analyse !== null && !MODES_ANALYSE.includes(analyse)) throw new RefusIA("Analyse des documents : IA, Claude (MCP) ou les deux.");
+  if (client === "*" && analyse === null) throw new RefusIA("Choisis l'analyse des documents par défaut.");
   const r = await lire(`${dossier(donnees)}/reglages.json`, {});
+  if (analyse !== undefined) {
+    r.analyse = r.analyse && typeof r.analyse === "object" ? r.analyse : {};
+    r.analyse.clients = r.analyse.clients && typeof r.analyse.clients === "object" ? r.analyse.clients : {};
+    if (client === "*") r.analyse.defaut = analyse;
+    else if (analyse === null) delete r.analyse.clients[client];
+    else r.analyse.clients[client] = analyse;
+  }
   r.factures = r.factures && typeof r.factures === "object" ? r.factures : {};
   r.factures.clients = r.factures.clients && typeof r.factures.clients === "object" ? r.factures.clients : {};
   if (client === "*") r.factures.defaut = { attente, pages };

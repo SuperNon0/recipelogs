@@ -1813,6 +1813,9 @@ document.addEventListener("change", (ev) => {
 const nombreFr = (n) => Number(n || 0).toLocaleString("fr-FR");
 const dollars = (n) => `${Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 
+// Comment le client fait lire ses factures et mercuriales.
+const NOMS_ANALYSE = { "les-deux": "IA et Claude (MCP)", ia: "IA seulement", mcp: "Claude (MCP) seulement" };
+
 function afficherIA() {
   const zone = $("#ia");
   if (!IA) {
@@ -1825,6 +1828,8 @@ function afficherIA() {
     const c = IA.factures?.clients?.[nom] ?? {};
     return { attente: c.attente ?? fDef.attente, pages: c.pages ?? fDef.pages, propre: c.attente != null || c.pages != null };
   };
+  const aDef = IA.analyse?.defaut ?? "les-deux";
+  const aClient = (nom) => IA.analyse?.clients?.[nom] ?? null;
   const noms = [...new Set([...CLIENTS.map((c) => c.nom), ...Object.keys(IA.usage)])].sort();
   let total = { lectures: 0, cout: 0 };
   const lignes = noms
@@ -1838,6 +1843,7 @@ function afficherIA() {
       return `<tr><td><b>${e(nom)}</b></td>
         <td>${limite === 0 ? `<span class="etiquette pause">coupée</span>` : `${nombreFr(u.mois.lectures)} / ${nombreFr(limite)} ${plein ? `<span class="etiquette ko">plein</span>` : ""}<div class="jauge"><span class="j${pct > 0 ? Math.max(5, Math.round(pct / 5) * 5) : 0}"></span></div>`}</td>
         <td>${propre ? "à part" : "défaut"}</td>
+        <td>${e(NOMS_ANALYSE[aClient(nom) ?? aDef] ?? "")}${aClient(nom) ? " (à part)" : ""}</td>
         <td>${(() => { const f = fClient(nom); return f.attente === 0 ? `<span class="etiquette pause">coupées</span>` : `${nombreFr(f.attente)} · ${nombreFr(f.pages)} p.${f.propre ? " (à part)" : ""}`; })()}</td>
         <td>${nombreFr(u.mois.entree)} / ${nombreFr(u.mois.sortie)}</td>
         <td>${dollars(u.mois.cout)}</td>
@@ -1848,18 +1854,18 @@ function afficherIA() {
   zone.innerHTML = `<div class="barre serree">
       <span class="etiquette ${IA.cle ? "ok" : "pause"}">${IA.cle ? `IA de la plateforme : ${e(nomModeleIA(IA.cleInfo))}${IA.cleInfo?.fin ? ` (clé ${e(IA.cleInfo.fin)})` : IA.cleInfo?.source === "installation" ? " (clé de l'installation)" : ""}` : "Pas de clé d'IA : les clients doivent mettre la leur"}</span>
       <button class="btn${IA.cle ? "" : " principal"}" type="button" id="ia-cle">${IA.cle ? "Changer l'IA ou la clé" : "Mettre une clé d'IA"}</button>
-      <span class="sub">Par défaut : <b>${nombreFr(defaut)}</b> lectures par mois, <b>${nombreFr(fDef.attente)}</b> factures en attente de <b>${nombreFr(fDef.pages)}</b> pages au plus</span>
+      <span class="sub">Par défaut : <b>${nombreFr(defaut)}</b> lectures par mois, <b>${nombreFr(fDef.attente)}</b> factures en attente de <b>${nombreFr(fDef.pages)}</b> pages au plus, analyse : <b>${e(NOMS_ANALYSE[aDef])}</b></span>
       <button class="btn" type="button" id="ia-defaut">Changer le défaut</button>
       <button class="aide" type="button" data-aide="ia-a" aria-label="Aide">?</button></div>
-    <p class="texte-aide" id="ia-a">Dans leur RecipeLog, tes clients prennent une facture en photo ou en PDF et l'IA la recopie en lignes de prix à vérifier. Avec ta clé d'IA (Claude, Gemini ou ChatGPT, bouton « Mettre une clé d'IA » ou « Changer l'IA ou la clé »), chaque lecture compte dans leur quota du mois, remis à zéro le 1er. 0 = lecture par IA coupée pour ce client (il peut toujours mettre sa propre clé Claude, ChatGPT ou Gemini dans ses réglages : elle ne passe pas par toi et ne compte pas ici). Le coût est une estimation, au prix du modèle utilisé au moment de chaque lecture (réglé dans « Changer l'IA ou la clé ») ; les lectures d'avant ce réglage sont estimées au prix de Claude Opus 5.5. Colonne « Factures en photo » : avec « Nouvelle facture », le client prend une facture en photo depuis son téléphone et peut la garder « à traiter » pour plus tard ; le premier nombre dit combien peuvent attendre en même temps (0 = fonction coupée), le second combien de pages (photos) par facture. Ces photos prennent de la place sur la machine jusqu'à ce qu'elles soient lues.</p>
-    <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Lectures ce mois-ci (${e(IA.mois)})</th><th>Quota</th><th>Factures en photo</th><th>Jetons lus / écrits</th><th>Coût estimé</th><th>Mois dernier</th><th></th></tr></thead>
-    <tbody>${lignes || `<tr><td colspan="8">Aucun client.</td></tr>`}</tbody>
-    <tfoot><tr><td>Total</td><td>${nombreFr(total.lectures)}</td><td></td><td></td><td></td><td>${dollars(total.cout)}</td><td></td><td></td></tr></tfoot></table></div>`;
-  $("#ia-defaut").addEventListener("click", () => fenetreQuotaIA("*", defaut, fDef));
+    <p class="texte-aide" id="ia-a">Dans leur RecipeLog, tes clients prennent une facture en photo ou en PDF et l'IA la recopie en lignes de prix à vérifier. Avec ta clé d'IA (Claude, Gemini ou ChatGPT, bouton « Mettre une clé d'IA » ou « Changer l'IA ou la clé »), chaque lecture compte dans leur quota du mois, remis à zéro le 1er. 0 = lecture par IA coupée pour ce client (il peut toujours mettre sa propre clé Claude, ChatGPT ou Gemini dans ses réglages : elle ne passe pas par toi et ne compte pas ici). Le coût est une estimation, au prix du modèle utilisé au moment de chaque lecture (réglé dans « Changer l'IA ou la clé ») ; les lectures d'avant ce réglage sont estimées au prix de Claude Opus 5.5. Colonne « Factures en photo » : avec « Nouvelle facture », le client prend une facture en photo depuis son téléphone et peut la garder « à traiter » pour plus tard ; le premier nombre dit combien peuvent attendre en même temps (0 = fonction coupée), le second combien de pages (photos) par facture. Ces photos prennent de la place sur la machine jusqu'à ce qu'elles soient lues. Colonne « Analyse » : ce que le client peut utiliser pour lire ses factures et mercuriales. « IA seulement » : l'IA de la plateforme (dans son quota). « Claude (MCP) seulement » : il garde ses documents « à traiter » et les fait remplir par Claude avec le connecteur RecipeLog, sans IA de la plateforme. « IA et Claude (MCP) » : il a les deux et choisit son mode préféré dans ses réglages.</p>
+    <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Lectures ce mois-ci (${e(IA.mois)})</th><th>Quota</th><th>Analyse</th><th>Factures en photo</th><th>Jetons lus / écrits</th><th>Coût estimé</th><th>Mois dernier</th><th></th></tr></thead>
+    <tbody>${lignes || `<tr><td colspan="9">Aucun client.</td></tr>`}</tbody>
+    <tfoot><tr><td>Total</td><td>${nombreFr(total.lectures)}</td><td></td><td></td><td></td><td></td><td>${dollars(total.cout)}</td><td></td><td></td></tr></tfoot></table></div>`;
+  $("#ia-defaut").addEventListener("click", () => fenetreQuotaIA("*", defaut, { ...fDef, analyse: aDef }));
   $("#ia-cle").addEventListener("click", fenetreCleIA);
   zone.querySelectorAll("[data-ia]").forEach((b) =>
     b.addEventListener("click", () =>
-      fenetreQuotaIA(b.dataset.ia, typeof IA.clients[b.dataset.ia] === "number" ? IA.clients[b.dataset.ia] : null, IA.factures?.clients?.[b.dataset.ia] ?? {}),
+      fenetreQuotaIA(b.dataset.ia, typeof IA.clients[b.dataset.ia] === "number" ? IA.clients[b.dataset.ia] : null, { ...(IA.factures?.clients?.[b.dataset.ia] ?? {}), analyse: IA.analyse?.clients?.[b.dataset.ia] ?? null }),
     ),
   );
 }
@@ -1989,6 +1995,8 @@ function fenetreQuotaIA(client, actuel, factures = {}) {
   ouvrir(
     tous ? "Factures et IA : défaut" : `Factures et IA : ${client}`,
     `<form id="f-ia" novalidate>
+      <div class="champ"><label for="ia-analyse">Analyse des documents ${aide("ia-a-an", "Ce que le client peut utiliser pour lire ses factures et mercuriales. IA seulement : l'IA de la plateforme, dans son quota de lectures. Claude (MCP) seulement : il dépose ses documents « à traiter » et demande à Claude (connecteur RecipeLog) de les remplir ; aucune lecture par l'IA de la plateforme. IA et Claude (MCP) : il a les deux, et choisit son mode préféré dans Réglages → Lecture des factures. Sa propre clé d'IA reste toujours possible." + (tous ? "" : " « Défaut » : il suit le réglage par défaut."))}
+        <select id="ia-analyse">${tous ? "" : `<option value="">Défaut (${e(NOMS_ANALYSE[IA.analyse?.defaut ?? "les-deux"])})</option>`}${Object.entries(NOMS_ANALYSE).map(([v, n]) => `<option value="${v}"${factures.analyse === v ? " selected" : ""}>${e(n)}</option>`).join("")}</select></div>
       <div class="champ"><label for="ia-limite">Lectures par mois ${aide("ia-a-l", tous ? "Ce que reçoit chaque client qui n'a pas de réglage à part. Une lecture = une facture ou une mercuriale lue par l'IA. 0 = coupée pour tous." : "Une lecture = une facture ou une mercuriale lue par l'IA. 0 = coupée pour ce client. Vide : il suit le nombre par défaut.")}
         <div class="suffixe"><input id="ia-limite" type="number" min="0" max="100000" step="1" value="${actuel ?? ""}" placeholder="${tous ? "30" : `défaut (${IA.defaut ?? 30})`}"><span>par mois</span></div></div>
       <div class="champ"><label for="ia-attente">Factures en attente ${aide("ia-a-at", "Factures prises en photo (« Nouvelle facture ») et gardées « à traiter » en même temps, en attendant d'être lues par l'IA ou remplies par Claude. Une fois la liste pleine, le client doit en analyser ou en supprimer avant d'en ajouter. 0 = bouton « Nouvelle facture » coupé." + (tous ? "" : " Vide : il suit le défaut."))}
@@ -2000,10 +2008,10 @@ function fenetreQuotaIA(client, actuel, factures = {}) {
     </form>`,
     charger,
   );
-  const envoyer = async (limite, attente, pages) => {
+  const envoyer = async (limite, attente, pages, analyse) => {
     let r = await api("POST", "/ia/quota", tous && limite === null ? { client, limite: IA.defaut ?? 30 } : { client, limite });
     if (!r.usage) return ($("#ia-erreur").textContent = r.message || "Échec.");
-    r = await api("POST", "/ia/factures", { client, attente, pages });
+    r = await api("POST", "/ia/factures", { client, attente, pages, analyse });
     if (!r.usage) return ($("#ia-erreur").textContent = r.message || "Échec.");
     IA = r;
     $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Enregistré</p><p class="sub">Pris en compte tout de suite pour ${tous ? "tous les clients sans réglage à part" : e(client)}.</p>`;
@@ -2021,9 +2029,9 @@ function fenetreQuotaIA(client, actuel, factures = {}) {
     if ([limite, attente, pages].some((n) => Number.isNaN(n))) return ($("#ia-erreur").textContent = "Écris des nombres entiers (0 pour couper).");
     if (tous && (limite === null || attente === null || pages === null)) return ($("#ia-erreur").textContent = "Remplis les trois nombres par défaut.");
     if (pages !== null && (pages < 1 || pages > 20)) return ($("#ia-erreur").textContent = "Pages par facture : de 1 à 20.");
-    envoyer(limite, attente, pages);
+    envoyer(limite, attente, pages, $("#ia-analyse").value || null);
   });
-  if (!tous) $("#ia-reset").addEventListener("click", () => envoyer(null, null, null));
+  if (!tous) $("#ia-reset").addEventListener("click", () => envoyer(null, null, null, null));
 }
 
 // ------------------------------------------------------------ vente (lot 8)
