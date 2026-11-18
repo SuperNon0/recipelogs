@@ -28,7 +28,7 @@ export function OrderHistory({ orders, suppliers }: { orders: SupplierOrderListI
           Choisis un fournisseur pour passer une commande. Toutes tes commandes restent ici, avec leur PDF.
           <Help title="Commandes" example="Touche « Metro », mets 2 cartons de croissants, puis « Enregistrer et copier » et colle le texte dans un message au commercial.">
             Une commande se prépare en touchant des boutons (1, 2, 3, carton, sac, kg), sans rien taper. Une fois enregistrée, elle est
-            gardée ici à sa date, avec le lieu de livraison et le fournisseur : tu peux recopier le texte, revoir le PDF ou la refaire
+            gardée ici à sa date, avec le fournisseur et ta signature : tu peux recopier le texte, revoir le PDF ou la refaire
             telle quelle.
           </Help>
         </p>
@@ -76,7 +76,7 @@ export function OrderHistory({ orders, suppliers }: { orders: SupplierOrderListI
                 </span>
               </b>
               <small>
-                {[`${o.lines} produit${s(o.lines)}`, o.place, o.deliveryDate ? `livraison ${frDay(o.deliveryDate)}` : null, o.estimate ? `≈ ${formatEuro(o.estimate)} HT` : null]
+                {[`${o.lines} produit${s(o.lines)}`, o.deliveryDate ? `livraison ${frDay(o.deliveryDate)}` : null, o.estimate ? `≈ ${formatEuro(o.estimate)} HT` : null]
                   .filter(Boolean)
                   .join(" · ")}
               </small>
@@ -118,7 +118,7 @@ export function OrderDetail({ order: o }: { order: SupplierOrderDetail }) {
         <p className="sub">
           {[
             `${o.lines.length} produit${s(o.lines.length)}`,
-            o.place ? `livraison à ${o.place}` : null,
+            o.signature ? `signée ${o.signature}` : null,
             o.deliveryDate ? `pour le ${frDay(o.deliveryDate)}` : null,
             o.addedBy ? `passée par ${o.addedBy}` : null,
           ]

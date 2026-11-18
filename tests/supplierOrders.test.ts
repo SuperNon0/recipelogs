@@ -39,7 +39,7 @@ describe("texte pour le commercial", () => {
   it("écrit le message", () => {
     const t = orderText({
       supplier: "Metro",
-      place: "Boutique",
+      signature: "Maison Chanka",
       deliveryDate: "2026-11-20",
       note: "Livrer avant 7 h",
       lines: [
@@ -47,10 +47,16 @@ describe("texte pour le commercial", () => {
         { label: "Farine T45", quantity: 1, unit: "sac" },
       ],
     });
-    expect(t).toContain("Voici ma commande pour Boutique, à livrer le vendredi 20 novembre :");
+    expect(t).toContain("Voici ma commande, à livrer le vendredi 20 novembre :");
+    expect(t.endsWith("Merci !\nMaison Chanka")).toBe(true);
     expect(t).toContain("- 2 cartons : Croissant pur beurre (réf. 123)");
     expect(t).toContain("- 1 sac : Farine T45");
     expect(t).toContain("Livrer avant 7 h");
+  });
+  it("ne signe pas sans signature", () => {
+    const t = orderText({ supplier: "Metro", lines: [{ label: "Beurre", quantity: 1, unit: "carton" }] });
+    expect(t).toContain("Voici ma commande :");
+    expect(t.endsWith("Merci !")).toBe(true);
   });
 });
 

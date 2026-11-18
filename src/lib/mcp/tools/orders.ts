@@ -26,7 +26,7 @@ const orderView = (o: NonNullable<Awaited<ReturnType<typeof loadSupplierOrder>>>
   fournisseur: o.supplier,
   date: o.date,
   livraison: o.deliveryDate,
-  lieu: o.place,
+  signature: o.signature,
   remarque: o.note,
   lignes: o.lines.map((l) => ({
     quantite: qtyLabel(l.quantity, l.unit),
@@ -54,7 +54,7 @@ export const ORDER_TOOLS: McpTool[] = [
       properties: {
         fournisseur_id: js.int("Id du fournisseur"),
         fournisseur: js.str("Ou son nom exact"),
-        lieu: js.str("Lieu de livraison (boutique, labo…)"),
+        signature: js.str("Nom de l'entreprise qui signe (« Maison Chanka »). Absent : celle des réglages ; donné : devient celle des prochaines commandes"),
         livraison: js.str("Livraison souhaitée, AAAA-MM-JJ (facultatif)"),
         remarque: js.str("Ajoutée à la fin du message"),
         lignes: {
@@ -80,7 +80,7 @@ export const ORDER_TOOLS: McpTool[] = [
         z.object({
           fournisseur_id: id.optional(),
           fournisseur: z.string().trim().max(200).optional(),
-          lieu: z.string().trim().max(200).optional(),
+          signature: z.string().trim().max(200).optional(),
           livraison: day.optional(),
           remarque: z.string().trim().max(2000).optional(),
           lignes: z
@@ -116,7 +116,7 @@ export const ORDER_TOOLS: McpTool[] = [
         if (!l.article) throw new Error("chaque ligne a besoin de produit_id, produit ou article");
         return { productId: null, label: articles.get(articleKey(l.article)) ?? l.article, quantity: l.quantite, unit: l.unite || "colis" };
       });
-      const { id: orderId } = await createSupplierOrder({ supplierId: sid, place: a.lieu, deliveryDate: a.livraison, note: a.remarque, lines });
+      const { id: orderId } = await createSupplierOrder({ supplierId: sid, signature: a.signature, deliveryDate: a.livraison, note: a.remarque, lines });
       revalidatePath("/fournisseurs", "layout");
       return text(orderView((await loadSupplierOrder(orderId))!));
     },
@@ -124,14 +124,14 @@ export const ORDER_TOOLS: McpTool[] = [
   {
     name: "lister_commandes",
     title: "Lister les commandes fournisseurs",
-    description: "Commandes passées aux fournisseurs, de la plus récente à la plus ancienne (date, fournisseur, lieu, nombre de lignes, total estimé).",
+    description: "Commandes passées aux fournisseurs, de la plus récente à la plus ancienne (date, fournisseur, nombre de lignes, total estimé).",
     inputSchema: { type: "object", properties: { fournisseur_id: js.int("Seulement ce fournisseur"), nombre: js.int("Combien (50 par défaut)") } },
     annotations: READ,
     run: async (args) => {
       const a = parseArgs(z.object({ fournisseur_id: id.optional(), nombre: z.number().int().min(1).max(500).default(50) }), args);
       const list = await listSupplierOrders({ supplierId: a.fournisseur_id, take: a.nombre });
       return text({
-        commandes: list.map((o) => ({ commande_id: o.id, date: o.date, fournisseur: o.supplier, lieu: o.place, livraison: o.deliveryDate, lignes: o.lines, total_estime_ht_eur: o.estimate })),
+        commandes: list.map((o) => ({ commande_id: o.id, date: o.date, fournisseur: o.supplier, livraison: o.deliveryDate, lignes: o.lines, total_estime_ht_eur: o.estimate })),
       });
     },
   },

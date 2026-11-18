@@ -48,7 +48,7 @@ const frDay = (iso: string) => {
   return `${d}/${m}/${y}`;
 };
 
-export async function orderPdf(o: SupplierOrderDetail, shop?: string | null): Promise<Uint8Array> {
+export async function orderPdf(o: SupplierOrderDetail): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(safe(`Commande ${o.supplier} du ${frDay(o.date)}`));
   doc.setProducer("RecipeLog");
@@ -62,12 +62,15 @@ export async function orderPdf(o: SupplierOrderDetail, shop?: string | null): Pr
   // En-tête
   text("Bon de commande", M, 20, bold);
   y -= 26;
-  text(o.supplier, M, 14, bold);
+  if (o.signature) {
+    text(`De : ${o.signature}`, M, 12, bold);
+    y -= 18;
+  }
+  text(o.signature ? `À : ${o.supplier}` : o.supplier, M, 14, bold);
   y -= 18;
   const infos = [
     `Commande du ${frDay(o.date)}`,
     o.deliveryDate ? `Livraison souhaitée le ${frDay(o.deliveryDate)}` : null,
-    o.place ? `Lieu de livraison : ${o.place}` : shop ? `Pour : ${shop}` : null,
     o.addedBy ? `Passée par ${o.addedBy}` : null,
   ].filter((x): x is string => !!x);
   for (const l of infos) {
