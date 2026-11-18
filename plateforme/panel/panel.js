@@ -646,7 +646,6 @@ function dessinerPf(v) {
   if (v.statut === "ko" && !$("#pf-relancer")) {
     fin.innerHTML = `<div class="pied pied-gauche"><button class="btn" type="button" id="pf-relancer">${ic("rotate", "s16")}Relancer la mise à jour</button></div>`;
     $("#pf-relancer").onclick = () => fenetreMajPlateforme();
-    $("#pf-detail").open = true;
   }
 
   const log = $("#pf-log");
@@ -655,7 +654,9 @@ function dessinerPf(v) {
     log.textContent = p.journal;
     if (logEnBas) log.scrollTop = log.scrollHeight;
   }
-  if ($("#pf-detail").open && enBas) corps.scrollTop = corps.scrollHeight;
+  // Fin : on remonte en haut pour voir le résultat ; sinon on suit le journal s'il est ouvert.
+  if (v.statut === "ok" || v.statut === "ko") corps.scrollTop = 0;
+  else if ($("#pf-detail").open && enBas) corps.scrollTop = corps.scrollHeight;
 }
 
 // Suit la mise à jour : le panel et le moteur redémarrent en route, donc on tolère que
