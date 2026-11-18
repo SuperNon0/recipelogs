@@ -2,7 +2,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRICE_UNITS } from "@/lib/cost";
-import { SUPPLIER_FAMILIES, groupByArticle } from "@/lib/suppliers";
+import { SUPPLIER_FAMILIES, articleKey, groupByArticle } from "@/lib/suppliers";
+import { packNameOf } from "@/lib/supplierOrders";
 import {
   addManualPrice,
   chooseProductForIngredient,
@@ -64,6 +65,35 @@ const lineSchema = z.object({
   prix_colis: money.optional(),
   montant_ligne: money.optional(),
   ingredient: z.union([z.number().int().positive(), z.string().trim().min(1).max(200)]).optional(),
+  conditionnement: z.string().trim().max(40).optional(),
+});
+
+const lineProps = {
+  produit: js.str("Désignation du produit telle qu'écrite (« Guanaja 70 % fèves 3 kg »)"),
+  reference: js.str("Référence / code article du fournisseur"),
+  article: js.str("Nom commun qui regroupe les variantes (« Croissant » pour pur beurre, beurre, margarine)"),
+  famille: js.str("Famille (Chocolat, Crèmerie et œufs, Emballages…)"),
+  contenance: js.num("Contenance d'un colis dans l'unité de prix (25 pour 25 kg)"),
+  unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg (défaut), L ou pièce"),
+  prix_unitaire: js.num("Prix en € HT par unité de prix (par kg, L ou pièce)"),
+  prix_colis: js.num("Ou prix d'un colis en € HT"),
+  conditionnement: js.str("Ce qu'on commande : carton, sac, seau, boîte, bidon, colis, kg, pièce… (bouton de la page Passer une commande)"),
+  ingredient: { type: ["string", "integer"], description: "Ingrédient des recettes correspondant (nom exact ou id), facultatif" },
+};
+
+const toLine = (l: z.infer<typeof lineSchema>) => ({
+  product: l.produit,
+  reference: l.reference,
+  article: l.article,
+  family: l.famille,
+  quantity: l.quantite,
+  packSize: l.contenance,
+  unit: l.unite_prix,
+  unitPrice: l.prix_unitaire,
+  packPrice: l.prix_colis,
+  lineTotal: l.montant_ligne,
+  ingredient: l.ingredient,
+  packName: l.conditionnement,
 });
 
 export const SUPPLIER_TOOLS: McpTool[] = [
@@ -106,6 +136,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
               prix_unitaire: js.num("Prix en € HT par unité de prix (par kg, L ou pièce)"),
               prix_colis: js.num("Ou prix d'un colis en € HT"),
               montant_ligne: js.num("Montant HT de la ligne en €"),
+              conditionnement: js.str("Ce qu'on commande : carton, sac, seau, kg… (facultatif)"),
               ingredient: { type: ["string", "integer"], description: "Ingrédient des recettes correspondant (nom exact ou id), facultatif" },
             },
           },
@@ -138,19 +169,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         total: a.total,
         note: a.note,
         replace: a.remplacer,
-        lines: a.lignes.map((l) => ({
-          product: l.produit,
-          reference: l.reference,
-          article: l.article,
-          family: l.famille,
-          quantity: l.quantite,
-          packSize: l.contenance,
-          unit: l.unite_prix,
-          unitPrice: l.prix_unitaire,
-          packPrice: l.prix_colis,
-          lineTotal: l.montant_ligne,
-          ingredient: l.ingredient,
-        })),
+        lines: a.lignes.map(toLine),
       });
       const photosJointes = a.facture_a_traiter_id ? await finishPendingInvoice(a.facture_a_traiter_id, summary.facture_id) : undefined;
       refresh();
@@ -161,6 +180,51 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           ? {}
           : { photos_jointes: photosJointes, ...(photosJointes ? {} : { a_faire: "les photos n'ont pas pu être jointes : la facture reste dans « À traiter », supprime-la une fois vérifiée" }) }),
       });
+    },
+  },
+
+  {
+    name: "enregistrer_mercuriale",
+    title: "Enregistrer une mercuriale (liste de prix)",
+    description:
+      "Enregistre la mercuriale (liste de prix) d'un fournisseur : chaque ligne devient un produit de ce fournisseur et son prix entre dans l'historique à la date donnée, SANS compter comme une facture. Fait pour les longues mercuriales (plusieurs pages, jusqu'à 1 500 lignes par appel). " +
+      "Mercuriale longue : envoie-la en plusieurs appels avec le même nom et partie = 1, 2, 3… (par exemple 3 à 4 pages par appel) ; renvoyer la même partie la remplace. AVANT d'enregistrer, relis CHAQUE ligne : aucun produit ni prix oublié, compte les lignes de chaque page et compare. " +
+      "Mêmes règles que enregistrer_facture pour prix_unitaire / prix_colis / contenance / unite_prix. article = nom commun qui REGROUPE les doublons (« Croissant » pour « Croissant pur beurre 70 g », « Croissant beurre 60 g », « Croissant margarine ») : réutilise les articles existants (voir_fournisseur), garde séparés ce qui change la recette (chocolat par %, farine par type, crème par matière grasse). conditionnement = ce qu'on commande (carton, sac, seau, kg…). " +
+      `${FAMILIES_HELP} Réponse : nouveaux produits, prix changés, lignes à vérifier ; à montrer à l'utilisateur.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        fournisseur: js.str("Nom du fournisseur (créé s'il n'existe pas)"),
+        date: js.str("Date à partir de laquelle ces prix valent, AAAA-MM-JJ"),
+        nom: js.str("Nom de la mercuriale (« Mercuriale novembre 2026 »)"),
+        partie: js.int("Numéro de la partie pour une longue mercuriale envoyée en plusieurs fois (1, 2, 3…)"),
+        lignes: { type: "array", description: "Une entrée par produit de la liste", items: { type: "object", required: ["produit"], properties: lineProps } },
+      },
+      required: ["fournisseur", "date", "lignes"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({
+          fournisseur: z.string().trim().min(1).max(200),
+          date: day,
+          nom: z.string().trim().max(150).optional(),
+          partie: z.number().int().min(1).max(100).optional(),
+          lignes: z.array(lineSchema).min(1).max(1500),
+        }),
+        args,
+      );
+      const summary = await recordPurchaseOrder({
+        supplier: a.fournisseur,
+        date: a.date,
+        manual: true,
+        keepFamily: true,
+        note: `Mercuriale${a.nom ? ` « ${a.nom} »` : ""}${a.partie ? ` (partie ${a.partie})` : ""} envoyée à Claude`,
+        lines: a.lignes.map(toLine),
+      });
+      refresh();
+      const { facture_id, ...rest } = summary;
+      return text({ ...rest, mercuriale_id: facture_id, voir: `/fournisseurs` });
     },
   },
 
@@ -336,14 +400,23 @@ export const SUPPLIER_TOOLS: McpTool[] = [
   {
     name: "voir_fournisseur",
     title: "Voir un fournisseur",
-    description: "Produits d'un fournisseur (dernier prix, évolution, moyenne, ingrédient relié) et ses factures.",
+    description:
+      "Produits d'un fournisseur (dernier prix, évolution, moyenne, ingrédient relié, conditionnement commandé) et ses factures. Gros catalogue (mercuriale) : filtre avec chercher, ou lis par pages (page, 300 produits par page).",
     inputSchema: {
       type: "object",
-      properties: { id: js.int("Id du fournisseur"), nom: js.str("Ou son nom") },
+      properties: {
+        id: js.int("Id du fournisseur"),
+        nom: js.str("Ou son nom"),
+        chercher: js.str("Mots à trouver dans le produit, l'article ou la référence (facultatif)"),
+        page: js.int("Page de 300 produits (1 par défaut)"),
+      },
     },
     annotations: READ,
     run: async (args) => {
-      const a = parseArgs(z.object({ id: id.optional(), nom: z.string().trim().optional() }), args);
+      const a = parseArgs(
+        z.object({ id: id.optional(), nom: z.string().trim().optional(), chercher: z.string().trim().max(100).optional(), page: z.number().int().min(1).max(100).default(1) }),
+        args,
+      );
       const sid =
         a.id ??
         (a.nom
@@ -351,10 +424,16 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           : undefined);
       const s = sid ? await loadSupplier(sid) : null;
       if (!s) throw new Error("fournisseur introuvable");
+      const words = a.chercher ? articleKey(a.chercher).split(" ").filter(Boolean) : [];
+      const matching = s.products.filter((p) => words.every((w) => articleKey(`${p.name} ${p.article ?? ""} ${p.reference ?? ""}`).includes(w)));
+      const PER = 300;
+      const pageItems = matching.slice((a.page - 1) * PER, a.page * PER);
       return text({
         id: s.id,
         nom: s.name,
-        produits: s.products.map((p) => ({
+        produits_trouves: matching.length,
+        ...(matching.length > PER ? { page: a.page, pages: Math.ceil(matching.length / PER) } : {}),
+        produits: pageItems.map((p) => ({
           produit_id: p.id,
           produit: p.name,
           article: p.article,
@@ -364,8 +443,11 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           evolution: p.stats?.changePct,
           moyenne: p.stats?.average,
           ingredient: p.base?.name ?? null,
+          ...(p.reference ? { reference: p.reference } : {}),
+          ...(p.packSize ? { contenance: p.packSize } : {}),
+          conditionnement: packNameOf({ name: p.name, packName: p.packName, packSize: p.packSize, priceUnit: p.unit }),
         })),
-        articles_regroupes: groupByArticle(s.products)
+        articles_regroupes: groupByArticle(pageItems)
           .filter((g) => g.products.length > 1)
           .map((g) => ({
             article: g.article,
@@ -670,6 +752,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg, L ou pièce (défaut kg)"),
         contenance: js.num("Contenance d'un colis dans l'unité (25 pour un sac de 25 kg)"),
         reference: js.str("Code article du fournisseur"),
+        conditionnement: js.str("Ce qu'on commande : carton, sac, seau, kg… (facultatif, sinon deviné)"),
         prix: js.num("Premier prix, en € HT par unité de prix"),
         date: js.str("Date de ce prix, AAAA-MM-JJ (défaut : aujourd'hui)"),
       },
@@ -686,12 +769,14 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           unite_prix: z.enum(PRICE_UNITS).default("kg"),
           contenance: z.number().positive().max(1_000_000).optional(),
           reference: z.string().trim().max(100).optional(),
+          conditionnement: z.string().trim().max(40).optional(),
           prix: money.optional(),
           date: day.optional(),
         }),
         args,
       );
       const p = await createProduct(a.fournisseur_id, {
+        packName: a.conditionnement,
         name: a.produit,
         article: a.article,
         family: a.famille,
@@ -721,6 +806,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         unite_prix: js.enum(PRICE_UNITS, "kg, L ou pièce (seulement si le produit n'a pas encore de prix)"),
         contenance: js.num("Contenance d'un colis (0 pour l'effacer)"),
         reference: js.str("Référence (texte vide pour l'effacer)"),
+        conditionnement: js.str("Ce qu'on commande : carton, sac, seau, kg… (texte vide = deviné d'après le nom)"),
       },
       required: ["produit_id"],
     },
@@ -735,10 +821,12 @@ export const SUPPLIER_TOOLS: McpTool[] = [
           unite_prix: z.enum(PRICE_UNITS).optional(),
           contenance: z.number().min(0).max(1_000_000).optional(),
           reference: z.string().max(100).optional(),
+          conditionnement: z.string().max(40).optional(),
         }),
         args,
       );
       await updateProduct(a.produit_id, {
+        packName: a.conditionnement,
         name: a.produit,
         article: a.article,
         family: a.famille,

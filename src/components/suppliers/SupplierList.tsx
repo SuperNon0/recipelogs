@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Plus, Store } from "lucide-react";
+import { ChevronRight, Plus, ShoppingCart, Store } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { SupplierFormModal } from "./ManageForms";
@@ -20,11 +20,16 @@ export function SupplierList({ suppliers }: { suppliers: Row[] }) {
     <>
       <div className="page-head">
         <h1>Mes fournisseurs</h1>
-        {can("costs.edit") && (
-          <button type="button" className="fl-btn fl-btn-primary" onClick={() => setCreating(true)}>
-            <Plus size={15} /> Nouveau fournisseur
-          </button>
-        )}
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-primary">
+            <ShoppingCart size={15} /> Passer une commande
+          </Link>
+          {can("costs.edit") && (
+            <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setCreating(true)}>
+              <Plus size={15} /> Nouveau fournisseur
+            </button>
+          )}
+        </span>
         <p className="sub">
           {suppliers.length} fournisseur{s(suppliers.length)}. Touche un fournisseur pour le modifier, le supprimer, ou gérer ses
           produits et leurs prix.

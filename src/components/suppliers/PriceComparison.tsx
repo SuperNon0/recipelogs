@@ -84,15 +84,17 @@ export function PriceComparison({
     );
   }, [allRows, selected, often, query, byId]);
 
+  // Une mercuriale peut ajouter des centaines d'articles : le tableau s'affiche par paquets.
+  const [shown, setShown] = useState(250);
   const groups = useMemo(() => {
     const out: { family: string; rows: ComparisonRow[] }[] = [];
-    for (const r of rows) {
+    for (const r of rows.slice(0, shown)) {
       const last = out[out.length - 1];
       if (last && last.family === r.family) last.rows.push(r);
       else out.push({ family: r.family, rows: [r] });
     }
     return out;
-  }, [rows]);
+  }, [rows, shown]);
 
   // Colonnes dans l'ordre des boutons (alphabétique), pas dans l'ordre des clics.
   const cols = suppliers.filter((s) => selected.includes(s.id));
@@ -168,6 +170,11 @@ export function PriceComparison({
             </tbody>
           </table>
         </div>
+      )}
+      {rows.length > shown && (
+        <button type="button" className="fl-btn fl-btn-ghost" style={{ margin: "8px 0" }} onClick={() => setShown((n) => n + 250)}>
+          Afficher la suite ({rows.length - shown} articles)
+        </button>
       )}
       <div className="sup-legend">
         <span>

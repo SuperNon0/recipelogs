@@ -100,6 +100,7 @@ export default async function RecipePage({
           saleCoef: showCosts && recipe.saleCoef != null ? Number(recipe.saleCoef) : null,
           salePrice: showCosts && recipe.salePrice != null ? Number(recipe.salePrice) : null,
           saleVat: showCosts && recipe.saleVat != null ? Number(recipe.saleVat) : null,
+          sold: showCosts ? recipe.sold : false,
         }}
         ingredients={ingredients}
         subRecipes={subRecipes}

@@ -28,6 +28,7 @@ const editableOf = (p: ProductDetail) => ({
   family: p.family,
   unit: p.unit,
   packSize: p.packSize,
+  packName: p.packName,
   hasPrices: p.history.length > 0,
 });
 

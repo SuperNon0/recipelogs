@@ -7,6 +7,7 @@ import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 import { PRICE_UNITS, formatEuro, type PriceUnit } from "@/lib/cost";
 import { SUPPLIER_FAMILIES } from "@/lib/suppliers";
+import { PACK_NAMES, packNameOf } from "@/lib/supplierOrders";
 import {
   addPrice,
   addProduct,
@@ -259,6 +260,8 @@ export type EditableProduct = {
   family: string | null;
   unit: string;
   packSize: number | null;
+  /** Ce qu'on commande (carton, sac…), null = deviné d'après le nom. */
+  packName?: string | null;
   /** A déjà des prix : l'unité ne change plus. */
   hasPrices: boolean;
 };
@@ -283,6 +286,11 @@ const HELP = {
     title: "Prix au…",
     text: "Le prix est toujours ramené au kg, au litre ou à la pièce pour pouvoir comparer. Une fois qu'il y a des prix, l'unité ne change plus.",
     example: "Farine : au kg. Lait : au L. Boîtes à gâteau : à la pièce.",
+  },
+  packName: {
+    title: "Commandé par",
+    text: "Ce que tu commandes chez ce fournisseur : carton, sac, seau, kg… Ce sont les boutons proposés dans « Passer une commande ». Vide : deviné d'après le nom (« sac 25 kg » → sac).",
+    example: "Croissants surgelés : carton. Farine T45 : sac. Fraises : kg.",
   },
   pack: {
     title: "Contenance d'un colis",
@@ -328,6 +336,7 @@ export function ProductFormModal({
   const [unit, setUnit] = useState<string>(product?.unit ?? "kg");
   const [pack, setPack] = useState(show(product?.packSize));
   const [reference, setReference] = useState(product?.reference ?? "");
+  const [packName, setPackName] = useState(product?.packName ?? "");
   const [price, setPrice] = useState("");
   const [date, setDate] = useState(today());
 
@@ -341,7 +350,7 @@ export function ProductFormModal({
       onSubmit={async () => {
         const packSize = parseNumber(pack);
         if (packSize != null && !(packSize > 0)) return { ok: false, error: "Contenance invalide." };
-        const data = { name, article, family, reference, packSize, unit: unit as PriceUnit };
+        const data = { name, article, family, reference, packSize, packName: packName.trim() || null, unit: unit as PriceUnit };
         if (product) return editProduct(product.id, data);
         const p = parseNumber(price);
         if (p != null && !(p >= 0)) return { ok: false, error: "Prix invalide." };
@@ -378,9 +387,26 @@ export function ProductFormModal({
           <input className="fl-input" inputMode="decimal" value={pack} placeholder={unit === "pièce" ? "50" : "25"} onChange={(e) => setPack(e.target.value)} />
         </Field>
       </div>
-      <Field label="Référence" help={HELP.reference}>
-        <input className="fl-input" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} />
-      </Field>
+      <div style={two}>
+        <Field label="Commandé par" help={HELP.packName}>
+          <input
+            className="fl-input"
+            list="sup-pack-names"
+            value={packName}
+            placeholder={packNameOf({ name, packSize: parseNumber(pack), priceUnit: unit })}
+            onChange={(e) => setPackName(e.target.value)}
+            maxLength={40}
+          />
+          <datalist id="sup-pack-names">
+            {PACK_NAMES.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="Référence" help={HELP.reference}>
+          <input className="fl-input" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} />
+        </Field>
+      </div>
       {!product && (
         <div style={two}>
           <Field label={`Prix (€ / ${unit})`} help={HELP.price}>

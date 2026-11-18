@@ -201,6 +201,8 @@ export type PurchaseLineInput = {
   lineTotal?: number | null;
   /** Ingrédient des recettes (id ou nom exact) auquel relier le produit. */
   ingredient?: number | string | null;
+  /** Ce qu'on commande : « carton », « sac »… */
+  packName?: string | null;
 };
 
 export type PurchaseOrderInput = {
@@ -318,11 +320,29 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       let computedTotal = 0;
       let lineCount = 0;
       // Produits du fournisseur par nom « à plat » (sans accents ni majuscules) : « Creme 35% » = « Crème 35% ».
-      const parCle = new Map(
-        (await tx.supplierProduct.findMany({ where: { supplierId: supplier.id }, select: { id: true, name: true }, orderBy: { id: "desc" } })).map(
-          (p) => [articleKey(p.name), p.id] as const,
-        ),
-      );
+      // Tous les produits du fournisseur en une requête (une mercuriale de plusieurs centaines de
+      // lignes ne fait plus trois requêtes par ligne pour retrouver chaque produit).
+      const known = await tx.supplierProduct.findMany({ where: { supplierId: supplier.id }, orderBy: { id: "desc" } });
+      type Known = (typeof known)[number];
+      const parRef = new Map<string, Known>();
+      const parNom = new Map<string, Known>();
+      const parCle = new Map<string, Known>();
+      // Garde la dernière version d'un produit (créé ou modifié plus haut dans le document).
+      const put = (m: Map<string, Known>, k: string, p: Known) => {
+        if (!m.has(k) || m.get(k)!.id === p.id) m.set(k, p);
+      };
+      const remember = (p: Known) => {
+        if (p.reference) put(parRef, p.reference, p);
+        put(parNom, p.name.toLowerCase(), p);
+        put(parCle, articleKey(p.name), p);
+      };
+      for (const p of [...known].reverse()) {
+        // Du plus ancien au plus récent : à clé égale, le plus récent gagne (comme avant).
+        if (p.reference) parRef.set(p.reference, p);
+        parNom.set(p.name.toLowerCase(), p);
+        parCle.set(articleKey(p.name), p);
+      }
+      const newLines: Prisma.PurchaseOrderLineCreateManyInput[] = [];
 
       for (const l of input.lines) {
         const name = l.product.trim();
@@ -332,26 +352,21 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           continue;
         }
         const reference = l.reference?.trim() || null;
-        let product =
-          (reference
-            ? await tx.supplierProduct.findFirst({ where: { supplierId: supplier.id, reference } })
-            : null) ??
-          (await tx.supplierProduct.findFirst({
-            where: { supplierId: supplier.id, name: { equals: name, mode: "insensitive" } },
-          })) ??
-          (parCle.has(articleKey(name)) ? await tx.supplierProduct.findUnique({ where: { id: parCle.get(articleKey(name))! } }) : null);
+        let product: Known | null =
+          (reference ? parRef.get(reference) : undefined) ?? parNom.get(name.toLowerCase()) ?? parCle.get(articleKey(name)) ?? null;
         const details = {
           ...(reference ? { reference } : {}),
           ...(l.article?.trim() ? { article: l.article.trim() } : {}),
           ...(l.family?.trim() ? { family: l.family.trim() } : {}),
           ...(l.packSize != null && l.packSize > 0 ? { packSize: l.packSize } : {}),
+          ...(l.packName?.trim() ? { packName: l.packName.trim().slice(0, 40) } : {}),
         };
         if (!product) {
           product = await tx.supplierProduct.create({
             data: { supplierId: supplier.id, name, priceUnit: l.unit, ...details },
           });
           created.push(name);
-          parCle.set(articleKey(name), product.id);
+          remember(product);
         } else {
           if (input.keepFamily && product.family?.trim()) delete (details as { family?: string }).family;
           if (product.price != null && product.priceUnit !== l.unit) {
@@ -362,20 +377,25 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           if (!before.has(product.id)) {
             before.set(product.id, { name: product.name, price: num(product.price), unit: product.priceUnit });
           }
-          if (Object.keys(details).length) product = await tx.supplierProduct.update({ where: { id: product.id }, data: details });
+          const changed = Object.entries(details).some(([k, v]) => {
+            const cur = (product as Record<string, unknown>)[k];
+            return cur == null || String(cur) !== String(v);
+          });
+          if (changed) {
+            product = await tx.supplierProduct.update({ where: { id: product.id }, data: details });
+            remember(product);
+          }
         }
 
-        await tx.purchaseOrderLine.create({
-          data: {
-            orderId: order.id,
-            productId: product.id,
-            quantity: l.quantity ?? null,
-            packSize: l.packSize != null && l.packSize > 0 ? l.packSize : 1,
-            packPrice: l.packPrice ?? null,
-            unitPrice,
-            priceUnit: l.unit,
-            lineTotal: l.lineTotal ?? null,
-          },
+        newLines.push({
+          orderId: order.id,
+          productId: product.id,
+          quantity: l.quantity ?? null,
+          packSize: l.packSize != null && l.packSize > 0 ? l.packSize : 1,
+          packPrice: l.packPrice ?? null,
+          unitPrice,
+          priceUnit: l.unit,
+          lineTotal: l.lineTotal ?? null,
         });
         lineCount++;
         touched.push(product.id);
@@ -401,6 +421,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
       }
 
       if (lineCount === 0) throw new Error("aucune ligne avec un prix : rien n'a été enregistré");
+      // Lignes écrites en une fois, dans l'ordre du document.
+      await tx.purchaseOrderLine.createMany({ data: newLines });
       if (input.total == null && computedTotal > 0 && !input.manual) {
         await tx.purchaseOrder.update({ where: { id: order.id }, data: { total: Math.round(computedTotal * 100) / 100 } });
       }
@@ -435,9 +457,10 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
           select: { id: true, name: true, article: true, price: true, priceUnit: true, priceDate: true },
         });
         const keyOf = (p: (typeof all)[number]) => `${articleKey(articleOf(p))}|${p.priceUnit}`;
-        for (const p of all.filter((x) => created.includes(x.name))) {
+        const createdSet = new Set(created);
+        for (const p of all.filter((x) => createdSet.has(x.name))) {
           const prev = all
-            .filter((x) => x.id !== p.id && !created.includes(x.name) && keyOf(x) === keyOf(p) && x.price != null)
+            .filter((x) => x.id !== p.id && !createdSet.has(x.name) && keyOf(x) === keyOf(p) && x.price != null)
             .sort((a, b) => (b.priceDate?.getTime() ?? 0) - (a.priceDate?.getTime() ?? 0))[0];
           const now = num(p.price);
           if (!prev || now == null) continue;
@@ -497,7 +520,8 @@ export async function recordPurchaseOrder(input: PurchaseOrderInput): Promise<Pu
         ...(replacedId !== null ? { remplace: true } : {}),
       };
     },
-    { timeout: 30_000 },
+    // Une mercuriale de 13 pages peut faire plus de 1 000 lignes.
+    { timeout: 120_000, maxWait: 10_000 },
   );
 }
 
@@ -624,6 +648,8 @@ export type ProductInput = {
   unit?: PriceUnit;
   /** Contenance d'un colis dans l'unité (25 pour un sac de 25 kg). */
   packSize?: number | null;
+  /** Ce qu'on commande : « carton », « sac »… (null = deviné d'après le nom). */
+  packName?: string | null;
 };
 
 async function productNameFree(tx: Tx, supplierId: number, name: string, exceptId?: number) {
@@ -655,6 +681,7 @@ export async function createProduct(
         family: cleanText(input.family, 80),
         priceUnit: unit,
         packSize: input.packSize != null && input.packSize > 0 ? input.packSize : null,
+        packName: cleanText(input.packName, 40),
       },
       select: { id: true, name: true },
     });
@@ -682,6 +709,7 @@ export async function updateProduct(id: number, input: ProductInput) {
     if (input.article !== undefined) data.article = cleanText(input.article, 200);
     if (input.family !== undefined) data.family = cleanText(input.family, 80);
     if (input.packSize !== undefined) data.packSize = input.packSize != null && input.packSize > 0 ? input.packSize : null;
+    if (input.packName !== undefined) data.packName = cleanText(input.packName, 40);
     if (input.unit !== undefined && input.unit !== p.priceUnit) {
       if (!isPriceUnit(input.unit)) throw new Error("Unité inconnue (kg, L ou pièce).");
       if (p._count.lines > 0) throw new Error("L'unité ne change plus : ce produit a déjà des prix. Supprime ses prix d'abord.");
@@ -691,6 +719,24 @@ export async function updateProduct(id: number, input: ProductInput) {
     // Un nouvel article peut regrouper ce produit avec d'autres variantes.
     if (input.article !== undefined) await followArticles(tx, p.supplierId, [id]);
   });
+}
+
+/**
+ * Range plusieurs produits d'un fournisseur sous un même article (« Croissant »
+ * pour pur beurre, beurre, margarine). article vide : chacun reprend son nom.
+ */
+export async function groupProducts(supplierId: number, productIds: number[], article: string | null): Promise<number> {
+  const name = cleanText(article, 200);
+  const ids = [...new Set(productIds)].slice(0, 2000);
+  if (!ids.length) return 0;
+  return prisma.$transaction(
+    async (tx) => {
+      const { count } = await tx.supplierProduct.updateMany({ where: { supplierId, id: { in: ids } }, data: { article: name } });
+      await followArticles(tx, supplierId, ids);
+      return count;
+    },
+    { timeout: 60_000 },
+  );
 }
 
 /**
@@ -849,6 +895,7 @@ const productSelect = {
   article: true,
   family: true,
   packSize: true,
+  packName: true,
   price: true,
   priceUnit: true,
   priceDate: true,
@@ -907,6 +954,7 @@ function toComparisonProduct(p: ProductRow) {
     ...product,
     reference: p.reference,
     packSize: num(p.packSize),
+    packName: p.packName,
     base: p.base ? { id: p.base.id, name: p.base.name, chosen: p.base.chosenProductId === p.id } : null,
     history,
   };

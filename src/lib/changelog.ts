@@ -11,6 +11,28 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.22",
+    date: "2026-11-18",
+    title: "Commandes fournisseurs et produits vendus",
+    summary:
+      "Passe une commande à un fournisseur en quelques touches (1, 2, 3 cartons, sacs ou kilos), copie le texte pour le commercial et garde le PDF dans l'historique. Les produits en double sont regroupés (« Croissant »), et une page « Produits vendus » montre la marge de chaque produit fini.",
+    features: [
+      "Fiche d'un fournisseur → « Passer une commande » : tous ses produits avec des boutons 1, 2, 3 (et + pour plus) et le conditionnement (carton, sac, kg…), sans rien taper. Recherche, familles et « Ma commande » pour retrouver vite un produit",
+      "Les variantes d'un même produit tiennent sur une ligne (« Croissant » → pur beurre, beurre, margarine) : commande « Croissant » directement, ou touche la flèche pour choisir une variante",
+      "« Voir ma commande » → « Enregistrer et copier » : la commande est gardée à la date du jour avec le lieu de livraison et le fournisseur, et le texte est copié pour le coller dans un message au commercial (bouton « Envoyer… » sur téléphone). Le PDF du bon de commande est prêt aussitôt",
+      "Page « Commandes » (Comparer les prix, Mes fournisseurs ou Réglages) : toutes les commandes passées, avec leur texte, leur PDF et « Refaire cette commande »",
+      "Fiche d'un fournisseur → « Regrouper » : RecipeLog propose de ranger ensemble les produits qui commencent par le même mot (Croissant pur beurre, Croissant margarine…). Tu coches ce que tu gardes, ou tu choisis toi-même",
+      "Modifier un produit → « Commandé par » : carton, sac, seau, kg… (deviné d'après le nom quand c'est vide)",
+      "Case « Produit vendu » sur une recette (dans « Modifier » ou dans la carte du coût) et page « Produits vendus » dans les Réglages : coût de revient, prix de vente et marge en € et en % de chaque produit, triables, avec ceux qui ont un prix mais ne sont pas encore cochés",
+      "Les longues mercuriales (plusieurs centaines de produits) s'affichent par paquets et restent fluides sur téléphone : fiche fournisseur avec recherche, tableau des prix, vérification après lecture par IA (avec « À vérifier » pour ne voir que les lignes douteuses)",
+      "Claude (connecteur RecipeLog) : enregistrer_mercuriale pour les mercuriales de plusieurs pages, passer_commande, lister_commandes, voir_commande, supprimer_commande, regrouper_produits et produits_vendus",
+    ],
+    fixes: [
+      "Enregistrer une longue mercuriale ou une grosse facture va beaucoup plus vite et ne s'arrête plus au bout de 30 secondes",
+    ],
+    migrations: ["Nouvelles tables pour les commandes fournisseurs, conditionnement commandé des produits et case « Produit vendu » des recettes : faites toutes seules à la mise à jour"],
+  },
+  {
     version: "V2.21",
     date: "2026-11-17",
     title: "Clé secrète MCP selon l'offre",

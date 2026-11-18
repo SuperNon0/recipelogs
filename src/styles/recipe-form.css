@@ -404,3 +404,23 @@
 .rf-sub-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-sub-qty { flex: none; color: var(--soft); }
 .rf-sub-tag { flex: none; padding-right: 6px; }
+
+/* Case « Produit vendu » */
+.rf-sold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 14px;
+}
+.rf-sold label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.rf-sold input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertTriangle, FileUp, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -494,7 +494,22 @@ function Verifier({
    * a déjà dans RecipeLog (jamais remplacé par la proposition de l'IA) ; sinon la proposition.
    */
   const articleDe = (l: LigneEcran) => (l.articleChoisi ? l.article : (trouver(l)?.article ?? l.article));
-  const ligne = (i: number, p: Partial<LigneEcran>) => setDoc((d) => ({ ...d, lignes: d.lignes.map((l, j) => (j === i ? { ...l, ...p } : l)) }));
+  // Rappels stables : seule la ligne modifiée se redessine (une mercuriale peut faire 1 000 lignes).
+  const ligne = useCallback((i: number, p: Partial<LigneEcran>) => setDoc((d) => ({ ...d, lignes: d.lignes.map((l, j) => (j === i ? { ...l, ...p } : l)) })), []);
+  const retirer = useCallback((i: number) => setDoc((d) => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) })), []);
+  const douteuse = (l: LigneLue) => !!l.aVerifier || (l.produit.trim() !== "" && prixALUnite(l) == null);
+  const aVerifier = doc.lignes.filter(douteuse).length;
+  const [seulementDoutes, setSeulementDoutes] = useState(false);
+  const indices = doc.lignes.map((_, i) => i).filter((i) => !seulementDoutes || douteuse(doc.lignes[i]));
+  const [montrees, setMontrees] = useState(PAQUET);
+  const suite = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = suite.current;
+    if (!el || montrees >= indices.length) return;
+    const io = new IntersectionObserver((e) => e[0]?.isIntersecting && setMontrees((n) => n + PAQUET), { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [montrees, indices.length]);
   const somme = doc.lignes.reduce((s, l) => s + (montantLigne(l) ?? 0), 0);
   const ecart = facture && doc.total != null && somme > 0 && Math.abs(somme - doc.total) > Math.max(0.05, doc.total * 0.005);
   const sansPrix = doc.lignes.filter((l) => l.produit.trim() && prixALUnite(l) == null).length;
@@ -589,58 +604,43 @@ function Verifier({
       <datalist id="ia-articles">
         {articles.map((a) => <option key={a} value={a} />)}
       </datalist>
+      {doc.lignes.length > 30 && (
+        <div className="sup-chips" role="group" aria-label="Lignes montrées">
+          <button type="button" className="fl-chip" aria-pressed={!seulementDoutes} onClick={() => setSeulementDoutes(false)}>
+            Toutes ({doc.lignes.length})
+          </button>
+          <button type="button" className="fl-chip" aria-pressed={seulementDoutes} onClick={() => setSeulementDoutes(true)}>
+            <AlertTriangle size={13} /> À vérifier ({aVerifier})
+          </button>
+        </div>
+      )}
       <div className="ia-lignes">
-        {doc.lignes.map((l, i) => {
+        {indices.slice(0, montrees).map((i) => {
+          const l = doc.lignes[i];
           const connu = trouver(l);
-          const pu = prixALUnite(l);
           const article = articleDe(l) ?? "";
-          const nouvelArticle = article.trim() !== "" && !clesArticles.has(articleKey(article));
-          const uniteChange = connu && connu.prix != null && connu.unite !== l.unite;
-          const change = connu && connu.prix != null && pu != null && connu.unite === l.unite ? Math.round(((pu - connu.prix) / connu.prix) * 100) : null;
           return (
-            <div key={i} className="ia-ligne" data-doute={!!l.aVerifier || (l.produit.trim() !== "" && pu == null) || undefined}>
-              <div className="ia-ligne-haut">
-                <input className="fl-input ia-produit" aria-label="Produit" value={l.produit} placeholder="Produit" onChange={(e) => ligne(i, { produit: e.target.value })} />
-                <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Retirer la ligne" onClick={() => setDoc((d) => ({ ...d, lignes: d.lignes.filter((_, j) => j !== i) }))}>
-                  <Trash2 size={15} />
-                </button>
-              </div>
-              <div className="ia-ligne-champs">
-                <label className="ia-champ-article">
-                  <span>Article</span>
-                  <input className="fl-input" aria-label="Article" list="ia-articles" value={article} placeholder="comme le produit" onChange={(e) => ligne(i, { article: e.target.value || null, articleChoisi: true })} />
-                </label>
-                <label><span>Réf.</span><input className="fl-input" aria-label="Référence" value={l.reference ?? ""} onChange={(e) => ligne(i, { reference: e.target.value || null })} /></label>
-                {facture && <label><span>Quantité</span><NumInput label="Quantité" negatif value={l.quantite} onChange={(v) => ligne(i, { quantite: v })} /></label>}
-                <label><span>Contenance</span><NumInput label="Contenance" value={l.contenance} placeholder="1" onChange={(v) => ligne(i, { contenance: v })} /></label>
-                <label>
-                  <span>Unité</span>
-                  <select className="fl-input" aria-label="Unité" value={l.unite} onChange={(e) => ligne(i, { unite: e.target.value as PriceUnit })}>
-                    {PRICE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </label>
-                <label><span>Prix colis</span><NumInput label="Prix du colis" value={l.prixColis} onChange={(v) => ligne(i, { prixColis: v })} /></label>
-                <label><span>Prix /{l.unite}</span><NumInput label="Prix à l'unité" value={l.prixUnitaire} onChange={(v) => ligne(i, { prixUnitaire: v })} /></label>
-                {facture && <label><span>Montant</span><NumInput label="Montant de la ligne" negatif value={l.montant} onChange={(v) => ligne(i, { montant: v })} /></label>}
-              </div>
-              <div className="ia-ligne-bas">
-                <span className="ia-pu">{pu != null ? `= ${prixTxt(pu, l.unite)}` : "Prix manquant : la ligne sera ignorée"}</span>
-                {!connu && l.produit.trim() && <span className="ia-badge">Nouveau</span>}
-                {nouvelArticle && <span className="ia-badge" data-sens="hausse">Nouvel article</span>}
-                {uniteChange && (
-                  <span className="ia-doute"><AlertTriangle size={13} /> Ce produit était suivi en « {connu!.unite} » : enregistrer change son unité, et le coût des recettes qui l&apos;utilisent.</span>
-                )}
-                {change != null && change !== 0 && (
-                  <span className="ia-badge" data-sens={change > 0 ? "hausse" : "baisse"}>
-                    {change > 0 ? "+" : ""}{change} % (avant {prixTxt(connu!.prix!, connu!.unite)})
-                  </span>
-                )}
-                {l.aVerifier && <span className="ia-doute"><AlertTriangle size={13} /> {l.aVerifier}</span>}
-              </div>
-            </div>
+            <LigneVerif
+              key={i}
+              i={i}
+              l={l}
+              connu={connu}
+              article={article}
+              nouvelArticle={article.trim() !== "" && !clesArticles.has(articleKey(article))}
+              facture={facture}
+              onChange={ligne}
+              onRemove={retirer}
+            />
           );
         })}
       </div>
+      {indices.length > montrees && (
+        <div ref={suite} style={{ display: "flex", justifyContent: "center" }}>
+          <button type="button" className="fl-btn fl-btn-ghost" onClick={() => setMontrees((n) => n + PAQUET)}>
+            Afficher la suite ({indices.length - montrees})
+          </button>
+        </div>
+      )}
       <button type="button" className="fl-btn fl-btn-ghost" style={{ justifySelf: "start" }} onClick={() => setDoc((d) => ({ ...d, lignes: [...d.lignes, ligneVide()] }))}>
         <Plus size={15} /> Ajouter une ligne
       </button>
@@ -682,6 +682,63 @@ function Verifier({
 // ─────────────────────────────────────────────
 // 4. Fini
 // ─────────────────────────────────────────────
+
+const PAQUET = 100;
+
+/** Une ligne à vérifier (mémorisée : taper dans une ligne ne redessine pas les autres). */
+const LigneVerif = memo(function LigneVerif({
+  i, l, connu, article, nouvelArticle, facture, onChange, onRemove,
+}: {
+  i: number; l: LigneEcran; connu: Connu | undefined; article: string; nouvelArticle: boolean; facture: boolean;
+  onChange: (i: number, p: Partial<LigneEcran>) => void; onRemove: (i: number) => void;
+}) {
+  const ligne = onChange;
+  const pu = prixALUnite(l);
+  const uniteChange = connu && connu.prix != null && connu.unite !== l.unite;
+  const change = connu && connu.prix != null && pu != null && connu.unite === l.unite ? Math.round(((pu - connu.prix) / connu.prix) * 100) : null;
+  return (
+    <div className="ia-ligne" data-doute={!!l.aVerifier || (l.produit.trim() !== "" && pu == null) || undefined}>
+      <div className="ia-ligne-haut">
+        <input className="fl-input ia-produit" aria-label="Produit" value={l.produit} placeholder="Produit" onChange={(e) => ligne(i, { produit: e.target.value })} />
+        <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Retirer la ligne" onClick={() => onRemove(i)}>
+          <Trash2 size={15} />
+        </button>
+      </div>
+      <div className="ia-ligne-champs">
+        <label className="ia-champ-article">
+          <span>Article</span>
+          <input className="fl-input" aria-label="Article" list="ia-articles" value={article} placeholder="comme le produit" onChange={(e) => ligne(i, { article: e.target.value || null, articleChoisi: true })} />
+        </label>
+        <label><span>Réf.</span><input className="fl-input" aria-label="Référence" value={l.reference ?? ""} onChange={(e) => ligne(i, { reference: e.target.value || null })} /></label>
+        {facture && <label><span>Quantité</span><NumInput label="Quantité" negatif value={l.quantite} onChange={(v) => ligne(i, { quantite: v })} /></label>}
+        <label><span>Contenance</span><NumInput label="Contenance" value={l.contenance} placeholder="1" onChange={(v) => ligne(i, { contenance: v })} /></label>
+        <label>
+          <span>Unité</span>
+          <select className="fl-input" aria-label="Unité" value={l.unite} onChange={(e) => ligne(i, { unite: e.target.value as PriceUnit })}>
+            {PRICE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </label>
+        <label><span>Prix colis</span><NumInput label="Prix du colis" value={l.prixColis} onChange={(v) => ligne(i, { prixColis: v })} /></label>
+        <label><span>Prix /{l.unite}</span><NumInput label="Prix à l'unité" value={l.prixUnitaire} onChange={(v) => ligne(i, { prixUnitaire: v })} /></label>
+        {facture && <label><span>Montant</span><NumInput label="Montant de la ligne" negatif value={l.montant} onChange={(v) => ligne(i, { montant: v })} /></label>}
+      </div>
+      <div className="ia-ligne-bas">
+        <span className="ia-pu">{pu != null ? `= ${prixTxt(pu, l.unite)}` : "Prix manquant : la ligne sera ignorée"}</span>
+        {!connu && l.produit.trim() && <span className="ia-badge">Nouveau</span>}
+        {nouvelArticle && <span className="ia-badge" data-sens="hausse">Nouvel article</span>}
+        {uniteChange && (
+          <span className="ia-doute"><AlertTriangle size={13} /> Ce produit était suivi en « {connu!.unite} » : enregistrer change son unité, et le coût des recettes qui l&apos;utilisent.</span>
+        )}
+        {change != null && change !== 0 && (
+          <span className="ia-badge" data-sens={change > 0 ? "hausse" : "baisse"}>
+            {change > 0 ? "+" : ""}{change} % (avant {prixTxt(connu!.prix!, connu!.unite)})
+          </span>
+        )}
+        {l.aVerifier && <span className="ia-doute"><AlertTriangle size={13} /> {l.aVerifier}</span>}
+      </div>
+    </div>
+  );
+});
 
 function Fini({ type, resume, fichierJoint, onClose }: { type: TypeLecture; resume: PurchaseOrderSummary; fichierJoint: boolean | null; onClose: () => void }) {
   const r = resume as PurchaseOrderSummary & { a_verifier?: string[] };

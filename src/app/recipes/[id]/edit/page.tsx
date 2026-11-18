@@ -62,6 +62,7 @@ export default async function EditRecipePage({
           folderId: recipe.folderId,
           yieldCount: recipe.yieldCount,
           yieldLabel: recipe.yieldLabel,
+          sold: recipe.sold,
           mold: parseMold(recipe.mold),
           ingredients: recipe.ingredients.map((i) => ({
             name: i.name ?? i.ingredientBase?.name ?? "",
