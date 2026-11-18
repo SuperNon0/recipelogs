@@ -148,8 +148,12 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         }),
         args,
       );
-      if (a.facture_a_traiter_id && !(await getPendingInvoice(a.facture_a_traiter_id))) {
-        throw new Error(`facture à traiter ${a.facture_a_traiter_id} introuvable (déjà enregistrée ou supprimée ? voir lister_factures_a_traiter)`);
+      if (a.facture_a_traiter_id) {
+        const att = await getPendingInvoice(a.facture_a_traiter_id);
+        if (!att) throw new Error(`facture à traiter ${a.facture_a_traiter_id} introuvable (déjà enregistrée ou supprimée ? voir lister_factures_a_traiter)`);
+        if (att.kind === "mercuriale") {
+          throw new Error(`le document à traiter ${att.id} est une mercuriale${att.supplierName ? ` de ${att.supplierName}` : ""} : enregistre-la avec enregistrer_mercuriale`);
+        }
       }
       const summary = await recordPurchaseOrder({
         supplier: a.fournisseur,
@@ -268,18 +272,26 @@ export const SUPPLIER_TOOLS: McpTool[] = [
 
   {
     name: "lister_factures_a_traiter",
-    title: "Lister les factures à traiter",
+    title: "Lister les factures et mercuriales à traiter",
     description:
-      "Factures prises en photo sur le site (bouton « Nouvelle facture ») et pas encore enregistrées : id, date d'ajout, nombre de pages, remarque, qui l'a ajoutée, erreur de la dernière lecture par IA. " +
-      "Pour en remplir une : voir_facture_a_traiter (pour lire les photos), puis enregistrer_facture avec facture_a_traiter_id.",
-    inputSchema: { type: "object", properties: {} },
+      "Documents déposés sur le site et pas encore enregistrés : factures (bouton « Nouvelle facture ») et mercuriales (fiche d'un fournisseur → « Importer une mercuriale » → « Enregistrer pour Claude »). " +
+      "Pour chacun : id, type (facture ou mercuriale), fournisseur (mercuriale), date d'ajout, nombre de pages, remarque, qui l'a ajouté, erreur de la dernière lecture par IA. " +
+      "Quand l'utilisateur dit « analyse ma mercuriale », c'est ici qu'elle se trouve (type=mercuriale). " +
+      "Pour en remplir un : voir_facture_a_traiter (pour le lire), puis enregistrer_facture (facture) ou enregistrer_mercuriale (mercuriale, avec son fournisseur) avec facture_a_traiter_id.",
+    inputSchema: {
+      type: "object",
+      properties: { type: js.enum(["facture", "mercuriale"], "Ne lister que les factures, ou que les mercuriales (facultatif)") },
+    },
     annotations: READ,
-    run: async () => {
-      const liste = await listPendingInvoices();
+    run: async (args) => {
+      const a = parseArgs(z.object({ type: z.enum(["facture", "mercuriale"]).optional() }), args ?? {});
+      const liste = await listPendingInvoices(a.type ? { kind: a.type } : {});
       return text({
         nombre: liste.length,
         factures: liste.map((f) => ({
           id: f.id,
+          type: f.kind,
+          ...(f.kind === "mercuriale" ? { fournisseur: f.supplierName, fournisseur_id: f.supplierId } : {}),
           ajoutee_le: f.createdAt,
           pages: f.pages,
           pdf: f.pdf,
@@ -294,9 +306,9 @@ export const SUPPLIER_TOOLS: McpTool[] = [
 
   {
     name: "voir_facture_a_traiter",
-    title: "Voir les photos d'une facture à traiter",
+    title: "Voir une facture ou une mercuriale à traiter",
     description:
-      "Renvoie les photos (ou le PDF) d'une facture à traiter pour que tu la lises. Recopie ensuite CHAQUE ligne avec enregistrer_facture (facture_a_traiter_id = cet id), en suivant ses règles : " +
+      "Renvoie les photos (ou le PDF) d'une facture ou d'une mercuriale à traiter pour que tu la lises. Mercuriale (type=mercuriale) : enregistre ses prix avec enregistrer_mercuriale (fournisseur indiqué, facture_a_traiter_id = cet id, derniere_partie=true au dernier envoi). Facture : Recopie ensuite CHAQUE ligne avec enregistrer_facture (facture_a_traiter_id = cet id), en suivant ses règles : " +
       "avant d'enregistrer, regarde les articles déjà utilisés (comparer_prix_fournisseurs, voir_fournisseur) et REGROUPE les produits proches sous l'article existant, même orthographe (« Fraise Espagne » et « Fraise France » → article « Fraise » ; tomates, citrons verts… idem), " +
       "sauf ce qui change la recette, comme le chocolat qui se distingue par son % (« Chocolat noir 64 % »). En cas de doute entre deux articles, demande à l'utilisateur. Si une page est illisible, dis-le plutôt que de deviner. " +
       "PDF numérique (mercuriale, facture reçue par e-mail) : son texte est rendu page par page (texte_pdf), exact au centime, et le fichier n'est pas renvoyé (fichier=true pour l'avoir quand même) ; un PDF scanné n'a pas de texte, le fichier est alors renvoyé. " +
@@ -341,11 +353,16 @@ export const SUPPLIER_TOOLS: McpTool[] = [
             text: JSON.stringify(
               {
                 id: f.id,
+                type: f.kind,
+                ...(f.kind === "mercuriale" ? { fournisseur: f.supplierName } : {}),
                 pages: pagesPdf || f.pages,
                 pages_lisibles: pages.length + (textes.length ? 1 : 0),
                 remarque: f.note,
                 ajoutee_le: f.createdAt,
-                ensuite: `enregistrer_facture (ou enregistrer_mercuriale pour une liste de prix) avec facture_a_traiter_id: ${f.id}`,
+                ensuite:
+                  f.kind === "mercuriale"
+                    ? `enregistrer_mercuriale avec fournisseur: "${f.supplierName ?? "?"}", facture_a_traiter_id: ${f.id}, en plusieurs parties si elle est longue (derniere_partie=true au dernier envoi)`
+                    : `enregistrer_facture (ou enregistrer_mercuriale pour une liste de prix) avec facture_a_traiter_id: ${f.id}`,
                 ...(textes.length
                   ? {
                       texte_pdf: textes,
@@ -367,8 +384,8 @@ export const SUPPLIER_TOOLS: McpTool[] = [
 
   {
     name: "supprimer_facture_a_traiter",
-    title: "Supprimer une facture à traiter",
-    description: "Supprime une facture à traiter et ses photos (doublon, photo ratée…). Demande d'abord à l'utilisateur. Ne touche à aucune facture enregistrée.",
+    title: "Supprimer une facture ou mercuriale à traiter",
+    description: "Supprime une facture ou une mercuriale à traiter et ses photos (doublon, photo ratée…). Demande d'abord à l'utilisateur. Ne touche à aucune facture enregistrée.",
     inputSchema: {
       type: "object",
       properties: { id: js.int("Id de la facture à traiter") },

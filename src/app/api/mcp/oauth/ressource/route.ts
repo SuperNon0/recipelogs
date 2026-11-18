@@ -1,4 +1,4 @@
-import { mcpAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis } from "@/lib/mcp/allowed";
 import { oauthSetup, resourceMetadata } from "@/lib/mcp/oauth";
 import { oauthJson, oauthNotFound, oauthPreflight } from "@/lib/mcp/oauthHttp";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const setup = oauthSetup();
-  if (!setup || !mcpAllowed()) return oauthNotFound();
+  if (!setup || !(await mcpPermis())) return oauthNotFound();
   return oauthJson(resourceMetadata(setup.base), 200, { "Cache-Control": "public, max-age=300" });
 }
 

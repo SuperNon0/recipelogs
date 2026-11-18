@@ -11,6 +11,23 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.25",
+    date: "2026-11-18",
+    title: "Factures et mercuriales : IA ou Claude",
+    summary:
+      "Partout où tu déposes une facture ou une mercuriale, tu choisis « Analyser par l'IA » ou « Garder pour Claude (MCP) ». Les mercuriales se scannent aussi depuis la fiche du fournisseur.",
+    features: [
+      "Fiche d'un fournisseur → « Importer une mercuriale » : scanner avec l'appareil photo (une photo par page, jusqu'à 20), choisir un PDF ou des photos, ou un tableau Excel / CSV (lu directement, comme avant)",
+      "Nouvelle facture et mercuriale : deux boutons, « Analyser par l'IA » (l'IA lit tout de suite, tu vérifies) ou « Garder pour Claude (MCP) » (le document attend dans « À traiter »). Seuls les modes compris dans ton offre sont proposés",
+      "Réglages → Lecture des factures : si ton offre comprend l'IA et Claude, choisis le bouton mis en avant à chaque dépôt",
+      "Offre sans lecture des documents : les factures et les prix se saisissent à la main, et les mercuriales Excel ou CSV restent lisibles",
+      "RecipeLog en ligne : l'IA est celle fournie par RecipeLog, il n'y a plus de clé d'IA à mettre soi-même",
+      "« À traiter » (page Factures) et « Mercuriales à traiter » (fiche du fournisseur) rappellent quoi dire à Claude, et « Analyser par l'IA » n'apparaît que si l'IA est comprise",
+      "Claude (connecteur RecipeLog) : « analyse ma mercuriale à traiter ». Il la trouve, la lit page par page et enregistre chaque prix chez le bon fournisseur ; elle quitte ensuite la liste",
+    ],
+    migrations: ["Les documents à traiter savent s'ils sont une facture ou une mercuriale : fait tout seul à la mise à jour"],
+  },
+  {
     version: "V2.24",
     date: "2026-11-18",
     title: "Commandes fournisseurs et produits vendus",

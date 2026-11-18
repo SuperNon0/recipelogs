@@ -22,6 +22,7 @@ import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
 import { articleKey } from "@/lib/suppliers";
 import { lireTableur } from "@/lib/mercurialeFichier";
 import { finishPendingInvoice, pendingDocument, setPendingError } from "@/lib/pendingInvoices";
+import { modesAnalyse, savePrefere, type ModeAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
 
 /**
  * Lecture des factures et des mercuriales par IA (lot 7 de la plateforme).
@@ -64,13 +65,17 @@ export type EtatIA = {
 export async function etatLectureIA(): Promise<EtatIA> {
   await requireAccess("costs.edit");
   const r = await getReglagesIA();
-  if (r.mode === "off") return { mode: "off", prete: false, message: "La lecture par IA est coupée : un administrateur peut l'activer dans Réglages → Lecture des factures par IA.", quota: null };
+  if (r.mode === "off") return { mode: "off", prete: false, message: "La lecture par IA est coupée : un administrateur peut l'activer dans Réglages → Lecture des factures.", quota: null };
   if (r.mode === "cle") return { mode: "cle", prete: !!r.cle, message: r.cle ? null : "Aucune clé d'API enregistrée.", quota: null };
   const q = await getQuotaIA();
   if (!q.ok) return { mode: "plateforme", prete: false, message: q.message, quota: null };
+  if (q.quota.analyse === "aucun") return { mode: "plateforme", prete: false, message: "La lecture des documents n'est pas comprise dans ton offre.", quota: null };
+  if (q.quota.analyse === "mcp") {
+    return { mode: "plateforme", prete: false, message: "Ton offre lit les documents avec Claude (connecteur RecipeLog) : garde-les pour Claude.", quota: null };
+  }
   const { disponible, limite, utilise } = q.quota;
-  if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog, ou mets ta propre clé d'IA dans les réglages.", quota: { limite, utilise } };
-  if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois ; tu peux aussi mettre ta propre clé d'IA dans les réglages.`, quota: { limite, utilise } };
+  if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog.", quota: { limite, utilise } };
+  if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois.`, quota: { limite, utilise } };
   return { mode: "plateforme", prete: true, message: null, quota: { limite, utilise } };
 }
 
@@ -89,8 +94,9 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
   try {
     const attenteId = Number(fd.get("attenteId")) || null;
     let fichier: { data: Buffer; mime: string; nom: string };
+    let attente: Awaited<ReturnType<typeof pendingDocument>> | null = null;
     if (attenteId) {
-      fichier = await pendingDocument(attenteId);
+      fichier = attente = await pendingDocument(attenteId);
     } else {
       const f = fd.get("fichier");
       if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Choisis un fichier." };
@@ -100,11 +106,12 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
       if (!mime || !fichierAccepte(mime)) return { ok: false, error: "Envoie un PDF ou une photo (JPG, PNG ou WebP)." };
       fichier = { data, mime, nom: f.name };
     }
-    const type: TypeLecture = attenteId ? "facture" : fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
-    const fournisseurId = Number(fd.get("fournisseurId")) || null;
+    // Un document « à traiter » sait lui-même s'il est une facture ou une mercuriale (et de quel fournisseur).
+    const type: TypeLecture = attente ? attente.kind : fd.get("type") === "mercuriale" ? "mercuriale" : "facture";
+    const fournisseurId = (attente ? attente.supplierId : null) ?? (Number(fd.get("fournisseurId")) || null);
 
     const reglages = await getReglagesIA();
-    if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures par IA)." };
+    if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures)." };
     const [produits, fournisseur] = await Promise.all([
       prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 400 }),
       fournisseurId ? prisma.supplier.findUnique({ where: { id: fournisseurId }, select: { name: true } }) : null,
@@ -257,7 +264,14 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
 }
 
 /** Mercuriale : les prix entrent dans l'historique du fournisseur, à la date choisie, sans compter comme une facture. */
-export async function enregistrerMercuriale(input: { fournisseurId: number; date: string; nomFichier: string; lignes: LigneLue[] }): Promise<{ ok: true; resume: PurchaseOrderSummary } | Erreur> {
+/** attenteId : la mercuriale venait de « À traiter » ; son fichier est joint et elle quitte la liste. */
+export async function enregistrerMercuriale(input: {
+  fournisseurId: number;
+  date: string;
+  nomFichier: string;
+  lignes: LigneLue[];
+  attenteId?: number | null;
+}): Promise<{ ok: true; resume: PurchaseOrderSummary; fichierJoint: boolean | null } | Erreur> {
   await requireAccess("costs.edit");
   try {
     const s = await prisma.supplier.findUnique({ where: { id: Number(input.fournisseurId) || 0 }, select: { name: true } });
@@ -273,8 +287,9 @@ export async function enregistrerMercuriale(input: { fournisseurId: number; date
       keepFamily: true,
       lines: versLignes(doc.lignes),
     });
+    const fichierJoint = input.attenteId ? await finishPendingInvoice(Number(input.attenteId), resume.facture_id) : null;
     refresh();
-    return { ok: true, resume };
+    return { ok: true, resume, fichierJoint };
   } catch (e) {
     return erreur(e);
   }
@@ -311,6 +326,26 @@ export async function lireReglagesIA(): Promise<InfosReglagesIA> {
     if (q.ok) quota = { disponible: q.quota.disponible, limite: q.quota.limite, utilise: q.quota.utilise };
   }
   return { reglages: r, quota };
+}
+
+/** Réglages → Lecture des factures : ce que le panel permet, et le mode préféré. */
+export async function lireModesAnalyse(): Promise<ModesAnalyse> {
+  await requireAccess("costs.edit");
+  return modesAnalyse();
+}
+
+export async function sauverModeAnalyse(prefere: ModeAnalyse): Promise<{ ok: true; modes: ModesAnalyse } | Erreur> {
+  await requireAccess("site.update");
+  try {
+    const m = await modesAnalyse();
+    if (prefere !== "ia" && prefere !== "mcp") return { ok: false, error: "Choisis l'IA ou Claude." };
+    if (!m[prefere]) return { ok: false, error: prefere === "ia" ? "La lecture par IA n'est pas comprise dans ton offre." : "Claude (MCP) n'est pas compris dans ton offre." };
+    await savePrefere(prefere);
+    refresh();
+    return { ok: true, modes: await modesAnalyse() };
+  } catch (e) {
+    return erreur(e);
+  }
 }
 
 export async function sauverReglagesIA(input: { mode: ModeIA; fournisseur: FournisseurIA; cle?: string; modele?: string }): Promise<{ ok: true; reglages: ReglagesIAPublic } | Erreur> {

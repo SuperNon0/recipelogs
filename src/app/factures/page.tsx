@@ -8,6 +8,7 @@ import { InvoiceList } from "@/components/suppliers/InvoiceList";
 import { NouvelleFactureButton, FacturesATraiter } from "@/components/suppliers/NouvelleFacture";
 import { listPendingInvoices, limitesFactures } from "@/lib/pendingInvoices";
 import { viewerCan } from "@/lib/auth/viewer";
+import { modesAnalyse } from "@/lib/ia/analyse";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const to = day(sp.au);
   const supplierId = Number(sp.fournisseur) || null;
   const peutModifier = viewerCan(viewer, "costs.edit");
-  const [orders, suppliers, aTraiter, limites] = await Promise.all([
+  const [orders, suppliers, aTraiter, limites, modes] = await Promise.all([
     listPurchaseOrders({ from, to, supplierId }),
     prisma.supplier.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    peutModifier ? listPendingInvoices() : Promise.resolve([]),
+    peutModifier ? listPendingInvoices({ kind: "facture" }) : Promise.resolve([]),
     peutModifier ? limitesFactures() : Promise.resolve(null),
+    modesAnalyse(),
   ]);
   const total = orders.reduce((s, o) => s + (o.total ?? 0), 0);
   const filtered = !!(from || to || supplierId);
@@ -36,14 +38,15 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </Link>
       <div className="page-head">
         <h1>Factures</h1>
-        {peutModifier && <NouvelleFactureButton fournisseurs={suppliers.map((s) => s.name)} />}
+        {/* Offre « Aucun » (ni IA ni Claude) : les factures se saisissent à la main, depuis la fiche du fournisseur. */}
+        {peutModifier && (modes.ia || modes.mcp) && <NouvelleFactureButton fournisseurs={suppliers.map((s) => s.name)} />}
         <p className="sub">
           {orders.length} facture{orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} HT` : ""}
           {filtered ? " sur cette sélection" : ", de la plus récente à la plus ancienne"}
         </p>
       </div>
-      {peutModifier && <FacturesATraiter factures={aTraiter} fournisseurs={suppliers.map((s) => s.name)} limite={limites?.attente ?? 0} />}
+      {peutModifier && <FacturesATraiter factures={aTraiter} fournisseurs={suppliers.map((s) => s.name)} limite={limites?.attente ?? 0} modes={modes} />}
       <form className="sup-range" method="get">
         <select name="fournisseur" className="fl-input" defaultValue={supplierId ?? ""} aria-label="Fournisseur">
           <option value="">Tous les fournisseurs</option>

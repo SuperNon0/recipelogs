@@ -39,6 +39,9 @@ describe("factures à traiter", () => {
     expect(() => verifierPages([JPG, JPG, JPG, JPG], limites)).toThrow(/3 pages au plus/);
     expect(() => verifierPages([JPG, PDF], limites)).toThrow(/PDF s'envoie seul/);
     expect(() => verifierPages([Buffer.from("bonjour")], limites)).toThrow(/ni une photo/);
+    // Une mercuriale peut avoir plus de pages qu'une facture (jusqu'au plafond absolu).
+    expect(verifierPages([JPG, JPG, JPG, JPG], limites, "mercuriale")).toHaveLength(4);
+    expect(() => verifierPages([], limites, "mercuriale")).toThrow(/photo de la mercuriale/);
   });
 
   it("réunit plusieurs photos en un PDF, une page par photo", async () => {

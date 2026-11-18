@@ -295,6 +295,8 @@ export type QuotaIA = {
   /** IA et modèle choisis dans le panel ; null = ancienne passerelle (Claude Opus 5.5). */
   fournisseur: "anthropic" | "openai" | "gemini" | null;
   modele: string | null;
+  /** Analyse des documents permise par le panel : IA, Claude (MCP) ou les deux ; null = ancienne passerelle (les deux). */
+  analyse: "les-deux" | "ia" | "mcp" | "aucun" | null;
 };
 
 /** GET /v1/ia/quota. disponible = false : la plateforme n'a pas (encore) de clé d'IA. */
@@ -312,6 +314,7 @@ export async function getQuotaIA(opts: PasserelleOptions = {}): Promise<Passerel
       factures: lireLimitesFactures(j.factures),
       fournisseur: j.fournisseur === "anthropic" || j.fournisseur === "openai" || j.fournisseur === "gemini" ? j.fournisseur : null,
       modele: typeof j.modele === "string" && /^[A-Za-z0-9._-]{1,100}$/.test(j.modele) ? j.modele : null,
+      analyse: j.analyse === "les-deux" || j.analyse === "ia" || j.analyse === "mcp" || j.analyse === "aucun" ? j.analyse : null,
     },
   };
 }

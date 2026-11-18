@@ -13,7 +13,9 @@ import { Change } from "./PriceComparison";
 import { ProductHistoryModal } from "./ProductHistoryModal";
 import { InvoiceList } from "./InvoiceList";
 import { DeleteSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
-import { AiReaderButton } from "./AiReader";
+import { FacturesATraiter, NouvelleMercurialeButton } from "./NouvelleFacture";
+import type { PendingInvoiceItem } from "@/lib/pendingInvoices";
+import type { ModesAnalyse } from "@/lib/ia/analyse";
 import { GroupProductsModal } from "./GroupProducts";
 import { articleKey } from "@/lib/suppliers";
 
@@ -22,7 +24,10 @@ const PAGE = 150;
 type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 
 /** Fiche d'un fournisseur : ses produits (dernier prix, évolution, moyenne) et ses factures. */
-export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases: { id: number; name: string }[] }) {
+/** aTraiter : mercuriales de ce fournisseur gardées « à traiter ». */
+export function SupplierDetail({
+  supplier, bases, aTraiter = [], modes,
+}: { supplier: Supplier; bases: { id: number; name: string }[]; aTraiter?: PendingInvoiceItem[]; modes: ModesAnalyse }) {
   const can = useCan();
   const router = useRouter();
   const editable = can("costs.edit");
@@ -52,7 +57,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
             <Link href={`/fournisseurs/${supplier.id}/commande`} className="fl-btn fl-btn-primary">
               <ShoppingCart size={15} /> Passer une commande
             </Link>
-            <AiReaderButton type="mercuriale" fournisseur={{ id: supplier.id, name: supplier.name }} />
+            <NouvelleMercurialeButton fournisseur={{ id: supplier.id, name: supplier.name }} />
             <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("edit")}>
               <Pencil size={15} /> Modifier
             </button>
@@ -68,6 +73,7 @@ export function SupplierDetail({ supplier, bases }: { supplier: Supplier; bases:
         </p>
         {supplier.note && <p className="sub" style={{ whiteSpace: "pre-line" }}>{supplier.note}</p>}
       </div>
+      {editable && <FacturesATraiter factures={aTraiter} fournisseurs={[]} limite={0} fournisseur={{ id: supplier.id, name: supplier.name }} modes={modes} />}
 
       <div className="sect-title" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <h2>Produits</h2>

@@ -7,12 +7,15 @@ import type { FournisseurIA, ModeIA, ReglagesIAPublic } from "@/lib/ia/reglages"
 
 type Infos = { id: FournisseurIA; nom: string; modele: string; ouObtenir: string };
 
-/** Réglages → Lecture des factures par IA : d'où vient l'IA, et la clé du client s'il met la sienne. */
+/** Réglages → Lecture des factures : d'où vient l'IA, et la clé du client s'il met la sienne. */
 export function AiSettings({
   initial,
   quota,
   fournisseurs,
+  iaPlateforme = true,
 }: {
+  /** false : l'offre ne comprend pas l'IA de RecipeLog (panel « Claude (MCP) seulement »), seule la clé du client reste. */
+  iaPlateforme?: boolean;
   initial: ReglagesIAPublic;
   quota: { disponible: boolean; limite: number; utilise: number } | null;
   fournisseurs: Infos[];
@@ -56,12 +59,14 @@ export function AiSettings({
         <legend className="sup-lbl">
           D&apos;où vient l&apos;IA ?
           <Help title="D'où vient l'IA ?" example="Avec l'IA de RecipeLog et 30 lectures par mois, la 31e facture du mois se saisit à la main ou attend le 1er.">
-            L&apos;IA de RecipeLog est comprise dans ton offre, avec un nombre de lectures par mois. Avec ta propre clé, tu paies directement ton
-            fournisseur d&apos;IA (quelques centimes par facture) et il n&apos;y a pas de limite. Coupée : le bouton « Lire une facture avec
+            {r.plateforme
+              ? "L'IA de RecipeLog est comprise dans ton offre, avec un nombre de lectures par mois."
+              : "Avec ta propre clé, tu paies directement ton fournisseur d'IA (quelques centimes par facture) et il n'y a pas de limite."}{" "}
+            Coupée : le bouton « Lire une facture avec
             l&apos;IA » ne marche plus ; l&apos;import Excel et CSV des mercuriales marche toujours.
           </Help>
         </legend>
-        {r.plateforme && (
+        {r.plateforme && (iaPlateforme || mode === "plateforme") && (
           <label className="ia-mode">
             <input type="radio" name="mode" checked={mode === "plateforme"} onChange={() => setMode("plateforme")} />
             <span>
@@ -76,6 +81,7 @@ export function AiSettings({
             </span>
           </label>
         )}
+        {!r.plateforme && (
         <label className="ia-mode">
           <input type="radio" name="mode" checked={mode === "cle"} onChange={() => setMode("cle")} />
           <span>
@@ -83,6 +89,7 @@ export function AiSettings({
             <small>Claude, ChatGPT ou Gemini : tu paies ton fournisseur d&apos;IA, sans limite</small>
           </span>
         </label>
+        )}
         <label className="ia-mode">
           <input type="radio" name="mode" checked={mode === "off"} onChange={() => setMode("off")} />
           <span>

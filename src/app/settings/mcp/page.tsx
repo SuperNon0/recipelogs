@@ -4,7 +4,7 @@ import { getMcpToken } from "@/lib/mcp/token";
 import { MCP_TOOL_GROUPS } from "@/lib/mcp/tools";
 import { McpAccess, type ToolGroupInfo } from "@/components/settings/McpAccess";
 import { requirePage } from "@/lib/auth/guard";
-import { mcpAllowed, mcpKeyAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis, mcpKeyAllowed } from "@/lib/mcp/allowed";
 import { getOauthState, oauthSetup } from "@/lib/mcp/oauth";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export default async function McpSettingsPage() {
         <h1>Accès MCP</h1>
         <p className="sub">Laisser Claude consulter et gérer RecipeLog</p>
       </div>
-      {mcpAllowed() ? (
+      {(await mcpPermis()) ? (
         <McpAccess token={token} groups={groups} oauth={oauth} keyAllowed={mcpKeyAllowed()} />
       ) : (
         <p className="sub">L'accès MCP n'est pas compris dans ton offre RecipeLog. Demande-le à RecipeLog pour l'activer.</p>

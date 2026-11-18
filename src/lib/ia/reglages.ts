@@ -38,6 +38,8 @@ export async function getReglagesIA(): Promise<ReglagesIA> {
   const fournisseur = estFournisseur(v.fournisseur) ? v.fournisseur : "anthropic";
   let mode: ModeIA = v.mode === "cle" || v.mode === "off" || v.mode === "plateforme" ? v.mode : surPlateforme() ? "plateforme" : "off";
   if (mode === "plateforme" && !surPlateforme()) mode = "off";
+  // RecipeLog en ligne : pas de clé d'IA du client pour l'instant (Noë, 18/11/2026), seulement celle de la plateforme.
+  if (mode === "cle" && surPlateforme()) mode = "plateforme";
   if (isDemo()) mode = "off";
   return {
     mode,
@@ -61,6 +63,7 @@ export async function saveReglagesIA(next: { mode: ModeIA; fournisseur: Fourniss
   const cleTapee = (next.cle ?? "").trim();
   const cle = cleTapee === "-" ? "" : cleTapee || (next.fournisseur === avant.fournisseur ? avant.cle : "");
   if (next.mode === "plateforme" && !surPlateforme()) throw new Error("La clé de la plateforme n'existe que sur un RecipeLog hébergé par RecipeLog.");
+  if (next.mode === "cle" && surPlateforme()) throw new Error("Sur RecipeLog en ligne, l'IA est fournie par RecipeLog : pas de clé à mettre.");
   if (next.mode === "cle" && !cle) throw new Error("Colle ta clé d'API pour utiliser ta propre IA.");
   if (cle && (cle.length > 400 || /\s/.test(cle))) throw new Error("Cette clé n'a pas l'air valable (pas d'espace, 400 caractères au plus).");
   const modele = (next.modele ?? "").trim().slice(0, 100);

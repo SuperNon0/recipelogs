@@ -58,7 +58,7 @@ export async function lireAvecIA(
   ctx: ContexteLecture,
   opts: OptionsIA = {},
 ): Promise<ResultatIA> {
-  if (reglages.mode === "off") return erreur("off", "La lecture par IA n'est pas activée (Réglages → Lecture des factures par IA).");
+  if (reglages.mode === "off") return erreur("off", "La lecture par IA n'est pas activée (Réglages → Lecture des factures).");
   if (!fichierAccepte(fichier.mime)) return erreur("format", "Envoie un PDF ou une photo (JPG, PNG ou WebP).");
   const texte = consigne(type, ctx);
   if (reglages.mode === "plateforme") {
@@ -134,7 +134,7 @@ function erreurClaude(e: unknown, plateforme: boolean): ResultatIA {
     if (e instanceof Anthropic.AuthenticationError) {
       return plateforme
         ? erreur("cle_invalide", "La plateforme n'a pas reconnu ce site. Préviens RecipeLog.")
-        : erreur("cle_refusee", "Ta clé Claude est refusée. Vérifie-la dans Réglages → Lecture des factures par IA.");
+        : erreur("cle_refusee", "Ta clé Claude est refusée. Vérifie-la dans Réglages → Lecture des factures.");
     }
     if (e instanceof Anthropic.PermissionDeniedError) return erreur("cle_refusee", "Ta clé Claude n'a pas le droit d'utiliser ce modèle.");
     if (e instanceof Anthropic.RateLimitError) return erreur("limite", "L'IA reçoit trop de demandes en ce moment. Réessaie dans une minute.");
@@ -196,7 +196,7 @@ function erreurPlateforme(nom: string, status: number, corps?: string): Resultat
 }
 
 function erreurHttp(nom: string, status: number): ResultatIA {
-  if (status === 401 || status === 403) return erreur("cle_refusee", `Ta clé ${nom} est refusée. Vérifie-la dans Réglages → Lecture des factures par IA.`);
+  if (status === 401 || status === 403) return erreur("cle_refusee", `Ta clé ${nom} est refusée. Vérifie-la dans Réglages → Lecture des factures.`);
   if (status === 404) return erreur("modele", `Le modèle choisi n'existe pas chez ${nom}. Vérifie son nom dans les réglages.`);
   if (status === 429) return erreur("limite", `${nom} refuse pour l'instant (limite ou crédit épuisé sur ton compte).`);
   if (status === 0) return erreur("injoignable", `${nom} ne répond pas pour l'instant. Réessaie dans quelques minutes.`);

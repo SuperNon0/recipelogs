@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { mcpAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis } from "@/lib/mcp/allowed";
 import {
   OAUTH_SCOPE,
   accountMayUseMcp,
@@ -44,7 +44,7 @@ function backToClient(redirectUri: string, params: Record<string, string | null>
 
 export async function GET(req: NextRequest) {
   const setup = oauthSetup();
-  if (!setup || !mcpAllowed()) return oauthNotFound();
+  if (!setup || !(await mcpPermis())) return oauthNotFound();
   const q = req.nextUrl.searchParams;
 
   const found = await resolveClient(q.get("client_id"), setup);
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const setup = oauthSetup();
-  if (!setup || !mcpAllowed()) return oauthNotFound();
+  if (!setup || !(await mcpPermis())) return oauthNotFound();
   const form = new URLSearchParams((await req.text()).slice(0, 20000));
   const consent = readConsent(form.get("billet") ?? "", setup.key);
   if (!consent) return oauthErrorPage("Page expirée", "La page d'autorisation a expiré. Relance la connexion depuis Claude.");
