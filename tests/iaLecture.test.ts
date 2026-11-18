@@ -136,7 +136,7 @@ const fichier = { data: Buffer.from("%PDF-1.4 faux"), mime: "application/pdf", n
 
 describe("lecture avec la clé de la plateforme", () => {
   it("passe par la passerelle, qui met sa clé et compte la lecture", async () => {
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.document.lignes[0]).toMatchObject({ produit: "Citron vert", prixUnitaire: 5 });
@@ -151,15 +151,15 @@ describe("lecture avec la clé de la plateforme", () => {
   });
 
   it("refuse au-delà du quota du mois, avec un message pour le client", async () => {
-    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r).toMatchObject({ ok: false, code: "quota_ia" });
     if (!r.ok) expect(r.message).toContain("2 lectures");
   });
 
   it("le réglage du panel passe avant le défaut", async () => {
     writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 } }));
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r.ok).toBe(true);
   });
 
@@ -171,5 +171,42 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(controler({ ...ok, tools: [] }, [])).toMatch(/tools/);
     expect(controler({ ...ok, max_tokens: 64000 }, [])).toMatch(/max_tokens/);
     expect(controler(ok, ["files-api-2025-04-14"])).toMatch(/refusée/);
+  });
+});
+
+describe("IA de la plateforme choisie dans le panel (Gemini, ChatGPT, Claude Haiku)", () => {
+  const doc = JSON.stringify({ fournisseur: "Ribera", date: null, numero: null, total_ht: null, remarque: null, lignes: [] });
+  const espion = (reponse: unknown, statut = 200) => {
+    const appels: { url: string; headers: Record<string, string>; corps: Record<string, unknown> }[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      appels.push({ url, headers: init.headers as Record<string, string>, corps: JSON.parse(String(init.body)) });
+      return new Response(JSON.stringify(reponse), { status: statut });
+    }) as unknown as typeof fetch;
+    return { f, appels };
+  };
+
+  it("Gemini : passe par la passerelle avec la clé du site, pas de clé Google", async () => {
+    const { f, appels } = espion({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: doc }] } }] });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "gemini", modele: "gemini-2.5-flash" } });
+    expect(r).toMatchObject({ ok: true, modele: "gemini-2.5-flash" });
+    expect(appels[0].url).toBe("http://passerelle/v1/ia/gemini/v1beta/models/gemini-2.5-flash:generateContent");
+    expect(appels[0].headers.Authorization).toBe("Bearer cle-de-maison-assez-longue-pour-passer");
+    expect(appels[0].headers["x-goog-api-key"]).toBeUndefined();
+  });
+
+  it("ChatGPT : passe par la passerelle ; un refus de la passerelle garde son message", async () => {
+    const { f, appels } = espion({ type: "error", error: "quota_ia", message: "Les 30 lectures par IA du mois sont utilisées." }, 429);
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "openai", modele: "gpt-5-mini" } });
+    expect(appels[0].url).toBe("http://passerelle/v1/ia/openai/v1/responses");
+    expect(appels[0].corps.model).toBe("gpt-5-mini");
+    expect(r).toMatchObject({ ok: false, code: "quota_ia", message: "Les 30 lectures par IA du mois sont utilisées." });
+  });
+
+  it("Claude Haiku : sans l'option de modèle de secours (refusée par Haiku)", async () => {
+    // Directement sur la fausse API Anthropic (la passerelle de cette branche ne connaît que Claude Opus).
+    const direct = `http://127.0.0.1:${(amont.address() as AddressInfo).port}`;
+    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: direct, plateforme: { fournisseur: "anthropic", modele: "claude-haiku-5-5" } });
+    expect(recu!.corps.model).toBe("claude-haiku-5-5");
+    expect(recu!.corps.fallbacks).toBeUndefined();
   });
 });

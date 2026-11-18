@@ -11,6 +11,16 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.22",
+    date: "2026-11-18",
+    title: "Lecture des factures avec Gemini ou ChatGPT",
+    summary:
+      "RecipeLog en ligne : l'IA fournie par RecipeLog pour lire les factures peut maintenant être Claude, Gemini ou ChatGPT, choisie par RecipeLog. Rien ne change de ton côté.",
+    features: [
+      "Lecture des factures par l'IA de RecipeLog : elle passe par l'IA et le modèle choisis par RecipeLog (Claude, Gemini ou ChatGPT). Ton nombre de lectures par mois ne change pas",
+    ],
+  },
+  {
     version: "V2.21",
     date: "2026-11-17",
     title: "Clé secrète MCP selon l'offre",
