@@ -1904,7 +1904,7 @@ function fenetreCleIA() {
       <div class="champ"><label for="ia-modele">Modèle ${aide("ia-a-mod", "Choisis dans la liste, ou écris le nom exact d'un autre modèle du même fournisseur. Le panel vérifie chez le fournisseur qu'il existe avant de le garder.")}
         <select id="ia-modele"></select>
         <input id="ia-modele-autre" type="text" spellcheck="false" autocapitalize="off" placeholder="nom exact du modèle" hidden></div>
-      <div class="champ"><label for="ia-cle-champ">Clé <span id="ia-cle-nom"></span> ${aide("ia-a-cle", "La clé d'API du fournisseur choisi. Claude : platform.claude.com → API keys (commence par « sk-ant- »). Gemini : aistudio.google.com → Get API key (commence par « AIza »). ChatGPT : platform.openai.com → API keys (commence par « sk- »). Elle est essayée avant d'être gardée, rangée sur le serveur (lisible par la passerelle seule) et ne s'affiche plus jamais en entier. Laisse vide pour garder la clé déjà mise et changer seulement de modèle.")}
+      <div class="champ"><label for="ia-cle-champ">Clé <span id="ia-cle-nom"></span> ${aide("ia-a-cle", "La clé d'API du fournisseur choisi. Claude : platform.claude.com → API keys (commence par « sk-ant- »). Gemini : aistudio.google.com → Get API key (commence par « AQ. » ou, pour les anciennes, « AIza »). ChatGPT : platform.openai.com → API keys (commence par « sk- »). Elle est essayée avant d'être gardée, rangée sur le serveur (lisible par la passerelle seule) et ne s'affiche plus jamais en entier. Laisse vide pour garder la clé déjà mise et changer seulement de modèle.")}
         <input id="ia-cle-champ" type="password" spellcheck="false" autocapitalize="off" autocomplete="new-password">
         <p class="sub"><a id="ia-cle-ou" target="_blank" rel="noopener">Où trouver cette clé ↗</a></p></div>
       <div class="champ"><label>Prix (dollars par million de jetons) ${aide("ia-a-prix", "Sert seulement à estimer le coût dans le tableau. Il est rempli avec le prix connu du modèle choisi ; vérifie-le sur la page des prix du fournisseur et corrige-le s'il a changé.")}
@@ -1937,7 +1937,7 @@ function fenetreCleIA() {
     $("#ia-cle-ou").href = f.ou;
     const memeIA = info.source === "panel" && info.fournisseur === four;
     $("#ia-cle-champ").value = "";
-    $("#ia-cle-champ").placeholder = memeIA ? `vide = garder la clé ${info.fin}` : four === "anthropic" ? "sk-ant-…" : four === "openai" ? "sk-…" : "AIza…";
+    $("#ia-cle-champ").placeholder = memeIA ? `vide = garder la clé ${info.fin}` : four === "anthropic" ? "sk-ant-…" : four === "openai" ? "sk-…" : "AQ.… ou AIza…";
     remplirPrix();
   };
   remplir();

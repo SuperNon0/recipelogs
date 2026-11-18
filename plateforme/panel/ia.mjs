@@ -207,7 +207,8 @@ const NOM_IA = { anthropic: "Anthropic", gemini: "Google", openai: "OpenAI" };
 const FORMES = {
   anthropic: { re: /^sk-ant-[A-Za-z0-9_-]{20,300}$/, aide: "Une clé Claude commence par « sk-ant- »." },
   openai: { re: /^sk-[A-Za-z0-9_-]{20,300}$/, aide: "Une clé ChatGPT commence par « sk- »." },
-  gemini: { re: /^[A-Za-z0-9_-]{30,100}$/, aide: "Une clé Gemini ressemble à « AIza… » (aistudio.google.com → Get API key)." },
+  // Google donne maintenant des clés « AQ.Ab8R… » (avec des points) en plus des anciennes « AIza… ».
+  gemini: { re: /^(?:AIza[A-Za-z0-9_-]{30,100}|AQ\.[A-Za-z0-9_.-]{20,300})$/, aide: "Une clé Gemini commence par « AQ. » ou « AIza » (aistudio.google.com → Get API key)." },
 };
 const MODELE_RE = /^[A-Za-z0-9._-]{1,100}$/;
 
@@ -228,6 +229,8 @@ export async function essayerCle(fournisseur, cle, modele, f = fetch) {
     if (r.ok) return { ok: true };
     const texte = await r.text().catch(() => "");
     // Google répond 400 « API_KEY_INVALID » pour une fausse clé.
+    // Google répond 401 « ACCESS_TOKEN_TYPE_UNSUPPORTED » pour une clé « AQ. » coupée ou pas encore liée à l'API Gemini.
+    if (fournisseur === "gemini" && r.status === 401 && /ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(texte)) return { ok: false, refusee: true, cleAQ: true };
     if (r.status === 401 || r.status === 403 || (fournisseur === "gemini" && r.status === 400 && /API_KEY/i.test(texte))) return { ok: false, refusee: true };
     if (r.status === 404) return { ok: false, modeleInconnu: true };
     return { ok: false, detail: `${NOM_IA[fournisseur]} a répondu ${r.status}` };
@@ -267,6 +270,7 @@ export async function reglerCle(donnees, corps, f = fetch) {
   const conseil = IA_PROPOSEES[fournisseur].modeles.find((m) => m.id === modele)?.prix ?? null;
   const prix = prixValide(corps?.prix?.entree) && prixValide(corps?.prix?.sortie) ? { entree: corps.prix.entree, sortie: corps.prix.sortie } : conseil;
   const essai = await essayerCle(fournisseur, cle, modele, f);
+  if (essai.cleAQ) throw new RefusIA("Google refuse cette clé « AQ. » : elle est peut-être coupée au copier-coller, ou l'API Gemini n'est pas activée sur son projet. Recrée une clé sur aistudio.google.com → Get API key et colle-la en entier. Rien n'a été changé.");
   if (essai.refusee) throw new RefusIA(`${NOM_IA[fournisseur]} refuse cette clé (fausse, supprimée ou désactivée). Rien n'a été changé.`);
   if (essai.modeleInconnu) throw new RefusIA(`La clé marche, mais le modèle « ${modele} » n'existe pas chez ${NOM_IA[fournisseur]}. Rien n'a été changé.`);
   await mkdir(d, { recursive: true });
