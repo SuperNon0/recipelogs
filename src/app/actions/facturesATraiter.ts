@@ -13,6 +13,7 @@ import {
   type PendingInvoiceItem,
 } from "@/lib/pendingInvoices";
 import { prisma } from "@/lib/prisma";
+import { INVOICE_MAX_BYTES } from "@/lib/invoiceFiles";
 import { etatLectureIA, type EtatIA } from "./ia";
 import { modesAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
 
@@ -29,13 +30,24 @@ function auteur(viewer: Viewer): string | null {
   return viewer.kind === "account" ? (viewer.realAccount ?? viewer.account).email : null;
 }
 
-/** pagesMercuriale : une mercuriale peut avoir plus de pages qu'une facture. */
-export type EtatNouvelleFacture = { ia: EtatIA; limites: LimitesFactures; enAttente: number; pagesMercuriale: number; modes: ModesAnalyse };
+/**
+ * pagesMercuriale : une mercuriale peut avoir plus de pages qu'une facture.
+ * octetsMax : poids maximum d'un fichier (PDF ou photo), vérifié aussi dans
+ * le navigateur pour dire tout de suite « trop lourd » au lieu d'un envoi raté.
+ */
+export type EtatNouvelleFacture = {
+  ia: EtatIA;
+  limites: LimitesFactures;
+  enAttente: number;
+  pagesMercuriale: number;
+  modes: ModesAnalyse;
+  octetsMax: number;
+};
 
 export async function etatNouvelleFacture(): Promise<EtatNouvelleFacture> {
   await requireAccess("costs.edit");
   const [ia, limites, enAttente, modes] = await Promise.all([etatLectureIA(), limitesFactures(), prisma.pendingInvoice.count(), modesAnalyse()]);
-  return { ia, limites, enAttente, pagesMercuriale: PAGES_MAX_ABSOLU, modes };
+  return { ia, limites, enAttente, pagesMercuriale: PAGES_MAX_ABSOLU, modes, octetsMax: INVOICE_MAX_BYTES };
 }
 
 /** fd : pages (une ou plusieurs photos, ou un PDF), note ; type « mercuriale » + fournisseurId pour une liste de prix. */
