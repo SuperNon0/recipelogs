@@ -548,7 +548,9 @@ function fenetreMajPlateforme() {
     : n
       ? `<p class="sub">Aucune nouveauté sur GitHub : ta plateforme est déjà à jour. Tu peux quand même relancer l'installation (pour réparer, par exemple).</p>`
       : `<p class="sub">Impossible de demander à GitHub ce qui a changé. La mise à jour prendra quand même la dernière version.</p>`;
-  const derniere = p.maj?.etat === "fini" ? `<p class="discret">Dernière mise à jour : ${p.maj.ok ? "réussie" : "échouée"}${p.maj.fin ? ` le ${e(heureFr(p.maj.fin))}` : ""}.${p.journal ? ` <button class="lien" type="button" id="pf-journal">Voir son journal</button>` : ""}</p><pre class="sortie journaux cache" id="pf-ancien">${e(p.journal ?? "")}</pre>` : "";
+  const derniere = p.maj?.etat === "fini"
+    ? `<p class="discret">Dernière mise à jour : ${p.maj.ok ? "réussie" : "échouée"}${p.maj.fin ? ` le ${e(heureFr(p.maj.fin))}` : ""}.</p>${p.journal ? `<details class="pf-detail"><summary>${ic("chevd", "s16")}<span>Voir son journal</span><small>journal technique</small></summary><pre class="pf-log">${e(p.journal)}</pre></details>` : ""}`
+    : "";
   ouvrir(
     "Mettre à jour la plateforme ?",
     `${liste}
@@ -556,18 +558,105 @@ function fenetreMajPlateforme() {
     ${derniere}
     <div class="pied"><button class="btn principal" id="ok-pf" type="button">Mettre à jour la plateforme</button></div>`,
   );
-  const j = $("#pf-journal");
-  if (j) j.onclick = () => $("#pf-ancien").classList.toggle("cache");
   $("#ok-pf").onclick = async () => {
     const avant = PLATEFORME?.maj?.debut ?? null;
     $("#ok-pf").disabled = true;
     const r = await appel("POST", "/plateforme/maj").catch((err) => ({ ok: false, sortie: String(err.message ?? err) }));
     if (!r.ok) {
-      $("#fenetre-corps").innerHTML = `<p class="etiquette ko">Échec</p><pre class="sortie">${e(r.sortie || r.message || "Le moteur n'a pas pu lancer la mise à jour.")}</pre>`;
+      $("#fenetre-corps").innerHTML = `<div class="console-pf"><div class="pf-tete ko"><span class="pf-icone">${ic("x", "s22")}</span><div><b>La mise à jour n'a pas pu démarrer</b><p>Rien n'a été changé.</p></div></div><pre class="pf-log">${e(r.sortie || r.message || "Le moteur n'a pas pu lancer la mise à jour.")}</pre></div>`;
       return;
     }
     suivrePlateforme(avant);
   };
+}
+
+// Console de la mise à jour : les grandes étapes (lues par le moteur dans tout le journal),
+// une barre d'avancement, les alertes, et le journal brut replié sous « Voir le détail ».
+const ETAPES_PF = [
+  { id: "telechargement", nom: "Téléchargement de la nouvelle version" },
+  { id: "preparation", nom: "Préparation des réglages" },
+  { id: "construction", nom: "Construction du panel et des outils" },
+  { id: "redemarrage", nom: "Redémarrage des services" },
+  { id: "connexion", nom: "Vérification de la connexion" },
+];
+const dureeFr = (a, b) => {
+  const s = Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 1000));
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min${s % 60 ? ` ${String(s % 60).padStart(2, "0")} s` : ""}`;
+};
+
+function htmlConsolePf() {
+  return `<div class="console-pf">
+    <div class="pf-tete" id="pf-tete"></div>
+    <div class="pf-barre" aria-hidden="true"><span id="pf-barre"></span></div>
+    <div class="pf-etapes-t"><span class="lbl-mono">Étapes</span><button class="aide" type="button" data-aide="aide-pf-etapes" aria-label="Aide sur les étapes de la mise à jour">?</button></div>
+    <p class="texte-aide" id="aide-pf-etapes"><b>Téléchargement</b> : le serveur récupère la nouvelle version sur GitHub. <b>Préparation</b> : il garde tes réglages et prépare la base. <b>Construction</b> : il fabrique le nouveau panel et les outils (le plus long, 3 à 6 minutes). <b>Redémarrage</b> : les services repartent avec la nouvelle version ; le panel est coupé un moment, c'est normal. <b>Connexion</b> : il vérifie que l'écran de connexion répond. Les sites des clients restent en ligne tout du long.</p>
+    <ol class="pf-etapes" id="pf-etapes"></ol>
+    <div id="pf-alertes"></div>
+    <div id="pf-fin"></div>
+    <details class="pf-detail" id="pf-detail"><summary>${ic("chevd", "s16")}<span>Voir le détail</span><small>journal technique</small></summary><pre class="pf-log" id="pf-log">Rien pour l'instant.</pre></details>
+  </div>`;
+}
+
+// v : { statut: lancement | attente | en-cours | coupe | ok | ko, p (réponse du moteur), coupe }
+function dessinerPf(v) {
+  const p = v.p ?? {};
+  const m = p.maj ?? {};
+  const av = p.avancement ?? {};
+  const etapes = av.etapes?.length ? av.etapes : ETAPES_PF;
+  const corps = $("#fenetre-corps");
+  const enBas = corps.scrollTop + corps.clientHeight >= corps.scrollHeight - 40;
+  let etape = v.statut === "ok" ? etapes.length : av.etape ?? 0;
+  if (v.statut === "coupe") etape = Math.max(etape, 3);
+  if (v.statut === "lancement" || v.statut === "attente") etape = 0;
+
+  const tete = {
+    lancement: ["encours", "", "Lancement de la mise à jour…", "Le serveur prépare la mise à jour."],
+    attente: ["encours", "", "La mise à jour n'a pas encore démarré", "Si rien ne bouge d'ici une minute, regarde le journal du panel."],
+    "en-cours": ["encours", "", "Mise à jour en cours", `${m.debut ? `Commencée ${depuis(m.debut).replace("depuis", "il y a")}. ` : ""}Compte 5 à 10 minutes. Tu peux fermer cette fenêtre : la mise à jour continue.`],
+    coupe: ["encours", "", "Le panel redémarre…", "C'est normal : il revient dans un instant et cette fenêtre reprend toute seule."],
+    ok: ["ok", "check", "La plateforme est à jour", `${p.version ? `Version ${e(p.version.numero ?? p.version.court)}. ` : ""}${m.debut && m.fin ? `Terminée en ${dureeFr(m.debut, m.fin)}.` : ""}`],
+    ko: ["ko", "x", "La mise à jour a échoué", m.interrompue ? "Elle ne s'est jamais terminée (machine redémarrée en route ?). Tu peux la relancer." : `L'installation s'est arrêtée${m.code != null ? ` (code ${e(m.code)})` : ""}. Les sites des clients ne sont pas touchés.`],
+  }[v.statut];
+  $("#pf-tete").className = `pf-tete ${tete[0]}`;
+  $("#pf-tete").innerHTML = `<span class="pf-icone">${tete[1] ? ic(tete[1], "s22") : `<span class="rond"></span>`}</span><div><b>${tete[2]}</b><p>${tete[3]}</p></div>`;
+
+  const pourcent = v.statut === "ok" ? 100 : Math.min(97, Math.round(((etape + (v.statut === "lancement" || v.statut === "attente" ? 0.15 : 0.5)) / etapes.length) * 100));
+  $("#pf-barre").style.width = `${pourcent}%`;
+  $("#pf-barre").parentElement.className = `pf-barre ${tete[0]}`;
+
+  $("#pf-etapes").innerHTML = etapes
+    .map((x, i) => {
+      const etat = i < etape ? "fait" : i > etape ? "afaire" : v.statut === "ko" ? "echec" : "encours";
+      const icone = etat === "fait" ? ic("check", "s16") : etat === "echec" ? ic("x", "s16") : etat === "encours" ? `<span class="rond"></span>` : `<span class="pf-point"></span>`;
+      const detail = etat === "encours" || etat === "echec" ? (v.statut === "coupe" ? "Le panel lui-même redémarre" : av.detail) : "";
+      return `<li class="${etat}"><span class="pf-pastille">${icone}</span><span class="pf-nom">${e(x.nom)}${detail ? `<small>${e(detail)}</small>` : ""}</span></li>`;
+    })
+    .join("");
+
+  const alertes = av.alertes ?? [];
+  $("#pf-alertes").innerHTML = alertes.length
+    ? `<div class="pf-alertes ${v.statut === "ko" ? "ko" : ""}"><b>${ic("alert", "s16")}${v.statut === "ko" ? "Ce qui a bloqué" : "À regarder"}</b><ul>${alertes.map((a) => `<li>${e(a)}</li>`).join("")}</ul></div>`
+    : "";
+
+  const fin = $("#pf-fin");
+  if (v.statut === "ok" && !$("#pf-recharger")) {
+    fin.innerHTML = `<div class="pied pied-gauche"><button class="btn principal" type="button" id="pf-recharger">${ic("refresh", "s16")}Recharger la page</button><span class="discret">pour avoir le nouveau panel</span></div>`;
+    $("#pf-recharger").onclick = () => location.reload();
+  }
+  if (v.statut === "ko" && !$("#pf-relancer")) {
+    fin.innerHTML = `<div class="pied pied-gauche"><button class="btn" type="button" id="pf-relancer">${ic("rotate", "s16")}Relancer la mise à jour</button></div>`;
+    $("#pf-relancer").onclick = () => fenetreMajPlateforme();
+  }
+
+  const log = $("#pf-log");
+  if (p.journal) {
+    const logEnBas = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    log.textContent = p.journal;
+    if (logEnBas) log.scrollTop = log.scrollHeight;
+  }
+  // Fin : on remonte en haut pour voir le résultat ; sinon on suit le journal s'il est ouvert.
+  if (v.statut === "ok" || v.statut === "ko") corps.scrollTop = 0;
+  else if ($("#pf-detail").open && enBas) corps.scrollTop = corps.scrollHeight;
 }
 
 // Suit la mise à jour : le panel et le moteur redémarrent en route, donc on tolère que
@@ -576,18 +665,13 @@ let suiviPf = 0;
 async function suivrePlateforme(avant) {
   const jeton = (suiviPf += 1);
   if (avant === undefined) avant = PLATEFORME?.maj?.etat === "en-cours" ? null : PLATEFORME?.maj?.debut ?? null;
-  ouvrir(
-    "Mise à jour de la plateforme",
-    `<p class="attente" id="pf-etat"><span class="rond"></span>Lancement…</p>
-    <p class="texte-aide visible discret" id="pf-explication">Compte 5 à 10 minutes. Le panel va se couper puis revenir : cette fenêtre attend et reprend toute seule. Tu peux aussi la fermer, la mise à jour continue.</p>
-    <pre class="sortie journaux" id="pf-log"></pre>`,
-    () => {
-      suiviPf += 1;
-      charger();
-    },
-  );
+  ouvrir("Mise à jour de la plateforme", htmlConsolePf(), () => {
+    suiviPf += 1;
+    charger();
+  });
+  let dernier = PLATEFORME ?? {};
+  dessinerPf({ statut: "lancement", p: {} });
   const debut = Date.now();
-  let coupe = false;
   while (jeton === suiviPf) {
     await pause(4000);
     if (jeton !== suiviPf) return;
@@ -598,36 +682,24 @@ async function suivrePlateforme(avant) {
     } catch {
       p = null;
     }
-    const zEtat = $("#pf-etat");
-    if (!zEtat) return;
+    if (!$("#pf-etapes")) return;
     if (!p) {
-      coupe = true;
-      zEtat.innerHTML = `<span class="rond"></span>Le panel redémarre, il revient dans un instant…`;
+      dessinerPf({ statut: "coupe", p: dernier });
       continue;
     }
     PLATEFORME = p;
+    dernier = p;
     const m = p.maj;
-    const log = $("#pf-log");
-    if (log && p.journal) {
-      const enBas = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
-      log.textContent = p.journal;
-      if (enBas) log.scrollTop = log.scrollHeight;
-    }
     const nouvelle = m && m.debut !== avant;
     if (nouvelle && m.etat === "fini") {
-      zEtat.outerHTML = m.ok
-        ? `<p class="etiquette ok">Réussi</p><p class="sub">La plateforme est à jour${p.version ? ` (version ${e(p.version.court)})` : ""}. Recharge la page pour avoir le nouveau panel.</p><div class="pied pied-gauche"><button class="btn principal" type="button" id="pf-recharger">Recharger la page</button></div>`
-        : `<p class="etiquette ko">Échec</p><p class="sub">${m.interrompue ? "La mise à jour ne s'est jamais terminée (machine redémarrée en route ?)." : `L'installation s'est arrêtée (code ${e(m.code)}).`} Le journal ci-dessous dit pourquoi. Les sites des clients ne sont pas touchés.</p>`;
-      $("#pf-explication")?.remove();
-      const b = $("#pf-recharger");
-      if (b) b.onclick = () => location.reload();
+      dessinerPf({ statut: m.ok ? "ok" : "ko", p });
       return;
     }
-    if (!nouvelle && Date.now() - debut > 60000) {
-      zEtat.innerHTML = `<span class="rond"></span>La mise à jour n'a pas encore démarré. Si rien ne bouge, regarde le journal du panel.`;
+    if (!nouvelle) {
+      dessinerPf({ statut: Date.now() - debut > 60000 ? "attente" : "lancement", p: { ...p, avancement: null } });
       continue;
     }
-    zEtat.innerHTML = `<span class="rond"></span>${nouvelle ? `En cours ${e(depuis(m.debut))}${coupe ? " (le panel a redémarré)" : ""}…` : "Lancement…"}`;
+    dessinerPf({ statut: "en-cours", p });
   }
 }
 
