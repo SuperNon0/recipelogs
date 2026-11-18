@@ -292,6 +292,9 @@ export type QuotaIA = {
   mois: string;
   /** Limites des factures prises en photo (« Nouvelle facture »), réglées dans le panel ; null = ancienne passerelle. */
   factures: { attente: number; pages: number } | null;
+  /** IA et modèle choisis dans le panel ; null = ancienne passerelle (Claude Opus 5.5). */
+  fournisseur: "anthropic" | "openai" | "gemini" | null;
+  modele: string | null;
 };
 
 /** GET /v1/ia/quota. disponible = false : la plateforme n'a pas (encore) de clé d'IA. */
@@ -307,6 +310,8 @@ export async function getQuotaIA(opts: PasserelleOptions = {}): Promise<Passerel
       utilise: typeof j.utilise === "number" ? j.utilise : 0,
       mois: typeof j.mois === "string" ? j.mois : "",
       factures: lireLimitesFactures(j.factures),
+      fournisseur: j.fournisseur === "anthropic" || j.fournisseur === "openai" || j.fournisseur === "gemini" ? j.fournisseur : null,
+      modele: typeof j.modele === "string" && /^[A-Za-z0-9._-]{1,100}$/.test(j.modele) ? j.modele : null,
     },
   };
 }

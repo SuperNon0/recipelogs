@@ -136,7 +136,7 @@ const fichier = { data: Buffer.from("%PDF-1.4 faux"), mime: "application/pdf", n
 
 describe("lecture avec la clé de la plateforme", () => {
   it("passe par la passerelle, qui met sa clé et compte la lecture", async () => {
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.document.lignes[0]).toMatchObject({ produit: "Citron vert", prixUnitaire: 5 });
@@ -151,15 +151,15 @@ describe("lecture avec la clé de la plateforme", () => {
   });
 
   it("refuse au-delà du quota du mois, avec un message pour le client", async () => {
-    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r).toMatchObject({ ok: false, code: "quota_ia" });
     if (!r.ok) expect(r.message).toContain("2 lectures");
   });
 
   it("le réglage du panel passe avant le défaut", async () => {
     writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 } }));
-    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais, plateforme: { fournisseur: "anthropic", modele: "claude-opus-5-5" } });
     expect(r.ok).toBe(true);
   });
 
@@ -171,5 +171,82 @@ describe("lecture avec la clé de la plateforme", () => {
     expect(controler({ ...ok, tools: [] }, [])).toMatch(/tools/);
     expect(controler({ ...ok, max_tokens: 64000 }, [])).toMatch(/max_tokens/);
     expect(controler(ok, ["files-api-2025-04-14"])).toMatch(/refusée/);
+  });
+});
+
+describe("IA de la plateforme choisie dans le panel (Gemini, ChatGPT, Claude Haiku)", () => {
+  const doc = JSON.stringify({ fournisseur: "Ribera", date: null, numero: null, total_ht: null, remarque: null, lignes: [] });
+  const espion = (reponse: unknown, statut = 200) => {
+    const appels: { url: string; headers: Record<string, string>; corps: Record<string, unknown> }[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      appels.push({ url, headers: init.headers as Record<string, string>, corps: JSON.parse(String(init.body)) });
+      return new Response(JSON.stringify(reponse), { status: statut });
+    }) as unknown as typeof fetch;
+    return { f, appels };
+  };
+
+  // Gemini répond en continu (text/event-stream) : la réponse arrive en plusieurs morceaux.
+  const flux = (morceaux: unknown[]) =>
+    morceaux.map((m) => `data: ${JSON.stringify(m)}\r\n\r\n`).join("");
+  const espionFlux = (texte: string, statut = 200) => {
+    const appels: { url: string; headers: Record<string, string>; corps: Record<string, unknown> }[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      appels.push({ url, headers: init.headers as Record<string, string>, corps: JSON.parse(String(init.body)) });
+      // Le flux est coupé n'importe où, même au milieu d'un caractère accentué.
+      const octets = new TextEncoder().encode(texte);
+      const corps = new ReadableStream<Uint8Array>({
+        start(c) {
+          for (let i = 0; i < octets.length; i += 7) c.enqueue(octets.slice(i, i + 7));
+          c.close();
+        },
+      });
+      return new Response(corps, { status: statut });
+    }) as unknown as typeof fetch;
+    return { f, appels };
+  };
+
+  it("Gemini : passe par la passerelle avec la clé du site, pas de clé Google, et lit la réponse en continu", async () => {
+    const moitie = Math.floor(doc.length / 2);
+    const { f, appels } = espionFlux(
+      flux([
+        { candidates: [{ content: { parts: [{ text: "je réfléchis", thought: true }] } }] },
+        { candidates: [{ content: { parts: [{ text: doc.slice(0, moitie) }] } }] },
+        { candidates: [{ finishReason: "STOP", content: { parts: [{ text: doc.slice(moitie) }] } }] },
+      ]),
+    );
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "gemini", modele: "gemini-3.8-flash" } });
+    expect(r).toMatchObject({ ok: true, modele: "gemini-3.8-flash", document: { fournisseur: "Ribera" } });
+    expect(appels[0].url).toBe("http://passerelle/v1/ia/gemini/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse");
+    expect(appels[0].headers.Authorization).toBe("Bearer cle-de-maison-assez-longue-pour-passer");
+    expect(appels[0].headers["x-goog-api-key"]).toBeUndefined();
+    expect((appels[0].corps.generationConfig as Record<string, unknown>).maxOutputTokens).toBe(64000);
+  });
+
+  it("Gemini avec la clé du client : une clé refusée (400 chez Google) est expliquée", async () => {
+    const { f } = espion({ error: { code: 400, message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } }, 400);
+    const r = await lireAvecIA({ mode: "cle", fournisseur: "gemini", cle: "AIza-fausse", modele: "gemini-3.8-flash" }, fichier, "facture", { articles: [] }, { fetch: f });
+    expect(r).toMatchObject({ ok: false, code: "cle_refusee" });
+  });
+
+  it("Gemini : réponse coupée par la limite de longueur = document trop long", async () => {
+    const { f } = espionFlux(flux([{ candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "{\"lignes\": [" }] } }] }]));
+    const r = await lireAvecIA({ mode: "cle", fournisseur: "gemini", cle: "AIza-cle", modele: "gemini-3.8-flash" }, fichier, "mercuriale", { articles: [] }, { fetch: f });
+    expect(r).toMatchObject({ ok: false, code: "trop_long" });
+  });
+
+  it("ChatGPT : passe par la passerelle ; un refus de la passerelle garde son message", async () => {
+    const { f, appels } = espion({ type: "error", error: "quota_ia", message: "Les 30 lectures par IA du mois sont utilisées." }, 429);
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "openai", modele: "gpt-5-mini" } });
+    expect(appels[0].url).toBe("http://passerelle/v1/ia/openai/v1/responses");
+    expect(appels[0].corps.model).toBe("gpt-5-mini");
+    expect(r).toMatchObject({ ok: false, code: "quota_ia", message: "Les 30 lectures par IA du mois sont utilisées." });
+  });
+
+  it("Claude Haiku : sans l'option de modèle de secours (refusée par Haiku)", async () => {
+    // Directement sur la fausse API Anthropic (la passerelle de cette branche ne connaît que Claude Opus).
+    const direct = `http://127.0.0.1:${(amont.address() as AddressInfo).port}`;
+    await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: direct, plateforme: { fournisseur: "anthropic", modele: "claude-haiku-5-5" } });
+    expect(recu!.corps.model).toBe("claude-haiku-5-5");
+    expect(recu!.corps.fallbacks).toBeUndefined();
   });
 });

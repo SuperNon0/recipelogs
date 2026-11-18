@@ -11,7 +11,7 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "V2.22",
+    version: "V2.24",
     date: "2026-11-18",
     title: "Commandes fournisseurs et produits vendus",
     summary:
@@ -24,13 +24,38 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fiche d'un fournisseur → « Regrouper » : RecipeLog propose de ranger ensemble les produits qui commencent par le même mot (Croissant pur beurre, Croissant margarine…). Tu coches ce que tu gardes, ou tu choisis toi-même",
       "Modifier un produit → « Commandé par » : carton, sac, seau, kg… (deviné d'après le nom quand c'est vide)",
       "Case « Produit vendu » sur une recette (dans « Modifier » ou dans la carte du coût) et page « Produits vendus » dans les Réglages : coût de revient, prix de vente et marge en € et en % de chaque produit, triables, avec ceux qui ont un prix mais ne sont pas encore cochés",
-      "Les longues mercuriales (plusieurs centaines de produits) s'affichent par paquets et restent fluides sur téléphone : fiche fournisseur avec recherche, tableau des prix, vérification après lecture par IA (avec « À vérifier » pour ne voir que les lignes douteuses)",
-      "Claude (connecteur RecipeLog) : enregistrer_mercuriale pour les mercuriales de plusieurs pages, passer_commande, lister_commandes, voir_commande, supprimer_commande, regrouper_produits et produits_vendus",
-    ],
-    fixes: [
-      "Enregistrer une longue mercuriale ou une grosse facture va beaucoup plus vite et ne s'arrête plus au bout de 30 secondes",
+      "Fiche d'un fournisseur avec des centaines de produits : recherche par nom, article ou référence, et affichage par paquets. Le tableau « Comparer les prix » s'affiche aussi par paquets",
+      "Claude (connecteur RecipeLog) : passer_commande, lister_commandes, voir_commande, supprimer_commande, regrouper_produits et produits_vendus ; conditionnement des produits dans les factures et les mercuriales ; voir_fournisseur cherche et lit un gros catalogue page par page",
     ],
     migrations: ["Nouvelles tables pour les commandes fournisseurs, conditionnement commandé des produits et case « Produit vendu » des recettes : faites toutes seules à la mise à jour"],
+  },
+  {
+    version: "V2.23",
+    date: "2026-11-18",
+    title: "Longues mercuriales et Gemini",
+    summary:
+      "Une mercuriale de plusieurs centaines de produits s'enregistre en une ou deux secondes et se relit facilement, sans rien oublier. Claude (connecteur RecipeLog) peut aussi enregistrer une mercuriale entière.",
+    features: [
+      "Relire une longue mercuriale ou facture : boutons « À vérifier », « Nouveaux » et « Prix changés » pour ne voir que ces lignes, et une recherche par produit, article ou référence. Les lignes s'affichent 150 par 150 (« Afficher plus ») : l'écran reste fluide, même sur le téléphone. Toutes les lignes sont enregistrées, même celles cachées par un filtre",
+      "Claude (connecteur RecipeLog) : « enregistre cette mercuriale ». Une longue liste s'envoie en plusieurs parties, sans doublon si une partie est renvoyée",
+      "Claude lit le texte exact d'un PDF « à traiter » (mercuriale, facture reçue par e-mail) : les prix au centime près, page par page",
+    ],
+    fixes: [
+      "Enregistrer une mercuriale de 1 000 produits prend une ou deux secondes au lieu de quinze : elle ne risque plus d'échouer sur un petit serveur",
+      "Gemini avec ta propre clé : le modèle proposé est maintenant gemini-3.8-flash (l'ancien, gemini-2.5-flash, est en fin de vie chez Google)",
+      "Gemini : une clé refusée est expliquée clairement au lieu d'une « erreur 400 »",
+      "Gemini : une longue lecture (plus de 5 minutes) n'est plus coupée en route",
+    ],
+  },
+  {
+    version: "V2.22",
+    date: "2026-11-18",
+    title: "Lecture des factures avec Gemini ou ChatGPT",
+    summary:
+      "RecipeLog en ligne : l'IA fournie par RecipeLog pour lire les factures peut maintenant être Claude, Gemini ou ChatGPT, choisie par RecipeLog. Rien ne change de ton côté.",
+    features: [
+      "Lecture des factures par l'IA de RecipeLog : elle passe par l'IA et le modèle choisis par RecipeLog (Claude, Gemini ou ChatGPT). Ton nombre de lectures par mois ne change pas",
+    ],
   },
   {
     version: "V2.21",

@@ -30,6 +30,7 @@ import { currentOrigin } from "@/lib/auth/service";
 import { deletePendingInvoice, finishPendingInvoice, getPendingInvoice, listPendingInvoices, readPendingPage } from "@/lib/pendingInvoices";
 import { DELETE, READ, WRITE, id, js, parseArgs, text, type McpTool } from "./helpers";
 import type { McpToolResult } from "../protocol";
+import { texteDuPdf } from "@/lib/pdfTexte";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date au format AAAA-MM-JJ");
 const money = z.number().min(0).max(10_000_000);
@@ -68,18 +69,6 @@ const lineSchema = z.object({
   conditionnement: z.string().trim().max(40).optional(),
 });
 
-const lineProps = {
-  produit: js.str("Désignation du produit telle qu'écrite (« Guanaja 70 % fèves 3 kg »)"),
-  reference: js.str("Référence / code article du fournisseur"),
-  article: js.str("Nom commun qui regroupe les variantes (« Croissant » pour pur beurre, beurre, margarine)"),
-  famille: js.str("Famille (Chocolat, Crèmerie et œufs, Emballages…)"),
-  contenance: js.num("Contenance d'un colis dans l'unité de prix (25 pour 25 kg)"),
-  unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg (défaut), L ou pièce"),
-  prix_unitaire: js.num("Prix en € HT par unité de prix (par kg, L ou pièce)"),
-  prix_colis: js.num("Ou prix d'un colis en € HT"),
-  conditionnement: js.str("Ce qu'on commande : carton, sac, seau, boîte, bidon, colis, kg, pièce… (bouton de la page Passer une commande)"),
-  ingredient: { type: ["string", "integer"], description: "Ingrédient des recettes correspondant (nom exact ou id), facultatif" },
-};
 
 const toLine = (l: z.infer<typeof lineSchema>) => ({
   product: l.produit,
@@ -187,20 +176,43 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     name: "enregistrer_mercuriale",
     title: "Enregistrer une mercuriale (liste de prix)",
     description:
-      "Enregistre la mercuriale (liste de prix) d'un fournisseur : chaque ligne devient un produit de ce fournisseur et son prix entre dans l'historique à la date donnée, SANS compter comme une facture. Fait pour les longues mercuriales (plusieurs pages, jusqu'à 1 500 lignes par appel). " +
-      "Mercuriale longue : envoie-la en plusieurs appels avec le même nom et partie = 1, 2, 3… (par exemple 3 à 4 pages par appel) ; renvoyer la même partie la remplace. AVANT d'enregistrer, relis CHAQUE ligne : aucun produit ni prix oublié, compte les lignes de chaque page et compare. " +
-      "Mêmes règles que enregistrer_facture pour prix_unitaire / prix_colis / contenance / unite_prix. article = nom commun qui REGROUPE les doublons (« Croissant » pour « Croissant pur beurre 70 g », « Croissant beurre 60 g », « Croissant margarine ») : réutilise les articles existants (voir_fournisseur), garde séparés ce qui change la recette (chocolat par %, farine par type, crème par matière grasse). conditionnement = ce qu'on commande (carton, sac, seau, kg…). " +
-      `${FAMILIES_HELP} Réponse : nouveaux produits, prix changés, lignes à vérifier ; à montrer à l'utilisateur.`,
+      "Enregistre une mercuriale (liste de prix, offre de prix, tarif d'un fournisseur) : chaque produit est créé ou retrouvé chez ce fournisseur et son prix entre dans l'historique à la DATE indiquée, sans compter comme une facture (pas de quantité, pas de total). " +
+      "Mêmes règles que enregistrer_facture pour chaque ligne : produit = désignation exacte, article = nom commun qui REGROUPE les variantes (réutilise TOUJOURS l'article existant, voir comparer_prix_fournisseurs), unite_prix, contenance et prix_colis bien lus (un sac de 25 kg à 23 € : contenance 25, prix_colis 23). " +
+      "Pour les variantes d'un même produit (« Croissant pur beurre », « Croissant beurre », « Croissant margarine ») : un produit par ligne, avec le même article (« Croissant ») s'ils s'utilisent de la même façon. " +
+      "Longue mercuriale (plusieurs pages, des centaines de produits) : envoie-la en plusieurs appels, par exemple une ou deux pages à la fois, avec le même nom et partie = 1, 2, 3… Renvoyer une partie déjà envoyée la remplace (pas de doublon). " +
+      "N'oublie AUCUN produit : à la fin, compare le nombre de produits enregistrés au nombre de lignes du document et dis-le à l'utilisateur. " +
+      "Réponse : nombre de lignes, nouveaux produits, prix qui ont changé (avant → après), lignes à vérifier ou ignorées. Si elle vient de « À traiter » (facture_a_traiter_id), le fichier est joint et elle quitte la liste avec la dernière partie (derniere_partie=true).",
     inputSchema: {
       type: "object",
       properties: {
         fournisseur: js.str("Nom du fournisseur (créé s'il n'existe pas)"),
         date: js.str("Date à partir de laquelle ces prix valent, AAAA-MM-JJ"),
-        nom: js.str("Nom de la mercuriale (« Mercuriale novembre 2026 »)"),
-        partie: js.int("Numéro de la partie pour une longue mercuriale envoyée en plusieurs fois (1, 2, 3…)"),
-        lignes: { type: "array", description: "Une entrée par produit de la liste", items: { type: "object", required: ["produit"], properties: lineProps } },
+        nom: js.str("Nom de la mercuriale, le même pour toutes les parties (« Mercuriale novembre 2026 »)"),
+        partie: js.int("Numéro de la partie (1, 2, 3…) pour une longue mercuriale envoyée en plusieurs fois"),
+        derniere_partie: js.bool("true pour la dernière partie (ou l'unique) : le fichier « à traiter » est alors joint et sort de la liste"),
+        facture_a_traiter_id: js.int("Id du document « à traiter » d'où vient la mercuriale (lister_factures_a_traiter)"),
+        lignes: {
+          type: "array",
+          description: "Un produit par entrée (400 au plus par appel)",
+          items: {
+            type: "object",
+            required: ["produit"],
+            properties: {
+              produit: js.str("Désignation telle qu'écrite (« Croissant pur beurre 60 g x 70 »)"),
+              reference: js.str("Code article du fournisseur"),
+              article: js.str("Nom commun qui regroupe les variantes (« Croissant »)"),
+              famille: js.str("Famille (Viennoiserie, Chocolat, Crèmerie et œufs…)"),
+              contenance: js.num("Contenance d'un colis dans l'unité de prix (70 pour un carton de 70 pièces, 25 pour 25 kg)"),
+              unite_prix: js.enum(PRICE_UNITS, "Unité du prix : kg (défaut), L ou pièce"),
+              prix_unitaire: js.num("Prix en € HT par kg, L ou pièce"),
+              prix_colis: js.num("Ou prix d'un colis (carton, sac, bidon) en € HT"),
+              conditionnement: js.str("Ce qu'on commande : carton, sac, seau, kg… (bouton de « Passer une commande », facultatif)"),
+              ingredient: { type: ["string", "integer"], description: "Ingrédient des recettes correspondant (nom exact ou id), facultatif" },
+            },
+          },
+        },
       },
-      required: ["fournisseur", "date", "lignes"],
+      required: ["fournisseur", "date", "nom", "lignes"],
     },
     annotations: WRITE,
     run: async (args) => {
@@ -208,23 +220,49 @@ export const SUPPLIER_TOOLS: McpTool[] = [
         z.object({
           fournisseur: z.string().trim().min(1).max(200),
           date: day,
-          nom: z.string().trim().max(150).optional(),
+          nom: z.string().trim().min(1).max(120),
           partie: z.number().int().min(1).max(100).optional(),
-          lignes: z.array(lineSchema).min(1).max(1500),
+          derniere_partie: z.boolean().default(true),
+          facture_a_traiter_id: id.optional(),
+          lignes: z.array(lineSchema.omit({ quantite: true, montant_ligne: true })).min(1).max(400),
         }),
         args,
       );
+      if (a.facture_a_traiter_id && !(await getPendingInvoice(a.facture_a_traiter_id))) {
+        throw new Error(`document à traiter ${a.facture_a_traiter_id} introuvable (déjà enregistré ou supprimé ? voir lister_factures_a_traiter)`);
+      }
+      const nom = a.nom.replace(/^mercuriale\s+/i, "");
       const summary = await recordPurchaseOrder({
         supplier: a.fournisseur,
         date: a.date,
         manual: true,
         keepFamily: true,
-        note: `Mercuriale${a.nom ? ` « ${a.nom} »` : ""}${a.partie ? ` (partie ${a.partie})` : ""} envoyée à Claude`,
-        lines: a.lignes.map(toLine),
+        // La note distingue chaque partie : renvoyer une partie la remplace, sans toucher aux autres.
+        note: `Mercuriale importée (${nom}${a.partie ? `, partie ${a.partie}` : ""})`,
+        lines: a.lignes.map((l) => ({
+          product: l.produit,
+          reference: l.reference,
+          article: l.article,
+          family: l.famille,
+          packSize: l.contenance,
+          unit: l.unite_prix,
+          unitPrice: l.prix_unitaire,
+          packPrice: l.prix_colis,
+          ingredient: l.ingredient,
+          packName: l.conditionnement,
+        })),
       });
+      const joint = a.facture_a_traiter_id && a.derniere_partie ? await finishPendingInvoice(a.facture_a_traiter_id, summary.facture_id) : undefined;
       refresh();
-      const { facture_id, ...rest } = summary;
-      return text({ ...rest, mercuriale_id: facture_id, voir: `/fournisseurs` });
+      const { facture_id, total: _total, ...reste } = summary;
+      return text({
+        mercuriale_id: facture_id,
+        partie: a.partie ?? 1,
+        lignes_envoyees: a.lignes.length,
+        ...reste,
+        voir: `/fournisseurs/${(await prisma.supplier.findFirst({ where: { name: { equals: summary.fournisseur, mode: "insensitive" } }, select: { id: true } }))?.id ?? ""}`,
+        ...(joint === undefined ? {} : { fichier_joint: joint }),
+      });
     },
   },
 
@@ -260,27 +298,42 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     description:
       "Renvoie les photos (ou le PDF) d'une facture à traiter pour que tu la lises. Recopie ensuite CHAQUE ligne avec enregistrer_facture (facture_a_traiter_id = cet id), en suivant ses règles : " +
       "avant d'enregistrer, regarde les articles déjà utilisés (comparer_prix_fournisseurs, voir_fournisseur) et REGROUPE les produits proches sous l'article existant, même orthographe (« Fraise Espagne » et « Fraise France » → article « Fraise » ; tomates, citrons verts… idem), " +
-      "sauf ce qui change la recette, comme le chocolat qui se distingue par son % (« Chocolat noir 64 % »). En cas de doute entre deux articles, demande à l'utilisateur. Si une page est illisible, dis-le plutôt que de deviner.",
+      "sauf ce qui change la recette, comme le chocolat qui se distingue par son % (« Chocolat noir 64 % »). En cas de doute entre deux articles, demande à l'utilisateur. Si une page est illisible, dis-le plutôt que de deviner. " +
+      "PDF numérique (mercuriale, facture reçue par e-mail) : son texte est rendu page par page (texte_pdf), exact au centime, et le fichier n'est pas renvoyé (fichier=true pour l'avoir quand même) ; un PDF scanné n'a pas de texte, le fichier est alors renvoyé. " +
+      "Une mercuriale (liste de prix, pas une facture) s'enregistre avec enregistrer_mercuriale, pas avec enregistrer_facture.",
     inputSchema: {
       type: "object",
-      properties: { id: js.int("Id de la facture à traiter (lister_factures_a_traiter)") },
+      properties: {
+        id: js.int("Id de la facture à traiter (lister_factures_a_traiter)"),
+        fichier: js.bool("true pour recevoir aussi le PDF même quand son texte est lisible"),
+      },
       required: ["id"],
     },
     annotations: READ,
     run: async (args) => {
-      const a = parseArgs(z.object({ id }), args);
+      const a = parseArgs(z.object({ id, fichier: z.boolean().default(false) }), args);
       const f = await getPendingInvoice(a.id);
       if (!f) throw new Error("facture à traiter introuvable (déjà enregistrée ou supprimée ?)");
       const pages: McpToolResult["content"] = [];
+      const textes: { page: number; texte: string }[] = [];
+      let pagesPdf = 0;
       for (let i = 1; i <= f.pages; i++) {
         const p = await readPendingPage(f.id, i);
         if (!p) continue;
-        pages.push(
-          p.type === "application/pdf"
-            ? { type: "resource", resource: { uri: `recipelog://factures-a-traiter/${f.id}.pdf`, mimeType: p.type, blob: p.bytes.toString("base64") } }
-            : { type: "image", data: p.bytes.toString("base64"), mimeType: p.type },
-        );
+        if (p.type !== "application/pdf") {
+          pages.push({ type: "image", data: p.bytes.toString("base64"), mimeType: p.type });
+          continue;
+        }
+        // PDF numérique : on lit son texte (prix exacts, léger à envoyer) ; un scan n'en a pas.
+        const lu = await texteDuPdf(p.bytes).catch(() => null);
+        pagesPdf = lu?.pages ?? 0;
+        const avecTexte = lu?.lues.filter((x) => x.texte.trim().length > 20) ?? [];
+        textes.push(...avecTexte);
+        if (a.fichier || !lu || avecTexte.length < lu.lues.length) {
+          pages.push({ type: "resource", resource: { uri: `recipelog://factures-a-traiter/${f.id}.pdf`, mimeType: p.type, blob: p.bytes.toString("base64") } });
+        }
       }
+      const texteVide = pagesPdf > 0 && textes.length === 0;
       return {
         content: [
           {
@@ -288,11 +341,19 @@ export const SUPPLIER_TOOLS: McpTool[] = [
             text: JSON.stringify(
               {
                 id: f.id,
-                pages: f.pages,
-                pages_lisibles: pages.length,
+                pages: pagesPdf || f.pages,
+                pages_lisibles: pages.length + (textes.length ? 1 : 0),
                 remarque: f.note,
                 ajoutee_le: f.createdAt,
-                ensuite: `enregistrer_facture avec facture_a_traiter_id: ${f.id}`,
+                ensuite: `enregistrer_facture (ou enregistrer_mercuriale pour une liste de prix) avec facture_a_traiter_id: ${f.id}`,
+                ...(textes.length
+                  ? {
+                      texte_pdf: textes,
+                      lecture:
+                        "Texte du PDF page par page, les colonnes séparées par « | ». Recopie CHAQUE produit et son prix, page après page, sans en sauter : compte les produits de chaque page et vérifie le total à la fin.",
+                    }
+                  : {}),
+                ...(texteVide ? { lecture: "PDF scanné (sans texte) : lis le fichier joint." } : {}),
               },
               null,
               2,
