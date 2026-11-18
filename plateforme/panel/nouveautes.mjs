@@ -11,7 +11,7 @@
 // org.opencontainers.image.revision mise par GitHub Actions), celle de la vitrine dans
 // vitrine/code/.commit (écrit par « recipelog-instance vitrine maj »).
 //
-// Rien n'est jamais installé tout seul : on affiche et on prévient (Telegram, Discord, email,
+// Rien n'est jamais installé tout seul : on affiche et on prévient (Discord par BotPanel, cloche du panel,
 // les canaux réglés pour les alertes), une seule fois par nouvelle version.
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
@@ -250,7 +250,7 @@ const NOMS = { instance: "Standard", "beta-instance": "Bêta", plateforme: "Anci
 const liste = (ch) => ch.slice(0, 5).map((c) => `  • ${c.titre}`).join("\n");
 
 // Vérifie maintenant. entree() rend { clients, vitrine, plateforme } (lu au dernier moment).
-// alerter(titre, texte) : celui de surveillance.mjs. Une seule alerte par nouvelle version.
+// alerter(type, titre, texte) : celui de surveillance.mjs. Une seule alerte par nouvelle version.
 export async function verifier(entree, alerter) {
   const e0 = await entree();
   const canaux = [...new Set(["instance", "beta-instance", ...e0.clients.map((c) => c.canal)])].filter((c) => BRANCHE_CANAL[c]);
@@ -281,12 +281,12 @@ export async function verifier(entree, alerter) {
   if (morceaux.length) {
     // Même alerte coupée, on retient ce qui a été vu : la rallumer ne renvoie pas les vieilles versions.
     await ecrireJson("prevenu.json", nouveau).catch(() => {});
-    if (r.alerte) {
-      envoi = await alerter(
-        "🆕 Mise à jour disponible",
-        `${morceaux.join("\n\n")}\n\nRien n'est installé tout seul : c'est toi qui lances la mise à jour depuis le panel (Accueil → Mises à jour).`,
-      );
-    }
+    // Coupé ou non : réglé dans le panel, Notifications → Réglages (type « Nouvelle version »).
+    envoi = await alerter(
+      "maj",
+      "🆕 Mise à jour disponible",
+      `${morceaux.join("\n\n")}\n\nRien n'est installé tout seul : c'est toi qui lances la mise à jour depuis le panel (Accueil → Mises à jour).`,
+    );
   }
   return { ...r, prevenu: morceaux.length, envoi };
 }

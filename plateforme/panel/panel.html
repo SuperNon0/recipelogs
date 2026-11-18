@@ -17,6 +17,7 @@
     <a class="side-it" href="#accueil" data-nav="accueil"><svg class="ic s18"><use href="/icones.svg#i-home"/></svg>Accueil<span class="n" data-badge="accueil"></span></a>
     <a class="side-it" href="#clients" data-nav="clients"><svg class="ic s18"><use href="/icones.svg#i-users"/></svg>Clients<span class="n" data-badge="clients"></span></a>
     <a class="side-it" href="#support" data-nav="support"><svg class="ic s18"><use href="/icones.svg#i-chat"/></svg>Support<span class="n" data-badge="support"></span></a>
+    <a class="side-it" href="#notifications" data-nav="notifications"><svg class="ic s18"><use href="/icones.svg#i-bell"/></svg>Notifications<span class="n" data-badge="notifs"></span></a>
     <a class="side-it" href="#maintenance" data-nav="maintenance"><svg class="ic s18"><use href="/icones.svg#i-wrench"/></svg>Maintenance et messages</a>
     <p class="side-g">Vente</p>
     <a class="side-it" href="#vitrine" data-nav="vitrine"><svg class="ic s18"><use href="/icones.svg#i-compass"/></svg>Site vitrine<span class="n" data-badge="vitrine"></span></a>
@@ -37,7 +38,7 @@
     <!-- Barre du haut (téléphone et tablette) -->
     <header class="top">
       <a class="wm" href="#accueil">Recipe<b>Log</b><small>admin</small></a>
-      <div class="droite"><button class="ib" type="button" data-apparence aria-label="Apparence"><svg class="ic s18"><use href="/icones.svg#i-palette"/></svg></button></div>
+      <div class="droite"><a class="ib cloche" href="#notifications" aria-label="Notifications"><svg class="ic s18"><use href="/icones.svg#i-bell"/></svg><span class="n" data-badge="notifs"></span></a><button class="ib" type="button" data-apparence aria-label="Apparence"><svg class="ic s18"><use href="/icones.svg#i-palette"/></svg></button></div>
     </header>
 
     <main class="pages">
@@ -84,6 +85,13 @@
       <section class="page" data-page="support">
         <div class="tete-page"><h1>Support</h1></div>
         <section class="support" id="support"><div class="vide">Chargement…</div></section>
+      </section>
+
+      <!-- ============================================ Notifications (pour toi : Discord + ici) -->
+      <section class="page" data-page="notifications">
+        <div class="tete-page"><h1>Notifications</h1><button class="aide" type="button" data-aide="a-notifs" aria-label="Aide sur les notifications">?</button></div>
+        <p class="texte-aide" id="a-notifs">Tout ce que la plateforme a à te dire : site en panne, sauvegarde ratée, nouvelle demande de support ou sur la vitrine, fin d'essai, nouvelle version… Chaque notification arrive ici (la cloche) et sur ton Discord par BotPanel. Plus aucun email ne t'est envoyé : ton quota d'emails reste pour tes clients. « Réglages » : l'adresse de BotPanel, et pour chaque sorte de notification, si elle part sur Discord et si elle est gardée ici.</p>
+        <section class="notifs" id="notifs"><div class="vide">Chargement…</div></section>
       </section>
 
       <!-- ============================================ Maintenance et messages -->

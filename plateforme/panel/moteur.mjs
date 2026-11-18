@@ -8,6 +8,7 @@ import { appendFile, chown, mkdir, readFile, readdir, rename, stat, writeFile } 
 import { timingSafeEqual, randomBytes } from "node:crypto";
 import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJour, taille, verifier } from "./surveillance.mjs";
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
+import { RefusNotif, marquer as marquerNotifs, regler as reglerNotifs, resume as resumeNotifs, vider as viderNotifs } from "./notifications.mjs";
 import { RefusIA, reglerCle, reglerFactures, reglerQuota, resume as resumeIA } from "./ia.mjs";
 import { RefusVente, lire as lireVente, manques as manquesVente, regler as reglerVente } from "./vente.mjs";
 import { demarrer as demarrerPlateforme, etat as etatPlateforme, oublierNouveautes } from "./plateforme.mjs";
@@ -395,7 +396,7 @@ async function sante() {
     clients,
     services: etatCourant(),
     disponibilite: await disponibilites(30),
-    alertes: canauxAlerte(),
+    alertes: await canauxAlerte(),
   };
   santeCache = { valeur, jusqua: Date.now() + 60000 };
   return valeur;
@@ -833,13 +834,37 @@ createServer(async (req, res) => {
     if (req.method === "POST" && morceaux[0] === "support" && morceaux.length === 4) {
       return repondre(res, 200, await actionTicket(qui, morceaux[1], morceaux[2], morceaux[3], await lireCorps(req)));
     }
-    if (req.method === "POST" && url.pathname === "/alertes/essai") {
-      const r = await alerter("🔔 Essai d'alerte RecipeLog", `Envoyé depuis le panel par ${qui}. Si tu lis ceci, les alertes marchent.`);
-      const noms = { telegram: "Telegram", discord: "Discord", email: "Email" };
-      const lignes = Object.entries(r.canaux).map(([k, v]) => `${noms[k]} : ${v === null ? "pas réglé" : v === true ? "envoyé ✅" : `échec ❌ (${v})`}`);
-      if (!r.ok) lignes.push("Aucun canal n'a marché (voir A-FAIRE.md, étape F).");
-      await noter(qui, "alerte-essai", "-", { ok: r.ok, sortie: lignes.join("\n") });
-      return repondre(res, r.ok ? 200 : 500, { ok: r.ok, canaux: r.canaux, sortie: lignes.join("\n") });
+    if (req.method === "POST" && (url.pathname === "/alertes/essai" || url.pathname === "/notifications/essai")) {
+      const r = await alerter("test", "🔔 Essai de notification RecipeLog", `Envoyé depuis le panel par ${qui}. Si tu lis ceci, les notifications marchent.`);
+      const discord = r.canaux.discord === null ? "pas réglé (mets l'adresse de BotPanel dans les réglages des notifications)" : r.canaux.discord === true ? "envoyé ✅" : `échec ❌ (${r.canaux.discord})`;
+      const lignes = [`Discord (BotPanel) : ${discord}`, `Panel : ${r.canaux.panel === true ? "ajoutée ✅" : "pas gardée"}`];
+      const ok = r.canaux.discord === true;
+      await noter(qui, "notification-essai", "-", { ok, sortie: lignes.join("\n") });
+      return repondre(res, 200, { ok, canaux: r.canaux, sortie: lignes.join("\n") });
+    }
+    if (req.method === "GET" && url.pathname === "/notifications") return repondre(res, 200, await resumeNotifs());
+    if (req.method === "POST" && url.pathname === "/notifications/reglages") {
+      let r;
+      try {
+        r = await reglerNotifs(await lireCorps(req));
+      } catch (e) {
+        if (e instanceof RefusNotif) throw new Refus(400, e.message);
+        throw e;
+      }
+      await noter(qui, "notifications-reglages", "plateforme", { ok: true, sortie: "" }, { botpanel: Boolean(r.botpanel), coupes: Object.entries(r.types).filter(([, t]) => !t.discord).map(([k]) => k) });
+      return repondre(res, 200, { ok: true, reglages: r });
+    }
+    if (req.method === "POST" && url.pathname === "/notifications/lu") {
+      try {
+        return repondre(res, 200, await marquerNotifs(await lireCorps(req)));
+      } catch (e) {
+        if (e instanceof RefusNotif) throw new Refus(400, e.message);
+        throw e;
+      }
+    }
+    if (req.method === "POST" && url.pathname === "/notifications/vider") {
+      await noter(qui, "notifications-vider", "plateforme", { ok: true, sortie: "" });
+      return repondre(res, 200, await viderNotifs());
     }
     if (req.method === "GET" && morceaux[0] === "clients" && morceaux[2] === "journaux" && morceaux.length === 3) {
       exiger(NOM_RE.test(morceaux[1]), "Nom de client invalide.");
@@ -908,7 +933,11 @@ createServer(async (req, res) => {
 // Toutes les heures : les essais terminés passent en pause.
 async function essais() {
   const r = await unParUn(() => outilLong(["verifier-essais"]), null, "fin des essais");
-  if (r.sortie) await noter("automatique", "fin-essai", "-", r);
+  if (r.sortie) {
+    await noter("automatique", "fin-essai", "-", r);
+    const finis = String(r.sortie).split("\n").map((l) => l.match(/Essai de (\S+) terminé le (\S+) :/)).filter(Boolean);
+    if (finis.length) void alerter("essai", "⏳ Fin d'essai", `${finis.map((m) => `${m[1]} (essai fini le ${m[2]})`).join(", ")} : site mis en pause. Panel → Clients pour le réactiver s'il s'abonne.`);
+  }
 }
 setTimeout(() => essais().catch((e) => console.error("Essais :", e.message)), 60 * 1000);
 setInterval(() => essais().catch((e) => console.error("Essais :", e.message)), 60 * 60 * 1000);
@@ -978,7 +1007,7 @@ async function tourPlanning() {
     await noter("automatique", "sauvegardes-nuit", "tous", { ok: !rates.length, sortie: lignes.join("\n") }, { essai: s.n });
     if (rates.length) {
       const suite = s.n < 3 ? "Nouvel essai dans une heure." : "Trois essais ratés cette nuit : regarde le journal du panel (souvent : disque plein).";
-      void alerter("🔴 Sauvegarde de la nuit ratée", `Pas sauvegardé : ${rates.map((n) => (n === PLATEFORME ? "la plateforme" : n)).join(", ")}. ${suite}`);
+      void alerter("sauvegarde", "🔴 Sauvegarde de la nuit ratée", `Pas sauvegardé : ${rates.map((n) => (n === PLATEFORME ? "la plateforme" : n)).join(", ")}. ${suite}`);
     }
   }
 
@@ -993,7 +1022,7 @@ async function tourPlanning() {
     }
     if (vieux.length) {
       await noter("automatique", "sauvegardes-controle", "tous", { ok: false, sortie: `Pas de sauvegarde depuis plus de 36 heures : ${vieux.join(", ")}.` });
-      void alerter("🔴 Clients sans sauvegarde récente", `Pas de sauvegarde depuis plus de 36 heures : ${vieux.join(", ")}. Regarde le journal du panel.`);
+      void alerter("sauvegarde", "🔴 Clients sans sauvegarde récente", `Pas de sauvegarde depuis plus de 36 heures : ${vieux.join(", ")}. Regarde le journal du panel.`);
     }
   }
 
@@ -1010,7 +1039,7 @@ async function tourPlanning() {
     const demos = (await clientsBruts()).filter((c) => c.demo).map((c) => c.nom);
     const r = await unParUn(() => outilLong(["demo-remettre", "--toutes"]), demos, "remise à zéro des démos");
     if (r.sortie) await noter("automatique", "demo-remettre", "démos", r);
-    if (!r.ok) void alerter("⚠️ Démo non remise à zéro", fin(r));
+    if (!r.ok) void alerter("demo", "⚠️ Démo non remise à zéro", fin(r));
   }
 
   // --- test de restauration de la semaine
@@ -1030,7 +1059,7 @@ async function tourPlanning() {
       }
     }
     await noter("automatique", "test-sauvegardes", "tous", { ok: !rates.length, sortie: lignes.join("\n") });
-    if (rates.length) void alerter("🔴 Test de restauration raté", `Ces sauvegardes ne se restaurent pas : ${rates.join(", ")}. Regarde le journal du panel.`);
+    if (rates.length) void alerter("sauvegarde", "🔴 Test de restauration raté", `Ces sauvegardes ne se restaurent pas : ${rates.join(", ")}. Regarde le journal du panel.`);
   }
 }
 // Un seul tour à la fois : des sauvegardes longues (plus de 5 minutes) ne se chevauchent pas.
@@ -1052,6 +1081,9 @@ setInterval(planning, 5 * 60 * 1000);
 // Chaque minute : chaque site et service est-il en forme ? Nouvelles demandes de support ?
 const ticketsVus = new Set();
 let ticketsInitialises = false;
+const demandesVues = new Set();
+let demandesInitialisees = false;
+let vitrineVueA = 0;
 let surveillanceEnCours = false;
 async function surveiller() {
   if (surveillanceEnCours) return;
@@ -1075,11 +1107,27 @@ async function surveiller() {
       ticketsVus.add(`${t.id}:${t.messages.length}`);
       if (!ticketsInitialises) continue; // au démarrage : pas de rafale pour les anciennes
       const dernier = t.messages.at(-1);
-      void alerter(`📩 ${t.messages.length > 1 ? "Nouveau message" : "Nouvelle demande"} de ${t.client}`, `${t.email} : ${String(dernier?.texte ?? "").slice(0, 300)}`);
+      void alerter("support", `📩 ${t.messages.length > 1 ? "Nouveau message" : "Nouvelle demande"} de ${t.client}`, `${t.email} : ${String(dernier?.texte ?? "").slice(0, 300)}`);
     }
     ticketsInitialises = true;
   } catch (e) {
     console.error("Support :", e.message);
+  }
+  // Toutes les 5 minutes : nouvelles demandes reçues par le formulaire de la vitrine.
+  if (Date.now() - vitrineVueA >= 5 * 60 * 1000) {
+    vitrineVueA = Date.now();
+    try {
+      const v = await vitrine();
+      for (const d of v.demandes.filter((x) => !x.traitee && !demandesVues.has(x.cle))) {
+        demandesVues.add(d.cle);
+        if (!demandesInitialisees) continue; // au démarrage : pas de rafale pour les anciennes
+        const qui = [d.nom, d.etab, d.email].filter(Boolean).join(" · ");
+        void alerter("vitrine", "🌐 Nouvelle demande sur la vitrine", `${qui}${d.msg ? ` : ${String(d.msg).slice(0, 300)}` : ""}\nPanel → Site vitrine pour créer le client.`);
+      }
+      demandesInitialisees = true;
+    } catch (e) {
+      console.error("Vitrine :", e.message);
+    }
   }
   surveillanceEnCours = false;
 }
