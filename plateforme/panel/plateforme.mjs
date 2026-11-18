@@ -65,12 +65,13 @@ export async function etat() {
   const version = await lireJson("version.json");
   let maj = await lireJson("etat.json");
   if (maj?.etat === "en-cours" && Date.now() - Date.parse(maj.debut) > DUREE_MAX) maj = { ...maj, etat: "fini", ok: false, interrompue: true };
-  let journal = "";
+  let complet = "";
   try {
-    journal = (await readFile(`${DOSSIER}/journal.txt`, "utf8")).replace(/\x1b\[[0-9;]*m/g, "").split("\n").slice(-80).join("\n");
+    complet = (await readFile(`${DOSSIER}/journal.txt`, "utf8")).replace(/\x1b\[[0-9;]*m/g, "").replace(/\r/g, "");
   } catch {
-    journal = "";
+    complet = "";
   }
+  const journal = complet.split("\n").slice(-300).join("\n");
   // Numéro lisible (P1.0.<dernière PR>) et dernières PR installées, demandés une fois par version.
   const h = version ? await historique(version.commit).catch(() => null) : null;
   return {
@@ -79,8 +80,60 @@ export async function etat() {
       : null,
     maj,
     journal,
+    avancement: avancement(complet, maj),
     nouveautes: version ? await chercherNouveautes(version) : null,
   };
+}
+
+// Les grandes étapes de la console du panel, lues dans tout le journal d'install.sh (ses
+// lignes « ==> … ») : on garde l'avancement même quand le début du journal n'est plus affiché.
+export const ETAPES = [
+  { id: "telechargement", nom: "Téléchargement de la nouvelle version" },
+  { id: "preparation", nom: "Préparation des réglages" },
+  { id: "construction", nom: "Construction du panel et des outils" },
+  { id: "redemarrage", nom: "Redémarrage des services" },
+  { id: "connexion", nom: "Vérification de la connexion" },
+];
+const REPERES = [
+  [/Téléchargement d'install|Paquets de base|Mémoire d'échange|Installation de Docker|Pare-feu|Fichiers de la plateforme/, 0],
+  [/Réglages (écrits|existants)|Version par défaut|Démarrage de PostgreSQL|Site vitrine/, 1],
+  [/Démarrage de Traefik|Redémarrage des services/, 2],
+  [/Attente d'Authentik|Attente de la connexion|Page de connexion|super-admin|Accès du panel|Se connecter|Client de test/, 4],
+];
+// Lignes de Docker Compose quand il (re)lance les conteneurs, après la construction.
+const CONTENEUR = /^\s*Container \S+\s+(Recreate|Recreated|Creating|Created|Starting|Started|Stopping|Stopped|Waiting|Healthy|Running)\b/;
+
+export function avancement(texte, maj) {
+  const lignes = String(texte ?? "").split("\n");
+  let etape = 0;
+  let detail = "";
+  let relances = 0;
+  const alertes = [];
+  for (const brute of lignes) {
+    const l = brute.trim();
+    if (!l) continue;
+    if (l.startsWith("==> ")) {
+      const r = REPERES.find(([re]) => re.test(l));
+      if (r && r[1] >= etape) etape = r[1];
+      detail = l.slice(4).replace(/…$/, "").replace(/^✅\s*/, "");
+      continue;
+    }
+    if (/^(⚠️|❌)/.test(l)) {
+      alertes.push(l.replace(/^(⚠️|❌)\s*/, ""));
+      continue;
+    }
+    if (etape === 2 || etape === 3) {
+      const b = /^#\d+ \[([\w.-]+) (\d+)\/(\d+)\]/.exec(l);
+      if (b && etape === 2) detail = `${b[1]} : étape ${b[2]} sur ${b[3]}`;
+      if (CONTENEUR.test(l)) {
+        etape = 3;
+        if (/Recreate|Started|Created/.test(l)) relances += 1;
+        detail = `Service ${l.replace(/^\s*Container\s+/, "").replace(/^recipelog-/, "").split(/\s+/)[0]}`;
+      }
+    }
+  }
+  const fini = maj?.etat === "fini";
+  return { etapes: ETAPES, etape: fini && maj.ok ? ETAPES.length : etape, detail, relances, alertes: alertes.slice(-6) };
 }
 
 // Script lancé sur la machine (en root, hors de Docker). Variables : B (branche), D (dossier).
