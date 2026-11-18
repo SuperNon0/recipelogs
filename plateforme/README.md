@@ -218,8 +218,10 @@ D'où vient l'IA (Réglages → **Lecture des factures par IA**, réservé à l'
   panel, partie **Lecture des factures par IA** : lectures du mois de chaque client, coût
   estimé, et le nombre de lectures par mois (30 par défaut, un nombre à part par client,
   0 = coupé). Le compteur revient à zéro le 1er du mois.
-- **Sa propre clé** : Claude, ChatGPT ou Gemini. Le client paie son fournisseur d'IA, sans
-  limite, et ça ne passe pas par toi.
+- Pas de clé d'IA du client sur la plateforme pour l'instant.
+- **Analyse des documents** (même fenêtre « Régler ») : IA seulement, Claude (MCP) seulement,
+  les deux, ou aucun. « IA seulement » et « Aucun » coupent aussi l'accès MCP du client ;
+  « Claude (MCP) seulement » et « Aucun » coupent l'IA (aucune lecture relayée).
 
 Une lecture tourne en arrière-plan (20 s à 2 min) : pas de coupure Cloudflare au bout de
 100 s. Fichiers : `/srv/recipelog/ia/` (réglages écrits par le panel, compteurs par la passerelle).

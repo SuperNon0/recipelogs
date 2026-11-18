@@ -141,9 +141,10 @@ async function ecrireReglages(donnees, r) {
 
 /**
  * Comment le client fait lire ses factures et mercuriales : « ia » (IA de la plateforme),
- * « mcp » (Claude par le connecteur RecipeLog) ou « les-deux » (il choisit dans son RecipeLog).
+ * « mcp » (Claude par le connecteur RecipeLog), « les-deux » (il choisit dans son RecipeLog)
+ * ou « aucun » (ni l'un ni l'autre : saisie à la main). « ia » et « aucun » coupent aussi son accès MCP.
  */
-export const MODES_ANALYSE = ["les-deux", "ia", "mcp"];
+export const MODES_ANALYSE = ["les-deux", "ia", "mcp", "aucun"];
 
 /** Factures prises en photo (« Nouvelle facture ») : nombre en attente et pages par facture. null = suivre le défaut. */
 export async function reglerFactures(donnees, corps) {
@@ -160,7 +161,7 @@ export async function reglerFactures(donnees, corps) {
   if (client === "*" && (attente === null || pages === null)) throw new RefusIA("Donne les deux nombres par défaut.");
   // analyse absent : ne pas y toucher (ancien panel) ; null : suivre le défaut.
   const analyse = corps?.analyse;
-  if (analyse !== undefined && analyse !== null && !MODES_ANALYSE.includes(analyse)) throw new RefusIA("Analyse des documents : IA, Claude (MCP) ou les deux.");
+  if (analyse !== undefined && analyse !== null && !MODES_ANALYSE.includes(analyse)) throw new RefusIA("Analyse des documents : IA, Claude (MCP), les deux ou aucun.");
   if (client === "*" && analyse === null) throw new RefusIA("Choisis l'analyse des documents par défaut.");
   const r = await lire(`${dossier(donnees)}/reglages.json`, {});
   if (analyse !== undefined) {

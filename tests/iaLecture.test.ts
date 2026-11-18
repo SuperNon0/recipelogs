@@ -182,6 +182,9 @@ describe("lecture avec la clé de la plateforme", () => {
     const ia = await import("../plateforme/passerelle/ia.mjs");
     expect(await ia.quota("maison")).toMatchObject({ disponible: false, limite: 0, analyse: "mcp" });
     expect(await ia.quota("autre")).toMatchObject({ analyse: "les-deux" });
+    writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, analyse: { defaut: "aucun" } }));
+    expect(await ia.quota("autre")).toMatchObject({ disponible: false, limite: 0, analyse: "aucun" });
+    writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 }, analyse: { defaut: "les-deux", clients: { maison: "mcp" } } }));
     const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { anthropicBaseURL: urlRelais });
     expect(r).toMatchObject({ ok: false, code: "quota_ia" });
     writeFileSync(join(dossier, "reglages.json"), JSON.stringify({ defaut: 2, clients: { maison: 10 } }));
