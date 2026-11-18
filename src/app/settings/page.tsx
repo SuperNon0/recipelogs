@@ -162,8 +162,8 @@ export default async function SettingsPage() {
               <Row
                 href="/settings/ia"
                 icon={Sparkles}
-                title="Lecture des factures par IA"
-                sub="IA de RecipeLog ou ta propre clé (Claude, ChatGPT, Gemini) · photo ou PDF lu en lignes de prix"
+                title="Lecture des factures"
+                sub="Par l'IA ou par Claude (MCP) · factures et mercuriales lues en lignes de prix"
               />
             )}
           </div>

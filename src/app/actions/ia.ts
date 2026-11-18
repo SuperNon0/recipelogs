@@ -22,6 +22,7 @@ import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
 import { articleKey } from "@/lib/suppliers";
 import { lireTableur } from "@/lib/mercurialeFichier";
 import { finishPendingInvoice, pendingDocument, setPendingError } from "@/lib/pendingInvoices";
+import { modesAnalyse, savePrefere, type ModeAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
 
 /**
  * Lecture des factures et des mercuriales par IA (lot 7 de la plateforme).
@@ -64,10 +65,13 @@ export type EtatIA = {
 export async function etatLectureIA(): Promise<EtatIA> {
   await requireAccess("costs.edit");
   const r = await getReglagesIA();
-  if (r.mode === "off") return { mode: "off", prete: false, message: "La lecture par IA est coupée : un administrateur peut l'activer dans Réglages → Lecture des factures par IA.", quota: null };
+  if (r.mode === "off") return { mode: "off", prete: false, message: "La lecture par IA est coupée : un administrateur peut l'activer dans Réglages → Lecture des factures.", quota: null };
   if (r.mode === "cle") return { mode: "cle", prete: !!r.cle, message: r.cle ? null : "Aucune clé d'API enregistrée.", quota: null };
   const q = await getQuotaIA();
   if (!q.ok) return { mode: "plateforme", prete: false, message: q.message, quota: null };
+  if (q.quota.analyse === "mcp") {
+    return { mode: "plateforme", prete: false, message: "Ton offre lit les documents avec Claude (connecteur RecipeLog) : garde-les pour Claude.", quota: null };
+  }
   const { disponible, limite, utilise } = q.quota;
   if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog, ou mets ta propre clé d'IA dans les réglages.", quota: { limite, utilise } };
   if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois ; tu peux aussi mettre ta propre clé d'IA dans les réglages.`, quota: { limite, utilise } };
@@ -106,7 +110,7 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
     const fournisseurId = (attente ? attente.supplierId : null) ?? (Number(fd.get("fournisseurId")) || null);
 
     const reglages = await getReglagesIA();
-    if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures par IA)." };
+    if (reglages.mode === "off") return { ok: false, error: "La lecture par IA est coupée (Réglages → Lecture des factures)." };
     const [produits, fournisseur] = await Promise.all([
       prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 400 }),
       fournisseurId ? prisma.supplier.findUnique({ where: { id: fournisseurId }, select: { name: true } }) : null,
@@ -321,6 +325,26 @@ export async function lireReglagesIA(): Promise<InfosReglagesIA> {
     if (q.ok) quota = { disponible: q.quota.disponible, limite: q.quota.limite, utilise: q.quota.utilise };
   }
   return { reglages: r, quota };
+}
+
+/** Réglages → Lecture des factures : ce que le panel permet, et le mode préféré. */
+export async function lireModesAnalyse(): Promise<ModesAnalyse> {
+  await requireAccess("costs.edit");
+  return modesAnalyse();
+}
+
+export async function sauverModeAnalyse(prefere: ModeAnalyse): Promise<{ ok: true; modes: ModesAnalyse } | Erreur> {
+  await requireAccess("site.update");
+  try {
+    const m = await modesAnalyse();
+    if (prefere !== "ia" && prefere !== "mcp") return { ok: false, error: "Choisis l'IA ou Claude." };
+    if (!m[prefere]) return { ok: false, error: prefere === "ia" ? "La lecture par IA n'est pas comprise dans ton offre." : "Claude (MCP) n'est pas compris dans ton offre." };
+    await savePrefere(prefere);
+    refresh();
+    return { ok: true, modes: await modesAnalyse() };
+  } catch (e) {
+    return erreur(e);
+  }
 }
 
 export async function sauverReglagesIA(input: { mode: ModeIA; fournisseur: FournisseurIA; cle?: string; modele?: string }): Promise<{ ok: true; reglages: ReglagesIAPublic } | Erreur> {

@@ -1245,3 +1245,15 @@ a.sold-row:hover {
 .nf-tuile-large {
   grid-column: 1 / -1;
 }
+/* « Avec Claude, dis : … » au-dessus des documents à traiter. */
+.nf-claude {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.nf-claude svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--accent);
+}

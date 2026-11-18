@@ -7,12 +7,15 @@ import type { FournisseurIA, ModeIA, ReglagesIAPublic } from "@/lib/ia/reglages"
 
 type Infos = { id: FournisseurIA; nom: string; modele: string; ouObtenir: string };
 
-/** Réglages → Lecture des factures par IA : d'où vient l'IA, et la clé du client s'il met la sienne. */
+/** Réglages → Lecture des factures : d'où vient l'IA, et la clé du client s'il met la sienne. */
 export function AiSettings({
   initial,
   quota,
   fournisseurs,
+  iaPlateforme = true,
 }: {
+  /** false : l'offre ne comprend pas l'IA de RecipeLog (panel « Claude (MCP) seulement »), seule la clé du client reste. */
+  iaPlateforme?: boolean;
   initial: ReglagesIAPublic;
   quota: { disponible: boolean; limite: number; utilise: number } | null;
   fournisseurs: Infos[];
@@ -61,7 +64,7 @@ export function AiSettings({
             l&apos;IA » ne marche plus ; l&apos;import Excel et CSV des mercuriales marche toujours.
           </Help>
         </legend>
-        {r.plateforme && (
+        {r.plateforme && (iaPlateforme || mode === "plateforme") && (
           <label className="ia-mode">
             <input type="radio" name="mode" checked={mode === "plateforme"} onChange={() => setMode("plateforme")} />
             <span>

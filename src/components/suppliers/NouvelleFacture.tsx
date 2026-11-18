@@ -8,6 +8,7 @@ import { Help } from "@/components/ui/Help";
 import { AiReaderModal, type FactureATraiter } from "./AiReader";
 import { estPdf, preparerPhoto } from "@/lib/photoFacture";
 import type { PendingInvoiceItem } from "@/lib/pendingInvoices";
+import type { ModesAnalyse } from "@/lib/ia/analyse";
 import {
   ajouterFactureATraiter,
   etatNouvelleFacture,
@@ -19,8 +20,8 @@ import {
  * Bouton « Nouvelle facture » de la page Factures, pensé pour le téléphone :
  * 1. prendre la facture en photo (ou la choisir dans la galerie, ou un PDF) ;
  * 2. le site la garde ;
- * 3. « Enregistrer et analyser » (l'IA la lit tout de suite, on vérifie les
- *    lignes) ou « Enregistrer seulement » (elle reste « à traiter », pour la
+ * 3. « Analyser par l'IA » (l'IA la lit tout de suite, on vérifie les
+ *    lignes) ou « Garder pour Claude » (elle reste « à traiter », pour la
  *    lire plus tard ou la faire remplir par Claude).
  */
 
@@ -29,8 +30,8 @@ type Fournisseur = { id: number; name: string };
 
 /**
  * « Importer une mercuriale » (fiche d'un fournisseur) : la même fenêtre que
- * « Nouvelle facture » — photo, galerie ou PDF, puis « Enregistrer et
- * analyser » (IA) ou « Enregistrer pour Claude » (elle attend dans « À
+ * « Nouvelle facture » — photo, galerie ou PDF, puis « Analyser par
+ * l'IA » ou « Garder pour Claude (MCP) » (elle attend dans « À
  * traiter » et Claude la remplit par le connecteur RecipeLog). Un tableau
  * Excel ou CSV est toujours lu directement, sans IA.
  */
@@ -179,13 +180,17 @@ function NouvelleFactureModal({
           <strong>{merc ? "Mercuriale gardée dans « À traiter »." : "Facture gardée dans « À traiter »."}</strong>
           {merc ? (
             <span className="sub">
-              Dis maintenant à Claude (connecteur RecipeLog) : « analyse ma mercuriale {fournisseur?.name ?? ""} à traiter ». Il lit chaque page
-              et enregistre les prix. Tu peux aussi la faire lire par l&apos;IA plus tard, depuis la fiche du fournisseur.
+              {etat?.modes.mcp === false
+                ? "Tu pourras la faire lire par l'IA plus tard, depuis la fiche du fournisseur."
+                : `Dis maintenant à Claude (connecteur RecipeLog) : « analyse ma mercuriale ${fournisseur?.name ?? ""} à traiter ». Il lit chaque page et enregistre les prix.`}
+              {etat?.modes.mcp && etat.modes.ia ? " Tu peux aussi la faire lire par l'IA plus tard, depuis la fiche du fournisseur." : ""}
             </span>
           ) : (
             <span className="sub">
-              Tu pourras la faire lire par l&apos;IA plus tard depuis la page Factures, ou demander à Claude de la remplir (« remplis mes factures
-              à traiter »).
+              {etat?.modes.mcp
+                ? "Dis maintenant à Claude (connecteur RecipeLog) : « remplis mes factures à traiter ». Il la lit et enregistre chaque ligne."
+                : "Tu pourras la faire lire par l'IA plus tard, depuis la page Factures."}
+              {etat?.modes.mcp && etat.modes.ia ? " Tu peux aussi la faire lire par l'IA plus tard, depuis la page Factures." : ""}
             </span>
           )}
           <button type="button" className="fl-btn fl-btn-primary" onClick={onClose}>Fermer</button>
@@ -224,9 +229,9 @@ function NouvelleFactureModal({
           <>
             <p className="sub" style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
               Scanne la mercuriale (une photo par page), choisis son PDF, ou un tableau Excel.
-              <Help title="Importer une mercuriale" example="La mercuriale Soframa de 13 pages reçue par e-mail : « Choisir un PDF ou des photos », puis « Enregistrer pour Claude ».">
-                Photo ou PDF : le site la garde, puis tu choisis « Enregistrer et analyser » (l&apos;IA lit les prix tout de suite) ou
-                « Enregistrer pour Claude » (elle attend dans « À traiter » et tu demandes à Claude de la remplir). Une photo par page, jusqu&apos;à{" "}
+              <Help title="Importer une mercuriale" example="La mercuriale Soframa de 13 pages reçue par e-mail : « Choisir un PDF ou des photos », puis « Garder pour Claude ».">
+                Photo ou PDF : le site la garde, puis tu choisis « Analyser par l&apos;IA » (l&apos;IA lit les prix tout de suite) ou
+                « Garder pour Claude (MCP) » (elle attend dans « À traiter » et tu demandes à Claude de la remplir). Une photo par page, jusqu&apos;à{" "}
                 {maxPages} pages. Excel ou CSV : lu directement par le site, sans IA ; tu choisis les colonnes puis tu vérifies.
               </Help>
             </p>
@@ -318,45 +323,80 @@ function NouvelleFactureModal({
               />
             </label>
 
-            <div className="nf-actions">
-              <span className="fl-label" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                Que faire de {merc ? "cette mercuriale" : "cette facture"} ?
-                {merc ? (
-                  <Help title="Analyser ou enregistrer pour Claude ?">
-                    « Enregistrer et analyser » : l&apos;IA lit les prix tout de suite, puis tu les vérifies avant qu&apos;ils soient enregistrés.
-                    « Enregistrer pour Claude » : la mercuriale attend dans « À traiter », sur la fiche du fournisseur. Ensuite, dis à Claude
-                    (connecteur RecipeLog) « analyse ma mercuriale à traiter » : il la lit page par page et enregistre chaque prix, sans
-                    utiliser tes lectures par IA.
-                  </Help>
-                ) : (
-                <Help title="Analyser ou enregistrer seulement ?">
-                  « Enregistrer et analyser » : l&apos;IA lit la facture tout de suite, puis tu vérifies chaque ligne avant qu&apos;elle soit
-                  enregistrée. « Enregistrer seulement » : elle attend dans « À traiter », en haut de la page Factures. Tu pourras la faire lire
-                  plus tard, ou demander à Claude (connecteur RecipeLog) de la remplir. Dans les deux cas, la photo est gardée et sera jointe à la
-                  facture.
-                </Help>
-                )}
-              </span>
-              <button type="button" className="fl-btn fl-btn-primary" disabled={!!occupe || !iaPrete} onClick={() => enregistrer(true)}>
-                {occupe === "analyser" ? <Loader2 size={15} className="ia-tourne" /> : <Sparkles size={15} />}
-                Enregistrer et analyser
-              </button>
-              <button type="button" className="fl-btn fl-btn-secondary" disabled={!!occupe} onClick={() => enregistrer(false)}>
-                {occupe === "garder" ? <Loader2 size={15} className="ia-tourne" /> : merc ? <MessageSquare size={15} /> : <Save size={15} />}
-                {merc ? "Enregistrer pour Claude" : "Enregistrer seulement"}
-              </button>
-              {etat && !iaPrete && <p className="ia-etat" data-ok="false">{etat.ia.message}</p>}
-              {etat && iaPrete && etat.ia.mode === "plateforme" && etat.ia.quota && (
-                <p className="ia-etat" data-ok="true">
-                  {Math.max(0, etat.ia.quota.limite - etat.ia.quota.utilise)} lecture(s) par IA restante(s) ce mois-ci.
-                </p>
-              )}
-            </div>
+            <ChoixAnalyse etat={etat} merc={merc} occupe={occupe} iaPrete={iaPrete} onEnregistrer={enregistrer} />
           </>
         )}
         {erreur && <span className="ing-fact-msg" data-err="true">{erreur}</span>}
       </div>
     </ModalOverlay>
+  );
+}
+
+/**
+ * « Analyser par l'IA » ou « Garder pour Claude » : seulement ce que l'offre
+ * permet (panel), le mode préféré (Réglages → Lecture des factures) en premier.
+ */
+function ChoixAnalyse({
+  etat, merc, occupe, iaPrete, onEnregistrer,
+}: {
+  etat: EtatNouvelleFacture | null;
+  merc: boolean;
+  occupe: "analyser" | "garder" | null;
+  iaPrete: boolean;
+  onEnregistrer: (analyser: boolean) => void;
+}) {
+  const modes = etat?.modes ?? { panel: "les-deux", ia: true, mcp: true, prefere: "ia" as const };
+  const doc = merc ? "la mercuriale" : "la facture";
+  const ou = merc ? "sur la fiche du fournisseur" : "en haut de la page Factures";
+  const boutonIA = modes.ia && (
+    <button
+      key="ia"
+      type="button"
+      className={`fl-btn ${modes.prefere === "ia" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+      disabled={!!occupe || !iaPrete}
+      onClick={() => onEnregistrer(true)}
+    >
+      {occupe === "analyser" ? <Loader2 size={15} className="ia-tourne" /> : <Sparkles size={15} />}
+      Analyser par l&apos;IA
+    </button>
+  );
+  const boutonGarder = (
+    <button
+      key="garder"
+      type="button"
+      className={`fl-btn ${modes.mcp && modes.prefere === "mcp" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+      disabled={!!occupe}
+      onClick={() => onEnregistrer(false)}
+    >
+      {occupe === "garder" ? <Loader2 size={15} className="ia-tourne" /> : modes.mcp ? <MessageSquare size={15} /> : <Save size={15} />}
+      {modes.mcp ? "Garder pour Claude (MCP)" : "Garder pour plus tard"}
+    </button>
+  );
+  return (
+    <div className="nf-actions">
+      <span className="fl-label" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        Que faire de {merc ? "cette mercuriale" : "cette facture"} ?
+        <Help title="Analyser par l'IA ou garder pour Claude ?">
+          {modes.ia && <>« Analyser par l&apos;IA » : l&apos;IA lit {doc} tout de suite, puis tu vérifies chaque ligne avant qu&apos;elle soit enregistrée. </>}
+          {modes.mcp ? (
+            <>
+              « Garder pour Claude (MCP) » : {doc} attend dans « À traiter », {ou}. Ensuite, dis à Claude (connecteur RecipeLog)
+              « {merc ? "analyse ma mercuriale à traiter" : "remplis mes factures à traiter"} » : il la lit et enregistre chaque ligne, sans
+              utiliser de lecture par IA.{" "}
+            </>
+          ) : (
+            <>« Garder pour plus tard » : {doc} attend dans « À traiter », {ou}, pour la faire lire par l&apos;IA quand tu veux. </>
+          )}
+          {modes.ia && modes.mcp && <>Le bouton mis en avant se choisit dans Réglages → Lecture des factures. </>}
+          Dans tous les cas, {merc ? "le fichier est gardé" : "la photo est gardée et sera jointe à la facture"}.
+        </Help>
+      </span>
+      {modes.prefere === "mcp" ? [boutonGarder, boutonIA] : [boutonIA, boutonGarder]}
+      {etat && modes.ia && !iaPrete && <p className="ia-etat" data-ok="false">{etat.ia.message}</p>}
+      {etat && modes.ia && iaPrete && etat.ia.mode === "plateforme" && etat.ia.quota && (
+        <p className="ia-etat" data-ok="true">{Math.max(0, etat.ia.quota.limite - etat.ia.quota.utilise)} lecture(s) par IA restante(s) ce mois-ci.</p>
+      )}
+    </div>
   );
 }
 
@@ -366,10 +406,11 @@ function NouvelleFactureModal({
 
 /** fournisseur : liste des mercuriales à traiter de ce fournisseur (sur sa fiche) au lieu des factures. */
 export function FacturesATraiter({
-  factures, fournisseurs, limite, fournisseur,
-}: { factures: PendingInvoiceItem[]; fournisseurs: string[]; limite: number; fournisseur?: Fournisseur }) {
+  factures, fournisseurs, limite, fournisseur, modes,
+}: { factures: PendingInvoiceItem[]; fournisseurs: string[]; limite: number; fournisseur?: Fournisseur; modes: ModesAnalyse }) {
   const router = useRouter();
   const merc = !!fournisseur;
+  const phrase = merc ? `analyse ma mercuriale ${fournisseur!.name} à traiter` : "remplis mes factures à traiter";
   const [analyse, setAnalyse] = useState<FactureATraiter | null>(null);
   const [voir, setVoir] = useState<PendingInvoiceItem | null>(null);
   const [supprimer, setSupprimer] = useState<PendingInvoiceItem | null>(null);
@@ -380,20 +421,27 @@ export function FacturesATraiter({
       <h2 style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {merc ? "Mercuriales à traiter" : "À traiter"} ({factures.length}{limite ? ` sur ${limite}` : ""})
         {merc ? (
-          <Help title="Mercuriales à traiter" example={`« Analyse ma mercuriale ${fournisseur!.name} à traiter »`}>
-            Les mercuriales gardées avec « Importer une mercuriale » dont les prix ne sont pas encore enregistrés. Demande à Claude
-            (connecteur RecipeLog) de l&apos;analyser : il lit chaque page et enregistre les prix. Ou touche « Analyser » pour la faire lire
-            par l&apos;IA, puis vérifie les prix. Une fois enregistrée, elle quitte cette liste.
+          <Help title="Mercuriales à traiter" example={modes.mcp ? `« ${phrase} »` : undefined}>
+            Les mercuriales gardées avec « Importer une mercuriale » dont les prix ne sont pas encore enregistrés.
+            {modes.mcp && <> Demande à Claude (connecteur RecipeLog) de l&apos;analyser : il lit chaque page et enregistre les prix.</>}
+            {modes.ia && <> « Analyser par l&apos;IA » : l&apos;IA la lit, puis tu vérifies les prix.</>} Une fois enregistrée, elle quitte
+            cette liste.
           </Help>
         ) : (
-        <Help title="Factures à traiter">
-          Les factures prises en photo avec « Nouvelle facture » qui ne sont pas encore enregistrées. « Analyser » : l&apos;IA les lit et tu
-          vérifies les lignes. Tu peux aussi demander à Claude (connecteur RecipeLog) : « remplis mes factures à traiter ». Une fois
-          enregistrée, la facture quitte cette liste et ses photos sont jointes à la facture.
+        <Help title="Factures à traiter" example={modes.mcp ? `« ${phrase} »` : undefined}>
+          Les factures prises en photo avec « Nouvelle facture » qui ne sont pas encore enregistrées.
+          {modes.ia && <> « Analyser par l&apos;IA » : l&apos;IA les lit et tu vérifies les lignes.</>}
+          {modes.mcp && <> Avec Claude (connecteur RecipeLog), dis : « remplis mes factures à traiter ».</>} Une fois enregistrée, la facture
+          quitte cette liste et ses photos sont jointes à la facture.
         </Help>
         )}
       </h2>
       </div>
+      {modes.mcp && (
+        <p className="sub nf-claude">
+          <MessageSquare size={14} /> Avec Claude (connecteur RecipeLog), dis : « {phrase} ».
+        </p>
+      )}
       <div className="fl-list">
         {factures.map((f) => (
           <div key={f.id} className="fl-row nf-ligne">
@@ -412,9 +460,15 @@ export function FacturesATraiter({
               {f.lastError && <small className="nf-err">Dernière lecture : {f.lastError}</small>}
             </span>
             <span className="nf-btns">
-              <button type="button" className="fl-btn fl-btn-primary" onClick={() => setAnalyse({ id: f.id, pages: f.pages, pdf: f.pdf })}>
-                <Sparkles size={15} /> Analyser
-              </button>
+              {modes.ia && (
+                <button
+                  type="button"
+                  className={`fl-btn ${modes.prefere === "ia" ? "fl-btn-primary" : "fl-btn-secondary"}`}
+                  onClick={() => setAnalyse({ id: f.id, pages: f.pages, pdf: f.pdf })}
+                >
+                  <Sparkles size={15} /> Analyser par l&apos;IA
+                </button>
+              )}
               <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label="Voir" onClick={() => setVoir(f)}>
                 <Eye size={16} />
               </button>

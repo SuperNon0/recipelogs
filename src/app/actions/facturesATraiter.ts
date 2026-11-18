@@ -14,6 +14,7 @@ import {
 } from "@/lib/pendingInvoices";
 import { prisma } from "@/lib/prisma";
 import { etatLectureIA, type EtatIA } from "./ia";
+import { modesAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
 
 /**
  * Bouton « Nouvelle facture » (page Factures) : la personne prend la facture en
@@ -29,12 +30,12 @@ function auteur(viewer: Viewer): string | null {
 }
 
 /** pagesMercuriale : une mercuriale peut avoir plus de pages qu'une facture. */
-export type EtatNouvelleFacture = { ia: EtatIA; limites: LimitesFactures; enAttente: number; pagesMercuriale: number };
+export type EtatNouvelleFacture = { ia: EtatIA; limites: LimitesFactures; enAttente: number; pagesMercuriale: number; modes: ModesAnalyse };
 
 export async function etatNouvelleFacture(): Promise<EtatNouvelleFacture> {
   await requireAccess("costs.edit");
-  const [ia, limites, enAttente] = await Promise.all([etatLectureIA(), limitesFactures(), prisma.pendingInvoice.count()]);
-  return { ia, limites, enAttente, pagesMercuriale: PAGES_MAX_ABSOLU };
+  const [ia, limites, enAttente, modes] = await Promise.all([etatLectureIA(), limitesFactures(), prisma.pendingInvoice.count(), modesAnalyse()]);
+  return { ia, limites, enAttente, pagesMercuriale: PAGES_MAX_ABSOLU, modes };
 }
 
 /** fd : pages (une ou plusieurs photos, ou un PDF), note ; type « mercuriale » + fournisseurId pour une liste de prix. */
