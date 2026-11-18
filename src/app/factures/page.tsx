@@ -38,7 +38,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </Link>
       <div className="page-head">
         <h1>Factures</h1>
-        {peutModifier && <NouvelleFactureButton fournisseurs={suppliers.map((s) => s.name)} />}
+        {/* Offre « Aucun » (ni IA ni Claude) : les factures se saisissent à la main, depuis la fiche du fournisseur. */}
+        {peutModifier && (modes.ia || modes.mcp) && <NouvelleFactureButton fournisseurs={suppliers.map((s) => s.name)} />}
         <p className="sub">
           {orders.length} facture{orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} HT` : ""}

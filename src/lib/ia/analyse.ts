@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getQuotaIA } from "@/lib/auth/passerelle";
 import { getReglagesIA, surPlateforme } from "./reglages";
+import { mcpAllowed } from "@/lib/mcp/allowed";
 
 /**
  * Comment on fait lire une facture ou une mercuriale déposée sur le site :
@@ -11,10 +12,10 @@ import { getReglagesIA, surPlateforme } from "./reglages";
  * (IA, MCP ou les deux). Avec les deux, le client choisit son mode préféré
  * dans Réglages → Lecture des factures (table settings, clé « analyse ») :
  * c'est le bouton mis en avant à chaque dépôt. Hors plateforme : les deux.
- * Sa propre clé d'IA reste toujours possible : elle ne coûte rien à RecipeLog.
+ * « IA seulement » coupe aussi tout l'accès MCP du client (src/lib/mcp/allowed.ts).
  */
 export type ModeAnalyse = "ia" | "mcp";
-export type PermisPanel = "les-deux" | "ia" | "mcp";
+export type PermisPanel = "les-deux" | "ia" | "mcp" | "aucun";
 export type ModesAnalyse = {
   /** Ce que le panel permet (« les-deux » hors plateforme). */
   panel: PermisPanel;
@@ -45,10 +46,10 @@ export async function permisPanel(): Promise<PermisPanel> {
 }
 
 /** Règle pure (testée) : ce qui est permis et le bouton mis en avant. */
-export function calculerModes(panel: PermisPanel, modeIA: "plateforme" | "cle" | "off", choisi: ModeAnalyse | null): ModesAnalyse {
-  // « Claude (MCP) seulement » coupe l'IA de RecipeLog, pas la clé du client.
-  const ia = panel !== "mcp" || modeIA === "cle";
-  const mcp = panel !== "ia";
+export function calculerModes(panel: PermisPanel, modeIA: "plateforme" | "cle" | "off", choisi: ModeAnalyse | null, mcpCompris = true): ModesAnalyse {
+  const ia = panel === "les-deux" || panel === "ia";
+  // « IA seulement » et « Aucun » coupent aussi tout l'accès MCP (voir mcpPermis), comme RECIPELOG_MCP=0.
+  const mcp = (panel === "les-deux" || panel === "mcp") && mcpCompris;
   // Sans choix : l'IA si elle est réglée, sinon Claude.
   const prefere: ModeAnalyse = !ia ? "mcp" : !mcp ? "ia" : (choisi ?? (modeIA === "off" ? "mcp" : "ia"));
   return { panel, ia, mcp, prefere };
@@ -56,5 +57,5 @@ export function calculerModes(panel: PermisPanel, modeIA: "plateforme" | "cle" |
 
 export async function modesAnalyse(): Promise<ModesAnalyse> {
   const [panel, reglages, choisi] = await Promise.all([permisPanel(), getReglagesIA(), getPrefere()]);
-  return calculerModes(panel, reglages.mode, choisi);
+  return calculerModes(panel, reglages.mode, choisi, mcpAllowed());
 }

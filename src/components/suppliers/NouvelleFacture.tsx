@@ -225,6 +225,25 @@ function NouvelleFactureModal({
             {etat!.enAttente} documents attendent déjà dans « À traiter » (factures et mercuriales, {etat!.limites.attente} au plus). Analyse ou
             supprime-en avant d&apos;en ajouter un.
           </p>
+        ) : pages.length === 0 && merc && etat && !etat.modes.ia && !etat.modes.mcp ? (
+          <>
+            <p className="sub" style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>
+              Choisis le tableau Excel ou CSV du fournisseur : le site lit ses colonnes, puis tu vérifies les prix.
+              <Help title="Importer une mercuriale">
+                La lecture des PDF et des photos (par l&apos;IA ou par Claude) n&apos;est pas comprise dans ton offre. Un tableau Excel ou CSV est
+                lu directement par le site. Tu peux aussi ajouter les prix à la main : « Ajouter un produit » sur cette fiche.
+              </Help>
+            </p>
+            {onTableur && (
+              <div className="nf-choix">
+                <button type="button" className="nf-tuile nf-tuile-large" onClick={() => tableur.current?.click()}>
+                  <FileSpreadsheet size={26} />
+                  <strong>Tableau Excel ou CSV</strong>
+                  <small>Lu directement, sans IA</small>
+                </button>
+              </div>
+            )}
+          </>
         ) : pages.length === 0 && merc ? (
           <>
             <p className="sub" style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>

@@ -1,4 +1,4 @@
-import { mcpAllowed, mcpKeyAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis, mcpKeyAllowed } from "@/lib/mcp/allowed";
 import { handleMcpBody } from "./protocol";
 import { getMcpToken, tokensMatch } from "./token";
 import { MCP_TOOLS } from "./tools";
@@ -18,7 +18,7 @@ import { checkAccessToken, looksLikeAccessToken, oauthSetup, wwwAuthenticate } f
  * Claude propose « Se connecter ».
  */
 export async function mcpResponse(req: Request): Promise<Response> {
-  if (!mcpAllowed()) return new Response("Not found", { status: 404 });
+  if (!(await mcpPermis())) return new Response("Not found", { status: 404 });
   // Clé secrète coupée depuis le panel : seule la connexion par compte reste.
   const expected = mcpKeyAllowed() ? await getMcpToken() : null;
   const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)\s*$/i)?.[1];

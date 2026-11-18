@@ -44,6 +44,8 @@ export async function ajouterFactureATraiter(fd: FormData): Promise<{ ok: true; 
   try {
     const fichiers = fd.getAll("pages").filter((f): f is File => f instanceof File && f.size > 0);
     const pages = await Promise.all(fichiers.map(async (f) => Buffer.from(await f.arrayBuffer())));
+    const modes = await modesAnalyse();
+    if (!modes.ia && !modes.mcp) return { ok: false, error: "La lecture des documents n'est pas comprise dans ton offre : saisis-les à la main." };
     const mercuriale = fd.get("type") === "mercuriale";
     const facture = await createPendingInvoice({
       pages,

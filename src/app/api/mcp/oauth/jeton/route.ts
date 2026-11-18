@@ -1,4 +1,4 @@
-import { mcpAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis } from "@/lib/mcp/allowed";
 import {
   accountMayUseMcp,
   clientAuthenticated,
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const setup = oauthSetup();
-  if (!setup || !mcpAllowed()) return oauthNotFound();
+  if (!setup || !(await mcpPermis())) return oauthNotFound();
   const form = await readForm(req);
 
   // Identifiant (et secret éventuel) du client : dans le corps ou en « Basic ».

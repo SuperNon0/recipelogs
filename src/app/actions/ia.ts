@@ -69,12 +69,13 @@ export async function etatLectureIA(): Promise<EtatIA> {
   if (r.mode === "cle") return { mode: "cle", prete: !!r.cle, message: r.cle ? null : "Aucune clé d'API enregistrée.", quota: null };
   const q = await getQuotaIA();
   if (!q.ok) return { mode: "plateforme", prete: false, message: q.message, quota: null };
+  if (q.quota.analyse === "aucun") return { mode: "plateforme", prete: false, message: "La lecture des documents n'est pas comprise dans ton offre.", quota: null };
   if (q.quota.analyse === "mcp") {
     return { mode: "plateforme", prete: false, message: "Ton offre lit les documents avec Claude (connecteur RecipeLog) : garde-les pour Claude.", quota: null };
   }
   const { disponible, limite, utilise } = q.quota;
-  if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog, ou mets ta propre clé d'IA dans les réglages.", quota: { limite, utilise } };
-  if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois ; tu peux aussi mettre ta propre clé d'IA dans les réglages.`, quota: { limite, utilise } };
+  if (!disponible) return { mode: "plateforme", prete: false, message: "La lecture par IA n'est pas encore ouverte sur ton offre. Demande-la à RecipeLog.", quota: { limite, utilise } };
+  if (utilise >= limite) return { mode: "plateforme", prete: false, message: `Les ${limite} lectures du mois sont utilisées. Elles reviennent le 1er du mois.`, quota: { limite, utilise } };
   return { mode: "plateforme", prete: true, message: null, quota: { limite, utilise } };
 }
 

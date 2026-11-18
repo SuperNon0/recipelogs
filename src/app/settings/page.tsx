@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { getSiteUrl } from "@/app/actions/settings";
 import { getMcpToken } from "@/lib/mcp/token";
-import { mcpAllowed, mcpKeyAllowed } from "@/lib/mcp/allowed";
+import { mcpPermis, mcpKeyAllowed } from "@/lib/mcp/allowed";
 import { oauthSetup } from "@/lib/mcp/oauth";
 import { SiteSettings } from "@/components/settings/SiteSettings";
 import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const viewer = await requirePage("read");
   const can = (p: Permission) => viewerCan(viewer, p);
-  const [folderCount, categoryCount, ingredientBaseCount, pricedCount, themes, siteUrl, mcpToken, supplierCount, invoiceCount] = await Promise.all([
+  const [folderCount, categoryCount, ingredientBaseCount, pricedCount, themes, siteUrl, mcpToken, supplierCount, invoiceCount, mcpOk] = await Promise.all([
     prisma.folder.count(),
     prisma.category.count(),
     prisma.ingredientBase.count(),
@@ -30,6 +30,7 @@ export default async function SettingsPage() {
     getMcpToken(),
     prisma.supplier.count(),
     prisma.purchaseOrder.count({ where: { manual: false } }),
+    mcpPermis(),
   ]);
   const auth = can("accounts.manage") ? await getAuthSettings() : null;
   const accountsWaiting = auth?.enabled ? await prisma.account.count({ where: { status: "pending" } }) : 0;
@@ -214,7 +215,7 @@ export default async function SettingsPage() {
             <h2>Claude</h2>
           </div>
           <div className="fl-list">
-            {can("mcp.manage") && mcpAllowed() && (
+            {can("mcp.manage") && mcpOk && (
               <Row
                 href="/settings/mcp"
                 icon={Plug}

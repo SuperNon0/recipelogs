@@ -15,7 +15,17 @@ describe("IA ou Claude (MCP) pour lire les documents", () => {
     expect(calculerModes("les-deux", "off", null).prefere).toBe("mcp");
   });
 
-  it("garde la propre clé du client même en « Claude (MCP) seulement »", () => {
-    expect(calculerModes("mcp", "cle", null)).toMatchObject({ ia: true, mcp: true });
+  it("« Claude (MCP) seulement » : pas d'IA, même avec une clé enregistrée", () => {
+    expect(calculerModes("mcp", "cle", null)).toMatchObject({ ia: false, mcp: true });
+  });
+
+  it("accès MCP coupé pour ce client : pas de « Garder pour Claude »", () => {
+    expect(calculerModes("les-deux", "plateforme", "mcp", false)).toMatchObject({ ia: true, mcp: false, prefere: "ia" });
+  });
+});
+
+describe("ni IA ni Claude", () => {
+  it("« Aucun » : rien à proposer", () => {
+    expect(calculerModes("aucun", "plateforme", "ia")).toMatchObject({ ia: false, mcp: false });
   });
 });

@@ -286,8 +286,9 @@ function Choisir({
               : "IA prête (ta propre clé)."
             : etat.message}
           <Help title="D'où vient l'IA ?">
-            Soit l'IA fournie avec ton offre RecipeLog (un nombre de lectures par mois), soit ta propre clé Claude, ChatGPT ou Gemini (tu paies
-            directement ton fournisseur d&apos;IA, sans limite). Un administrateur choisit dans Réglages → Lecture des factures.
+            {etat.mode === "plateforme"
+              ? "L'IA fournie avec ton offre RecipeLog, avec un nombre de lectures par mois."
+              : "Ta propre clé Claude, ChatGPT ou Gemini (tu paies directement ton fournisseur d'IA). Un administrateur la règle dans Réglages → Lecture des factures."}
           </Help>
         </p>
       )}

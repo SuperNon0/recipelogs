@@ -14,3 +14,21 @@ export function mcpAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
 export function mcpKeyAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.RECIPELOG_MCP_CLE !== "0";
 }
+
+let cache: { at: number; ok: boolean } | null = null;
+
+/**
+ * L'accès MCP marche-t-il vraiment ? Coupé par RECIPELOG_MCP=0, ou par le
+ * panel quand l'analyse des documents du client est « IA seulement » (lu sur
+ * la passerelle, gardé une minute). Si la passerelle ne répond pas, on ne
+ * coupe rien.
+ */
+export async function mcpPermis(): Promise<boolean> {
+  if (!mcpAllowed()) return false;
+  if (cache && Date.now() - cache.at < 60_000) return cache.ok;
+  const { permisPanel } = await import("@/lib/ia/analyse");
+  const p = await permisPanel();
+  const ok = p === "les-deux" || p === "mcp";
+  cache = { at: Date.now(), ok };
+  return ok;
+}
