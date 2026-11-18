@@ -810,7 +810,7 @@ createServer(async (req, res) => {
         if (e instanceof RefusIA) throw new Refus(400, e.message);
         throw e;
       }
-      await noter(qui, "ia-factures", corps.client === "*" ? "tous" : corps.client, { ok: true, sortie: "" }, { attente: corps.attente, pages: corps.pages });
+      await noter(qui, "ia-factures", corps.client === "*" ? "tous" : corps.client, { ok: true, sortie: "" }, { attente: corps.attente, pages: corps.pages, analyse: corps.analyse ?? null });
       return repondre(res, 200, await resumeIA(DONNEES));
     }
     // Vente (lot 8) : identité de l'éditeur, offres et prix, pages publiques.

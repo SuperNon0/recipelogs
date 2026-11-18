@@ -11,7 +11,12 @@
 //
 // Fichiers (dossier /ia, partagé avec le moteur du panel) :
 //   reglages.json        écrit par le panel : { defaut: 30, clients: { maison: 100 },
-//                        factures: { defaut: { attente: 30, pages: 10 }, clients: { maison: { attente: 50, pages: 10 } } } }
+//                        factures: { defaut: { attente: 30, pages: 10 }, clients: { maison: { attente: 50, pages: 10 } } },
+//                        analyse: { defaut: "les-deux", clients: { maison: "mcp" } } }
+//                        analyse = comment le client fait lire ses factures et mercuriales :
+//                        « ia » (l'IA de la plateforme), « mcp » (Claude par le connecteur RecipeLog,
+//                        sans IA de la plateforme : aucune lecture n'est relayée), « les-deux » ou « aucun »
+//                        (ni IA ni MCP). L'appli coupe aussi son accès MCP en « ia » et « aucun ».
 //   usage/<client>.json  écrit ici : { "2026-11": { lectures, entree, sortie } }
 //   etat.json            écrit ici au démarrage : la clé d'installation est-elle réglée ? (le panel l'affiche)
 //   cle.json             écrit par le panel (Factures par IA → « Clé d'IA ») :
@@ -115,16 +120,29 @@ export async function limitesFactures(client) {
   return { attente: ok(c.attente, 10_000) ?? d.attente, pages: Math.max(1, ok(c.pages, PAGES_MAX) ?? d.pages) };
 }
 
+export const MODES_ANALYSE = ["les-deux", "ia", "mcp", "aucun"];
+
+/** Ce que le client a le droit d'utiliser pour lire ses documents (réglé dans le panel). */
+export async function analyse(client) {
+  const r = await lireJson(`${RACINE}/reglages.json`, {});
+  const a = r?.analyse ?? {};
+  const c = a.clients?.[client];
+  if (MODES_ANALYSE.includes(c)) return c;
+  return MODES_ANALYSE.includes(a.defaut) ? a.defaut : "les-deux";
+}
+
 async function usage(client) {
   return lireJson(`${RACINE}/usage/${client}.json`, {});
 }
 
 /** GET /v1/ia/quota */
 export async function quota(client) {
-  const [l, u, factures, c] = await Promise.all([limite(client), usage(client), limitesFactures(client), configActuelle()]);
+  const [lim, u, factures, c, mode] = await Promise.all([limite(client), usage(client), limitesFactures(client), configActuelle(), analyse(client)]);
   const m = mois();
+  // « Claude (MCP) seulement » ou « Aucun » : pas d'IA de la plateforme pour ce client (aucune lecture relayée).
+  const l = mode === "mcp" || mode === "aucun" ? 0 : lim;
   // fournisseur et modele : l'appli s'en sert pour savoir quelle IA appeler (par la passerelle).
-  return { disponible: !!c && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m, factures, fournisseur: c?.fournisseur ?? null, modele: c?.modele ?? null };
+  return { disponible: !!c && l > 0, limite: l, utilise: u[m]?.lectures ?? 0, mois: m, factures, analyse: mode, fournisseur: c?.fournisseur ?? null, modele: c?.modele ?? null };
 }
 
 function compter(client, entree, sortie, prix) {
@@ -153,8 +171,8 @@ async function reserver(client, res) {
   const occupees = enCours.get(client) ?? 0;
   if (q.utilise + occupees >= q.limite) {
     refuser(res, 429, "quota_ia", q.limite > 0
-      ? `Les ${q.limite} lectures par IA du mois sont utilisées. Elles reviennent le 1er du mois ; tu peux aussi mettre ta propre clé d'IA dans les réglages.`
-      : "La lecture par IA n'est pas ouverte sur ton offre. Demande-la à RecipeLog, ou mets ta propre clé d'IA dans les réglages.");
+      ? `Les ${q.limite} lectures par IA du mois sont utilisées. Elles reviennent le 1er du mois.`
+      : "La lecture par IA n'est pas ouverte sur ton offre. Demande-la à RecipeLog.");
     return false;
   }
   enCours.set(client, occupees + 1);
