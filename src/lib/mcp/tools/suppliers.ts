@@ -655,7 +655,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     name: "relier_produit_ingredient",
     title: "Relier un produit à un ingrédient",
     description:
-      "Relie un produit acheté à un ingrédient des recettes (ou le détache avec ingredient_id = null et sans nom). utiliser_ce_prix = true : l'ingrédient prend le prix de ce produit dans le coût de toutes les recettes (et le suit aux prochaines factures). Un ingrédient peut avoir plusieurs produits reliés (plusieurs chocolats, plusieurs fournisseurs), un seul est utilisé.",
+      "Relie un produit acheté à un ingrédient des recettes (ou le détache avec ingredient_id = null et sans nom). utiliser_ce_prix = true : l'ingrédient prend le prix de ce produit dans le coût de toutes les recettes (et le suit aux prochaines factures). Un ingrédient peut avoir plusieurs produits reliés (plusieurs chocolats, plusieurs fournisseurs), un seul est utilisé. Et un même produit peut donner son prix à PLUSIEURS ingrédients (« Crème 35 % à froid » et « Crème 35 % à chaud » sur « Crème 35 % brique 1 L ») : appelle l'outil avec utiliser_ce_prix = true pour chacun, aucun ne perd le prix des autres.",
     inputSchema: {
       type: "object",
       properties: {

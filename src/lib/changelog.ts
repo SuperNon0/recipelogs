@@ -26,6 +26,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Case « Produit vendu » sur une recette (dans « Modifier » ou dans la carte du coût) et page « Produits vendus » dans les Réglages : coût de revient, prix de vente et marge en € et en % de chaque produit, triables, avec ceux qui ont un prix mais ne sont pas encore cochés",
       "Fiche d'un fournisseur avec des centaines de produits : recherche par nom, article ou référence, et affichage par paquets. Le tableau « Comparer les prix » s'affiche aussi par paquets",
       "Claude (connecteur RecipeLog) : passer_commande, lister_commandes, voir_commande, supprimer_commande, regrouper_produits et produits_vendus ; conditionnement des produits dans les factures et les mercuriales ; voir_fournisseur cherche et lit un gros catalogue page par page",
+      "Un même produit peut donner son prix à plusieurs ingrédients : « Crème 35 % à froid » et « Crème 35 % à chaud » peuvent suivre toutes les deux « Crème 35 % brique 1 L ». Avant, le choisir pour le second ingrédient le retirait du premier",
     ],
     migrations: ["Nouvelles tables pour les commandes fournisseurs, conditionnement commandé des produits et case « Produit vendu » des recettes : faites toutes seules à la mise à jour"],
   },

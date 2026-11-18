@@ -152,13 +152,9 @@ export async function chooseProductForIngredient(baseId: number, productId: numb
       select: { id: true, baseId: true, price: true, priceUnit: true },
     });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId !== baseId) {
-      // Le produit change d'ingrédient : l'ancien ne le suit plus (il garde son dernier prix).
-      if (product.baseId != null) {
-        await tx.ingredientBase.updateMany({ where: { id: product.baseId, chosenProductId: productId }, data: { chosenProductId: null } });
-      }
-      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
-    }
+    // Plusieurs ingrédients peuvent suivre le même produit (« Crème 35 % à froid » et « Crème 35 % à
+    // chaud » sur « Crème 35 % brique 1 L ») : l'ingrédient qui le suivait déjà le garde.
+    if (product.baseId == null) await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
     await tx.ingredientBase.update({ where: { id: baseId }, data: { chosenProductId: productId } });
     await applyProductPrice(tx, baseId, product, base.prices[0]);
   });
@@ -172,14 +168,15 @@ export async function linkProductToIngredient(productId: number, baseId: number 
   await prisma.$transaction(async (tx) => {
     const product = await tx.supplierProduct.findUnique({ where: { id: productId }, select: { id: true, baseId: true } });
     if (!product) throw new Error("Produit introuvable.");
-    if (product.baseId && product.baseId !== baseId) {
-      await tx.ingredientBase.updateMany({
-        where: { id: product.baseId, chosenProductId: productId },
-        data: { chosenProductId: null },
-      });
+    if (baseId == null) {
+      // Détacher : plus aucun ingrédient ne suit ce produit (ils gardent leur dernier prix).
+      await tx.ingredientBase.updateMany({ where: { chosenProductId: productId }, data: { chosenProductId: null } });
+      await tx.supplierProduct.update({ where: { id: productId }, data: { baseId: null } });
+      return;
     }
+    // Les autres ingrédients qui suivent déjà ce produit le gardent : un produit peut servir à plusieurs ingrédients.
     await tx.supplierProduct.update({ where: { id: productId }, data: { baseId } });
-    if (baseId != null) await autoChoose(tx, baseId, productId);
+    await autoChoose(tx, baseId, productId);
   });
 }
 
