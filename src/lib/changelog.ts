@@ -47,6 +47,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Les installations actuelles (connexion par Cloudflare) ne changent pas",
     ],
     fixes: [
+      "Panel de la plateforme : les nouvelles clés Gemini de Google (qui commencent par « AQ. ») sont acceptées dans le réglage de l'IA, en plus des anciennes « AIza… »",
       "Les longues factures et les mercuriales PDF de plusieurs pages sont lues en entier (avant : « document trop long » au-delà d'une centaine de lignes)",
       "Une mercuriale de plus de 500 lignes est enregistrée en entier (jusqu'à 3000 lignes), au lieu d'être coupée sans prévenir",
       "Importer deux fois la même mercuriale remplace la première au lieu de tout mettre en double. Une facture sans numéro déjà enregistrée (même fournisseur, même date, mêmes lignes) est signalée",

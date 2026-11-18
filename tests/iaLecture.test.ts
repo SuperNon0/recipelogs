@@ -305,6 +305,25 @@ describe("IA de la plateforme réglée dans le panel", () => {
     await expect(ia.reglerCle(d, { fournisseur: "openai", modele: "gpt-5-mini", cle: "" }, faux(200))).rejects.toThrow(/Colle la clé/);
   });
 
+  it("Gemini : accepte les nouvelles clés « AQ. » et les envoie dans x-goog-api-key", async () => {
+    const d = mkdtempSync(join(tmpdir(), "panel-"));
+    const ia = await import("../plateforme/panel/ia.mjs");
+    const cleAQ = "AQ.Ab8RN6" + "c".repeat(40) + ".d-e_F";
+    let entete = "";
+    const espion = (async (_url: string, init: RequestInit) => {
+      entete = (init.headers as Record<string, string>)["x-goog-api-key"];
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    expect(await ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.8-flash", cle: cleAQ }, espion)).toEqual({ avertissement: null });
+    expect(entete).toBe(cleAQ);
+    expect(JSON.parse(readFileSync(join(d, "ia", "cle.json"), "utf8")).cle).toBe(cleAQ);
+    // Toujours refusé : ni « AQ. » ni « AIza ».
+    await expect(ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.8-flash", cle: "bonjour.tout.le.monde.1234567890abc" }, faux(200))).rejects.toThrow(/AQ\./);
+    // Clé « AQ. » refusée par Google : message qui explique quoi faire.
+    const refus = (async () => new Response('{"error":{"status":"UNAUTHENTICATED","details":[{"reason":"ACCESS_TOKEN_TYPE_UNSUPPORTED"}]}}', { status: 401 })) as unknown as typeof fetch;
+    await expect(ia.reglerCle(d, { fournisseur: "gemini", modele: "gemini-3.8-flash", cle: cleAQ }, refus)).rejects.toThrow(/Recrée une clé/);
+  });
+
   it("refuse une clé fausse ou refusée par Anthropic, garde une clé non essayée avec un avertissement", async () => {
     const d = mkdtempSync(join(tmpdir(), "panel-"));
     const ia = await import("../plateforme/panel/ia.mjs");
