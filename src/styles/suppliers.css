@@ -517,6 +517,39 @@ button.cost-line:hover {
   display: grid;
   gap: 8px;
 }
+/* Longue mercuriale : filtres et recherche au-dessus des lignes */
+.ia-filtres {
+  display: grid;
+  gap: 8px;
+}
+.ia-filtres-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ia-filtre {
+  min-height: 36px;
+  border: 1px solid var(--border);
+}
+.ia-filtre[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.ia-filtre b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ia-cherche {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ia-cherche .fl-input {
+  flex: 1;
+  min-width: 0;
+}
 .ia-ligne {
   display: grid;
   gap: 8px;
