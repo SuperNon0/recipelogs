@@ -1,9 +1,9 @@
 // Surveillance (lot 5) : le moteur vérifie chaque minute que chaque site répond,
-// note les pannes, prévient Noë (Telegram, Discord et/ou email) et mesure la
+// note les pannes, prévient Noë (Discord par BotPanel, et la cloche du panel) et mesure la
 // machine et les clients (processeur, mémoire, disque, usage).
 import { appendFile, readFile, readdir, statfs, stat } from "node:fs/promises";
 import os from "node:os";
-import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
+import { notifier, reglages } from "./notifications.mjs";
 
 const DONNEES = process.env.DONNEES || "/srv/recipelog";
 const DOMAINE = process.env.DOMAINE || "recipelog.cc";
@@ -11,50 +11,17 @@ const EVENEMENTS = `${DONNEES}/surveillance.jsonl`;
 const PANNE_APRES = 2; // vérifications ratées de suite (une par minute) avant de prévenir
 
 // ------------------------------------------------------------ alertes
-const ADMINS = (process.env.ADMIN_EMAILS || "").split(/[,;\s]+/).filter(Boolean);
+// Tout passe par notifications.mjs : Discord (BotPanel) et la cloche du panel.
+// Plus d'email ni de Telegram pour Noë (quota Brevo gardé pour les clients).
+export const alerter = (type, titre, texte) => notifier(type, titre, texte);
 
-/**
- * Envoie une alerte par tous les canaux réglés. Ne lève jamais d'erreur.
- * Rend le résultat canal par canal : { telegram, discord, email } avec true (parti),
- * un texte (la raison de l'échec) ou null (canal pas réglé), et `ok` si au moins un est parti.
- */
-export async function alerter(titre, texte) {
-  const canaux = { telegram: null, discord: null, email: null };
-  const essais = [];
-  const essayer = (nom, promesse) =>
-    essais.push(
-      promesse.then(
-        () => (canaux[nom] = true),
-        (e) => {
-          canaux[nom] = String(e?.message ?? e).slice(0, 200);
-          console.error(`Alerte non envoyée (${nom}) :`, canaux[nom]);
-        },
-      ),
-    );
-  // Telegram et Discord répondent « 200 » seulement si le message est vraiment accepté.
-  const poster = async (url, corps) => {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps), signal: AbortSignal.timeout(10000) });
-    if (!r.ok) throw new Error(`refusé (${r.status}) ${(await r.text().catch(() => "")).slice(0, 120)}`);
-  };
-  const tg = process.env.ALERTE_TELEGRAM_JETON;
-  const chat = process.env.ALERTE_TELEGRAM_CHAT;
-  if (tg && chat) essayer("telegram", poster(`https://api.telegram.org/bot${tg}/sendMessage`, { chat_id: chat, text: `${titre}\n${texte}`, disable_web_page_preview: true }));
-  if (process.env.ALERTE_DISCORD_URL) essayer("discord", poster(process.env.ALERTE_DISCORD_URL, { content: `**${titre}**\n${texte}`.slice(0, 1900) }));
-  if (process.env.ALERTE_EMAIL !== "non" && courrielRegle() && ADMINS.length) {
-    essayer("email", envoyerCourriel({ a: ADMINS, sujet: `[RecipeLog] ${titre}`, texte: `${texte}\n\nPanel : https://admin.${DOMAINE}` }));
-  }
-  await Promise.all(essais);
-  return { ok: Object.values(canaux).some((v) => v === true), canaux };
-}
+// Sans attendre : une alerte lente (BotPanel qui traîne) ne doit jamais retarder la surveillance.
+const prevenir = (type, titre, texte) => void alerter(type, titre, texte).catch(() => {});
 
-// Sans attendre : une alerte lente (serveur d'e-mail qui traîne) ne doit jamais retarder la surveillance.
-const prevenir = (titre, texte) => void alerter(titre, texte).catch(() => {});
-
-export const canauxAlerte = () => ({
-  telegram: Boolean(process.env.ALERTE_TELEGRAM_JETON && process.env.ALERTE_TELEGRAM_CHAT),
-  discord: Boolean(process.env.ALERTE_DISCORD_URL),
-  email: process.env.ALERTE_EMAIL !== "non" && courrielRegle() && ADMINS.length > 0,
-});
+export const canauxAlerte = async () => {
+  const r = await reglages().catch(() => ({ botpanel: "" }));
+  return { discord: Boolean(r.botpanel), panel: true };
+};
 
 // ------------------------------------------------------------ vérifications
 // Le moteur n'est PAS sur le réseau des clients (un site piraté ne peut pas lui parler) :
@@ -137,7 +104,7 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
         if (e.ok === false) {
           const panne = Date.now() - e.depuis;
           await noterEvenement(cible, true);
-          prevenir(`✅ ${nom} répond de nouveau`, `Panne de ${duree(panne)}.`);
+          prevenir("panne", `✅ ${nom} répond de nouveau`, `Panne de ${duree(panne)}.`);
           await noter("automatique", "retour", nom, { ok: true, sortie: `Répond de nouveau après ${duree(panne)}.` });
           e.depuis = Date.now();
         }
@@ -154,7 +121,7 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
             : cible === "service:acces"
               ? "Les sites ne sont plus joignables depuis internet. Dans la VM : recipelog-plateforme ps (cloudflared et traefik), et l'état du tunnel dans Cloudflare."
               : "Dans la VM : recipelog-plateforme ps";
-          prevenir(`🔴 ${nom} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`);
+          prevenir("panne", `🔴 ${nom} ne répond plus`, `Depuis ${PANNE_APRES} minutes. ${conseil}`);
           await noter("automatique", "panne", nom, { ok: false, sortie: `Ne répond plus depuis ${PANNE_APRES} minutes.` });
         }
       }
@@ -168,6 +135,7 @@ export async function verifier(clients, conteneurs, noter, occupes = () => false
     if (jourAlerteDisque !== jour) {
       jourAlerteDisque = jour;
       prevenir(
+        "disque",
         d.pourcent >= 95 ? "🔴 Disque plein : les sauvegardes sont arrêtées" : "⚠️ Disque presque plein",
         `${d.pourcent} % utilisés sur la machine (${Math.round(d.libre / 1e9)} Go libres). Agrandis le disque de la VM dans Proxmox, ou supprime de vieilles sauvegardes.`,
       );

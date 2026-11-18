@@ -160,9 +160,10 @@ réseau interne avec une clé. Le moteur lance `recipelog-instance`, comme en li
 - **Chaque minute**, le moteur vérifie que chaque client et chaque service (connexion,
   passerelle, vitrine) répond. Après 2 minutes sans réponse, tu reçois une **alerte**, puis
   une autre quand il revient (avec la durée de la panne). Aussi : disque à 90 % (une fois par
-  jour) et chaque nouvelle demande de support. Les alertes partent par **email** (adresses
-  super-admin, même compte Brevo) et, si tu le règles, par **Telegram** ou **Discord** :
-  [A-FAIRE.md](A-FAIRE.md), étape F.
+  jour) et chaque nouvelle demande de support. Les alertes partent sur ton **Discord** par
+  **BotPanel** et restent dans le panel (partie **Notifications**, la cloche, avec lu / non
+  lu). Aucun email pour toi : le quota Brevo reste pour les clients. [A-FAIRE.md](A-FAIRE.md),
+  étape F.
 - **Page de statut publique** sur `status.recipelog.cc` : chaque partie du service, avec
   90 jours d'historique, sans aucun nom de client. À donner aux clients.
 - Dans le panel, partie **Santé de la machine** : processeur, mémoire, disque, état des
@@ -322,6 +323,7 @@ prix, vente).
 
 | Date | Lot | Ce qui a été fait | Ce qu'il te reste à faire |
 |---|---|---|---|
+| 2026-11-18 | Notifications | Plus aucun email ni Telegram pour toi : tes notifications (panne, sauvegarde, disque, support, demande sur la vitrine, fin d'essai, nouvelle version, maintenance, démo) partent sur Discord par BotPanel et restent dans le panel : nouvelle partie **Notifications** (cloche en haut sur téléphone, pastille des non lues, filtres, lu / non lu, historique des 1000 dernières). Réglages : adresse de BotPanel et, pour chaque sorte, Discord et/ou Panel. Les emails aux clients (réponses de support, préavis de maintenance, messages, comptes) ne changent pas. | Étape F de [A-FAIRE.md](A-FAIRE.md) : créer les notifications dans BotPanel (ou me le demander), mettre l'adresse de BotPanel dans le panel, « Tester ». |
 | 2026-11-17 | Versions | La plateforme et la vitrine ont un vrai numéro comme l'appli (plateforme P1.0.<dernière PR>, vitrine 1.0.<dernière PR>) et une fenêtre « Version et nouveautés » (Accueil → Mises à jour) qui liste les dernières modifications installées. | Mettre la plateforme à jour ; la vitrine une fois pour avoir son numéro. |
 | 2026-11-17 | Mises à jour | Le panel vérifie toutes les heures s'il y a une nouvelle version : clients par canal (Standard, Bêta : dès que l'image Docker est prête), plateforme et vitrine. Accueil → carte « Mises à jour » (état, ce qui a changé, bouton « Vérifier maintenant »), lignes dans « À faire », pastille sur Clients, filtre « À mettre à jour ». Un message (Telegram, Discord, email réglés pour les alertes) part une seule fois par nouvelle version, désactivable dans le panel. Rien ne s'installe tout seul, les clients ne voient rien. | Après la mise à jour de la plateforme : mettre la vitrine à jour une fois (sinon sa version reste « inconnue »). Facultatif : `GITHUB_JETON` (jeton GitHub lecture seule) dans `.env` si GitHub limite les demandes. |
 | 2026-11-17 | Relance de l'installation | `bash /root/install-plateforme.sh` lançait la vieille copie du script gardée depuis la création de la VM : les corrections de l'installation elle-même (dont « ne plus recréer test ») ne s'appliquaient pas. Le script se remplace maintenant par la dernière version avant de continuer. | Une seule fois : lancer `bash /opt/recipelog-plateforme/plateforme/install.sh` (voir le fil). |

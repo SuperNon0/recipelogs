@@ -15,6 +15,7 @@ let ANNONCES = null;
 let IA = null;
 let VENTE = null;
 let PLATEFORME = null; // version installée, nouveautés sur GitHub, dernière mise à jour (plateforme.mjs)
+let NOTIFS = null; // notifications pour toi : liste, non lues, réglages (notifications.mjs)
 let MAJ = null; // nouvelles versions pour les clients (par canal) et la vitrine (nouveautes.mjs)
 let CANAL = "instance"; // version donnée par défaut aux nouveaux clients (dit par le moteur)
 // Versions de l'appli (canaux) proposées dans le panel. « plateforme » : l'ancien canal,
@@ -428,7 +429,7 @@ function afficherPlateforme() {
   );
   const [aAide, aTexte] = aideB(
     "maj-a-alerte",
-    "Quand une nouvelle version sort, un message part une seule fois par les mêmes canaux que les alertes de panne (Telegram, Discord et/ou email, réglés dans le fichier .env de la machine). Décoché : seulement les badges dans le panel.",
+    "Quand une nouvelle version sort, une notification part une seule fois sur ton Discord (par BotPanel) et sous la cloche du panel. Pour la couper : Notifications → Réglages → « Nouvelle version ».",
   );
   const quand = !MAJ?.date ? "Pas encore vérifié" : Date.now() - Date.parse(MAJ.date) < 60000 ? "Vérifié à l'instant" : `Vérifié ${depuis(MAJ.date).replace("depuis", "il y a")}`;
   z.innerHTML =
@@ -436,7 +437,7 @@ function afficherPlateforme() {
     (MAJ?.erreur ? `<p class="discret">${e(MAJ.erreur)}</p>` : "") +
     `<div class="pf-bas"><span class="discret">${e(quand)}</span><button class="btn petit" type="button" id="maj-verifier">Vérifier maintenant</button>${vAide}</div>${vTexte}` +
     `<div class="pf-bas"><button class="lien" type="button" id="maj-histo">Version et nouveautés</button></div>` +
-    (MAJ ? `<label class="case maj-alerte"><input type="checkbox" id="maj-alerte"${MAJ.alerte ? " checked" : ""}> Me prévenir par message ${aAide}</label>${aTexte}` : "");
+    `<div class="pf-bas"><a href="#notifications">Être prévenu sur Discord</a>${aAide}</div>${aTexte}`;
   $("#pf-voir").onclick = () => (m?.etat === "en-cours" ? suivrePlateforme() : fenetreMajPlateforme());
   z.querySelectorAll("[data-maj-canal]").forEach((b) => (b.onclick = () => fenetreMajCanal(b.dataset.majCanal)));
   const bv = $("#maj-vitrine");
@@ -450,15 +451,6 @@ function afficherPlateforme() {
     await charger();
     if (!r.ok) alerteDiscrete("La vérification n'a pas pu se faire. Réessaie dans un moment.");
   };
-  const ca = $("#maj-alerte");
-  if (ca)
-    ca.onchange = async () => {
-      ca.disabled = true;
-      const r = await appel("POST", "/nouveautes/reglages", { alerte: ca.checked }).catch(() => ({ ok: false }));
-      if (r.ok) MAJ.alerte = r.alerte;
-      else ca.checked = !ca.checked;
-      ca.disabled = false;
-    };
 }
 
 // Petit message sous la carte des mises à jour (pas de fenêtre qui s'ouvre toute seule).
@@ -709,7 +701,8 @@ function afficherBadges() {
   const support = (SUPPORT ?? []).filter((t) => t.statut === "ouvert").length;
   const vitrine = (VITRINE?.demandes ?? []).filter((d) => !d.traitee).length;
   const clients = CLIENTS.filter((c) => majDispo(c) > 0).length;
-  const valeurs = { accueil: urgent, afaire: AFAIRE.length, support, vitrine, plus: vitrine, clients };
+  const notifs = NOTIFS?.nonLues ?? 0;
+  const valeurs = { accueil: urgent, afaire: AFAIRE.length, support, vitrine, plus: vitrine, clients, notifs };
   document.querySelectorAll("[data-badge]").forEach((b) => {
     const v = valeurs[b.dataset.badge] ?? 0;
     b.textContent = v ? String(v) : "";
@@ -812,7 +805,7 @@ function ongletResume(c, z) {
 }
 
 // ------------------------------------------------------------ navigation (adresse après #)
-const TITRES = { accueil: "Accueil", clients: "Clients", client: "Client", support: "Support", maintenance: "Maintenance et messages", vitrine: "Site vitrine", vente: "Tarifs et textes légaux", ia: "Factures par IA", sante: "Santé de la machine", journal: "Journal" };
+const TITRES = { accueil: "Accueil", clients: "Clients", client: "Client", support: "Support", notifications: "Notifications", maintenance: "Maintenance et messages", vitrine: "Site vitrine", vente: "Tarifs et textes légaux", ia: "Factures par IA", sante: "Santé de la machine", journal: "Journal" };
 let CHARGE = false;
 let pageAvant = "";
 function rendre(auto = false) {
@@ -843,6 +836,7 @@ $("#bouton-plus").addEventListener("click", () => {
   ouvrir(
     "Plus",
     `<div class="plus-tuiles">
+      <a href="#notifications">${ic("bell", "s22")}Notifications${NOTIFS?.nonLues ? `<span class="n">${NOTIFS.nonLues}</span>` : ""}</a>
       <a href="#maintenance">${ic("wrench", "s22")}Maintenance et messages</a>
       <a href="#vitrine">${ic("compass", "s22")}Site vitrine${n ? `<span class="n">${n}</span>` : ""}</a>
       <a href="#vente">${ic("ticket", "s22")}Tarifs et textes légaux</a>
@@ -974,11 +968,13 @@ document.addEventListener("click", (ev) => {
 });
 
 async function charger(options = {}) {
-  const [c, j, v, sa, su, an, ia, ve, pf, nv] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente"), api("GET", "/plateforme"), api("GET", "/nouveautes")]);
+  const [c, j, v, sa, su, an, ia, ve, pf, nv, nt] = await Promise.all([api("GET", "/clients"), api("GET", "/journal"), api("GET", "/vitrine"), api("GET", "/mesures"), api("GET", "/support"), api("GET", "/annonces"), api("GET", "/ia"), api("GET", "/vente"), api("GET", "/plateforme"), api("GET", "/nouveautes"), api("GET", "/notifications")]);
   IA = ia.usage ? ia : null;
   VENTE = ve.offres ? ve : null;
   PLATEFORME = "maj" in pf ? pf : null;
   MAJ = nv.canaux ? nv : null;
+  NOTIFS = nt.liste ? nt : null;
+  afficherNotifications();
   VITRINE = v.demandes ? v : null;
   afficherVitrine();
   SANTE = sa.machine ? sa : null;
@@ -1404,9 +1400,8 @@ function afficherSante() {
       return `<span class="etiquette ${ok ? "ok" : "ko"}" title="${ok ? "Répond" : `Ne répond plus depuis le ${e(heureFr(s.depuis))}`}">${e(nom)}</span>`;
     })
     .join(" ");
-  const canaux = Object.entries({ telegram: "Telegram", discord: "Discord", email: "Email" })
-    .map(([k, n]) => `<span class="etiquette ${SANTE.alertes[k] ? "ok" : "pause"}">${n} ${SANTE.alertes[k] ? "réglé" : "pas réglé"}</span>`)
-    .join(" ");
+  const discordOk = NOTIFS ? Boolean(NOTIFS.reglages.botpanel) : SANTE.alertes?.discord;
+  const canaux = `<span class="etiquette ${discordOk ? "ok" : "pause"}">Discord (BotPanel) ${discordOk ? "branché" : "pas branché"}</span> <span class="etiquette ok">Panel (cloche)</span>`;
   const lignes = CLIENTS.map((c) => {
     const s = SANTE.clients[c.nom] ?? {};
     const u = s.usage;
@@ -1431,9 +1426,10 @@ function afficherSante() {
         <div class="etiquettes">${services}</div><small>${m.demarre ? `VM démarrée ${e(depuisFr(m.demarre))}` : ""}</small></div>
     </div>
     <div class="carte-vitrine alertes"><div class="ligne-vitrine"><div><b>Alertes</b><small>Chaque minute, chaque site est vérifié. S'il ne répond plus 2 minutes de suite, tu es prévenu, puis encore quand il revient. Aussi : disque presque plein, nouvelle demande de support.</small></div>
+      <a class="btn petit" href="#notifications">Notifications</a>
       <button class="btn petit" type="button" id="sa-essai">Tester les alertes</button>
       <button class="aide" type="button" data-aide="sa-a-al" aria-label="Aide">?</button></div>
-      <p class="texte-aide" id="sa-a-al">L'email part vers les adresses super-admin (ADMIN_EMAILS). Pour recevoir aussi les alertes sur ton téléphone par Telegram ou Discord, suis l'étape F de A-FAIRE.md (2 minutes). « Tester » envoie un message d'essai sur tous les canaux réglés.</p>
+      <p class="texte-aide" id="sa-a-al">Les alertes partent sur ton Discord par BotPanel et restent dans le panel (Notifications, la cloche). Plus aucun email ne t'est envoyé. L'adresse de BotPanel et ce qui part se règlent dans Notifications → Réglages. « Tester » envoie une notification d'essai.</p>
       <div class="etiquettes">${canaux}</div><p class="erreur" id="sa-erreur"></p></div>
     <div class="tableau-sante"><table><thead><tr><th>Client</th><th>Processeur</th><th>Mémoire</th><th>Base</th><th>Fichiers</th><th>Sauvegardes</th><th>Recettes</th><th>Comptes</th><th>Dernière activité</th></tr></thead>
       <tbody>${lignes || `<tr><td colspan="9">Pas encore de client.</td></tr>`}</tbody></table></div>
@@ -1441,9 +1437,9 @@ function afficherSante() {
   $("#sa-essai").addEventListener("click", async (ev) => {
     ev.target.disabled = true;
     $("#sa-erreur").textContent = "Envoi…";
-    const r = await api("POST", "/alertes/essai");
+    const r = await api("POST", "/notifications/essai");
     ev.target.disabled = false;
-    // Résultat canal par canal (Telegram, Discord, email) : on voit lequel ne marche pas.
+    // Résultat canal par canal (Discord, panel) : on voit lequel ne marche pas.
     $("#sa-erreur").textContent = r.sortie || r.message || (r.ok ? "" : "Échec.");
     $("#sa-erreur").style.whiteSpace = "pre-line";
     if (r.ok) ev.target.textContent = "Envoyée ✓";
@@ -2149,5 +2145,166 @@ function fenetreVente() {
     if (!r.offres) return ($("#ve-erreur").textContent = r.message || "Échec.");
     VENTE = r;
     $("#fenetre-corps").innerHTML = `<p class="etiquette ok">Enregistré</p><p class="sub">Les pages du site sont à jour (une minute au plus).${r.manques.length ? ` Il manque encore : ${e(r.manques.join(", "))}.` : ""}</p>`;
+  });
+}
+
+// ------------------------------------------------------------ notifications (pour toi)
+// Tout ce que la plateforme a à te dire : sur Discord par BotPanel, et gardé ici (cloche).
+// Plus aucun email pour toi : le quota d'emails (Brevo) reste pour tes clients.
+const ICONES_NOTIF = { panne: "alert", disque: "layers", sauvegarde: "cloud", support: "chat", vitrine: "compass", essai: "hourglass", maj: "download", maintenance: "wrench", demo: "play", test: "bell" };
+let filtreNotifs = "toutes"; // toutes | non-lues | <type>
+function nomTypeNotif(id) {
+  if (id === "test") return "Essai";
+  return NOTIFS?.types.find((t) => t.id === id)?.nom ?? id;
+}
+function etatDiscord(n) {
+  if (n.discord === true) return `<span class="etiquette ok" title="Partie sur Discord">Discord ✓</span>`;
+  if (n.discord === null || n.discord === undefined) return `<span class="etiquette pause" title="Discord coupé pour cette sorte de notification, ou BotPanel pas réglé">Pas sur Discord</span>`;
+  return `<span class="etiquette ko" title="${e(n.discord)}">Discord ✗</span>`;
+}
+function afficherNotifications() {
+  const zone = $("#notifs");
+  if (!NOTIFS) {
+    zone.innerHTML = `<div class="vide">Notifications indisponibles (le moteur ne répond pas).</div>`;
+    return;
+  }
+  const r = NOTIFS.reglages;
+  const coupes = NOTIFS.types.filter((t) => !r.types[t.id]?.discord).length;
+  const etat = r.botpanel
+    ? `<span class="etiquette ok">Discord branché</span> <small>par BotPanel (${e(r.botpanel)})${coupes ? ` · ${coupes} sorte${coupes > 1 ? "s" : ""} coupée${coupes > 1 ? "s" : ""} sur Discord` : ""}</small>`
+    : `<span class="etiquette pause">Discord pas branché</span> <small>Mets l'adresse de ton BotPanel dans « Réglages » : en attendant, les notifications arrivent seulement ici.</small>`;
+  const nonLues = NOTIFS.liste.filter((n) => !n.lu).length;
+  const typesVus = [...new Set(NOTIFS.liste.map((n) => n.type))];
+  const liste = NOTIFS.liste.filter((n) => (filtreNotifs === "toutes" ? true : filtreNotifs === "non-lues" ? !n.lu : n.type === filtreNotifs));
+  const [eAide, eTexte] = aideB(
+    "nt-a-etat",
+    "Chaque notification part sur ton Discord par BotPanel (« Discord ✓ »). Si BotPanel n'a pas répondu, elle est marquée « Discord ✗ » (passe la souris ou touche-la pour voir pourquoi) mais elle reste ici. Rien ne t'est envoyé par email.",
+  );
+  zone.innerHTML = `<div class="carte-vitrine nt-etat"><div class="ligne-vitrine"><div>${etat}</div>
+      <button class="btn petit" type="button" id="nt-reglages">${ic("gear")}Réglages</button>
+      <button class="btn petit" type="button" id="nt-essai">Tester</button>${eAide}</div>${eTexte}
+      <p class="erreur" id="nt-erreur"></p></div>
+    <div class="puces nt-puces" role="group" aria-label="Filtrer les notifications">
+      <button class="puce${filtreNotifs === "toutes" ? " on" : ""}" type="button" data-f="toutes">Toutes</button>
+      <button class="puce${filtreNotifs === "non-lues" ? " on" : ""}" type="button" data-f="non-lues">Non lues${nonLues ? ` <span class="n">${nonLues}</span>` : ""}</button>
+      ${typesVus.map((t) => `<button class="puce${filtreNotifs === t ? " on" : ""}" type="button" data-f="${e(t)}">${e(nomTypeNotif(t))}</button>`).join("")}
+    </div>
+    <div class="barre serree">${nonLues ? `<button class="btn petit" type="button" id="nt-tout-lu">${ic("checks")}Tout marquer comme lu</button>` : ""}</div>
+    <div class="demandes nt-liste">${
+      liste
+        .map(
+          (n) => `<article class="demande notif${n.lu ? "" : " non-lu"}" data-id="${e(n.id)}">
+        <span class="nt-ic t-${e(n.type)}" aria-hidden="true">${ic(ICONES_NOTIF[n.type] ?? "bell")}</span>
+        <div class="nt-corps"><b>${e(n.titre)}</b>
+          <small>${e(quandFr(n.date))} · ${e(nomTypeNotif(n.type))}${n.lu ? "" : " · <b>nouvelle</b>"}</small>
+          <p>${e(n.texte)}</p></div>
+        <div class="actions">${etatDiscord(n)}${n.lu ? "" : `<button class="btn petit" type="button" data-lu>Lu</button>`}</div>
+      </article>`,
+        )
+        .join("") || `<div class="vide">${NOTIFS.liste.length ? "Rien dans ce filtre." : "Aucune notification pour l'instant. Tout va bien."}</div>`
+    }</div>
+    ${NOTIFS.liste.length ? `<div class="pf-bas"><span class="discret">${NOTIFS.total} notification${NOTIFS.total > 1 ? "s" : ""} gardée${NOTIFS.total > 1 ? "s" : ""} (les 1000 dernières)</span><button class="lien" type="button" id="nt-vider">Vider l'historique</button></div>` : ""}`;
+  zone.querySelectorAll("[data-f]").forEach((b) =>
+    b.addEventListener("click", () => {
+      filtreNotifs = b.dataset.f;
+      afficherNotifications();
+    }),
+  );
+  zone.querySelectorAll("[data-lu]").forEach((b) => b.addEventListener("click", () => marquerNotifs({ ids: [b.closest("[data-id]").dataset.id] })));
+  $("#nt-tout-lu")?.addEventListener("click", () => marquerNotifs({ tout: true }));
+  $("#nt-reglages").addEventListener("click", fenetreReglagesNotifs);
+  $("#nt-vider")?.addEventListener("click", fenetreViderNotifs);
+  $("#nt-essai").addEventListener("click", async (ev) => {
+    ev.target.disabled = true;
+    $("#nt-erreur").textContent = "Envoi…";
+    const r = await api("POST", "/notifications/essai");
+    ev.target.disabled = false;
+    await chargerNotifs();
+    $("#nt-erreur").textContent = r.sortie || r.message || (r.ok ? "" : "Échec.");
+    $("#nt-erreur").classList.toggle("ok", Boolean(r.ok));
+  });
+}
+async function chargerNotifs() {
+  const r = await api("GET", "/notifications").catch(() => ({}));
+  if (r.liste) NOTIFS = r;
+  afficherNotifications();
+  afficherBadges();
+}
+async function marquerNotifs(corps) {
+  const r = await api("POST", "/notifications/lu", corps).catch(() => ({}));
+  if (r.liste) NOTIFS = r;
+  afficherNotifications();
+  afficherBadges();
+}
+function fenetreViderNotifs() {
+  ouvrir(
+    "Vider l'historique ?",
+    `<p class="sub">Toutes les notifications gardées dans le panel sont effacées. Celles déjà parties sur Discord y restent.</p>
+    <p class="erreur" id="nv-erreur"></p>
+    <div class="pied"><button class="btn danger" id="nv-ok" type="button">Vider</button></div>`,
+  );
+  $("#nv-ok").addEventListener("click", async () => {
+    $("#nv-ok").disabled = true;
+    const r = await api("POST", "/notifications/vider");
+    if (!r.liste) {
+      $("#nv-ok").disabled = false;
+      return ($("#nv-erreur").textContent = r.message || "Échec.");
+    }
+    NOTIFS = r;
+    afficherNotifications();
+    afficherBadges();
+    $("#croix").click();
+  });
+}
+function fenetreReglagesNotifs() {
+  const r = NOTIFS.reglages;
+  const lignes = NOTIFS.types
+    .map(
+      (t) => `<div class="nt-type" data-type="${e(t.id)}">
+      <div class="nt-nom">${ic(ICONES_NOTIF[t.id] ?? "bell")}<b>${e(t.nom)}</b><button class="aide" type="button" data-aide="nt-t-${e(t.id)}" aria-label="Aide : ${e(t.nom)}">?</button></div>
+      <p class="texte-aide" id="nt-t-${e(t.id)}">${e(t.aide)}</p>
+      <label class="case"><input type="checkbox" data-c="discord"${r.types[t.id]?.discord ? " checked" : ""}> Discord</label>
+      <label class="case"><input type="checkbox" data-c="panel"${r.types[t.id]?.panel ? " checked" : ""}> Panel</label>
+    </div>`,
+    )
+    .join("");
+  const slugs = NOTIFS.types
+    .map(
+      (t) => `<div class="champ nt-slug"><label for="nt-s-${e(t.id)}">${e(t.nom)}</label><input id="nt-s-${e(t.id)}" type="text" data-slug="${e(t.id)}" value="${e(r.types[t.id]?.slug ?? t.slug)}" autocapitalize="none" spellcheck="false" maxlength="64"></div>`,
+    )
+    .join("");
+  ouvrir(
+    "Réglages des notifications",
+    `<div class="champ"><label for="nt-adresse">Adresse de BotPanel ${aide("nt-a-adr", "L'adresse de ton BotPanel vue depuis la machine de la plateforme, avec le port, par exemple <b>http://192.168.0.20:8080</b> (comme pour Home Assistant). Le panel lui envoie chaque notification ; BotPanel la poste sur ton Discord. Vide : rien ne part sur Discord, tout reste ici.")}
+      <input id="nt-adresse" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="http://192.168.0.20:8080" value="${e(r.botpanel)}"></div>
+    <div class="aide-ligne"><b>Quoi, et où</b> <button class="aide" type="button" data-aide="nt-a-ou" aria-label="Aide : quoi et où">?</button></div>
+    <p class="texte-aide" id="nt-a-ou"><b>Discord</b> : la notification part sur ton Discord par BotPanel (avec l'historique de Discord). <b>Panel</b> : elle est gardée ici, sous la cloche, avec lu / non lu. Décoche les deux pour ne plus du tout être prévenu de cette sorte de chose. Aucune de ces notifications ne part par email.</p>
+    <div class="nt-types">${lignes}</div>
+    <details class="nt-avance"><summary>Noms des notifications dans BotPanel</summary>
+      <p class="sub">Chaque sorte de notification correspond à une notification créée dans BotPanel, avec ce nom (le « slug »). Dans BotPanel, utilise dans le titre ou le message <code>{var:titre}</code>, <code>{var:texte}</code> et <code>{var:lien}</code> (adresse du panel). Tu peux donner le même nom à plusieurs sortes pour tout regrouper dans une seule notification.</p>
+      ${slugs}
+    </details>
+    <p class="erreur" id="nt-r-erreur"></p>
+    <div class="pied"><button class="btn principal" id="nt-r-ok" type="button">Enregistrer</button></div>`,
+  );
+  $("#nt-r-ok").addEventListener("click", async () => {
+    const types = {};
+    document.querySelectorAll(".nt-type").forEach((l) => {
+      types[l.dataset.type] = { discord: l.querySelector('[data-c="discord"]').checked, panel: l.querySelector('[data-c="panel"]').checked };
+    });
+    document.querySelectorAll("[data-slug]").forEach((i) => (types[i.dataset.slug].slug = i.value.trim()));
+    $("#nt-r-ok").disabled = true;
+    $("#nt-r-erreur").textContent = "";
+    const res = await api("POST", "/notifications/reglages", { botpanel: $("#nt-adresse").value.trim(), types });
+    $("#nt-r-ok").disabled = false;
+    if (!res.ok) return ($("#nt-r-erreur").textContent = res.message || "Échec.");
+    NOTIFS.reglages = res.reglages;
+    afficherNotifications();
+    afficherSante();
+    $("#nt-r-ok").textContent = "Enregistré ✓";
+    setTimeout(() => {
+      const b = $("#nt-r-ok");
+      if (b) b.textContent = "Enregistrer";
+    }, 2000);
   });
 }

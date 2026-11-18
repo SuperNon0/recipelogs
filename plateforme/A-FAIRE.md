@@ -323,33 +323,50 @@ adresses de E4 sur l'ancien tunnel suffit à tout remettre comme avant.
 
 ---
 
-## F. Les alertes sur ton téléphone (lot 5, facultatif, 5 min)
+## F. Tes notifications sur Discord par BotPanel (5 min)
 
-Les alertes (site en panne, retour, disque plein, nouvelle demande de support) arrivent déjà
-par **email** aux adresses super-admin. Pour les recevoir aussi en notification sur ton
-téléphone, choisis **Telegram** ou **Discord** (ou les deux).
+Tout ce que la plateforme a à te dire (site en panne puis revenu, sauvegarde ratée, disque
+plein, nouvelle demande de support ou sur la vitrine, fin d'essai, nouvelle version, préavis
+de maintenance pas parti, démo pas remise à zéro) arrive dans le panel, sous la **cloche**
+(partie **Notifications**, avec lu / non lu), et sur ton **Discord** par **BotPanel**.
+**Plus aucun email ne t'est envoyé** (ton quota Brevo reste pour les emails des clients) et
+Telegram n'existe plus.
 
-### ☐ F1. Telegram
-1. Dans Telegram, écris à **@BotFather** → `/newbot` → un nom (« RecipeLog alertes ») → il
-   te donne un **jeton** (`123456:ABC…`).
-2. Écris n'importe quoi à ton nouveau bot, puis ouvre
-   `https://api.telegram.org/bot<jeton>/getUpdates` : note le nombre après `"chat":{"id":`.
-3. Dans la VM, en root : `nano /srv/recipelog/.env`, ajoute
-   ```
-   ALERTE_TELEGRAM_JETON=123456:ABC…
-   ALERTE_TELEGRAM_CHAT=987654321
-   ```
+### ☐ F1. Créer les notifications dans BotPanel
+Dans BotPanel → **Notifications** → **+ Nouveau**, une notification par sorte, avec ce
+**slug** (ou demande-moi de les créer pour toi) :
 
-### ☐ F2. Discord
-Sur ton serveur Discord : **Paramètres du salon → Intégrations → Webhooks → Nouveau
-webhook → Copier l'URL**. Dans `/srv/recipelog/.env` : `ALERTE_DISCORD_URL=https://discord.com/api/webhooks/…`
+| Slug | Pour |
+|---|---|
+| `recipelog_panne` | site ou service en panne, puis revenu |
+| `recipelog_disque` | disque presque plein |
+| `recipelog_sauvegarde` | sauvegarde ratée, client sans sauvegarde, test de restauration raté |
+| `recipelog_support` | nouvelle demande ou nouveau message de support |
+| `recipelog_vitrine` | demande reçue par le formulaire de la vitrine |
+| `recipelog_essai` | fin d'essai d'un client |
+| `recipelog_maj` | nouvelle version disponible |
+| `recipelog_maintenance` | préavis de maintenance pas envoyé |
+| `recipelog_demo` | démo pas remise à zéro |
+| `recipelog_test` | le bouton « Tester » du panel |
 
-### ☐ F3. Appliquer et essayer
-```bash
-recipelog-plateforme appliquer
-```
-Puis dans le panel, partie **Santé de la machine** → **Tester les alertes** : le panel dit,
-pour chaque moyen (email, Telegram, Discord), si le message est parti. (Pour couper les emails d'alerte : `ALERTE_EMAIL=non` dans le `.env`.)
+Dans chacune : titre `{var:titre}`, message `{var:texte}` (et si tu veux un bouton ou un
+lien : `{var:lien}`, l'adresse du panel). Le salon, la couleur et le mode (direct, fil,
+forum) se choisissent dans BotPanel. Tu peux aussi donner le même slug à plusieurs sortes
+dans le panel (Réglages → « Noms des notifications dans BotPanel ») pour tout regrouper.
+
+### ☐ F2. Brancher le panel sur BotPanel
+Dans le panel : **Notifications** → **Réglages** → **Adresse de BotPanel** : l'adresse de
+ton BotPanel vue depuis la VM, avec le port, par exemple `http://192.168.0.20:8080` →
+**Enregistrer**. Dans la même fenêtre, coche pour chaque sorte si elle part sur **Discord**
+et si elle est gardée dans le **Panel**. (Ou, au choix, `BOTPANEL_URL=http://…` dans
+`/srv/recipelog/.env` puis `recipelog-plateforme appliquer`.)
+
+### ☐ F3. Essayer
+Dans le panel : **Notifications** → **Tester** : le panel dit si le message est parti sur
+Discord, sinon pourquoi (adresse fausse, slug pas créé dans BotPanel…).
+
+Si tu avais réglé l'ancien système : retire `ALERTE_TELEGRAM_JETON`, `ALERTE_TELEGRAM_CHAT`,
+`ALERTE_DISCORD_URL` et `ALERTE_EMAIL` de `/srv/recipelog/.env` (ils ne servent plus à rien).
 
 La page de statut **https://status.recipelog.cc** marche toute seule (elle passe par `*`
 dans Cloudflare) : rien à faire.

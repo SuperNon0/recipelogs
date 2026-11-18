@@ -305,10 +305,8 @@ services:
       SMTP_MOT_DE_PASSE: ${SMTP_MOT_DE_PASSE:-}
       SMTP_TLS: ${SMTP_TLS:-true}
       SMTP_EXPEDITEUR: ${SMTP_EXPEDITEUR:-RecipeLog <noreply@recipelog.cc>}
-      ALERTE_TELEGRAM_JETON: ${ALERTE_TELEGRAM_JETON:-}
-      ALERTE_TELEGRAM_CHAT: ${ALERTE_TELEGRAM_CHAT:-}
-      ALERTE_DISCORD_URL: ${ALERTE_DISCORD_URL:-}
-      ALERTE_EMAIL: ${ALERTE_EMAIL:-oui}
+      # Notifications pour toi : Discord par BotPanel (adresse réglable aussi dans le panel).
+      BOTPANEL_URL: ${BOTPANEL_URL:-}
       # Nouvelles versions (clients, plateforme, vitrine) : vérifiées toutes les MAJ_VERIFICATION_MINUTES.
       # GITHUB_JETON (facultatif, lecture seule) : si GitHub limite les demandes sans jeton.
       MAJ_VERIFICATION_MINUTES: ${MAJ_VERIFICATION_MINUTES:-60}
