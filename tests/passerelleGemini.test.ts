@@ -26,7 +26,6 @@ beforeAll(async () => {
   process.env.IA_DIR = dossier;
   process.env.IA_GEMINI_URL = `http://127.0.0.1:${(amont.address() as AddressInfo).port}`;
   writeFileSync(join(dossier, "cle.json"), JSON.stringify({ fournisseur: "gemini", modele: "gemini-3.8-flash", cle: "AIza-cle-de-test", prix: { entree: 0.75, sortie: 3.75 } }));
-  // @ts-expect-error : module JavaScript de la passerelle, sans types.
   const { relayerAutre } = await import("../plateforme/passerelle/ia.mjs");
   passerelle = createServer((req, res) => {
     const g = (req.url ?? "").match(/models\/([^:]+):(generateContent|streamGenerateContent)/);
