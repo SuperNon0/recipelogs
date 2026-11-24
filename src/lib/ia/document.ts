@@ -6,6 +6,7 @@
  */
 import { PRICE_UNITS, type PriceUnit } from "@/lib/cost";
 import { SUPPLIER_FAMILIES } from "@/lib/suppliers";
+import { joliNom } from "@/lib/ia/rapprochement";
 
 export type TypeLecture = "facture" | "mercuriale";
 
@@ -75,17 +76,24 @@ export const SCHEMA_DOCUMENT = {
   additionalProperties: false,
 } as const;
 
-/** Articles et familles déjà utilisés : l'IA les réutilise au lieu d'en inventer. */
-export type ContexteLecture = { articles: string[]; fournisseur?: string | null };
+/**
+ * Articles déjà utilisés (l'IA les réutilise au lieu d'en inventer) et, quand le
+ * fournisseur est connu, ses produits déjà enregistrés (même nom réutilisé).
+ */
+export type ContexteLecture = { articles: string[]; fournisseur?: string | null; produits?: string[] };
 
 export function consigne(type: TypeLecture, ctx: ContexteLecture): string {
   const articles = ctx.articles.slice(0, 400);
+  const produits = (ctx.produits ?? []).slice(0, 400);
   return [
     type === "facture"
       ? "Ce fichier est une facture, un bon de livraison ou un bon de commande d'un fournisseur de pâtisserie. Recopie chaque ligne de produit acheté."
       : `Ce fichier est une mercuriale (liste de prix) ${ctx.fournisseur ? `du fournisseur « ${ctx.fournisseur} »` : "d'un fournisseur"}. Recopie chaque produit avec son prix. Il n'y a pas de quantité achetée : laisse quantite et montant_ligne à null.`,
     "Les prix sont en euros HORS TAXES. N'invente rien : un champ absent ou illisible vaut null, et explique le doute dans a_verifier.",
-    "produit = la désignation exacte écrite (garde l'origine, la catégorie, le calibre). reference = le code article du fournisseur.",
+    "produit = la désignation écrite (garde l'origine, la catégorie, le calibre, la marque, le poids), mais écrite normalement : minuscules avec une majuscule au début, PAS TOUT EN MAJUSCULES (« CREME LIQ.35%MG 1L BAIGNES UHT FR » → « Crème liquide 35% MG 1 L Baignes UHT France »). Développe les abréviations évidentes (liq. → liquide, nois. → noisette, choc. → chocolat, FR → France), garde les sigles (UHT, AOP, IGP, PNE). reference = le code article du fournisseur.",
+    produits.length
+      ? `Produits déjà enregistrés chez ce fournisseur : quand une ligne est le même produit (même poids, même %), recopie EXACTEMENT ce nom-là dans produit : ${produits.join(" ; ")}.`
+      : "",
     "Conditionnement : dès qu'un poids ou un volume est connu, préfère unite_prix kg ou L plutôt que pièce. Sac de 25 kg : unite_prix kg, contenance 25, prix_colis = prix du sac. Boîte de conserve « 5/1 4,2 kg PNE 2,4 kg » : unite_prix kg, contenance = poids net égoutté (PNE) s'il est écrit, sinon le poids net. Bouteille, bidon, brique (« 70 cl », « 10 L ») : unite_prix L. Carton « x 50 » vendu au colis : unite_prix pièce, contenance 50, prix_colis = prix du carton. Garde pièce pour ce qui se compte.",
     "prix_unitaire = prix HT par kg, L ou pièce s'il est écrit. Sinon donne prix_colis (prix d'un colis) avec sa contenance, ou montant_ligne avec quantite (nombre de colis). Ne fais pas de calcul hasardeux : recopie ce qui est écrit.",
     "Ignore les lignes qui ne sont pas des produits : frais de port, consigne, remise globale, sous-totaux, TVA (mentionne-les dans remarque s'ils comptent).",
@@ -161,7 +169,7 @@ export function nettoyerDocument(brut: unknown): DocumentLu {
     .map((x) => {
       const l = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
       return {
-        produit: texte(l.produit) ?? "",
+        produit: joliNom(texte(l.produit) ?? ""),
         reference: texte(l.reference, 100),
         article: texte(l.article),
         famille: texte(l.famille, 100),
@@ -176,7 +184,7 @@ export function nettoyerDocument(brut: unknown): DocumentLu {
     })
     .filter((l) => l.produit);
   return {
-    fournisseur: texte(o.fournisseur),
+    fournisseur: o.fournisseur == null ? null : joliNom(texte(o.fournisseur) ?? "") || null,
     date: jour(o.date),
     numero: texte(o.numero, 100),
     total: nombre(o.total_ht, true),

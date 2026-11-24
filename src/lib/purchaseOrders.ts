@@ -764,6 +764,45 @@ export async function groupProducts(supplierId: number, productIds: number[], ar
 }
 
 /**
+ * Fusionne des doublons dans un produit (« CREME LIQ.35%MG 1L » créé par une lecture IA
+ * à côté de « Crème liquide 35% MG 1 L ») : leurs prix passent dans l'historique du produit
+ * gardé, à la date de leur facture ; les commandes et les ingrédients qui les suivaient
+ * passent aussi sur lui ; puis les doublons sont supprimés. Rien n'est perdu.
+ */
+export async function mergeProducts(supplierId: number, keepId: number, duplicateIds: number[]): Promise<{ name: string; merged: number; prices: number }> {
+  const ids = [...new Set(duplicateIds)].filter((id) => id !== keepId).slice(0, 500);
+  if (!ids.length) throw new Error("Choisis au moins un doublon.");
+  return prisma.$transaction(
+    async (tx) => {
+      const keep = await tx.supplierProduct.findFirst({ where: { id: keepId, supplierId } });
+      if (!keep) throw new Error("Produit introuvable.");
+      const dups = await tx.supplierProduct.findMany({ where: { id: { in: ids }, supplierId } });
+      if (dups.length !== ids.length) throw new Error("Un des doublons n'est plus chez ce fournisseur.");
+      const autreUnite = dups.find((d) => d.priceUnit !== keep.priceUnit);
+      if (autreUnite) throw new Error(`« ${autreUnite.name} » est suivi en « ${autreUnite.priceUnit} », « ${keep.name} » en « ${keep.priceUnit} » : corrige l'unité avant de fusionner.`);
+      const { count } = await tx.purchaseOrderLine.updateMany({ where: { productId: { in: ids } }, data: { productId: keepId } });
+      await tx.supplierOrderLine.updateMany({ where: { productId: { in: ids } }, data: { productId: keepId } });
+      await tx.ingredientBase.updateMany({ where: { chosenProductId: { in: ids } }, data: { chosenProductId: keepId } });
+      // Ce qui manque au produit gardé est repris d'un doublon (référence, article, ingrédient relié…).
+      const d = dups.find((x) => x.reference) ?? null;
+      const data: Prisma.SupplierProductUncheckedUpdateInput = {};
+      if (!keep.reference && d?.reference) data.reference = d.reference;
+      if (!keep.article?.trim()) { const a = dups.find((x) => x.article?.trim())?.article; if (a) data.article = a; }
+      if (!keep.family?.trim()) { const f = dups.find((x) => x.family?.trim())?.family; if (f) data.family = f; }
+      if (keep.packSize == null) { const ps = dups.find((x) => x.packSize != null)?.packSize; if (ps != null) data.packSize = ps; }
+      if (!keep.packName) { const pn = dups.find((x) => x.packName)?.packName; if (pn) data.packName = pn; }
+      if (keep.baseId == null) { const b = dups.find((x) => x.baseId != null)?.baseId; if (b != null) data.baseId = b; }
+      await tx.supplierProduct.deleteMany({ where: { id: { in: ids } } });
+      if (Object.keys(data).length) await tx.supplierProduct.update({ where: { id: keepId }, data });
+      await refreshProducts(tx, [keepId]);
+      await followArticles(tx, supplierId, [keepId]);
+      return { name: keep.name, merged: ids.length, prices: count };
+    },
+    { timeout: 60_000 },
+  );
+}
+
+/**
  * Supprime un produit et tous ses prix. Il disparaît aussi des factures où il
  * était (leur total écrit ne change pas). L'ingrédient qui le suivait garde son dernier prix.
  */

@@ -11,6 +11,22 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.26",
+    date: "2026-11-24",
+    title: "Factures lues par l'IA : plus de doublons",
+    summary:
+      "Une facture lue par l'IA retrouve maintenant tes produits déjà enregistrés, même quand elle les écrit en majuscules ou en abrégé : les prix vont dans le bon historique au lieu de créer un nouveau produit. Les doublons déjà créés se fusionnent depuis la fiche du fournisseur.",
+    features: [
+      "Lecture d'une facture ou d'une mercuriale par l'IA : chaque ligne est rapprochée du produit déjà enregistré chez ce fournisseur (même référence, ou même nom malgré les majuscules, les accents et les abréviations : « CREME LIQ.35%MG 1L » = « Crème liquide 35% MG 1 L »). Elle affiche « Reconnu » et son prix entre dans l'historique de ce produit, à la date de la facture",
+      "Jamais de rapprochement entre deux % différents (chocolat 64 % / 70 %), deux farines différentes (T45 / T55) ou deux poids différents. Si ce n'est pas le bon produit, « Ce n'est pas lui » en fait un nouveau produit",
+      "Les nouveaux produits ne sont plus écrits TOUT EN MAJUSCULES : « Tomate grappe France », avec les sigles gardés (UHT, AOP, MG)",
+      "Le fournisseur écrit « RIBERA ET FILS SAS » sur la facture est reconnu tout de suite comme « Ribera et Fils »",
+      "L'article suit l'orthographe déjà utilisée (« Fraises » → « Fraise », « crème 35% » → « Crème 35 % »), pour garder un seul historique de prix au kg par article",
+      "Fiche d'un fournisseur → « Doublons » (quand il y en a) : fusionne un produit enregistré deux fois en un seul, avec tous ses prix, ses factures et l'ingrédient relié",
+      "Claude (connecteur RecipeLog) : nouvel outil fusionner_produits, qui liste les doublons d'un fournisseur puis les fusionne avec ton accord",
+    ],
+  },
+  {
     version: "V2.25",
     date: "2026-11-18",
     title: "Factures et mercuriales : IA ou Claude",

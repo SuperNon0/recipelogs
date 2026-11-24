@@ -623,6 +623,20 @@ button.cost-line:hover {
   background: color-mix(in srgb, var(--accent-2) 14%, transparent);
   color: var(--accent-2);
 }
+.ia-reconnu {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  color: var(--muted, inherit);
+  font-size: 12.5px;
+}
+.ia-lien {
+  padding: 0 6px;
+  min-height: 0;
+  font-size: 12.5px;
+  text-decoration: underline;
+}
 .ia-doute {
   display: inline-flex;
   gap: 4px;
@@ -1139,6 +1153,35 @@ button.cost-line:hover {
   gap: 8px;
   align-items: center;
   font-size: 14px;
+}
+
+.fus-ligne {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.fus-ligne:last-of-type {
+  border-bottom: 0;
+}
+.fus-ligne > label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.fus-nom {
+  font-size: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .fus-ligne {
+    grid-template-columns: auto auto;
+  }
+  .fus-nom {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ─────────────────────────────────────────────
