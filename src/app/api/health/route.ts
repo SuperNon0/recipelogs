@@ -1,6 +1,7 @@
 import { BOOT_TIME } from "@/lib/bootTime";
 import { prisma } from "@/lib/prisma";
 import { fullVersion } from "@/lib/version";
+import { BUILD_ID } from "@/lib/appGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export async function GET(req: Request) {
   return Response.json({
     ok: true,
     version: fullVersion(),
+    // Les pages ouvertes avant une mise à jour se rechargent en le voyant changer (AppGuard).
+    build: BUILD_ID,
     bootedAt: BOOT_TIME,
     now: Date.now(),
   });

@@ -45,6 +45,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Réglages → Lecture des factures : sur RecipeLog en ligne, le bloc « Lecture par IA / D'où vient l'IA ? » a disparu. Il ne reste que le choix IA ou Claude, avec les lectures du mois (ou « pas encore ouverte ») sous « Analyser par l'IA »",
       "Importer une mercuriale ou une nouvelle facture : un document de plus de 10 Mo (une longue mercuriale en photos, par exemple) ne s'arrête plus sur « L'envoi n'a pas marché (connexion coupée ?) ». Jusqu'à 40 Mo par envoi passent, et un fichier trop lourd est signalé tout de suite avec son poids et quoi faire",
       "Importer une mercuriale, une nouvelle facture ou joindre un fichier à une facture : certains PDF tout à fait normaux étaient bloqués par le pare-feu de Cloudflare (« L'envoi n'a pas marché »). Les documents partent maintenant sous une forme qu'il laisse passer",
+      "Téléphone : la page ne reste plus figée (plus de défilement) après avoir fermé une fenêtre, et la barre du bas ne reste plus coincée au milieu de l'écran après le clavier ou un zoom. Si ça arrive encore, toucher l'écran ou revenir dans l'appli remet tout en place",
+      "Appli posée sur l'écran d'accueil : après une mise à jour du site, elle ne se bloque plus jusqu'à la relancer. Elle se recharge toute seule au retour (ou propose « Recharger » si tu es en train d'écrire), et « Action impossible » a un bouton « Recharger la page »",
     ],
     migrations: ["Les documents à traiter savent s'ils sont une facture ou une mercuriale : fait tout seul à la mise à jour"],
   },

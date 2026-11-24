@@ -206,3 +206,24 @@ svg.lucide {
   font-weight: 600;
   letter-spacing: 0.1em;
 }
+
+/* ─── Nouvelle version du site (AppGuard) : bandeau pour recharger ─── */
+.maj-dispo {
+  position: fixed;
+  z-index: 101;
+  left: 50%;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px;
+  background: var(--pop);
+  color: var(--text);
+  border: 1px solid var(--line2);
+  border-radius: 99px;
+  box-shadow: var(--shadow);
+  font-size: 13.5px;
+  white-space: nowrap;
+}

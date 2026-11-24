@@ -3,6 +3,7 @@ import "./globals.css";
 import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/AppNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { ZoomReset } from "@/components/ZoomReset";
+import { AppGuard } from "@/components/AppGuard";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
@@ -192,6 +193,7 @@ export default async function RootLayout({
         <CommandPalette />
         </PermissionsProvider>
         <ZoomReset />
+        <AppGuard />
         {authMode() === "oidc" && viewer.kind === "account" && <SessionKeeper />}
         {encreJs}
       </body>
