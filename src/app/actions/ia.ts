@@ -20,7 +20,7 @@ import { recordPurchaseOrder, type PurchaseOrderSummary } from "@/lib/purchaseOr
 import { INVOICE_MAX_BYTES, attachInvoiceFile, sniffInvoiceExt } from "@/lib/invoiceFiles";
 import { deballerFichier } from "@/lib/envoiFichier";
 import { devinerColonnes, ligneEntete } from "@/lib/mercuriale";
-import { articleKey } from "@/lib/suppliers";
+import { articleExistant, fournisseurExistant } from "@/lib/ia/rapprochement";
 import { lireTableur } from "@/lib/mercurialeFichier";
 import { finishPendingInvoice, pendingDocument, setPendingError } from "@/lib/pendingInvoices";
 import { modesAnalyse, savePrefere, type ModeAnalyse, type ModesAnalyse } from "@/lib/ia/analyse";
@@ -117,7 +117,15 @@ export async function lancerLecture(fd: FormData): Promise<{ ok: true; id: strin
       prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 400 }),
       fournisseurId ? prisma.supplier.findUnique({ where: { id: fournisseurId }, select: { name: true } }) : null,
     ]);
-    const ctx = { articles: produits.map((p) => p.article!).filter(Boolean), fournisseur: fournisseur?.name ?? null };
+    // Fournisseur connu (mercuriale, ou facture gardée depuis sa fiche) : ses produits, pour que l'IA reprenne leurs noms.
+    const sesProduits = fournisseurId
+      ? await prisma.supplierProduct.findMany({ where: { supplierId: fournisseurId }, select: { name: true }, orderBy: { priceDate: { sort: "desc", nulls: "last" } }, take: 400 })
+      : [];
+    const ctx = {
+      articles: produits.map((p) => p.article!).filter(Boolean),
+      fournisseur: fournisseur?.name ?? null,
+      produits: sesProduits.map((p) => p.name),
+    };
     const id = lancer<ResultatLecture>(
       qui(viewer),
       async () => {
@@ -165,29 +173,24 @@ export async function articlesConnus(): Promise<string[]> {
 // Enregistrement après vérification
 // ─────────────────────────────────────────────
 
-/** « RIBERA SAS » et « Ribera » : même nom une fois retirés la casse, les accents, la ponctuation et la forme de société. */
-function cleFournisseur(nom: string): string {
-  return articleKey(nom)
-    .replace(/[.,;:'’()&/-]+/g, " ")
-    .replace(/\b(sas|sasu|sarl|sa|eurl|sci|snc|ets|etablissements|societe|ste|et fils|france)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /** Un fournisseur déjà enregistré dont le nom ressemble à celui-ci (sans être exactement le même). */
 async function fournisseurRessemblant(nom: string): Promise<string | null> {
   const tous = await prisma.supplier.findMany({ select: { name: true } });
   if (tous.some((s) => s.name.trim().toLowerCase() === nom.trim().toLowerCase())) return null;
-  const cle = cleFournisseur(nom);
-  if (!cle) return null;
-  return tous.find((s) => cleFournisseur(s.name) === cle)?.name ?? null;
+  return fournisseurExistant(nom, tous.map((s) => s.name));
 }
 
-function versLignes(lignes: LigneLue[]) {
+/** Articles déjà utilisés : « Fraises » ou « crème 35% » reprennent l'orthographe enregistrée (« Fraise », « Crème 35 % »). */
+async function articlesEnregistres(): Promise<string[]> {
+  const p = await prisma.supplierProduct.findMany({ where: { article: { not: null } }, select: { article: true }, distinct: ["article"], take: 5000 });
+  return p.map((x) => x.article!.trim()).filter(Boolean);
+}
+
+function versLignes(lignes: LigneLue[], articles: string[] = []) {
   return lignes.map((l) => ({
     product: l.produit,
     reference: l.reference,
-    article: l.article,
+    article: articleExistant(l.article, articles) ?? l.article,
     family: l.famille,
     quantity: l.quantite,
     packSize: l.contenance,
@@ -242,7 +245,7 @@ export async function enregistrerFactureLue(fd: FormData): Promise<{ ok: true; r
       note,
       replace: fd.get("remplacer") === "1",
       keepFamily: true,
-      lines: versLignes(doc.lignes),
+      lines: versLignes(doc.lignes, await articlesEnregistres()),
     });
     let fichierJoint = false;
     const f = deballerFichier(fd.get("fichier"));
@@ -286,7 +289,7 @@ export async function enregistrerMercuriale(input: {
       manual: true,
       note: `Mercuriale importée${input.nomFichier ? ` (${String(input.nomFichier).slice(0, 120)})` : ""}`,
       keepFamily: true,
-      lines: versLignes(doc.lignes),
+      lines: versLignes(doc.lignes, await articlesEnregistres()),
     });
     const fichierJoint = input.attenteId ? await finishPendingInvoice(Number(input.attenteId), resume.facture_id) : null;
     refresh();

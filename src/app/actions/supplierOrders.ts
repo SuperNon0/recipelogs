@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAccess } from "@/lib/auth/guard";
 import type { Viewer } from "@/lib/auth/viewer";
-import { groupProducts } from "@/lib/purchaseOrders";
+import { groupProducts, mergeProducts } from "@/lib/purchaseOrders";
 import { createSupplierOrder, deleteSupplierOrder, type SupplierOrderLineInput } from "@/lib/supplierOrdersDb";
 
 type Erreur = { ok: false; error: string };
@@ -64,6 +64,23 @@ export async function regrouperProduits(supplierId: number, productIds: number[]
     const count = await groupProducts(Number(supplierId) || 0, ids, typeof article === "string" ? article : null);
     revalidatePath("/", "layout");
     return { ok: true, count };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Fusionne des doublons dans le produit gardé (leurs prix passent dans son historique), depuis la fiche fournisseur. */
+export async function fusionnerDoublons(
+  supplierId: number,
+  keepId: number,
+  duplicateIds: number[],
+): Promise<{ ok: true; name: string; merged: number; prices: number } | Erreur> {
+  await requireAccess("costs.edit");
+  try {
+    const ids = (Array.isArray(duplicateIds) ? duplicateIds : []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    const r = await mergeProducts(Number(supplierId) || 0, Number(keepId) || 0, ids);
+    revalidatePath("/", "layout");
+    return { ok: true, ...r };
   } catch (e) {
     return fail(e);
   }

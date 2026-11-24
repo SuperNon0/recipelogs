@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Combine, History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
@@ -17,6 +17,8 @@ import { FacturesATraiter, NouvelleMercurialeButton } from "./NouvelleFacture";
 import type { PendingInvoiceItem } from "@/lib/pendingInvoices";
 import type { ModesAnalyse } from "@/lib/ia/analyse";
 import { GroupProductsModal } from "./GroupProducts";
+import { MergeDuplicatesModal, type ProduitAFusionner } from "./MergeDuplicates";
+import { doublonsProduits } from "@/lib/ia/rapprochement";
 import { articleKey } from "@/lib/suppliers";
 
 const PAGE = 150;
@@ -32,12 +34,22 @@ export function SupplierDetail({
   const router = useRouter();
   const editable = can("costs.edit");
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [modal, setModal] = useState<"edit" | "delete" | "product" | "group" | null>(null);
+  const [modal, setModal] = useState<"edit" | "delete" | "product" | "group" | "merge" | null>(null);
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE);
   // Les variantes d'un même article (« Fraise France », « Fraise Espagne ») tiennent sur une ligne.
   const groups = useMemo(() => groupByArticle(supplier.products), [supplier.products]);
   const open = groups.find((g) => g.key === openKey);
+  // Doublons à fusionner (« CREME LIQ.35%MG 1L » à côté de « Crème liquide 35% MG 1 L ») : le bouton n'apparaît que s'il y en a.
+  const aFusionner = useMemo<ProduitAFusionner[]>(
+    () =>
+      supplier.products.map((p) => ({
+        id: p.id, name: p.name, reference: p.reference, priceUnit: p.unit, lignes: p.history.length,
+        dernierPrix: p.history[0]?.price ?? null, date: p.history[0]?.date ?? null,
+      })),
+    [supplier.products],
+  );
+  const nbDoublons = useMemo(() => doublonsProduits(aFusionner).reduce((n, g) => n + g.doublons.length, 0), [aFusionner]);
   // Recherche dans les noms, les articles et les références : utile avec une mercuriale de plusieurs centaines de produits.
   const words = articleKey(query).split(" ").filter(Boolean);
   const filtered = words.length
@@ -80,9 +92,16 @@ export function SupplierDetail({
         <Help title="Gérer les produits" example="Touche « Farine T45 », puis « Ajouter un prix » : 0,92 € le kg au 14/11.">
           Touche un produit pour voir tous ses prix. Là, tu peux ajouter un prix, corriger ou supprimer un prix, modifier le produit
           (nom, contenance, nom pour comparer) ou le supprimer. « Ajouter un produit » crée un produit à la main, sans facture.
+          « Doublons » apparaît quand un même produit est enregistré deux fois (par exemple écrit en majuscules par une lecture IA) : il
+          propose de les fusionner en un seul, avec tout l&apos;historique des prix.
         </Help>
         {editable && (
           <span style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {nbDoublons > 0 && (
+              <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("merge")}>
+                <Combine size={15} /> Doublons ({nbDoublons})
+              </button>
+            )}
             <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("group")}>
               <Layers size={15} /> Regrouper
             </button>
@@ -183,6 +202,7 @@ export function SupplierDetail({
         <DeleteSupplierModal id={supplier.id} onClose={() => setModal(null)} onDeleted={() => router.push("/fournisseurs/liste")} />
       )}
       {modal === "product" && <ProductFormModal supplierId={supplier.id} onClose={() => setModal(null)} />}
+      {modal === "merge" && <MergeDuplicatesModal supplierId={supplier.id} products={aFusionner} onClose={() => setModal(null)} />}
       {modal === "group" && (
         <GroupProductsModal
           supplierId={supplier.id}

@@ -2,7 +2,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { currentOrigin } from "@/lib/auth/service";
-import { groupProducts } from "@/lib/purchaseOrders";
+import { groupProducts, mergeProducts } from "@/lib/purchaseOrders";
+import { doublonsProduits } from "@/lib/ia/rapprochement";
 import { articleKey, articleOf } from "@/lib/suppliers";
 import { orderUnits, qtyLabel } from "@/lib/supplierOrders";
 import { createSupplierOrder, deleteSupplierOrder, listSupplierOrders, loadSupplierOrder } from "@/lib/supplierOrdersDb";
@@ -181,6 +182,45 @@ export const ORDER_TOOLS: McpTool[] = [
       const n = await groupProducts(a.fournisseur_id, a.produit_ids, a.article || null);
       revalidatePath("/", "layout");
       return text({ regroupes: n, article: a.article || null });
+    },
+  },
+  {
+    name: "fusionner_produits",
+    title: "Fusionner des produits en double",
+    description:
+      "Un même produit enregistré deux fois chez un fournisseur (souvent « CREME LIQ.35%MG 1L » lu par l'IA à côté de « Crème liquide 35% MG 1 L ») devient un seul : les prix du doublon passent dans l'historique du produit gardé, à la date de leur facture ; commandes et ingrédients suivent. Sans garder_id : renvoie seulement les doublons proposés (rien n'est changé). Demande l'accord de Noë avant de fusionner. Pour des variantes (Fraise France / Espagne), utilise plutôt regrouper_produits.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fournisseur_id: js.int("Id du fournisseur"),
+        garder_id: js.int("Id du produit à garder (facultatif : sans lui, liste les doublons proposés)"),
+        doublon_ids: { type: "array", items: { type: "integer" }, description: "Ids des doublons à fusionner dans garder_id" },
+      },
+      required: ["fournisseur_id"],
+    },
+    annotations: DELETE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ fournisseur_id: id, garder_id: id.optional(), doublon_ids: z.array(id).max(500).optional() }),
+        args,
+      );
+      if (!a.garder_id) {
+        const produits = await prisma.supplierProduct.findMany({
+          where: { supplierId: a.fournisseur_id },
+          select: { id: true, name: true, reference: true, priceUnit: true, _count: { select: { lines: true } } },
+        });
+        const groupes = doublonsProduits(produits.map((p) => ({ id: p.id, name: p.name, reference: p.reference, priceUnit: p.priceUnit, lignes: p._count.lines })));
+        return text({
+          doublons_proposes: groupes.map((g) => ({
+            garder: { id: g.garder.id, nom: g.garder.name, prix: g.garder.lignes },
+            doublons: g.doublons.map((d) => ({ id: d.id, nom: d.name, prix: d.lignes })),
+          })),
+        });
+      }
+      if (!a.doublon_ids?.length) throw new Error("donne doublon_ids");
+      const r = await mergeProducts(a.fournisseur_id, a.garder_id, a.doublon_ids);
+      revalidatePath("/", "layout");
+      return text({ garde: r.name, fusionnes: r.merged, prix_repris: r.prices });
     },
   },
   {

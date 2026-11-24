@@ -12,6 +12,7 @@ import { montantLigne, prixALUnite, type DocumentLu, type LigneLue, type TypeLec
 import { NOMS_ROLES, ROLES, lignesDepuisTableau, type Colonnes, type Role } from "@/lib/mercuriale";
 import type { PurchaseOrderSummary } from "@/lib/purchaseOrders";
 import { articleKey } from "@/lib/suppliers";
+import { articleExistant, fournisseurExistant, produitProche, type Rapprochement } from "@/lib/ia/rapprochement";
 import {
   articlesConnus,
   enregistrerFactureLue,
@@ -48,7 +49,9 @@ const jour = () => {
 };
 /** Ligne à l'écran : `articleChoisi` quand la personne a touché au champ Article. */
 /** uid : repère stable de la ligne à l'écran (pas envoyé au serveur). */
-type LigneEcran = LigneLue & { articleChoisi?: boolean; uid?: number };
+/** separe : la personne a dit que le produit reconnu n'est pas le bon (la ligne crée un nouveau produit). */
+type LigneEcran = LigneLue & { articleChoisi?: boolean; uid?: number; separe?: boolean };
+type Trouve = Rapprochement<Connu>;
 let uidSuivant = 1;
 const avecUid = <T extends LigneLue>(l: T): T & { uid: number } => ({ ...l, uid: uidSuivant++ });
 /** Lignes affichées d'un coup : une mercuriale de 1 000 lignes reste fluide, même sur un téléphone. */
@@ -56,8 +59,6 @@ const PAR_PAGE = 150;
 type Filtre = "toutes" | "doute" | "nouveau" | "change";
 const euro = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const prixTxt = (n: number, u: string) => `${n.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} €/${u}`;
-// Même règle que le serveur pour reconnaître un produit déjà connu (sans accents ni majuscules).
-const cleProduit = articleKey;
 
 const ligneVide = (): LigneLue => ({
   produit: "", reference: null, article: null, famille: null, quantite: null, contenance: null,
@@ -484,12 +485,15 @@ function NumInput({ value, onChange, label, placeholder, negatif }: { value: num
 
 /** Une ligne à relire. memo : taper dans une ligne ne redessine pas les centaines d'autres. */
 const LigneVerif = memo(function LigneVerif({
-  l, connu, article, nouvelArticle, facture, onChange, onRetirer,
+  l, trouve, proposition, article, nouvelArticle, facture, onChange, onRetirer,
 }: {
-  l: LigneEcran; connu: Connu | undefined; article: string; nouvelArticle: boolean; facture: boolean;
+  l: LigneEcran; trouve: Trouve | null; proposition: Trouve | null; article: string; nouvelArticle: boolean; facture: boolean;
   onChange: (uid: number, p: Partial<LigneEcran>) => void; onRetirer: (uid: number) => void;
 }) {
   const uid = l.uid!;
+  const connu = trouve?.produit;
+  // Nom différent de celui écrit sur la facture : la ligne ira sur le produit déjà enregistré.
+  const autreNom = !!connu && articleKey(connu.nom) !== articleKey(l.produit);
   const ligne = (p: Partial<LigneEcran>) => onChange(uid, p);
   const pu = prixALUnite(l);
   const uniteChange = connu && connu.prix != null && connu.unite !== l.unite;
@@ -522,7 +526,25 @@ const LigneVerif = memo(function LigneVerif({
       </div>
       <div className="ia-ligne-bas">
         <span className="ia-pu">{pu != null ? `= ${prixTxt(pu, l.unite)}` : "Prix manquant : la ligne sera ignorée"}</span>
+        {autreNom && (
+          <span className="ia-reconnu">
+            <span className="ia-badge" data-sens="baisse">Reconnu</span> ira sur « {connu!.nom} », déjà enregistré
+            {trouve!.par === "proche" && (
+              <button type="button" className="fl-btn fl-btn-ghost ia-lien" onClick={() => ligne({ separe: true })}>
+                Ce n&apos;est pas lui
+              </button>
+            )}
+          </span>
+        )}
         {!connu && l.produit.trim() && <span className="ia-badge">Nouveau</span>}
+        {l.separe && proposition && (
+          <span className="ia-reconnu">
+            Gardé à part de « {proposition.produit.nom} »
+            <button type="button" className="fl-btn fl-btn-ghost ia-lien" onClick={() => ligne({ separe: false })}>
+              Annuler
+            </button>
+          </span>
+        )}
         {nouvelArticle && <span className="ia-badge" data-sens="hausse">Nouvel article</span>}
         {uniteChange && (
           <span className="ia-doute"><AlertTriangle size={13} /> Ce produit était suivi en « {connu!.unite} » : enregistrer change son unité, et le coût des recettes qui l&apos;utilisent.</span>
@@ -544,7 +566,13 @@ function Verifier({
   type: TypeLecture; initial: DocumentLu; modele: string | null; secours: boolean; fournisseurFixe?: Fournisseur; fournisseurs: string[];
   onRetour: () => void; onEnregistrer: (doc: DocumentLu, remplacer: boolean, note: string, nouveauFournisseur: boolean) => Promise<string | null>;
 }) {
-  const [doc, setDoc] = useState<Omit<DocumentLu, "lignes"> & { lignes: LigneEcran[] }>(() => ({ ...initial, lignes: initial.lignes.map(avecUid) }));
+  // « RIBERA ET FILS SAS » lu sur la facture : on reprend tout de suite « Ribera et Fils », déjà enregistré.
+  const fournisseurLu = initial.fournisseur;
+  const [doc, setDoc] = useState<Omit<DocumentLu, "lignes"> & { lignes: LigneEcran[] }>(() => ({
+    ...initial,
+    fournisseur: fournisseurFixe ? initial.fournisseur : (fournisseurExistant(initial.fournisseur, fournisseurs) ?? initial.fournisseur),
+    lignes: initial.lignes.map(avecUid),
+  }));
   const [filtre, setFiltre] = useState<Filtre>("toutes");
   const [cherche, setCherche] = useState("");
   const [limite, setLimite] = useState(PAR_PAGE);
@@ -568,14 +596,23 @@ function Verifier({
   }, []);
 
   const clesArticles = useMemo(() => new Set(articles.map(articleKey)), [articles]);
-  const parNom = useMemo(() => new Map(connus.map((c) => [cleProduit(c.nom), c])), [connus]);
-  const parRef = useMemo(() => new Map(connus.filter((c) => c.reference).map((c) => [c.reference!.trim(), c])), [connus]);
-  const trouver = (l: LigneLue) => (l.reference && parRef.get(l.reference.trim())) || parNom.get(cleProduit(l.produit));
+  /**
+   * Le produit déjà enregistré pour cette ligne : même référence, même nom (sans majuscules
+   * ni accents) ou nom proche (« CREME LIQ.35%MG 1L » = « Crème liquide 35% MG 1 L »).
+   * Un nom proche refusé (« Ce n'est pas lui ») ne compte plus.
+   */
+  const proposer = (l: LigneLue): Trouve | null => produitProche(l, connus);
+  const trouver = (l: LigneEcran): Trouve | null => {
+    const t = proposer(l);
+    return t && !(l.separe && t.par === "proche") ? t : null;
+  };
   /**
    * L'article qui sera enregistré : celui que la personne a écrit ; sinon celui que le produit
-   * a déjà dans RecipeLog (jamais remplacé par la proposition de l'IA) ; sinon la proposition.
+   * a déjà dans RecipeLog (jamais remplacé par la proposition de l'IA) ; sinon la proposition,
+   * avec l'orthographe d'un article déjà utilisé (« Fraises » → « Fraise »).
    */
-  const articleDe = (l: LigneEcran) => (l.articleChoisi ? l.article : (trouver(l)?.article ?? l.article));
+  const articleDe = (l: LigneEcran) =>
+    l.articleChoisi ? l.article : (trouver(l)?.produit.article ?? articleExistant(l.article, articles) ?? l.article);
   const ligne = useCallback(
     (uid: number, p: Partial<LigneEcran>) => setDoc((d) => ({ ...d, lignes: d.lignes.map((l) => (l.uid === uid ? { ...l, ...p } : l)) })),
     [],
@@ -584,13 +621,14 @@ function Verifier({
 
   // État de chaque ligne (pour les filtres et l'affichage), calculé une fois par rendu.
   const infos = doc.lignes.map((l) => {
-    const connu = trouver(l);
+    const trouve = trouver(l);
+    const connu = trouve?.produit;
     const pu = prixALUnite(l);
     const article = articleDe(l) ?? "";
     const uniteChange = !!(connu && connu.prix != null && connu.unite !== l.unite);
     const change = connu && connu.prix != null && pu != null && connu.unite === l.unite ? Math.round(((pu - connu.prix) / connu.prix) * 100) : null;
     const doute = !!l.aVerifier || (l.produit.trim() !== "" && pu == null) || uniteChange;
-    return { l, connu, article, nouvelArticle: article.trim() !== "" && !clesArticles.has(articleKey(article)), doute, nouveau: !connu && l.produit.trim() !== "", change: change != null && change !== 0 };
+    return { l, trouve, proposition: l.separe ? proposer(l) : null, article, nouvelArticle: article.trim() !== "" && !clesArticles.has(articleKey(article)), doute, nouveau: !connu && l.produit.trim() !== "", change: change != null && change !== 0 };
   });
   const compte = { toutes: infos.length, doute: infos.filter((x) => x.doute).length, nouveau: infos.filter((x) => x.nouveau).length, change: infos.filter((x) => x.change).length };
   const cle = cherche.trim() ? articleKey(cherche) : "";
@@ -609,7 +647,13 @@ function Verifier({
   async function enregistrer() {
     setErreur(null);
     setOccupe(true);
-    const lignes = doc.lignes.filter((l) => l.produit.trim()).map(({ uid: _uid, ...l }) => ({ ...l, article: articleDe(l)?.trim() || null }));
+    // Ligne reconnue : elle prend le nom du produit déjà enregistré (son prix entre dans son historique, pas de doublon).
+    const lignes = doc.lignes
+      .filter((l) => l.produit.trim())
+      .map(({ uid: _uid, separe: _separe, articleChoisi: _choisi, ...l }) => {
+        const t = trouver({ ...l, separe: _separe });
+        return { ...l, produit: t ? t.produit.nom : l.produit, article: articleDe({ ...l, articleChoisi: _choisi, separe: _separe })?.trim() || null };
+      });
     const e = await onEnregistrer({ ...doc, lignes }, remplacer, note, nouveauFournisseur);
     setOccupe(false);
     if (e) setErreur(e);
@@ -629,7 +673,10 @@ function Verifier({
         <label>
           <span className="fl-label" style={{ display: "flex", gap: 4, alignItems: "center" }}>
             Fournisseur
-            <Help title="Fournisseur">Le nom écrit en haut de la facture. S&apos;il existe déjà dans RecipeLog (même nom), la facture lui est ajoutée ; sinon il est créé.</Help>
+            <Help title="Fournisseur" example="« RIBERA ET FILS SAS » lu sur la facture → « Ribera et Fils », déjà enregistré.">
+              Le nom écrit en haut de la facture. S&apos;il ressemble à un fournisseur déjà dans RecipeLog (majuscules, accents, « SAS »,
+              « SARL » mis à part), c&apos;est lui qui est repris et la facture lui est ajoutée ; sinon il est créé.
+            </Help>
           </span>
           <input
             className="fl-input"
@@ -638,6 +685,11 @@ function Verifier({
             disabled={!!fournisseurFixe}
             onChange={(e) => setDoc({ ...doc, fournisseur: e.target.value })}
           />
+          {!fournisseurFixe && fournisseurLu && doc.fournisseur !== fournisseurLu && fournisseurExistant(fournisseurLu, fournisseurs) === doc.fournisseur && (
+            <span className="ia-reconnu" style={{ marginTop: 4 }}>
+              <span className="ia-badge" data-sens="baisse">Reconnu</span> écrit « {fournisseurLu} » sur la facture
+            </span>
+          )}
           <datalist id="ia-fournisseurs">
             {fournisseurs.map((f) => <option key={f} value={f} />)}
           </datalist>
@@ -683,6 +735,12 @@ function Verifier({
           Pour chaque produit, donne le prix au kg / L / pièce, ou le prix du colis avec sa contenance (25 pour un sac de 25 kg, 50 pour un carton
           de 50). Le prix ramené à l&apos;unité s&apos;affiche à droite. « Nouveau » : produit jamais acheté chez ce fournisseur. Une ligne en
           orange est un doute de l&apos;IA à vérifier.
+        </Help>
+        <Help title="Reconnu" example="« CREME LIQ.35%MG 1L BAIGNES UHT FR » ira sur « Crème liquide 35% MG 1 L Baignes UHT France ».">
+          « Reconnu » : la ligne est un produit déjà enregistré chez ce fournisseur, même écrit autrement (majuscules, accents, abréviations,
+          même référence). Son prix va dans l&apos;historique de ce produit, à la date de la facture : pas de doublon. Le site ne rapproche jamais
+          deux produits de % différents (chocolat 64 % / 70 %), de types de farine différents ou de poids différents. Si ce n&apos;est pas le bon
+          produit, touche « Ce n&apos;est pas lui » : la ligne devient un nouveau produit.
         </Help>
         <Help title="Article" example="« Fraise France cat. I » et « Fraise Espagne » ont le même article : « Fraise ».">
           L&apos;article est le nom commun qui regroupe les produits semblables, pour suivre un seul prix et comparer les fournisseurs. Choisis
@@ -749,7 +807,8 @@ function Verifier({
           <LigneVerif
             key={x.l.uid}
             l={x.l}
-            connu={x.connu}
+            trouve={x.trouve}
+            proposition={x.proposition}
             article={x.article}
             nouvelArticle={x.nouvelArticle}
             facture={facture}
