@@ -35,6 +35,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_MERGED_PRS: JSON.stringify(prs),
     // Dernier nombre du numéro de version, « V2.3.88 » (src/lib/version.ts).
     NEXT_PUBLIC_LAST_PR: prs[0] ? String(prs[0].number) : "",
+    // Numéro propre à chaque build : une page ouverte avant une mise à jour le
+    // compare à /api/health et se recharge (src/components/AppGuard.tsx).
+    NEXT_PUBLIC_BUILD_ID: process.env.NEXT_PUBLIC_BUILD_ID || String(Date.now()),
   },
   experimental: {
     // Une mercuriale de 20 pages en photos dépasse vite 10 Mo au total.

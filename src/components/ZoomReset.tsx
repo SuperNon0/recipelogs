@@ -25,6 +25,10 @@ export function ZoomReset() {
       timer = window.setTimeout(() => {
         meta.content = original;
         timer = undefined;
+        // L'iPhone garde parfois la page décalée après ce retour à 1× : la barre
+        // d'onglets se retrouvait au milieu de l'écran. Redemander la même
+        // position la remet en place.
+        window.scrollTo(window.scrollX, window.scrollY);
       }, 400);
     };
 
