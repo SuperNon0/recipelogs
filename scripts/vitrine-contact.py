@@ -7,6 +7,7 @@ avec le compte e-mail réglé par « vitrine-reglage email » (/etc/recipelog-vi
 Uniquement la bibliothèque standard de Python : rien à installer.
 """
 import json
+import os
 import re
 import smtplib
 import ssl
@@ -152,6 +153,11 @@ class Handler(BaseHTTPRequestHandler):
             store_message(record)
         except OSError as e:
             sys.stderr.write("stockage impossible : %s\n" % e)
+
+        # Plateforme : plus d'email pour Noë. Le message gardé ci-dessus est lu par le panel,
+        # qui le montre (Site vitrine → Demandes) et prévient sur Discord.
+        if os.environ.get("VITRINE_SANS_EMAIL") == "1":
+            return self.reply(200, {"ok": True})
 
         conf = read_smtp()
         if not (conf.get("SMTP_USER") and conf.get("SMTP_PASS") and conf.get("MAIL_TO")):

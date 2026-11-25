@@ -8,4 +8,7 @@ window.VITRINE = {
   // Bouton « Se connecter » (en haut et en bas de page). Vide = caché. Sur la plateforme :
   // "/connexion" (chaque client arrive sur son propre RecipeLog après sa connexion).
   connexionUrl: "",
+  // Liens Tarifs, Mentions légales, CGV et Confidentialité en bas de page. Sur la plateforme :
+  // true (le panel sert ces pages). Ailleurs : false (les pages n'existent pas).
+  pagesLegales: false,
 };
