@@ -720,6 +720,7 @@ const ONGLETS = [
   ["equipe", "Équipe"],
   ["sauvegardes", "Sauvegardes"],
   ["journaux", "Journaux"],
+  ["modules", "Modules"],
   ["reglages", "Réglages"],
   ["demo", "Démo"],
 ];
@@ -755,6 +756,7 @@ function ficheClient(nom, onglet, auto) {
   if (onglet === "equipe") ongletEquipe(c, zc);
   if (onglet === "sauvegardes") ongletSauvegardes(c, zc);
   if (onglet === "journaux") ongletJournaux(c, zc);
+  if (onglet === "modules") ongletModules(c, zc);
   if (onglet === "reglages") ongletReglages(c, zc);
   if (onglet === "demo") ongletDemo(c, zc);
 }
@@ -937,6 +939,7 @@ const NOMS_ACTIONS = {
   "maintenance-annulee": "a annulé la maintenance :",
   "ia-quota": "a changé les lectures par IA de",
   "ia-factures": "a changé les factures en photo de",
+  modules: "a changé les modules de",
   "ia-cle": "a changé l'IA de la",
   "ia-cle-retiree": "a retiré la clé d'IA de la",
   vente: "a changé les tarifs et textes légaux de la",
@@ -1169,6 +1172,80 @@ function fenetreSuppression(c) {
   });
 }
 
+// Modules en option (modules.mjs) : une case par module, les sous-modules en retrait sous leur parent.
+// Décocher un parent grise ses sous-modules (coupés aussi) sans toucher à leurs cases.
+// L'accès Claude (MCP) est une option de l'instance : la changer redémarre le site.
+async function ongletModules(c, z) {
+  const moi = vue();
+  z.innerHTML = `<p class="attente"><span class="rond"></span>Chargement…</p>`;
+  const r = await api("GET", "/modules");
+  if (moi !== jetonVue) return;
+  if (!r.modules) {
+    z.innerHTML = `<p class="erreur">${e(r.message ?? "Modules indisponibles.")}</p>`;
+    return;
+  }
+  const coupes = r.clients?.[c.nom] ?? {};
+  const ligne = (m) => {
+    const sous = Boolean(m.parent);
+    return `<div class="champ module${sous ? " sous" : ""}" data-parent="${e(m.parent ?? "")}"><label class="case"><input type="checkbox" data-module="${e(m.cle)}" ${coupes[m.cle] === false ? "" : "checked"}> ${sous ? e(m.nom) : `<b>${e(m.nom)}</b>`} ${aide(`m-a-${m.cle}`, e(m.aide))}</div>`;
+  };
+  z.innerHTML = `<form id="f-modules" class="formulaire" novalidate>
+      <p class="sub">Toujours là : recettes, dossiers et catégories, ingrédients, favoris, historique, réglages et comptes.</p>
+      <div class="aide-ligne"><b>Modules de ${e(c.nom)}</b> <button class="aide" type="button" data-aide="m-a-tout" aria-label="Aide sur les modules">?</button>
+        <span class="droite"><button class="btn petit" type="button" data-m-tout="1">Tout activer</button> <button class="btn petit" type="button" data-m-tout="0">Tout couper</button></span></div>
+      <p class="texte-aide" id="m-a-tout">Un module coupé disparaît des menus de son RecipeLog, ses pages renvoient vers l'accueil et ses outils Claude (MCP) ne sont plus proposés. <b>Ses données ne sont jamais effacées</b> : en le recochant, tout revient. Couper un module en gras coupe aussi ses sous-modules (en gris) ; ils gardent leur case et reviennent comme avant quand on le recoche. Le changement est pris en compte sur son site en une minute environ, sans le redémarrer.</p>
+      ${r.modules.map(ligne).join("")}
+      <div class="champ module"><label class="case"><input id="m-mcp" type="checkbox" ${c.mcp ? "checked" : ""}> <b>Accès Claude (MCP)</b> ${aide("m-a-mcp", "Permet au client de brancher Claude sur son RecipeLog (connecteur RecipeLog dans claude.ai). Changer cette case redémarre son site (environ une minute). La clé secrète MCP se règle dans l'onglet Réglages.")}</div>
+      <p class="erreur" id="m-erreur"></p>
+      <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
+    </form>`;
+  const f = $("#f-modules");
+  const griser = () => {
+    for (const d of f.querySelectorAll(".module.sous")) {
+      const p = f.querySelector(`[data-module="${d.dataset.parent}"]`);
+      d.classList.toggle("eteint", Boolean(p && !p.checked));
+    }
+  };
+  griser();
+  f.addEventListener("change", griser);
+  f.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-m-tout]");
+    if (!b) return;
+    const oui = b.dataset.mTout === "1";
+    for (const i of f.querySelectorAll("[data-module], #m-mcp")) i.checked = oui;
+    griser();
+  });
+  f.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const modules = {};
+    for (const i of f.querySelectorAll("[data-module]")) {
+      const avant = coupes[i.dataset.module] !== false;
+      if (i.checked !== avant) modules[i.dataset.module] = i.checked;
+    }
+    const nMcp = $("#m-mcp").checked;
+    if (!Object.keys(modules).length && nMcp === c.mcp) return ($("#m-erreur").textContent = "Rien n'a changé.");
+    if (nMcp === c.mcp) {
+      const r2 = await api("POST", "/modules", { client: c.nom, modules });
+      if (!r2.modules) return ($("#m-erreur").textContent = r2.message ?? "Échec.");
+      ongletModules(c, z);
+      return;
+    }
+    await executer(`Modules de ${c.nom}`, async () => {
+      const sorties = [];
+      let ok = true;
+      if (Object.keys(modules).length) {
+        const r2 = await api("POST", "/modules", { client: c.nom, modules });
+        ok = Boolean(r2.modules);
+        sorties.push(`Modules : ${ok ? "enregistrés" : r2.message ?? "échec"}`);
+      }
+      const r3 = await api("POST", `/clients/${c.nom}/options`, { mcp: nMcp });
+      ok = ok && r3.ok;
+      sorties.push(`Accès Claude (MCP) : ${r3.sortie || r3.message || (r3.ok ? "fait" : "échec")}`);
+      return { ok, sortie: sorties.join("\n") };
+    });
+  });
+}
+
 function ongletReglages(c, z) {
   vue();
   const max = c.places?.max ?? 0;
@@ -1178,7 +1255,6 @@ function ongletReglages(c, z) {
         <input id="r-max" type="number" min="0" max="10000" value="${max}"></div>` : ""}
       <div class="champ"><label for="r-essai">Essai : jours restants ${aide("r-a-essai", "Change la fin de l'essai à partir d'aujourd'hui. 0 = ce n'est plus un essai (client normal, plus de pause automatique). Un client mis en pause par la fin d'essai se rouvre avec « Réactiver ».")}
         <div class="suffixe"><input id="r-essai" type="number" min="0" max="3650" value="${jours}"><span>${c.essaiFin ? `jusqu'au ${e(dateFr(c.essaiFin))}` : "pas d'essai"}</span></div></div>
-      <div class="champ"><label class="case"><input id="r-mcp" type="checkbox" ${c.mcp ? "checked" : ""}> Accès MCP (Claude) ${aide("r-a-mcp", "Permet au client de brancher Claude sur son RecipeLog. Changer cette case redémarre son site (environ une minute).")}</div>
       <div class="champ"><label class="case"><input id="r-mcp-cle" type="checkbox" ${c.mcpCle !== false ? "checked" : ""}> Clé secrète MCP ${aide("r-a-mcp-cle", "Ancienne façon de brancher Claude : une clé à copier dans claude.ai (utile pour Claude Code). Décoché : la section Clé secrète disparaît chez le client et une ancienne clé ne marche plus ; Claude se branche seulement avec un compte du client (« Se connecter » dans claude.ai). Changer cette case redémarre son site (environ une minute).")}</div>
       <p class="erreur" id="r-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
@@ -1188,18 +1264,12 @@ function ongletReglages(c, z) {
     const etapes = [];
     const nMax = $("#r-max") ? Number($("#r-max").value || 0) : max;
     const nJours = Number($("#r-essai").value || 0);
-    const nMcp = $("#r-mcp").checked;
     const nMcpCle = $("#r-mcp-cle").checked;
     if ($("#r-max") && nMax !== max) etapes.push(["Places", () => api("POST", `/clients/${c.nom}/quota`, { max: nMax })]);
     // Essai déjà fini (0 jour restant) : mettre 0 le retire pour de bon, c'est bien un changement.
     if (nJours !== jours || (c.essaiFin && nJours === 0)) etapes.push(["Essai", () => api("POST", `/clients/${c.nom}/essai`, { jours: nJours })]);
     const mcpCle = c.mcpCle !== false;
-    if (nMcp !== c.mcp || nMcpCle !== mcpCle) {
-      const corps = {};
-      if (nMcp !== c.mcp) corps.mcp = nMcp;
-      if (nMcpCle !== mcpCle) corps.mcpCle = nMcpCle;
-      etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, corps)]);
-    }
+    if (nMcpCle !== mcpCle) etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, { mcpCle: nMcpCle })]);
     if (!etapes.length) return ($("#r-erreur").textContent = "Rien n'a changé.");
     await executer(`Réglages de ${c.nom}`, async () => {
       const sorties = [];

@@ -631,3 +631,11 @@ pre.pf-log { margin: 0; padding: 12px; border-top: 1px solid var(--line); backgr
 .nt-avance { margin: 0 0 14px; }
 .nt-avance summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
 .nt-avance .champ { margin-bottom: 10px; }
+
+/* Onglet Modules : sous-modules en retrait, grisés quand leur parent est coupé. */
+.module { margin: 0; }
+.module.sous { padding-left: 28px; }
+.module.eteint { opacity: 0.45; }
+.module.eteint .case::after { content: "coupé avec son parent"; font-size: 12px; color: var(--soft, inherit); margin-left: 6px; }
+#f-modules .aide-ligne { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#f-modules .aide-ligne .droite { margin-left: auto; display: flex; gap: 6px; }

@@ -87,6 +87,7 @@ En-tête : `Authorization: Bearer ${RECIPELOG_PASSERELLE_CLE}`. Réponses JSON. 
 | `POST /v1/equipe` | `{ "email", "nom"? }` | `201 { "membre": {…}, "invitationEnvoyee": true }`. Crée le compte Authentik s'il n'existe pas, l'ajoute au groupe du client et envoie l'email « Choisis ton mot de passe ». `409 { "error": "quota", "max": 10 }` si le plafond est atteint ; `409 { "error": "deja_membre" }` ; `400 { "error": "email_invalide" }`. |
 | `DELETE /v1/equipe/<email>` | | `204`. Retire du groupe du client (le compte Authentik reste s'il sert ailleurs, sinon il est désactivé). |
 | `POST /v1/equipe/<email>/invitation` | | `200 { "invitationEnvoyee": true }`. Renvoie l'email. |
+| `GET /v1/modules` | | `200 { "coupes": ["factures", "courses"] }`. Modules décochés pour ce client dans le panel (onglet Modules, `ia/modules.json`). Tout le reste est allumé ; l'appli coupe aussi les sous-modules d'un module coupé (liste dans `panel/modules.mjs` et `src/lib/modules.ts`). |
 
 `401 { "error": "cle_invalide" }` si la clé ne correspond à aucun client. `503 { "error": "authentik_indisponible" }` si Authentik ne répond pas.
 
