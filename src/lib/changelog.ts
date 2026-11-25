@@ -11,6 +11,24 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.27",
+    date: "2026-11-25",
+    title: "Exporter des recettes et offres à la carte",
+    summary:
+      "Coche les recettes que tu veux, télécharge-les et importe-les dans un autre RecipeLog, avec leurs sous-recettes, dossiers et catégories. Sur RecipeLog en ligne, chaque partie du site (cahiers, courses, production, prix fournisseurs…) peut être activée ou non selon ton offre.",
+    features: [
+      "Réglages → Exporter des recettes : une barre de recherche (nom, dossier, catégorie), une case par recette et « Tout cocher », puis « Télécharger » : un fichier à importer dans un autre RecipeLog avec Réglages → Import JSON",
+      "Les sous-recettes utilisées (pâte, crème…) partent avec la recette et y sont reliées dans l'autre RecipeLog ; les dossiers et catégories qui n'existent pas là-bas sont créés avec leur couleur",
+      "Une recette qui existe déjà dans l'autre RecipeLog (même nom) est laissée telle quelle, et rien n'est retiré du RecipeLog d'origine",
+      "RecipeLog en ligne : les parties non comprises dans ton offre (cahiers, thèmes PDF, courses, production, prix fournisseurs, factures, mercuriales, commandes, produits vendus, imports) n'apparaissent plus dans les menus, et Claude ne les propose plus. Tes données restent gardées : elles reviennent dès que la partie est réactivée",
+      "RecipeLog en ligne, offre sans comptes d'équipe : seul le responsable se connecte, et Réglages → Comptes disparaît. Les comptes déjà créés sont gardés et reviennent si l'offre les comprend à nouveau",
+      "RecipeLog en ligne, offre sans rôles personnalisés : deux rôles seulement, Administrateur (tout) et Membre (tout sauf les comptes, la clé Claude et la mise à jour du site)",
+      "RecipeLog en ligne : ton offre peut fixer un nombre de recettes, de cahiers, de thèmes PDF, de rôles, de liens vidéo par mois et une place pour les fichiers (factures, mercuriales). Une fois au bout, RecipeLog le dit clairement et rien n'est jamais effacé. Un import ajoute ce qui rentre et dit combien de recettes restent dehors",
+      "Mercuriales : jusqu'à 20 pages par défaut, et jusqu'à 50 si ton offre le prévoit",
+      "Certaines offres ajoutent un petit « Fait avec RecipeLog » en bas à droite des PDF (recette, cahier, fiche de production)",
+    ],
+  },
+  {
     version: "V2.26",
     date: "2026-11-24",
     title: "Factures lues par l'IA : plus de doublons",

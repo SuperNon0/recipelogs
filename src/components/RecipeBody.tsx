@@ -34,7 +34,7 @@ import { DEFAULT_SALE_COEF, DEFAULT_SALE_VAT, SALE_VATS, costOf, formatEuro, for
 import { ModalOverlay } from "./ModalOverlay";
 import { CostDetail } from "./suppliers/CostDetail";
 import { Help } from "./ui/Help";
-import { useCan } from "./auth/Permissions";
+import { useCan, useModule } from "./auth/Permissions";
 import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
 import { AddSubRecipeDialog, SUB_MODE_HELP } from "./AddSubRecipeModal";
 
@@ -671,6 +671,7 @@ function CostCard({
   /** Permission « Modifier les prix » : sinon le coefficient se lit sans se changer. */
   canEditCoef: boolean;
 }) {
+  const ventes = useModule()("ventes");
   const [coefInput, setCoefInput] = useState(String(initialCoef).replace(".", ","));
   const [savedCoef, setSavedCoef] = useState(initialCoef);
   const [, startTransition] = useTransition();
@@ -687,7 +688,8 @@ function CostCard({
   };
 
   const per = pieces && pieces.count > 0 ? pieces : null;
-  const sale = (
+  // Module « Produits vendus et marges » coupé dans le panel admin : pas de prix de vente ni de marge.
+  const sale = !ventes ? null : (
     <SalePriceBlock
       recipeId={recipeId}
       cost={cost.total}

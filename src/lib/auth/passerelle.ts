@@ -31,6 +31,8 @@ export function passerelleMessage(code: string, max?: number | null, fallback?: 
   switch (code) {
     case "quota":
       return `Toutes les places de ton offre sont prises${typeof max === "number" ? ` (${max} utilisateurs)` : ""}. Retire quelqu'un de l'équipe, ou demande plus de places à RecipeLog.`;
+    case "module":
+      return "Ton offre ne comprend pas de comptes d'équipe : seul le responsable se connecte. Demande-les à RecipeLog.";
     case "deja_membre":
       return "Cette personne fait déjà partie de l'équipe.";
     case "email_invalide":

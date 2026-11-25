@@ -36,6 +36,17 @@ export function AccessGate({ viewer, need, logout }: { viewer: Viewer; need?: Ac
       </Card>
     );
   }
+  if ((viewer.kind === "unknown" || viewer.kind === "account") && viewer.seulResponsable) {
+    // Plateforme : l'offre du site ne comprend pas d'autres utilisateurs (module coupé dans le panel).
+    return (
+      <Card logout={logout} icon={Ban} tone="var(--accent-3)" title="Accès réservé" email={viewer.kind === "unknown" ? viewer.email : viewer.account.email}>
+        <p className="access-text">
+          Pour l&apos;instant, seul le responsable de ce RecipeLog peut s&apos;y connecter. Demande-lui
+          d&apos;ajouter les comptes d&apos;équipe à son offre.
+        </p>
+      </Card>
+    );
+  }
   if (viewer.kind === "unknown") {
     return (
       <Card logout={logout} icon={UserPlus} tone="var(--accent)" title="Bienvenue" email={viewer.email}>

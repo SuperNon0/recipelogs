@@ -30,7 +30,7 @@ import { ProductionDialog } from "@/components/ProductionDialog";
 import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/app/actions/recipes";
 import { assignRecipesToFolder } from "@/app/actions/settings";
 import { formatG } from "@/lib/format";
-import { useCan } from "@/components/auth/Permissions";
+import { useCan, useModule } from "@/components/auth/Permissions";
 
 export type FolderOption = { id: number; name: string; color: string };
 
@@ -73,6 +73,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
   const [dialog, setDialog] = useState<Dialog>(null);
   const [, startTransition] = useTransition();
   const can = useCan();
+  const mod = useModule();
 
   const getSpec = useCallback((): MenuSpec => {
     const moveTo: MenuEntry[] = [
@@ -154,7 +155,11 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
               {
                 label: "Dupliquer",
                 icon: Copy,
-                onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
+                onSelect: () =>
+                  startTransition(async () => {
+                    const res = await duplicateRecipe(r.id);
+                    if (res && !res.ok) alert(res.error);
+                  }),
               },
               { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },
             ]
@@ -165,7 +170,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
         ...(can("cookbooks.edit") ? [{ label: "Ajouter à un cahier…", icon: Library, onSelect: () => setDialog("cookbook") }] : []),
         ...(can("shopping.edit") ? [{ label: "Ajouter aux courses…", icon: ShoppingBasket, onSelect: () => setDialog("shopping") }] : []),
         ...(can("pdf.export") ? [{ label: "Télécharger le PDF…", icon: FileDown, onSelect: () => setDialog("pdf") }] : []),
-        ...(can("pdf.export") ? [{ label: "Fiche de production…", icon: ClipboardList, onSelect: () => setDialog("production") }] : []),
+        ...(can("pdf.export") && mod("production") ? [{ label: "Fiche de production…", icon: ClipboardList, onSelect: () => setDialog("production") }] : []),
         { separator: true },
         ...(can("recipes.edit")
           ? [

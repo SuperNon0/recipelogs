@@ -2,6 +2,7 @@
 
 import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
+import { placesRecettes } from "@/lib/limites";
 import JSZip from "jszip";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +47,9 @@ export async function importRecipeKeeperCsv(
   }
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
 
@@ -59,6 +63,16 @@ export async function importRecipeKeeperCsv(
         skipped++;
         continue;
       }
+
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
 
       await prisma.recipe.create({
         data: {
@@ -93,6 +107,7 @@ export async function importRecipeKeeperCsv(
   revalidatePath("/");
   revalidatePath("/settings");
 
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }
 
@@ -183,6 +198,9 @@ export async function importRecipeKeeperHtmlOrZip(
   }
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
 
@@ -215,6 +233,16 @@ export async function importRecipeKeeperHtmlOrZip(
           categoryConnects.push({ categoryId: cat.id });
         }
       }
+
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
 
       await prisma.recipe.create({
         data: {
@@ -257,6 +285,7 @@ export async function importRecipeKeeperHtmlOrZip(
   revalidatePath("/");
   revalidatePath("/settings");
 
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }
 
@@ -284,7 +313,23 @@ type JsonRecipe = {
   tags?: string[];
   favorite?: boolean;
   rating?: number | null;
+  /** Fichier « Exporter des recettes » : couleurs pour créer les dossiers et catégories qui manquent. */
+  folder_color?: string | null;
+  category_colors?: Record<string, string>;
+  /** Sous-recettes, par le nom de la recette utilisée (dans le fichier ou déjà là). */
+  sub_recipes?: {
+    recipe: string;
+    label?: string;
+    calc_mode?: string;
+    calc_value?: number;
+    pivot_position?: number | null;
+    is_locked?: boolean;
+    is_exact?: boolean;
+    position?: number;
+  }[];
 };
+
+const COULEUR_RE = /^#[0-9a-fA-F]{6}$/;
 
 function normalizeImportUnit(rawUnit: string, rawQty: number): { unit: string; quantityG: number } {
   const u = (rawUnit ?? "").toLowerCase().trim();
@@ -314,10 +359,15 @@ export async function importRecipesFromJson(
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucun fichier fourni."] };
 
   let recipes: JsonRecipe[];
+  let fromExport = false;
   try {
     const text = await file.text();
     const parsed = JSON.parse(text);
-    recipes = Array.isArray(parsed) ? parsed : [parsed];
+    // Fichier de « Exporter des recettes » : { recipelog_export: 1, recettes: [...] }.
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.recettes)) {
+      fromExport = true;
+      recipes = parsed.recettes;
+    } else recipes = Array.isArray(parsed) ? parsed : [parsed];
   } catch {
     return { ok: false, imported: 0, skipped: 0, errors: ["Fichier JSON invalide."] };
   }
@@ -326,8 +376,12 @@ export async function importRecipesFromJson(
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucune recette dans le fichier."] };
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const aRelier: { parentId: number; name: string; liens: NonNullable<JsonRecipe["sub_recipes"]> }[] = [];
 
   for (const r of recipes) {
     if (!r.name?.trim()) { errors.push("Recette sans nom ignorée."); continue; }
@@ -355,11 +409,23 @@ export async function importRecipesFromJson(
       if (r.yield?.trim()) notesParts.push(`Rendement : ${r.yield.trim()}`);
       if (r.notes?.trim()) notesParts.push(r.notes.trim());
 
+      // Fichier exporté d'un autre RecipeLog : on crée les dossiers et catégories qui manquent ici.
+      if (fromExport && typeof r.folder === "string" && r.folder.trim()) {
+        const color = typeof r.folder_color === "string" && COULEUR_RE.test(r.folder_color) ? r.folder_color : undefined;
+        await prisma.folder.upsert({ where: { name: r.folder.trim() }, update: {}, create: { name: r.folder.trim(), ...(color ? { color } : {}) } });
+      }
+      if (fromExport && Array.isArray(r.categories)) {
+        for (const name of r.categories.map((c) => String(c).trim()).filter(Boolean).slice(0, 50)) {
+          const c = r.category_colors?.[name];
+          const color = typeof c === "string" && COULEUR_RE.test(c) ? c : undefined;
+          await prisma.category.upsert({ where: { name }, update: {}, create: { name, ...(color ? { color } : {}) } });
+        }
+      }
       const folder = typeof r.folder === "string" && r.folder.trim()
         ? await prisma.folder.findUnique({ where: { name: r.folder.trim() }, select: { id: true } })
         : null;
       const categories = Array.isArray(r.categories) && r.categories.length
-        ? await prisma.category.findMany({ where: { name: { in: r.categories.map(String) } }, select: { id: true } })
+        ? await prisma.category.findMany({ where: { name: { in: r.categories.map((c) => String(c).trim()) } }, select: { id: true } })
         : [];
       const tags = Array.isArray(r.tags)
         ? [...new Set(r.tags.map((t) => String(t).trim()).filter(Boolean))].slice(0, 50)
@@ -367,7 +433,18 @@ export async function importRecipesFromJson(
       const mold = parseMold(r.mold);
       const rating = typeof r.rating === "number" && r.rating >= 1 && r.rating <= 5 ? Math.round(r.rating) : null;
 
-      await prisma.recipe.create({
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
+
+      const created = await prisma.recipe.create({
+        select: { id: true },
         data: {
           name: r.name.trim(),
           nameNormalized: normalizeForSearch(r.name.trim()),
@@ -394,13 +471,53 @@ export async function importRecipesFromJson(
       // Les intertitres (« Pâte », « Crème ») ne vont pas dans la base d'ingrédients.
       await ensureIngredientBases(ingredients.filter((i) => i.unit !== "titre").map((i) => i.name));
 
+      if (Array.isArray(r.sub_recipes) && r.sub_recipes.length) aRelier.push({ parentId: created.id, name: r.name.trim(), liens: r.sub_recipes });
       imported++;
     } catch (err) {
       errors.push(`"${r.name}" : ${err instanceof Error ? err.message : "erreur"}`);
     }
   }
 
+  // Sous-recettes : reliées une fois toutes les recettes créées (la recette utilisée
+  // peut venir plus loin dans le fichier, ou exister déjà ici sous le même nom).
+  for (const p of aRelier) {
+    for (const [i, l] of p.liens.entries()) {
+      const nom = typeof l?.recipe === "string" ? l.recipe.trim() : "";
+      if (!nom) continue;
+      try {
+        const child = await prisma.recipe.findFirst({
+          where: { name: nom },
+          select: { id: true, ingredients: { select: { id: true }, orderBy: { position: "asc" } } },
+        });
+        if (!child || child.id === p.parentId) {
+          errors.push(`"${p.name}" : sous-recette « ${nom} » introuvable, à ajouter à la main.`);
+          continue;
+        }
+        const mode = l.calc_mode === "mass_target" || l.calc_mode === "pivot_ingredient" ? l.calc_mode : "coefficient";
+        const pivot = mode === "pivot_ingredient" && Number.isInteger(l.pivot_position) ? child.ingredients[l.pivot_position as number]?.id ?? null : null;
+        const value = typeof l.calc_value === "number" && Number.isFinite(l.calc_value) && l.calc_value > 0 ? l.calc_value : 1;
+        await prisma.subRecipe.create({
+          data: {
+            parentId: p.parentId,
+            childId: child.id,
+            label: typeof l.label === "string" && l.label.trim() ? l.label.trim().slice(0, 200) : nom,
+            // Pivot perdu (ingrédient introuvable) : on garde la quantité en coefficient 1.
+            calcMode: mode === "pivot_ingredient" && pivot == null ? "coefficient" : mode,
+            calcValue: mode === "pivot_ingredient" && pivot == null ? 1 : value,
+            pivotIngredientId: pivot,
+            isLocked: l.is_locked === true,
+            isExact: l.is_exact === true,
+            position: Number.isInteger(l.position) ? (l.position as number) : i,
+          },
+        });
+      } catch (err) {
+        errors.push(`"${p.name}" : sous-recette « ${nom} » : ${err instanceof Error ? err.message : "erreur"}`);
+      }
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/settings");
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }

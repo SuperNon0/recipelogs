@@ -1,3 +1,4 @@
+import { marquePdf } from "@/lib/limites";
 import type { ProductionSheet } from "@/lib/productionData";
 import { formatG, formatQty } from "@/lib/format";
 import { FONTS, googleFontsHref, type CookbookTheme } from "./theme";
@@ -102,5 +103,5 @@ function stepsHtml(raw: string, coef: number): string {
 }
 
 export async function renderProductionPdf(sheet: ProductionSheet, theme: CookbookTheme, title: string, withSteps = false): Promise<Uint8Array> {
-  return renderHtmlToPdf(buildProductionHtml(sheet, theme, title, withSteps), "A4", { showPageNumber: true, footer: title });
+  return renderHtmlToPdf(buildProductionHtml(sheet, theme, title, withSteps), "A4", { showPageNumber: true, footer: title, marque: await marquePdf() });
 }

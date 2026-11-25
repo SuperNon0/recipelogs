@@ -2,6 +2,7 @@ import { mcpPermis, mcpKeyAllowed } from "@/lib/mcp/allowed";
 import { handleMcpBody } from "./protocol";
 import { getMcpToken, tokensMatch } from "./token";
 import { MCP_TOOLS } from "./tools";
+import { moduleDeLOutil, modulesCoupes } from "@/lib/modules";
 import { runAsService } from "@/lib/auth/service";
 import { authMode } from "@/lib/auth/config";
 import { getAnnonces } from "@/lib/auth/passerelle";
@@ -47,7 +48,13 @@ export async function mcpResponse(req: Request): Promise<Response> {
   }
   const body = await req.text();
   // Clé valide : les outils ont tous les droits, même quand les comptes sont activés.
-  const out = await runAsService("mcp", () => handleMcpBody(body, MCP_TOOLS), publicOrigin(req));
+  // Plateforme : les outils d'un module coupé dans le panel admin ne sont pas proposés à Claude.
+  const off = await modulesCoupes();
+  const tools = off.size ? MCP_TOOLS.filter((t) => {
+    const m = moduleDeLOutil(t.name);
+    return !m || !off.has(m);
+  }) : MCP_TOOLS;
+  const out = await runAsService("mcp", () => handleMcpBody(body, tools), publicOrigin(req));
   if (out === null) return new Response(null, { status: 202 });
   return Response.json(out, { headers: { "Cache-Control": "no-store" } });
 }

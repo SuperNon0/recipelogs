@@ -1,5 +1,6 @@
 "use server";
 
+import { verifierCahiers } from "@/lib/limites";
 import { requireAccess } from "@/lib/auth/guard";
 import { requireVisibleCookbook, requireVisibleRecipe } from "@/lib/auth/visibility";
 import { revalidatePath } from "next/cache";
@@ -34,6 +35,7 @@ export async function createCookbook(formData: FormData) {
     : "A4") as "A4" | "A5";
 
   if (!name) throw new Error("Le nom du cahier est obligatoire.");
+  await verifierCahiers();
 
   const template = await prisma.pdfTemplate.findUnique({
     where: { slug: "classique" },

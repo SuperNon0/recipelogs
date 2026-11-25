@@ -21,6 +21,8 @@ import {
   viewAsCookieValue,
 } from "@/lib/auth/viewer";
 import { headers } from "next/headers";
+import { MESSAGE_ROLES, roleDonnable, rolesFixes } from "@/lib/auth/roleMembre";
+import { verifierRoles } from "@/lib/limites";
 
 function refresh() {
   revalidatePath("/", "layout");
@@ -72,6 +74,7 @@ export async function requestAccess(): Promise<ActionResult> {
   // Pas de garde de rôle : c'est justement l'action des adresses sans compte.
   const viewer = await getViewer();
   if (viewer.kind !== "unknown") return { ok: false, error: "Aucune demande à envoyer." };
+  if (viewer.seulResponsable) return { ok: false, error: "Ce RecipeLog n'accepte pas d'autres comptes pour l'instant." };
   await prisma.account.upsert({
     where: { email: viewer.email },
     update: {},
@@ -88,6 +91,7 @@ export async function approveAccount(id: number, roleId: number): Promise<Action
   await requireAccess("accounts.manage");
   const me = await actingAdmin();
   const role = await findRole(roleId);
+  if (!(await roleDonnable(role))) return { ok: false, error: MESSAGE_ROLES };
   const acc = await target(id);
   const approved = await prisma.account.updateMany({ where: { id, status: "pending" }, data: { status: "active", roleId: role.id, approvedAt: new Date() } });
   if (!approved.count) return { ok: false, error: "Ce compte ne fait plus partie des demandes en attente." };
@@ -145,6 +149,7 @@ export async function setAccountRole(id: number, roleId: number): Promise<Action
   await requireAccess("accounts.manage");
   const me = await actingAdmin();
   const role = await findRole(roleId);
+  if (!(await roleDonnable(role))) return { ok: false, error: MESSAGE_ROLES };
   const acc = await target(id);
   if (acc.id === me.id && !role.isAdmin) {
     return { ok: false, error: "Tu ne peux pas retirer ton propre rôle d'administrateur." };
@@ -175,6 +180,7 @@ export async function inviteMember(emailInput: string, roleId: number): Promise<
   if (!EMAIL_RE.test(email) || email.length > 254) return { ok: false, error: "Cette adresse e-mail n'est pas valable." };
   if (isMaintenanceEmail(email)) return { ok: false, error: "Cette adresse ne peut pas être invitée depuis le site." };
   const role = await findRole(roleId);
+  if (!(await roleDonnable(role))) return { ok: false, error: MESSAGE_ROLES };
   const existing = await prisma.account.findUnique({ where: { email } });
   if (existing?.status === "active") return { ok: false, error: "Cette personne a déjà un compte actif sur le site." };
 
@@ -225,6 +231,7 @@ export async function saveRole(
   categoryIds: number[] = [],
 ): Promise<ActionResult & { id?: number }> {
   await requireAccess("accounts.manage");
+  if (await rolesFixes()) return { ok: false, error: MESSAGE_ROLES };
   const me = await actingAdmin();
   const clean = cleanName(name);
   if (!clean) return { ok: false, error: "Donne un nom au rôle." };
@@ -242,6 +249,11 @@ export async function saveRole(
     refresh();
     return { ok: true, id };
   }
+  try {
+    await verifierRoles();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const role = await prisma.role.create({ data: { name: clean, permissions: perms, categoryIds: cats } });
   await audit(me.email, "role_create", null, `${clean} : ${perms.length} permission(s)`);
   refresh();
@@ -250,6 +262,7 @@ export async function saveRole(
 
 export async function deleteRole(id: number): Promise<ActionResult> {
   await requireAccess("accounts.manage");
+  if (await rolesFixes()) return { ok: false, error: MESSAGE_ROLES };
   const me = await actingAdmin();
   const role = await findRole(id);
   if (role.isAdmin) return { ok: false, error: "Le rôle Administrateur ne peut pas être supprimé." };

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { noterVideo, verifierVideos } from "@/lib/limites";
 import { PLATFORM_FOLDER, extractUrl, readRecipeSource } from "@/lib/videoImport";
 import type { McpTool, McpToolResult } from "../protocol";
 import { READ, js, parseArgs } from "./helpers";
@@ -31,7 +32,9 @@ export const VIDEO_TOOLS: McpTool[] = [
       const a = parseArgs(z.object({ lien: z.string().trim().min(1).max(2000), images: z.number().int().min(0).max(12).default(8) }), args);
       const url = extractUrl(a.lien);
       if (!url) throw new Error("aucun lien http(s) trouvé dans le texte");
+      await verifierVideos();
       const src = await readRecipeSource(url, a.images);
+      await noterVideo();
 
       const folderName = PLATFORM_FOLDER[src.plateforme];
       const folder = await prisma.folder.findFirst({ where: { name: { equals: folderName, mode: "insensitive" } } });

@@ -22,6 +22,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { STOP } from "./Menu";
+import { useModule } from "@/components/auth/Permissions";
+import type { ModuleCle } from "@/lib/modules";
 
 /** Événement global pour ouvrir la recherche depuis n'importe quel bouton. */
 export const OPEN_SEARCH_EVENT = "recipelog:search";
@@ -40,6 +42,8 @@ type Item = {
   icon: LucideIcon;
   side?: string;
   color?: string | null;
+  /** Module en option (plateforme) : action masquée quand il est coupé. */
+  module?: ModuleCle;
 };
 
 type Results = {
@@ -56,15 +60,16 @@ const ACTIONS: Item[] = [
   { key: "a-new", group: "Actions", label: "Nouvelle recette", href: "/recipes/new", icon: Plus },
   { key: "a-fav", group: "Actions", label: "Favoris", href: "/favorites", icon: Star },
   { key: "a-hist", group: "Actions", label: "Historique (recettes ouvertes)", href: "/history", icon: History },
-  { key: "a-cb", group: "Actions", label: "Nouveau cahier", href: "/cookbooks/new", icon: Library },
-  { key: "a-sh", group: "Actions", label: "Nouvelle liste de courses", href: "/shopping/new", icon: ShoppingBasket },
-  { key: "a-prod", group: "Actions", label: "Fiche de production", href: "/production", icon: ClipboardList },
-  { key: "a-th", group: "Actions", label: "Thèmes PDF", href: "/settings/themes", icon: Palette },
+  { key: "a-cb", group: "Actions", label: "Nouveau cahier", href: "/cookbooks/new", icon: Library, module: "cahiers" },
+  { key: "a-sh", group: "Actions", label: "Nouvelle liste de courses", href: "/shopping/new", icon: ShoppingBasket, module: "courses" },
+  { key: "a-prod", group: "Actions", label: "Fiche de production", href: "/production", icon: ClipboardList, module: "production" },
+  { key: "a-th", group: "Actions", label: "Thèmes PDF", href: "/settings/themes", icon: Palette, module: "themes" },
   { key: "a-set", group: "Actions", label: "Réglages", href: "/settings", icon: Settings2 },
 ];
 
 /** Fenêtre de recherche globale, ouverte par Ctrl K (ou ⌘ K sur Mac). */
 export function CommandPalette() {
+  const mod = useModule();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -124,7 +129,8 @@ export function CommandPalette() {
 
   const items = useMemo<Item[]>(() => {
     const term = q.trim().toLowerCase();
-    const actions = term ? ACTIONS.filter((a) => a.label.toLowerCase().includes(term)) : ACTIONS;
+    const permises = ACTIONS.filter((a) => !a.module || mod(a.module));
+    const actions = term ? permises.filter((a) => a.label.toLowerCase().includes(term)) : permises;
     if (!res) return actions;
     return [
       ...res.recipes.map((r) => ({
@@ -154,10 +160,10 @@ export function CommandPalette() {
         key: `i${i.id}`, group: "Ingrédients", label: i.name, href: `/settings/ingredients/${i.id}`,
         icon: Wheat, side: `${i.uses} recette${i.uses > 1 ? "s" : ""}`,
       })),
-      ...res.cookbooks.map((c) => ({
+      ...(mod("cahiers") ? res.cookbooks : []).map((c) => ({
         key: `c${c.id}`, group: "Cahiers", label: c.name, href: `/cookbooks/${c.id}`, icon: FileText,
       })),
-      ...res.lists.map((l) => ({
+      ...(mod("courses") ? res.lists : []).map((l) => ({
         key: `l${l.id}`, group: "Courses", label: l.name, href: `/shopping/${l.id}`, icon: ShoppingBasket,
       })),
       ...actions,

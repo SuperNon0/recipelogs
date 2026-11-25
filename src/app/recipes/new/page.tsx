@@ -5,6 +5,7 @@ import { createRecipe } from "@/app/actions/recipes";
 import { listAllCategories, listAllFolders } from "@/lib/recipes";
 import { listPieceWeights } from "@/lib/ingredientInfo";
 import { requirePage } from "@/lib/auth/guard";
+import { placesRecettes } from "@/lib/limites";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,11 @@ export default async function NewRecipePage({
       ? Number(sp.folder)
       : undefined;
 
-  const [categories, folders, pieceWeights] = await Promise.all([
+  const [categories, folders, pieceWeights, places] = await Promise.all([
     listAllCategories(),
     listAllFolders(),
     listPieceWeights(),
+    placesRecettes(),
   ]);
 
   return (
@@ -35,6 +37,12 @@ export default async function NewRecipePage({
         <h1>Nouvelle recette</h1>
         <p className="sub">Le nom et au moins un ingrédient suffisent : tu pourras compléter plus tard.</p>
       </div>
+      {places === 0 ? (
+        <p className="set-note">
+          Ton offre ne permet pas de recettes en plus : supprime une recette pour en ajouter une autre, ou demande à RecipeLog
+          d&apos;agrandir ton offre.
+        </p>
+      ) : (
       <RecipeForm
         categories={categories}
         folders={folders}
@@ -43,6 +51,7 @@ export default async function NewRecipePage({
         submitLabel="Créer la recette"
         initial={preselectFolderId ? { folderId: preselectFolderId } : undefined}
       />
+      )}
     </div>
   );
 }

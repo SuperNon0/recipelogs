@@ -7,6 +7,8 @@ import { uploadFilePath } from "./uploads";
 import { INVOICE_MAX_BYTES, INVOICE_MIME, removeInvoiceFile, saveInvoiceFile, sniffInvoiceExt } from "./invoiceFiles";
 import { getQuotaIA } from "./auth/passerelle";
 import { surPlateforme } from "./ia/reglages";
+import { limites } from "./modules";
+import { verifierPlace } from "./limites";
 
 /**
  * Factures « à traiter » : prises en photo (ou choisies dans la galerie) avec
@@ -18,12 +20,17 @@ import { surPlateforme } from "./ia/reglages";
 
 /** Plafond absolu de pages par facture, quel que soit le réglage du panel. */
 export const PAGES_MAX_ABSOLU = 20;
+/** Mercuriale : 20 pages sauf réglage du panel (flèche de « Mercuriales »), 50 au plus. */
+export const PAGES_MERCURIALE_DEFAUT = 20;
+export const PAGES_MERCURIALE_MAX = 50;
 
 export type LimitesFactures = {
   /** Nombre de factures à traiter gardées en même temps (0 = fonction coupée). */
   attente: number;
   /** Pages (photos) par facture. */
   pages: number;
+  /** Pages par mercuriale (panel) ; absente = PAGES_MERCURIALE_DEFAUT. */
+  mercuriale?: number;
 };
 
 function envInt(nom: string, defaut: number): number {
@@ -42,9 +49,10 @@ export function limitesParDefaut(): LimitesFactures {
 export async function limitesFactures(): Promise<LimitesFactures> {
   const defaut = limitesParDefaut();
   if (!surPlateforme()) return defaut;
-  const q = await getQuotaIA();
-  if (!q.ok || !q.quota.factures) return defaut;
-  return { attente: q.quota.factures.attente, pages: Math.min(PAGES_MAX_ABSOLU, Math.max(1, q.quota.factures.pages)) };
+  const [q, l] = await Promise.all([getQuotaIA(), limites()]);
+  const mercuriale = l.mercurialePages ? Math.min(PAGES_MERCURIALE_MAX, l.mercurialePages) : undefined;
+  if (!q.ok || !q.quota.factures) return { ...defaut, mercuriale };
+  return { attente: q.quota.factures.attente, pages: Math.min(PAGES_MAX_ABSOLU, Math.max(1, q.quota.factures.pages)), mercuriale };
 }
 
 /** Ce qui attend : une facture, ou une mercuriale (liste de prix) d'un fournisseur. */
@@ -55,7 +63,7 @@ export type PendingKind = "facture" | "mercuriale";
  * Soframa) : elle peut toujours en avoir jusqu'au plafond absolu.
  */
 export function pagesMax(kind: PendingKind, limites: LimitesFactures): number {
-  return kind === "mercuriale" ? PAGES_MAX_ABSOLU : limites.pages;
+  return kind === "mercuriale" ? (limites.mercuriale ?? PAGES_MERCURIALE_DEFAUT) : limites.pages;
 }
 
 export type PendingInvoiceItem = {
@@ -152,6 +160,7 @@ export async function createPendingInvoice(input: {
       `Tu as déjà ${deja} document${deja > 1 ? "s" : ""} à traiter (factures et mercuriales, ${limites.attente} au plus). Analyse ou supprime ceux qui attendent, puis réessaie.`,
     );
   }
+  await verifierPlace(input.pages.reduce((t, b) => t + b.length, 0));
   const p = await prisma.pendingInvoice.create({
     data: { files: [], kind, supplierId, note: input.note?.trim().slice(0, 500) || null, addedBy: input.addedBy?.slice(0, 200) || null },
   });

@@ -5,6 +5,7 @@ import { requireVisibleRecipe, visibleRecipeWhere } from "@/lib/auth/visibility"
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { copyRecipe } from "@/lib/recipeCopy";
+import { verifierRecettes } from "@/lib/limites";
 import { variantRootOf } from "@/lib/variants";
 
 type Result = { ok: true; id?: number } | { ok: false; error: string };
@@ -32,6 +33,11 @@ export async function createVariant(recipeId: number, note: string): Promise<Res
   const count = await prisma.variant.count({ where: { sourceRecipeId: rootId } });
   const name = `${root?.name ?? source.name} · ${n ?? `essai ${count + 2}`}`.slice(0, 200);
 
+  try {
+    await verifierRecettes();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const id = await copyRecipe(recipeId, name);
   try {
     await prisma.variant.create({ data: { sourceRecipeId: rootId, variantRecipeId: id, note: n } });

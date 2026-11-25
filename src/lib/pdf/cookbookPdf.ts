@@ -1,3 +1,4 @@
+import { marquePdf } from "@/lib/limites";
 import { buildRecipeSnapshot, type RecipeSnapshot, getCookbookDetail } from "@/lib/cookbooks";
 import { buildCoverTocHtml, buildRecipesHtml, TOC_ANCHOR_PREFIX, type CookbookEntryUnion } from "./template";
 import { renderHtmlToPdf, mergePdfs, readAnchorPages } from "./renderer";
@@ -74,9 +75,11 @@ export async function renderCookbookPdf(opts: {
     const header = themeHeaderText(theme, opts.name);
     // Texte du cahier s'il en a un, sinon celui du thème.
     const footer = opts.footer?.trim() || theme.footerText.trim();
-    const hasFooter = !!footer || theme.showPageNumbers;
+    const marque = await marquePdf();
+    const hasFooter = !!footer || theme.showPageNumbers || marque;
     const html = buildRecipesHtml({ format, theme, entries, hasFooter, hasHeader: !!header });
     recipesPdf = await renderHtmlToPdf(html, format, {
+      marque,
       footer,
       footerAlign: theme.footerAlign,
       showPageNumber: theme.showPageNumbers,

@@ -42,6 +42,8 @@ type NavItem = {
   href: string;
   /** Permission nécessaire (lien masqué sinon, voir styles/auth.css). */
   needs?: string;
+  /** Module en option (plateforme) : lien masqué quand il est coupé dans le panel (data-module). */
+  module?: string;
   label: string;
   icon: LucideIcon;
   match: (p: string, folder: string | null) => boolean;
@@ -58,13 +60,14 @@ const NAV: NavItem[] = [
   },
   { href: "/favorites", label: "Favoris", icon: Star, match: (p) => p.startsWith("/favorites"), count: (c) => c.favorites },
   { href: "/history", label: "Historique", icon: History, match: (p) => p.startsWith("/history") },
-  { href: "/cookbooks", label: "Cahiers", icon: Library, match: (p) => p.startsWith("/cookbooks"), count: (c) => c.cookbooks },
-  { href: "/shopping", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
-  { href: "/production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
+  { href: "/cookbooks", module: "cahiers", label: "Cahiers", icon: Library, match: (p) => p.startsWith("/cookbooks"), count: (c) => c.cookbooks },
+  { href: "/shopping", module: "courses", label: "Courses", icon: ShoppingBasket, match: (p) => p.startsWith("/shopping"), count: (c) => c.lists },
+  { href: "/production", module: "production", label: "Production", icon: ClipboardList, match: (p) => p.startsWith("/production"), count: (c) => c.production },
   { href: "/settings/ingredients", needs: "organize.edit", label: "Ingrédients", icon: Wheat, match: (p) => p.startsWith("/settings/ingredients") },
   {
     href: "/fournisseurs",
     needs: "costs.view",
+    module: "fournisseurs",
     label: "Prix fournisseurs",
     icon: Store,
     match: (p) => p.startsWith("/fournisseurs") || p.startsWith("/factures"),
@@ -84,6 +87,7 @@ const SETTINGS: NavItem = {
 const THEMES: NavItem = {
   href: "/settings/themes",
   needs: "organize.edit",
+  module: "themes",
   label: "Thèmes PDF",
   icon: Palette,
   match: (p) => p.startsWith("/settings/themes"),
@@ -197,7 +201,7 @@ function SidebarInner({
 function SideLink({ item, counts, active }: { item: NavItem; counts: NavCounts; active: boolean }) {
   const Icon = item.icon;
   return (
-    <Link href={item.href} data-needs={item.needs} className={active ? "side-it on" : "side-it"} aria-current={active ? "page" : undefined}>
+    <Link href={item.href} data-needs={item.needs} data-module={item.module} className={active ? "side-it on" : "side-it"} aria-current={active ? "page" : undefined}>
       <Icon size={18} />
       <span className="nom">{item.label}</span>
       {item.count && <span className="n">{item.count(counts)}</span>}
@@ -217,7 +221,7 @@ export function AppTopBar() {
       <Link href="/history" className="ib" aria-label="Historique">
         <History size={19} />
       </Link>
-      <Link href="/settings/themes" data-needs="organize.edit" className="ib" aria-label="Thèmes PDF">
+      <Link href="/settings/themes" data-needs="organize.edit" data-module="themes" className="ib" aria-label="Thèmes PDF">
         <Palette size={19} />
       </Link>
     </header>
@@ -245,7 +249,7 @@ function TabBarInner() {
           const Icon = t.icon;
           const active = t.match(pathname, folder) || (t.href === "/" && pathname === "/");
           return (
-            <Link key={t.href} href={t.href} className={active ? "tab on" : "tab"} aria-current={active ? "page" : undefined}>
+            <Link key={t.href} href={t.href} data-module={t.module} className={active ? "tab on" : "tab"} aria-current={active ? "page" : undefined}>
               <span className="ti">
                 <Icon size={22} />
               </span>
@@ -297,7 +301,7 @@ function PlusSheet({ pathname, folder, onClose }: { pathname: string; folder: st
             const Icon = item.icon;
             const on = item.match(pathname, folder);
             return (
-              <Link key={item.href} href={item.href} data-needs={item.needs} className={on ? "qt on" : "qt"} onClick={onClose}>
+              <Link key={item.href} href={item.href} data-needs={item.needs} data-module={item.module} className={on ? "qt on" : "qt"} onClick={onClose}>
                 <Icon size={22} />
                 {item.label}
               </Link>

@@ -21,7 +21,7 @@ export function SupplierList({ suppliers }: { suppliers: Row[] }) {
       <div className="page-head">
         <h1>Mes fournisseurs</h1>
         <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-primary">
+          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-primary" data-module="commandes">
             <ShoppingCart size={15} /> Passer une commande
           </Link>
           {can("costs.edit") && (

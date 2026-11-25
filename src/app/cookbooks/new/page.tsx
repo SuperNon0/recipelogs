@@ -3,9 +3,11 @@ import { ChevronLeft, Plus } from "lucide-react";
 import { createCookbook } from "@/app/actions/cookbooks";
 import { Help } from "@/components/ui/Help";
 import { requirePage } from "@/lib/auth/guard";
+import { cahiersPleins } from "@/lib/limites";
 
 export default async function NewCookbookPage() {
   await requirePage("cookbooks.edit");
+  const plein = await cahiersPleins();
   return (
     <div style={{ maxWidth: 640 }}>
       <Link href="/cookbooks" className="crumb">
@@ -18,6 +20,12 @@ export default async function NewCookbookPage() {
         </p>
       </div>
 
+      {plein ? (
+        <p className="set-note">
+          Tu as tous les cahiers compris dans ton offre : supprime un cahier pour en créer un autre, ou demande à RecipeLog
+          d&apos;agrandir ton offre.
+        </p>
+      ) : (
       <form action={createCookbook} className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           <span className="fl-label">Nom du cahier</span>
@@ -63,6 +71,7 @@ export default async function NewCookbookPage() {
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }

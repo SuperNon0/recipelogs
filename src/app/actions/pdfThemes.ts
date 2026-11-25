@@ -1,5 +1,6 @@
 "use server";
 
+import { verifierThemes } from "@/lib/limites";
 import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
@@ -36,6 +37,11 @@ export async function createPdfTheme(
 ): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   await requireAccess("organize.edit");
   await ensureBuiltinThemes();
+  try {
+    await verifierThemes();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const src = fromId ? await prisma.pdfTheme.findUnique({ where: { id: fromId } }) : null;
   const t = await prisma.pdfTheme.create({
     data: {
