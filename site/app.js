@@ -70,6 +70,13 @@
     if (a) a.href = connexionUrl;
     el.hidden = false;
   });
+  // ── Tarifs et textes légaux : seulement là où ces pages existent (plateforme : le panel
+  //    les sert sur /tarifs, /mentions-legales, /cgv, /confidentialite) ──
+  if (window.VITRINE && window.VITRINE.pagesLegales) {
+    document.querySelectorAll("[data-legal]").forEach(function (el) {
+      el.hidden = false;
+    });
+  }
   var missing = document.getElementById("demo-missing");
   if (missing && !demoUrl) missing.hidden = false;
 
