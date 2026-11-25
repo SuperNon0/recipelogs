@@ -361,7 +361,8 @@ const TYPES_FICHIER = new Set(["application/pdf", "image/jpeg", "image/png", "im
 export function controlerOpenAI(corps, modele) {
   if (!corps || typeof corps !== "object" || Array.isArray(corps)) return "Demande illisible.";
   if (corps.model !== modele) return "Ce modèle n'est pas proposé par la plateforme.";
-  for (const k of Object.keys(corps)) if (!["model", "input", "text", "max_output_tokens"].includes(k)) return `Champ « ${k} » refusé par la plateforme.`;
+  for (const k of Object.keys(corps)) if (!["model", "input", "text", "max_output_tokens", "stream"].includes(k)) return `Champ « ${k} » refusé par la plateforme.`;
+  if (corps.stream !== undefined && typeof corps.stream !== "boolean") return "Demande illisible.";
   if (corps.max_output_tokens !== undefined && !(Number.isInteger(corps.max_output_tokens) && corps.max_output_tokens > 0 && corps.max_output_tokens <= MAX_SORTIE)) return "max_output_tokens invalide.";
   if (!Array.isArray(corps.input) || corps.input.length !== 1 || corps.input[0]?.role !== "user") return "Une seule demande de lecture à la fois.";
   const contenu = corps.input[0].content;
@@ -421,6 +422,8 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
   }
   const probleme = fournisseur === "openai" ? controlerOpenAI(corps, conf.modele) : modeleChemin !== conf.modele ? "Ce modèle n'est pas proposé par la plateforme." : controlerGemini(corps);
   if (probleme) return refuser(res, 400, "demande_refusee", probleme);
+  // ChatGPT en continu : l'appli demande « stream: true » dans le corps (Gemini : dans l'adresse).
+  if (fournisseur === "openai" && corps.stream === true) flux = true;
   if (!(await reserver(client, res))) return;
   try {
     const amont = await fetch(
@@ -434,8 +437,9 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
         signal: AbortSignal.timeout(DELAI_FLUX_MS),
       },
     );
-    // Gemini en continu : la réponse est transmise au fil de l'eau ; chaque morceau porte
-    // la consommation jusque-là (usageMetadata) et le dernier la raison de fin.
+    // En continu : la réponse est transmise au fil de l'eau. Gemini : chaque morceau porte la
+    // consommation jusque-là (usageMetadata) et le dernier la raison de fin. ChatGPT : le
+    // dernier événement (response.completed / response.incomplete) porte l'usage et l'état.
     if (flux && amont.ok && amont.body) {
       res.writeHead(200, { "Content-Type": amont.headers.get("content-type") || "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
       const decodeur = new TextDecoder();
@@ -447,6 +451,13 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
           if (!l.startsWith("data:")) continue;
           try {
             const j = JSON.parse(l.slice(5));
+            if (fournisseur === "openai") {
+              if (j.type === "response.completed" || j.type === "response.incomplete") {
+                u = j.response?.usage ?? {};
+                fin = j.response?.status === "completed" ? "STOP" : j.response?.status ?? j.type;
+              }
+              continue;
+            }
             if (j.usageMetadata) u = j.usageMetadata;
             if (j.candidates?.[0]?.finishReason) fin = j.candidates[0].finishReason;
           } catch {
@@ -471,7 +482,9 @@ export async function relayerAutre(client, req, res, fournisseur, modeleChemin =
         return;
       }
       if (fin === "STOP") {
-        await compter(client, u.promptTokenCount ?? 0, (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0), conf.prix).catch((e) =>
+        const entree = fournisseur === "openai" ? (u.input_tokens ?? 0) : (u.promptTokenCount ?? 0);
+        const sortie = fournisseur === "openai" ? (u.output_tokens ?? 0) : (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
+        await compter(client, entree, sortie, conf.prix).catch((e) =>
           console.error(`IA : usage de ${client} non noté (${e.message})`),
         );
       } else {
