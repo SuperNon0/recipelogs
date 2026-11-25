@@ -789,7 +789,8 @@ createServer(async (req, res) => {
         if (e instanceof RefusModules) throw new Refus(400, e.message);
         throw e;
       }
-      await noter(qui, "modules", corps.client, { ok: true, sortie: "" }, { coupes: Object.keys(apres).join(", ") || "aucun" });
+      const lim = Object.entries(apres.limites).map(([k, v]) => `${k}=${v}`).join(", ");
+      await noter(qui, "modules", corps.client, { ok: true, sortie: "" }, { coupes: Object.keys(apres.coupes).join(", ") || "aucun", limites: lim || "aucune", ...(corps.offre ? { offre: corps.offre } : {}) });
       return repondre(res, 200, await resumeModules(DONNEES));
     }
     if (req.method === "GET" && url.pathname === "/ia") return repondre(res, 200, await resumeIA(DONNEES));

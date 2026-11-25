@@ -42,6 +42,8 @@ async function traiter(req, res) {
 
   if (chemin === "/v1/equipe" && req.method === "GET") return repondre(res, 200, await equipe(nom));
   if (chemin === "/v1/equipe" && req.method === "POST") {
+    // Module « Utilisateurs » coupé dans le panel : le responsable ne peut inviter personne.
+    if ((await modulesPour(nom)).coupes.includes("utilisateurs")) return repondre(res, 403, { error: "module", message: "Les utilisateurs ne sont pas compris dans ton offre RecipeLog." });
     const { email, nom: nomAffiche } = await lireJson(req);
     return repondre(res, 201, await inviter(nom, email, nomAffiche));
   }
