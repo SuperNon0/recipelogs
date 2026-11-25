@@ -12,6 +12,8 @@ import {
   deletePriceLine,
   deleteProduct,
   deleteSupplier,
+  mergeSuppliers,
+  supplierMergeInfo,
   supplierDeletionInfo,
   updatePriceLine,
   updateProduct,
@@ -757,7 +759,7 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     name: "modifier_fournisseur",
     title: "Renommer ou modifier un fournisseur",
     description:
-      "Renomme un fournisseur et / ou change sa remarque. Ses produits, ses prix et ses factures restent. Refusé si un autre fournisseur porte déjà ce nom (pour réunir deux fournisseurs, demande à l'utilisateur).",
+      "Renomme un fournisseur et / ou change sa remarque. Ses produits, ses prix et ses factures restent. Refusé si un autre fournisseur porte déjà ce nom : s'il s'agit du même fournisseur (il a changé de nom, ou une lecture IA a créé une deuxième fiche), utilise reunir_fournisseurs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -777,6 +779,46 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       const s = await updateSupplier(a.id, { name: a.nom, note: a.note });
       refresh();
       return text({ fournisseur_id: s.id, nom: s.name, note: s.note });
+    },
+  },
+
+  {
+    name: "reunir_fournisseurs",
+    title: "Réunir deux fiches du même fournisseur",
+    description:
+      "Réunit deux fiches qui sont le même fournisseur (il a changé de nom, ou une lecture IA a créé « SOFRAMA Réseau Capella » à côté de « Soframa ») : les factures avec leurs PDF, les commandes, les mercuriales à traiter et les produits de doublon_id passent chez garder_id, puis la fiche vide est retirée. Un produit déjà présent (même référence ou même nom, même unité) garde un seul historique de prix. nom = nom final (facultatif, sinon celui de garder_id) ; l'ancien nom reste dans la remarque. Rien n'est perdu. Appelle d'abord sans confirmer=true pour voir ce qui passe, montre-le à l'utilisateur et demande son accord, puis rappelle avec confirmer=true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        garder_id: js.int("Id du fournisseur qui reste (en général celui qui a le plus de factures)"),
+        doublon_id: js.int("Id de la fiche en double, qui passe chez garder_id puis disparaît"),
+        nom: js.str("Nom final du fournisseur (facultatif)"),
+        confirmer: js.bool("true pour réunir vraiment (après l'accord de l'utilisateur)"),
+      },
+      required: ["garder_id", "doublon_id"],
+    },
+    annotations: WRITE,
+    run: async (args) => {
+      const a = parseArgs(
+        z.object({ garder_id: id, doublon_id: id, nom: z.string().trim().min(1).max(120).optional(), confirmer: z.boolean().optional() }),
+        args,
+      );
+      const info = await supplierMergeInfo(a.garder_id, a.doublon_id);
+      if (!info) throw new Error("fournisseur introuvable (ou deux fois le même id)");
+      const resume = {
+        garde: info.keep,
+        doublon: info.from,
+        nom_final: a.nom ?? info.keep,
+        factures_deplacees: info.invoices,
+        fichiers_joints: info.files,
+        commandes_deplacees: info.orders,
+        produits: info.products,
+        produits_deja_presents: info.sameProducts,
+      };
+      if (!a.confirmer) return text({ a_confirmer: true, ...resume, message: "Rien n'est changé. Demande confirmation, puis rappelle avec confirmer=true." });
+      const r = await mergeSuppliers(a.garder_id, a.doublon_id, a.nom);
+      refresh();
+      return text({ reuni: true, fournisseur_id: r.id, nom: r.name, ...resume, voir: `/fournisseurs/${r.id}` });
     },
   },
 

@@ -663,6 +663,152 @@ export async function deleteSupplier(id: number): Promise<{ name: string; filePa
   });
 }
 
+/** Ce qui passera d'un fournisseur à l'autre : à montrer avant de réunir. */
+export async function supplierMergeInfo(keepId: number, fromId: number) {
+  const [keep, from] = await Promise.all(
+    [keepId, fromId].map((id) =>
+      prisma.supplier.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          products: { select: { id: true, name: true, reference: true, priceUnit: true } },
+          orders: { select: { manual: true, filePath: true } },
+          commandes: { select: { id: true } },
+        },
+      }),
+    ),
+  );
+  if (!keep || !from || keep.id === from.id) return null;
+  const pairs = matchSupplierProducts(keep.products, from.products);
+  const invoices = from.orders.filter((o) => !o.manual);
+  return {
+    keep: keep.name,
+    from: from.name,
+    invoices: invoices.length,
+    files: invoices.filter((o) => o.filePath).length,
+    manualPrices: from.orders.length - invoices.length,
+    orders: from.commandes.length,
+    products: from.products.length,
+    /** Produits déjà chez le fournisseur gardé (même référence ou même nom) : leurs prix rejoignent son historique. */
+    sameProducts: pairs.size,
+  };
+}
+
+/** « 025171 » et « 25171 », « ab-12 » et « AB 12 » : même référence. */
+const refKey = (r: string | null | undefined) => (r ?? "").toUpperCase().replace(/[^0-9A-Z]/g, "").replace(/^0+(?=.)/, "");
+
+/**
+ * Pour chaque produit de `from`, le produit de `keep` qui est le même : même référence,
+ * sinon même nom (sans casse ni accents), et toujours la même unité de prix.
+ */
+function matchSupplierProducts<P extends { id: number; name: string; reference: string | null; priceUnit: string }>(
+  keep: readonly P[],
+  from: readonly P[],
+): Map<number, P> {
+  const parRef = new Map<string, P>();
+  const parNom = new Map<string, P>();
+  for (const p of keep) {
+    const r = refKey(p.reference);
+    if (r && !parRef.has(`${r}|${p.priceUnit}`)) parRef.set(`${r}|${p.priceUnit}`, p);
+    const n = articleKey(p.name);
+    if (n && !parNom.has(`${n}|${p.priceUnit}`)) parNom.set(`${n}|${p.priceUnit}`, p);
+  }
+  const pairs = new Map<number, P>();
+  for (const d of from) {
+    const r = refKey(d.reference);
+    const byRef = r ? parRef.get(`${r}|${d.priceUnit}`) : undefined;
+    const byName = parNom.get(`${articleKey(d.name)}|${d.priceUnit}`);
+    // Deux références différentes ne sont jamais le même produit.
+    const sameName = byName && !(r && refKey(byName.reference) && refKey(byName.reference) !== r) ? byName : undefined;
+    const match = byRef ?? sameName;
+    if (match) pairs.set(d.id, match);
+  }
+  return pairs;
+}
+
+/**
+ * Réunit deux fiches du même fournisseur (il a changé de nom, ou une lecture IA a créé
+ * « SOFRAMA Réseau Capella » à côté de « Soframa ») : les factures avec leurs PDF, les
+ * commandes, les mercuriales à traiter et les produits de `fromId` passent chez `keepId`.
+ * Un produit déjà présent (même référence ou même nom) garde un seul historique de prix.
+ * La fiche vide de `fromId` est ensuite retirée, et `keepId` peut prendre un nouveau nom.
+ * Rien n'est perdu : aucun prix, aucune facture, aucun fichier.
+ */
+export async function mergeSuppliers(
+  keepId: number,
+  fromId: number,
+  newName?: string | null,
+): Promise<{ id: number; name: string; invoices: number; products: number; merged: number }> {
+  if (keepId === fromId) throw new Error("Choisis un autre fournisseur.");
+  return prisma.$transaction(
+    async (tx) => {
+      const [keep, from] = await Promise.all(
+        [keepId, fromId].map((id) => tx.supplier.findUnique({ where: { id }, include: { products: true } })),
+      );
+      if (!keep || !from) throw new Error("Fournisseur introuvable.");
+      const name = newName === undefined || newName === null ? keep.name : cleanText(newName, 120);
+      if (!name) throw new Error("Le nom du fournisseur est vide.");
+
+      const pairs = matchSupplierProducts(keep.products, from.products);
+      const touched: number[] = [];
+      // 1. Produits en double : leurs prix, commandes et ingrédients passent sur le produit gardé.
+      for (const [dupId, target] of pairs) {
+        const dup = from.products.find((p) => p.id === dupId)!;
+        await tx.purchaseOrderLine.updateMany({ where: { productId: dupId }, data: { productId: target.id } });
+        await tx.supplierOrderLine.updateMany({ where: { productId: dupId }, data: { productId: target.id } });
+        await tx.ingredientBase.updateMany({ where: { chosenProductId: dupId }, data: { chosenProductId: target.id } });
+        const data: Prisma.SupplierProductUncheckedUpdateInput = {};
+        if (!target.reference && dup.reference) data.reference = dup.reference;
+        if (!target.article?.trim() && dup.article?.trim()) data.article = dup.article;
+        if (!target.family?.trim() && dup.family?.trim()) data.family = dup.family;
+        if (target.packSize == null && dup.packSize != null) data.packSize = dup.packSize;
+        if (!target.packName && dup.packName) data.packName = dup.packName;
+        if (target.baseId == null && dup.baseId != null) data.baseId = dup.baseId;
+        if (Object.keys(data).length) {
+          await tx.supplierProduct.update({ where: { id: target.id }, data });
+          Object.assign(target, data);
+        }
+        touched.push(target.id);
+      }
+      if (pairs.size) await tx.supplierProduct.deleteMany({ where: { id: { in: [...pairs.keys()] } } });
+
+      // 2. Les autres produits changent de fournisseur (un nom déjà pris reçoit « (2) »).
+      const noms = new Set(keep.products.map((p) => p.name.toLowerCase()));
+      for (const p of from.products.filter((x) => !pairs.has(x.id))) {
+        let nom = p.name;
+        for (let i = 2; noms.has(nom.toLowerCase()); i++) nom = `${p.name} (${i})`;
+        noms.add(nom.toLowerCase());
+        await tx.supplierProduct.update({ where: { id: p.id }, data: { supplierId: keepId, name: nom } });
+        touched.push(p.id);
+      }
+
+      // 3. Factures (avec leurs PDF), commandes et mercuriales à traiter.
+      const { count: invoices } = await tx.purchaseOrder.updateMany({ where: { supplierId: fromId, manual: false }, data: { supplierId: keepId } });
+      await tx.purchaseOrder.updateMany({ where: { supplierId: fromId }, data: { supplierId: keepId } });
+      await tx.supplierOrder.updateMany({ where: { supplierId: fromId }, data: { supplierId: keepId } });
+      await tx.pendingInvoice.updateMany({ where: { supplierId: fromId }, data: { supplierId: keepId } });
+
+      // 4. La fiche vide part ; l'ancien nom et la remarque restent dans la remarque.
+      const notes = [keep.note?.trim(), from.note?.trim()].filter(Boolean);
+      const anciens = [from.name, ...(name !== keep.name ? [keep.name] : [])].filter((n) => n.toLowerCase() !== name.toLowerCase());
+      if (anciens.length) notes.push(`Ancien nom : ${anciens.join(", ")}`);
+      await tx.supplier.delete({ where: { id: fromId } });
+      await supplierNameFree(tx, name, keepId);
+      const s = await tx.supplier.update({
+        where: { id: keepId },
+        data: { name, note: cleanText(notes.join("\n"), 2000) },
+        select: { id: true, name: true },
+      });
+
+      await refreshProducts(tx, touched);
+      await followArticles(tx, keepId, touched);
+      return { ...s, invoices, products: from.products.length, merged: pairs.size };
+    },
+    { timeout: 60_000 },
+  );
+}
+
 export type ProductInput = {
   name?: string;
   reference?: string | null;

@@ -15,11 +15,14 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
   const viewer = await requirePage("costs.view");
   const { id } = await params;
   const peutModifier = viewerCan(viewer, "costs.edit");
-  const [supplier, bases, aTraiter, modes] = await Promise.all([
+  const [supplier, bases, aTraiter, modes, autres] = await Promise.all([
     loadSupplier(Number(id) || 0),
     prisma.ingredientBase.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     peutModifier ? listPendingInvoices({ kind: "mercuriale", supplierId: Number(id) || -1 }) : Promise.resolve([]),
     modesAnalyse(),
+    peutModifier
+      ? prisma.supplier.findMany({ where: { NOT: { id: Number(id) || 0 } }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ]);
   if (!supplier) notFound();
   return (
@@ -32,6 +35,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
         bases={bases}
         aTraiter={aTraiter}
         modes={modes}
+        autres={autres}
       />
     </div>
   );

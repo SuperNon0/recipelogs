@@ -17,6 +17,8 @@ import {
   editProduct,
   editSupplier,
   getSupplierDeletionInfo,
+  getSupplierMergeInfo,
+  joinSuppliers,
   removePrice,
   removeProduct,
   removeSupplier,
@@ -197,6 +199,139 @@ export function SupplierFormModal({
         <textarea className="fl-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} />
       </Field>
     </FormModal>
+  );
+}
+
+/**
+ * Réunit une autre fiche du même fournisseur dans celle-ci (il a changé de nom, ou une
+ * lecture IA a créé une deuxième fiche) : factures et PDF, commandes et prix viennent ici.
+ */
+export function MergeSupplierModal({
+  supplier,
+  others,
+  onClose,
+}: {
+  supplier: { id: number; name: string };
+  others: { id: number; name: string }[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [fromId, setFromId] = useState<number | null>(null);
+  const [name, setName] = useState(supplier.name);
+  const [info, setInfo] = useState<Awaited<ReturnType<typeof getSupplierMergeInfo>> | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (fromId == null) return;
+    let off = false;
+    setInfo(undefined);
+    getSupplierMergeInfo(supplier.id, fromId).then(
+      (r) => !off && setInfo(r),
+      () => !off && setInfo(null),
+    );
+    return () => {
+      off = true;
+    };
+  }, [supplier.id, fromId]);
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  const from = others.find((o) => o.id === fromId);
+  return (
+    <ModalOverlay onClose={onClose} title="Réunir avec un autre fournisseur">
+      <form
+        style={{ display: "grid", gap: 12, fontSize: 14, lineHeight: 1.5 }}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (fromId == null) return setError("Choisis la fiche en double.");
+          setBusy(true);
+          const r = await joinSuppliers(supplier.id, fromId, name);
+          setBusy(false);
+          if (!r.ok) return setError(r.error);
+          onClose();
+          router.refresh();
+        }}
+      >
+        <p style={{ margin: 0 }}>
+          Pour un fournisseur qui a changé de nom, ou une deuxième fiche créée par erreur. Tout ce qui est sur l&apos;autre fiche vient
+          sur <b>{supplier.name}</b>.
+        </p>
+        <Field
+          label="Fiche en double"
+          help={{
+            title: "Fiche en double",
+            text: "L'autre fiche du même fournisseur. Ses factures (avec leurs PDF), ses commandes et ses prix viennent ici, puis cette fiche vide disparaît. Un produit qui existe déjà ici (même référence ou même nom) garde un seul historique de prix.",
+            example: "« SOFRAMA Réseau Capella » réunie dans « Soframa ».",
+          }}
+        >
+          <select
+            className="fl-input"
+            value={fromId ?? ""}
+            onChange={(e) => {
+              setFromId(e.target.value ? Number(e.target.value) : null);
+              setError(null);
+            }}
+            required
+          >
+            <option value="">Choisir…</option>
+            {others.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="Nom gardé"
+          help={{
+            title: "Nom gardé",
+            text: "Le nom du fournisseur après la réunion. Prends le nouveau nom s'il en a changé. L'ancien nom reste écrit dans sa remarque.",
+            example: "Coup de Pâtes devenu « Boul'Pat Littoral ».",
+          }}
+        >
+          <input className="fl-input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} />
+        </Field>
+        {from && (
+          <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[supplier.name, from.name].map((n) => (
+              <button key={n} type="button" className="fl-btn fl-btn-secondary" onClick={() => setName(n)} disabled={name === n}>
+                Garder « {n} »
+              </button>
+            ))}
+          </span>
+        )}
+        {fromId != null &&
+          (info === undefined ? (
+            <p style={{ color: "var(--muted)", margin: 0 }}>…</p>
+          ) : info === null ? (
+            <p style={{ margin: 0 }}>Fournisseur introuvable.</p>
+          ) : (
+            <>
+              <p style={{ margin: 0 }}>
+                Viennent de <b>{info.from}</b> :
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                <li>
+                  {plural(info.invoices, "facture", "factures")}
+                  {info.files ? ` (avec ${plural(info.files, "photo ou PDF joint", "photos ou PDF joints")})` : ""}
+                </li>
+                <li>
+                  {plural(info.products, "produit", "produits")}
+                  {info.sameProducts ? `, dont ${info.sameProducts} déjà ici : leurs prix rejoignent l'historique du même produit` : ""}
+                </li>
+                {info.orders > 0 && <li>{plural(info.orders, "commande", "commandes")}</li>}
+                {info.manualPrices > 0 && <li>{plural(info.manualPrices, "prix tapé à la main", "prix tapés à la main")}</li>}
+              </ul>
+              <p style={{ margin: 0 }}>Rien n&apos;est perdu. La fiche « {info.from} », vide, disparaît ensuite.</p>
+            </>
+          ))}
+        {error && <span className="ing-fact-msg" data-err="true">{error}</span>}
+        <button type="submit" className="fl-btn fl-btn-primary" disabled={busy || fromId == null || !info}>
+          {busy ? "…" : "Réunir les deux fiches"}
+        </button>
+        <button type="button" className="fl-btn fl-btn-secondary" disabled={busy} onClick={onClose}>
+          Annuler
+        </button>
+      </form>
+    </ModalOverlay>
   );
 }
 

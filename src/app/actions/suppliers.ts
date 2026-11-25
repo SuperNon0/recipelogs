@@ -13,7 +13,9 @@ import {
   deleteProduct,
   deletePurchaseOrder,
   deleteSupplier,
+  mergeSuppliers,
   supplierDeletionInfo,
+  supplierMergeInfo,
   updatePriceLine,
   updateProduct,
   updatePurchaseOrder,
@@ -127,6 +129,18 @@ export async function removeSupplier(id: number): Promise<ActionResult> {
   }
   refresh();
   return { ok: true };
+}
+
+/** Ce qui passera d'un fournisseur à l'autre, à montrer avant de réunir. */
+export async function getSupplierMergeInfo(keepId: number, fromId: number) {
+  await requireAccess("costs.edit");
+  return supplierMergeInfo(keepId, fromId);
+}
+
+/** Réunit deux fiches du même fournisseur : tout passe chez `keepId`, qui prend `name`. */
+export async function joinSuppliers(keepId: number, fromId: number, name: string): Promise<ActionResult> {
+  await requireAccess("costs.edit");
+  return edit(() => mergeSuppliers(keepId, fromId, name));
 }
 
 export async function addProduct(

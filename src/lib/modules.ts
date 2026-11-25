@@ -129,6 +129,7 @@ const OUTILS: Record<string, ModuleCle> = {
   relier_produit_ingredient: "fournisseurs",
   creer_fournisseur: "fournisseurs",
   modifier_fournisseur: "fournisseurs",
+  reunir_fournisseurs: "fournisseurs",
   supprimer_fournisseur: "fournisseurs",
   ajouter_produit_fournisseur: "fournisseurs",
   modifier_produit_fournisseur: "fournisseurs",

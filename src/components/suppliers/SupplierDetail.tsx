@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Combine, History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Combine, GitMerge, History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
@@ -12,7 +12,7 @@ import type { loadSupplier } from "@/lib/purchaseOrders";
 import { Change } from "./PriceComparison";
 import { ProductHistoryModal } from "./ProductHistoryModal";
 import { InvoiceList } from "./InvoiceList";
-import { DeleteSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
+import { DeleteSupplierModal, MergeSupplierModal, ProductFormModal, SupplierFormModal } from "./ManageForms";
 import { FacturesATraiter, NouvelleMercurialeButton } from "./NouvelleFacture";
 import type { PendingInvoiceItem } from "@/lib/pendingInvoices";
 import type { ModesAnalyse } from "@/lib/ia/analyse";
@@ -28,13 +28,20 @@ type Supplier = NonNullable<Awaited<ReturnType<typeof loadSupplier>>>;
 /** Fiche d'un fournisseur : ses produits (dernier prix, évolution, moyenne) et ses factures. */
 /** aTraiter : mercuriales de ce fournisseur gardées « à traiter ». */
 export function SupplierDetail({
-  supplier, bases, aTraiter = [], modes,
-}: { supplier: Supplier; bases: { id: number; name: string }[]; aTraiter?: PendingInvoiceItem[]; modes: ModesAnalyse }) {
+  supplier, bases, aTraiter = [], modes, autres = [],
+}: {
+  supplier: Supplier;
+  bases: { id: number; name: string }[];
+  aTraiter?: PendingInvoiceItem[];
+  modes: ModesAnalyse;
+  /** Les autres fournisseurs, pour réunir une fiche en double. */
+  autres?: { id: number; name: string }[];
+}) {
   const can = useCan();
   const router = useRouter();
   const editable = can("costs.edit");
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [modal, setModal] = useState<"edit" | "delete" | "product" | "group" | "merge" | null>(null);
+  const [modal, setModal] = useState<"edit" | "delete" | "product" | "group" | "merge" | "join" | null>(null);
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE);
   // Les variantes d'un même article (« Fraise France », « Fraise Espagne ») tiennent sur une ligne.
@@ -73,6 +80,11 @@ export function SupplierDetail({
             <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("edit")}>
               <Pencil size={15} /> Modifier
             </button>
+            {autres.length > 0 && (
+              <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setModal("join")}>
+                <GitMerge size={15} /> Réunir
+              </button>
+            )}
             <button type="button" className="fl-btn fl-btn-danger" onClick={() => setModal("delete")}>
               <Trash2 size={15} /> Supprimer
             </button>
@@ -203,6 +215,7 @@ export function SupplierDetail({
       {modal === "delete" && (
         <DeleteSupplierModal id={supplier.id} onClose={() => setModal(null)} onDeleted={() => router.push("/fournisseurs/liste")} />
       )}
+      {modal === "join" && <MergeSupplierModal supplier={{ id: supplier.id, name: supplier.name }} others={autres} onClose={() => setModal(null)} />}
       {modal === "product" && <ProductFormModal supplierId={supplier.id} onClose={() => setModal(null)} />}
       {modal === "merge" && <MergeDuplicatesModal supplierId={supplier.id} products={aFusionner} onClose={() => setModal(null)} />}
       {modal === "group" && (
