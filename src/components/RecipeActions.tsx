@@ -7,6 +7,7 @@ import {
   duplicateRecipe,
   toggleFavorite,
 } from "@/app/actions/recipes";
+import { demander, prevenir } from "@/components/ui/demander";
 
 export function RecipeActions({
   recipeId,
@@ -62,7 +63,7 @@ export function RecipeActions({
                 startTransition(async () => {
                   setOpen(false);
                   const res = await duplicateRecipe(recipeId);
-                  if (res && !res.ok) alert(res.error);
+                  if (res && !res.ok) prevenir(res.error);
                 })
               }
             >
@@ -70,16 +71,16 @@ export function RecipeActions({
             </MenuButton>
             <MenuButton
               danger
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  confirm(
+                  await demander(
                     "Supprimer définitivement cette recette ? Cette action est irréversible.",
                   )
                 ) {
                   startTransition(async () => {
                     setOpen(false);
                     const res = await deleteRecipe(recipeId);
-                    if (res && !res.ok) alert(res.error);
+                    if (res && !res.ok) prevenir(res.error);
                   });
                 }
               }}

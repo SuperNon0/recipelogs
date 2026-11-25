@@ -32,8 +32,8 @@ export function useCookbookMenu(cb: { id: number; name: string; recipeCount: num
   const download = useCallback(() => {
     window.location.href = `/cookbooks/${cb.id}/pdf`;
   }, [cb.id]);
-  const remove = useCallback(() => {
-    if (confirmDeleteCookbook(cb.name)) startTransition(() => deleteCookbook(cb.id));
+  const remove = useCallback(async () => {
+    if (await confirmDeleteCookbook(cb.name)) startTransition(() => deleteCookbook(cb.id));
   }, [cb.id, cb.name]);
 
   const getSpec = useCallback((): MenuSpec => {

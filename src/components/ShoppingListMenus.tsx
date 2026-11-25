@@ -6,6 +6,7 @@ import { ExternalLink, FileDown, ListX, RotateCcw, ShoppingBasket } from "lucide
 import { ContextArea, MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { removeChecked, uncheckAll } from "@/app/actions/shopping";
 import { downloadShoppingListPdf, useDeleteShoppingList } from "./DeleteShoppingListButton";
+import { demander } from "@/components/ui/demander";
 
 export type ShoppingListRowData = {
   id: number;
@@ -88,8 +89,8 @@ export function ShoppingListHeaderMenu({
         label: checked > 0 ? `Retirer les cochés (${checked})` : "Retirer les cochés",
         icon: ListX,
         disabled: checked === 0,
-        onSelect: () => {
-          if (confirm(`Retirer ${checked} article${checked > 1 ? "s" : ""} coché${checked > 1 ? "s" : ""} de la liste ?`)) {
+        onSelect: async () => {
+          if (await demander(`Retirer ${checked} article${checked > 1 ? "s" : ""} coché${checked > 1 ? "s" : ""} de la liste ?`)) {
             startTransition(async () => { await removeChecked(listId); });
           }
         },

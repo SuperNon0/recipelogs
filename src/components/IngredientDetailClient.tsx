@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
 import { IngredientProducts } from "@/components/suppliers/IngredientProducts";
 import type { ProductChoice } from "@/lib/purchaseOrders";
+import { demander } from "@/components/ui/demander";
 
 type Recipe = { id: number; name: string; ingredientName: string; quantityG: number; unit: string };
 
@@ -48,7 +49,7 @@ export function IngredientDetailClient({
   const [merging, setMerging] = useState(false);
 
   async function handleMerge(target: { id: number; name: string }): Promise<string | null> {
-    if (!confirm(`Fusionner « ${base.name} » dans « ${target.name} » ?\n\nToutes les recettes utilisant « ${base.name} » seront mises à jour avec « ${target.name} ». Cette action est irréversible.`)) return null;
+    if (!await demander(`Fusionner « ${base.name} » dans « ${target.name} » ?\n\nToutes les recettes utilisant « ${base.name} » seront mises à jour avec « ${target.name} ». Cette action est irréversible.`)) return null;
     const r = await mergeIngredientBases(base.id, target.id);
     if (!r.ok) return r.error;
     router.push("/settings/ingredients");

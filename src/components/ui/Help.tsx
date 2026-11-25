@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CircleHelp, X } from "lucide-react";
-import { useEscape, useIsPhone } from "./useMedia";
+import { useIsPhone } from "./useMedia";
 import { STOP } from "./Menu";
 import { useOverlayOpen } from "./overlay";
 
@@ -11,7 +11,10 @@ import { useOverlayOpen } from "./overlay";
  * Petit « ? » à côté d'une information. Au clic, ouvre une bulle qui explique
  * ce que c'est, comment c'est calculé et un exemple.
  * Ordinateur : bulle ancrée au bouton. Téléphone : feuille qui remonte du bas.
+ * Règle de Noë (comme le panel) : elle ne se ferme que par sa croix ou en retouchant
+ * le « ? », jamais par un clic à côté. Ouvrir un autre « ? » ferme celle-ci.
  */
+const EVT = "rl-aide-ouverte";
 export function Help({
   title,
   children,
@@ -35,11 +38,11 @@ export function Help({
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const phone = useIsPhone();
   const close = useCallback(() => setOpen(false), []);
-  useEscape(open, close);
   useOverlayOpen(open && phone);
 
-  useLayoutEffect(() => {
-    if (!open || phone || !btnRef.current || !popRef.current) return;
+  // Place la bulle sous le bouton (ou au-dessus s'il n'y a pas la place).
+  const placer = useCallback(() => {
+    if (!btnRef.current || !popRef.current) return;
     const b = btnRef.current.getBoundingClientRect();
     const p = popRef.current.getBoundingClientRect();
     let left = b.left + b.width / 2 - 40;
@@ -47,25 +50,34 @@ export function Help({
     let top = b.bottom + 8;
     if (top + p.height > window.innerHeight - 12) top = Math.max(12, b.top - p.height - 8);
     setPos({ left, top });
-  }, [open, phone]);
+  }, []);
 
+  useLayoutEffect(() => {
+    if (open && !phone) placer();
+  }, [open, phone, placer]);
+
+  // La bulle suit son bouton quand la page défile ; elle reste ouverte.
   useEffect(() => {
     if (!open || phone) return;
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (popRef.current?.contains(t) || btnRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const onScroll = () => setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("scroll", placer, true);
+    window.addEventListener("resize", placer);
     return () => {
-      document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("scroll", placer, true);
+      window.removeEventListener("resize", placer);
     };
-  }, [open, phone]);
+  }, [open, phone, placer]);
+
+  // Une seule aide ouverte à la fois : ouvrir un autre « ? » ferme celle-ci.
+  useEffect(() => {
+    if (!open) return;
+    const moi = btnRef.current;
+    const autre = (e: Event) => {
+      if ((e as CustomEvent).detail !== moi) setOpen(false);
+    };
+    window.dispatchEvent(new CustomEvent(EVT, { detail: moi }));
+    window.addEventListener(EVT, autre);
+    return () => window.removeEventListener(EVT, autre);
+  }, [open]);
 
   const body = (
     <>
@@ -120,7 +132,7 @@ export function Help({
           <div style={{ display: "contents" }} {...STOP}>
           {phone ? (
             <>
-              <div className="sheet-veil" onClick={close} />
+              <div className="sheet-veil" />
               <div className="sheet help-pop" role="dialog" aria-label={title} style={{ position: "fixed", width: "auto", borderRadius: "20px 20px 0 0", fontSize: 14.5, padding: "8px 18px calc(22px + env(safe-area-inset-bottom))" }}>
                 <div className="sheet-grab" />
                 {body}

@@ -20,6 +20,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { disableMcpAccess, regenerateMcpAccess, revokeMcpOauth } from "@/app/actions/mcp";
 import { Help } from "@/components/ui/Help";
+import { demander } from "@/components/ui/demander";
 
 /** Connexion par compte (OAuth, RecipeLog en ligne) : dernières applications connectées. */
 export type OauthInfo = { connections: { name: string; email: string; at: string }[] };
@@ -60,22 +61,22 @@ export function McpAccess({
   const endpoint = `${origin}/api/mcp`;
   const header = token ? `Bearer ${token}` : "";
 
-  const regenerate = () => {
-    if (token && !confirm("Changer la clé ? L'ancienne cessera aussitôt de marcher dans Claude.")) return;
+  const regenerate = async () => {
+    if (token && !await demander("Changer la clé ? L'ancienne cessera aussitôt de marcher dans Claude.")) return;
     startTransition(async () => {
       await regenerateMcpAccess();
     });
   };
 
-  const disable = () => {
-    if (!confirm("Couper l'accès MCP ? Claude ne pourra plus rien lire ni modifier.")) return;
+  const disable = async () => {
+    if (!await demander("Couper l'accès MCP ? Claude ne pourra plus rien lire ni modifier.")) return;
     startTransition(async () => {
       await disableMcpAccess();
     });
   };
 
-  const revoke = () => {
-    if (!confirm("Déconnecter Claude ? Il faudra cliquer à nouveau sur « Se connecter » dans ses réglages.")) return;
+  const revoke = async () => {
+    if (!await demander("Déconnecter Claude ? Il faudra cliquer à nouveau sur « Se connecter » dans ses réglages.")) return;
     startTransition(async () => {
       await revokeMcpOauth();
     });

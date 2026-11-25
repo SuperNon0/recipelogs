@@ -32,6 +32,7 @@ import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
 import { htmlToPlainText } from "@/lib/stepsText";
 import { AddSubRecipeDialog, type PickedSubRecipe } from "./AddSubRecipeModal";
+import { demander } from "@/components/ui/demander";
 
 /** Une sous-recette déjà liée (modification d'une recette), affichée pour mémoire. */
 type ExistingSubRecipe = { label: string; childName: string; calcMode: string; calcValue: number };
@@ -572,9 +573,9 @@ export function RecipeForm({
                 type="button"
                 className="fl-btn fl-btn-primary"
                 disabled={!freeText.trim()}
-                onClick={() => {
+                onClick={async () => {
                   const hasRows = ingredients.some((r) => r.name.trim());
-                  if (hasRows && !confirm("Remplacer les ingrédients déjà saisis par ceux du texte ?")) return;
+                  if (hasRows && !await demander("Remplacer les ingrédients déjà saisis par ceux du texte ?")) return;
                   importFreeText(false);
                 }}
               >

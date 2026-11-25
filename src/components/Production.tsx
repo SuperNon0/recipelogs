@@ -10,6 +10,7 @@ import { formatG, formatQty } from "@/lib/format";
 import { ModalOverlay } from "./ModalOverlay";
 import { fetchAvailableRecipes } from "@/app/actions/modals";
 import { addToProduction, clearProduction, fetchRecipeYield, removeProductionItem, setProductionAmount } from "@/app/actions/production";
+import { demander } from "@/components/ui/demander";
 
 const parse = (s: string) => Number(s.replace(",", "."));
 const show = (n: number) => String(n).replace(".", ",");
@@ -58,8 +59,8 @@ export function ProductionBoard({ items }: { items: ProductionItemRow[] }) {
             <button
               type="button"
               className="fl-btn fl-btn-ghost"
-              onClick={() => {
-                if (confirm("Vider la fiche de production ? Les recettes ne sont pas touchées.")) run(() => clearProduction());
+              onClick={async () => {
+                if (await demander("Vider la fiche de production ? Les recettes ne sont pas touchées.")) run(() => clearProduction());
               }}
             >
               <Trash2 size={15} /> Vider

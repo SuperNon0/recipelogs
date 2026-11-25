@@ -154,32 +154,6 @@ function erreurClaude(e: unknown, plateforme: boolean): ResultatIA {
 // ChatGPT et Gemini (clé du client)
 // ─────────────────────────────────────────────
 
-async function posterJson(
-  opts: OptionsIA,
-  url: string,
-  headers: Record<string, string>,
-  corps: unknown,
-): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number; corps?: string }> {
-  const doFetch = opts.fetch ?? fetch;
-  try {
-    const res = await doFetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(corps),
-      signal: AbortSignal.timeout(DELAI_MS),
-    });
-    if (!res.ok) {
-      const corps = await res.text().catch(() => "");
-      console.error(`IA : ${new URL(url).hostname} a répondu ${res.status} : ${corps.slice(0, 800)}`);
-      return { ok: false, status: res.status, corps };
-    }
-    return { ok: true, json: (await res.json()) as Record<string, unknown> };
-  } catch (e) {
-    console.error(`IA : ${new URL(url).hostname} injoignable :`, e instanceof Error ? e.message : e);
-    return { ok: false, status: 0 };
-  }
-}
-
 /** Avec la clé de la plateforme : la passerelle explique elle-même un refus ({ error, message }). */
 function erreurPlateforme(nom: string, status: number, corps?: string): ResultatIA {
   try {
@@ -211,19 +185,55 @@ function finir(t: string, modele: string): ResultatIA {
   }
 }
 
+/**
+ * ChatGPT en continu (API Responses avec stream: true), comme Gemini : sans ça, une longue
+ * mercuriale (plus de 5 minutes de lecture) était coupée par Node, qui abandonne une
+ * réponse dont les en-têtes tardent plus de 5 minutes.
+ */
 async function chatgpt(r: ReglagesIA, f: Fichier, texte: string, opts: OptionsIA): Promise<ResultatIA> {
   const data = `data:${f.mime};base64,${f.data.toString("base64")}`;
   const piece = f.mime === "application/pdf" ? { type: "input_file", filename: f.nom || "facture.pdf", file_data: data } : { type: "input_image", image_url: data };
   const plateforme = r.mode === "plateforme";
-  const rep = await posterJson(opts, plateforme ? `${passerelleURL()}/v1/ia/openai/v1/responses` : "https://api.openai.com/v1/responses", { Authorization: `Bearer ${plateforme ? passerelleCle() : r.cle}` }, {
-    model: r.modele,
-    input: [{ role: "user", content: [piece, { type: "input_text", text: texte }] }],
-    text: { format: { type: "json_schema", name: "document", schema: SCHEMA_DOCUMENT, strict: true } },
-  });
-  if (!rep.ok) return plateforme ? erreurPlateforme("ChatGPT", rep.status, rep.corps) : erreurHttp("ChatGPT", rep.status);
-  const sortie = Array.isArray(rep.json.output) ? (rep.json.output as { type?: string; content?: { type?: string; text?: string }[] }[]) : [];
-  const t = sortie.flatMap((o) => (o.type === "message" ? (o.content ?? []).filter((c) => c.type === "output_text").map((c) => c.text ?? "") : [])).join("");
-  if (rep.json.status === "incomplete") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
+  const doFetch = opts.fetch ?? fetch;
+  let res: Response;
+  try {
+    res = await doFetch(plateforme ? `${passerelleURL()}/v1/ia/openai/v1/responses` : "https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${plateforme ? passerelleCle() : r.cle}` },
+      body: JSON.stringify({
+        model: r.modele,
+        input: [{ role: "user", content: [piece, { type: "input_text", text: texte }] }],
+        text: { format: { type: "json_schema", name: "document", schema: SCHEMA_DOCUMENT, strict: true } },
+        stream: true,
+      }),
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+  } catch (e) {
+    console.error(`IA : ChatGPT injoignable :`, e instanceof Error ? e.message : e);
+    return plateforme ? erreurPlateforme("ChatGPT", 0) : erreurHttp("ChatGPT", 0);
+  }
+  if (!res.ok) {
+    const corps = await res.text().catch(() => "");
+    console.error(`IA : ChatGPT a répondu ${res.status} : ${corps.slice(0, 800)}`);
+    return plateforme ? erreurPlateforme("ChatGPT", res.status, corps) : erreurHttp("ChatGPT", res.status);
+  }
+  let t = "";
+  let statut: string | undefined;
+  try {
+    for await (const evt of evenementsSSE(res)) {
+      const j = evt as { type?: string; delta?: string; text?: string; response?: { status?: string }; error?: { message?: string } | string; message?: string };
+      if (j.type === "error" || j.type === "response.failed") {
+        const m = typeof j.error === "object" ? j.error?.message : j.message;
+        throw new Error(m ?? "erreur de ChatGPT");
+      }
+      if (j.type === "response.output_text.delta") t += j.delta ?? "";
+      if (j.type === "response.completed" || j.type === "response.incomplete") statut = j.response?.status ?? (j.type === "response.completed" ? "completed" : "incomplete");
+    }
+  } catch (e) {
+    console.error("IA : lecture ChatGPT coupée :", e instanceof Error ? e.message : e);
+    return erreur("injoignable", "La lecture a été coupée en route. Réessaie dans quelques minutes.");
+  }
+  if (statut === "incomplete") return erreur("trop_long", "Le document est trop long pour une seule lecture : envoie-le en plusieurs fois (quelques pages à la fois).");
   if (!t) return erreur("refus", "ChatGPT n'a rien renvoyé pour ce document.");
   return finir(t, r.modele);
 }

@@ -101,6 +101,7 @@ import {
   type CookbookTheme,
   type FontKey,
 } from "@/lib/pdf/theme";
+import { demander } from "@/components/ui/demander";
 
 type Props = {
   theme: {
@@ -177,8 +178,8 @@ export function ThemeEditor({ theme, recipes }: Props) {
           <button
             type="button"
             className="fl-btn fl-btn-secondary"
-            onClick={() => {
-              if (!confirm("Revenir aux réglages d'origine de ce thème ?")) return;
+            onClick={async () => {
+              if (!await demander("Revenir aux réglages d'origine de ce thème ?")) return;
               startTransition(async () => {
                 await resetPdfTheme(theme.id);
                 router.refresh();

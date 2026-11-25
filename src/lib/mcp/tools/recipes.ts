@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildRecipeSnapshot } from "@/lib/cookbooks";
+import { modulesCoupes } from "@/lib/modules";
 import { DEFAULT_SALE_COEF, DEFAULT_SALE_VAT, costOf, saleMargin } from "@/lib/cost";
 import { ingMass } from "@/lib/massAdjust";
 import { getRecipeDetail, listRecipes, loadRecipeTree } from "@/lib/recipes";
@@ -247,7 +248,11 @@ export const RECIPE_TOOLS: McpTool[] = [
     run: async (args) => {
       const a = parseArgs(z.object({ id, multiplicateur: z.number().positive().max(1000).default(1) }), args);
       const r = await requireRecipe(a.id);
-      const [snap, family] = await Promise.all([buildRecipeSnapshot(a.id, a.multiplicateur), getVariantFamily(a.id)]);
+      const [snap, family, off] = await Promise.all([buildRecipeSnapshot(a.id, a.multiplicateur), getVariantFamily(a.id), modulesCoupes()]);
+      // Module « Prix fournisseurs » (ou « Produits vendus ») coupé dans le panel : pas de coût ni
+      // de marge, comme sur la fiche recette de l'appli.
+      const sansCout = off.has("fournisseurs");
+      const sansVente = sansCout || off.has("ventes");
       const cost = snap ? costOf([...snap.ingredients, ...snap.subRecipes.flatMap((s) => s.ingredients)]) : null;
       const coef = r.saleCoef != null ? Number(r.saleCoef) : DEFAULT_SALE_COEF;
       const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -296,7 +301,7 @@ export const RECIPE_TOOLS: McpTool[] = [
         variantes: family ? family.members.map((m) => ({ id: m.id, nom: m.name, essai: m.note, version_principale: m.isRoot })) : [],
         allergenes: snap?.allergens ?? [],
         cout:
-          cost && cost.detail.length > 0
+          !sansCout && cost && cost.detail.length > 0
             ? {
                 cout_matiere_eur: round2(cost.total),
                 coef_vente: coef,
@@ -305,8 +310,7 @@ export const RECIPE_TOOLS: McpTool[] = [
                 ...(cost.missing.length ? { ingredients_sans_prix: cost.missing } : {}),
               }
             : null,
-        vente: saleInfo(),
-        produit_vendu: r.sold,
+        ...(sansVente ? {} : { vente: saleInfo(), produit_vendu: r.sold }),
         ingredients: (snap?.ingredients ?? []).map((i, idx) => ({
           id: r.ingredients[idx]?.id,
           nom: i.name,

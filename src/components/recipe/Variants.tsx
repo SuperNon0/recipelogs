@@ -12,6 +12,7 @@ import { Help } from "@/components/ui/Help";
 import { MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { fetchAvailableRecipes } from "@/app/actions/modals";
 import { createVariant, linkVariant, promoteVariant, setVariantNote, unlinkVariant } from "@/app/actions/variants";
+import { demander } from "@/components/ui/demander";
 
 /** Bloc « Variantes » de la fiche : la version principale et ses essais, à ouvrir ou comparer. */
 export function VariantsCard({
@@ -64,8 +65,8 @@ export function VariantsCard({
             {
               label: "Détacher (recette indépendante)",
               icon: Unlink,
-              onSelect: () => {
-                if (confirm("Détacher cette variante ? Elle redevient une recette indépendante, rien n'est supprimé.")) run(() => unlinkVariant(id));
+              onSelect: async () => {
+                if (await demander("Détacher cette variante ? Elle redevient une recette indépendante, rien n'est supprimé.")) run(() => unlinkVariant(id));
               },
             },
           ]

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { deleteShoppingList } from "@/app/actions/shopping";
 import type { MenuAction } from "@/components/ui/Menu";
+import { demander } from "@/components/ui/demander";
 
 /**
  * Action de menu « Supprimer la liste… » (avec confirmation).
@@ -17,8 +18,8 @@ export function useDeleteShoppingList(listId: number, listName: string): MenuAct
     icon: Trash2,
     danger: true,
     disabled: pending,
-    onSelect: () => {
-      if (confirm(`Supprimer définitivement la liste « ${listName} » ? Cette action est irréversible.`)) {
+    onSelect: async () => {
+      if (await demander(`Supprimer définitivement la liste « ${listName} » ? Cette action est irréversible.`)) {
         startTransition(() => deleteShoppingList(listId));
       }
     },

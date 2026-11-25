@@ -71,6 +71,7 @@ import { ModalOverlay } from "./ModalOverlay";
 import { ThemeThumb } from "./ThemeThumb";
 import { CookbookPreview, useCookbookPreview } from "./CookbookPreview";
 import { DeleteCookbookButton } from "./DeleteCookbookButton";
+import { demander } from "@/components/ui/demander";
 
 /** Thème PDF enregistré, proposé dans « Thème ». */
 export type CookbookThemeOption = {
@@ -276,8 +277,8 @@ export function CookbookConfigForm({
               <button
                 type="button"
                 className="fl-btn fl-btn-ghost"
-                onClick={() => {
-                  if (confirm("Remettre tous les réglages d'apparence du cahier à leurs valeurs de base ?")) setTheme(DEFAULT_THEME);
+                onClick={async () => {
+                  if (await demander("Remettre tous les réglages d'apparence du cahier à leurs valeurs de base ?")) setTheme(DEFAULT_THEME);
                 }}
               >
                 <RotateCcw size={15} /> Réglages de base

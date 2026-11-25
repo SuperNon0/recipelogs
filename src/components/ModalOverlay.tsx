@@ -2,15 +2,14 @@
 
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { useEscape } from "./ui/useMedia";
 import { STOP } from "./ui/Menu";
 import { useOverlayOpen, useScrollLock } from "./ui/overlay";
 
 /**
  * Fenêtre modale : centrée sur ordinateur, feuille qui remonte du bas sur
- * téléphone. Se ferme par la croix ou Échap, jamais par un clic à côté : un
- * appui raté en dehors ne doit pas faire perdre ce qu'on est en train de
- * remplir.
+ * téléphone. Se ferme seulement par la croix (règle de Noë, comme le panel) :
+ * ni clic à côté ni touche Échap, pour ne jamais perdre ce qu'on est en train
+ * de remplir.
  */
 export function ModalOverlay({
   onClose,
@@ -28,7 +27,6 @@ export function ModalOverlay({
   /** Fenêtre qui occupe tout l'écran (aperçu en grand). */
   full?: boolean;
 }) {
-  useEscape(true, onClose);
   useOverlayOpen(true);
 
   // Bloque le défilement de la page derrière la fenêtre (compteur : voir overlay.ts).

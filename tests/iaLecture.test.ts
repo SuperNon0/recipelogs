@@ -242,6 +242,27 @@ describe("IA de la plateforme choisie dans le panel (Gemini, ChatGPT, Claude Hai
     expect(r).toMatchObject({ ok: false, code: "quota_ia", message: "Les 30 lectures par IA du mois sont utilisées." });
   });
 
+  it("ChatGPT : lit la réponse en continu (stream), morceau par morceau", async () => {
+    const moitie = Math.floor(doc.length / 2);
+    const { f, appels } = espionFlux(
+      flux([
+        { type: "response.created", response: { status: "in_progress" } },
+        { type: "response.output_text.delta", delta: doc.slice(0, moitie) },
+        { type: "response.output_text.delta", delta: doc.slice(moitie) },
+        { type: "response.completed", response: { status: "completed", usage: { input_tokens: 10, output_tokens: 20 } } },
+      ]),
+    );
+    const r = await lireAvecIA(plateforme, fichier, "facture", { articles: [] }, { fetch: f, plateforme: { fournisseur: "openai", modele: "gpt-5-mini" } });
+    expect(r).toMatchObject({ ok: true, modele: "gpt-5-mini", document: { fournisseur: "Ribera" } });
+    expect(appels[0].corps.stream).toBe(true);
+  });
+
+  it("ChatGPT : réponse incomplète = document trop long", async () => {
+    const { f } = espionFlux(flux([{ type: "response.output_text.delta", delta: "{\"lignes\": [" }, { type: "response.incomplete", response: { status: "incomplete" } }]));
+    const r = await lireAvecIA({ mode: "cle", fournisseur: "openai", cle: "sk-cle", modele: "gpt-5-mini" }, fichier, "mercuriale", { articles: [] }, { fetch: f });
+    expect(r).toMatchObject({ ok: false, code: "trop_long" });
+  });
+
   it("Claude Haiku : sans l'option de modèle de secours (refusée par Haiku)", async () => {
     // Directement sur la fausse API Anthropic (la passerelle de cette branche ne connaît que Claude Opus).
     const direct = `http://127.0.0.1:${(amont.address() as AddressInfo).port}`;

@@ -52,6 +52,7 @@ import { ModalOverlay } from "./ModalOverlay";
 import { EditSnapshotMassModal } from "./EditSnapshotMassModal";
 import { AddRecipesToCookbookModal } from "./AddRecipesToCookbookModal";
 import { formatG } from "@/lib/format";
+import { demander } from "@/components/ui/demander";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -353,8 +354,8 @@ function RecipeRow({ entry, no, cookbookId, handle, canUp, canDown, onMove, onDi
     const relink = {
       label: "Relier à la recette",
       icon: Link2,
-      onSelect: () => {
-        if (confirm(`Relier « ${entry.recipeName} » ? La copie figée (et sa masse) sera abandonnée : le cahier suivra la recette.`)) {
+      onSelect: async () => {
+        if (await demander(`Relier « ${entry.recipeName} » ? La copie figée (et sa masse) sera abandonnée : le cahier suivra la recette.`)) {
           run(() => convertToLinked(entry.id, cookbookId));
         }
       },
@@ -368,8 +369,8 @@ function RecipeRow({ entry, no, cookbookId, handle, canUp, canDown, onMove, onDi
       label: "Retirer du cahier…",
       icon: Trash2,
       danger: true,
-      onSelect: () => {
-        if (confirm(`Retirer « ${entry.recipeName} » du cahier ? La recette elle-même n'est pas supprimée.`)) {
+      onSelect: async () => {
+        if (await demander(`Retirer « ${entry.recipeName} » du cahier ? La recette elle-même n'est pas supprimée.`)) {
           run(() => removeFromCookbook(entry.id, cookbookId));
         }
       },
@@ -448,8 +449,8 @@ function ChapterRow({ entry, cookbookId, handle, canUp, canDown, onMove, onDialo
       label: "Supprimer le chapitre…",
       icon: Trash2,
       danger: true,
-      onSelect: () => {
-        if (confirm(`Supprimer le chapitre « ${entry.title} » ? Les recettes du cahier ne sont pas touchées.`)) {
+      onSelect: async () => {
+        if (await demander(`Supprimer le chapitre « ${entry.title} » ? Les recettes du cahier ne sont pas touchées.`)) {
           run(() => deleteChapter(entry.id, cookbookId));
         }
       },
