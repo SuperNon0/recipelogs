@@ -244,6 +244,23 @@ body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
   display: none !important;
 }
 
+/* Modules coupés dans le panel admin (attribut data-off du <body>, src/lib/modules.ts). */
+body[data-off~="cahiers"] [data-module~="cahiers"],
+body[data-off~="themes"] [data-module~="themes"],
+body[data-off~="courses"] [data-module~="courses"],
+body[data-off~="production"] [data-module~="production"],
+body[data-off~="fournisseurs"] [data-module~="fournisseurs"],
+body[data-off~="factures"] [data-module~="factures"],
+body[data-off~="mercuriales"] [data-module~="mercuriales"],
+body[data-off~="commandes"] [data-module~="commandes"],
+body[data-off~="ventes"] [data-module~="ventes"],
+body[data-off~="imports"] [data-module~="imports"],
+body[data-off~="import-recipekeeper"] [data-module~="import-recipekeeper"],
+body[data-off~="import-json"] [data-module~="import-json"],
+body[data-off~="import-video"] [data-module~="import-video"] {
+  display: none !important;
+}
+
 /* Fenêtre d'un rôle : nom + permissions à cocher */
 .role-form {
   display: flex;

@@ -25,7 +25,8 @@ export function JsonRecipeImport() {
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
-        const list: JsonRecipe[] = Array.isArray(parsed) ? parsed : [parsed];
+        // Fichier de « Exporter des recettes » (un autre RecipeLog) : { recipelog_export: 1, recettes: [...] }.
+        const list: JsonRecipe[] = Array.isArray(parsed?.recettes) ? parsed.recettes : Array.isArray(parsed) ? parsed : [parsed];
         if (list.length === 0 || !list[0]?.name) {
           setParseError("Format non reconnu : vérifie que le fichier est bien un tableau de recettes.");
           setPreview(null);

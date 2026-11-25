@@ -66,7 +66,7 @@ export function SupplierDetail({
         <h1>{supplier.name}</h1>
         {editable && (
           <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href={`/fournisseurs/${supplier.id}/commande`} className="fl-btn fl-btn-primary">
+            <Link href={`/fournisseurs/${supplier.id}/commande`} className="fl-btn fl-btn-primary" data-module="commandes">
               <ShoppingCart size={15} /> Passer une commande
             </Link>
             <NouvelleMercurialeButton fournisseur={{ id: supplier.id, name: supplier.name }} />
@@ -131,7 +131,7 @@ export function SupplierDetail({
               </button>
             )}
           </div>
-          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-ghost">
+          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-ghost" data-module="commandes">
             <History size={15} /> Commandes
           </Link>
         </div>
@@ -189,10 +189,12 @@ export function SupplierDetail({
         </button>
       )}
 
-      <div className="sect-title" style={{ marginTop: 20 }}>
+      <div className="sect-title" style={{ marginTop: 20 }} data-module="factures">
         <h2>Factures</h2>
       </div>
-      <InvoiceList orders={supplier.orders} showSupplier={false} />
+      <div data-module="factures">
+        <InvoiceList orders={supplier.orders} showSupplier={false} />
+      </div>
 
       {open && <ProductHistoryModal products={open.products} supplier={supplier.name} bases={bases} onClose={() => setOpenKey(null)} />}
       {modal === "edit" && (

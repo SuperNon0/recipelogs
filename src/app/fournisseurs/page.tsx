@@ -21,13 +21,13 @@ export default async function SuppliersPage() {
       <div className="page-head">
         <h1>Comparer les prix</h1>
         <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-primary">
+          <Link href="/fournisseurs/commandes" className="fl-btn fl-btn-primary" data-module="commandes">
             <ShoppingCart size={15} /> Commandes
           </Link>
           <Link href="/fournisseurs/liste" className="fl-btn fl-btn-secondary">
             <Users size={15} /> Mes fournisseurs
           </Link>
-          <Link href="/factures" className="fl-btn fl-btn-secondary">
+          <Link href="/factures" className="fl-btn fl-btn-secondary" data-module="factures">
             <Receipt size={15} /> Factures
           </Link>
         </span>

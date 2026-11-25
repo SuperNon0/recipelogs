@@ -26,7 +26,7 @@ import { parseIngredientsText } from "@/lib/parseIngredientsText";
 import { recipeMass } from "@/lib/massAdjust";
 import { formatG } from "@/lib/format";
 import { Help } from "@/components/ui/Help";
-import { useCan } from "@/components/auth/Permissions";
+import { useCan, useModule } from "@/components/auth/Permissions";
 import { MoreButton, type MenuSpec } from "@/components/ui/Menu";
 import { CategoryCombobox } from "./CategoryCombobox";
 import { IngredientNameInput } from "./IngredientNameInput";
@@ -143,7 +143,9 @@ export function RecipeForm({
   };
 
   const markDirty = useCallback(() => setDirty(true), []);
-  const canSell = useCan()("costs.edit");
+  // Prix de vente : il faut le droit et le module « Produits vendus et marges » (panel admin).
+  const canEditCosts = useCan()("costs.edit");
+  const canSell = useModule()("ventes") && canEditCosts;
   const [mold, setMold] = useState<Mold | null>(initial?.mold ?? null);
   const existingSubs = initial?.subRecipes ?? [];
   const [pendingSubs, setPendingSubs] = useState<(PickedSubRecipe & { key: number })[]>([]);

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ChevronRight, Clapperboard, KeyRound, LifeBuoy, LogOut, Scale, Users, Euro, Receipt, ShoppingCart, BadgeEuro, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
+import type { ModuleCle } from "@/lib/modules";
+import { ChevronRight, Clapperboard, Download, KeyRound, LifeBuoy, LogOut, Scale, Users, Euro, Receipt, ShoppingCart, BadgeEuro, Sparkles, Store, FileArchive, FileJson, FolderOpen, Palette, Plug, Tag, Wheat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { listPdfThemes } from "@/lib/pdfThemes";
@@ -120,6 +121,7 @@ export default async function SettingsPage() {
             {can("costs.view") && (
               <Row
                 href="/settings/ingredients/prix"
+                module="fournisseurs"
                 icon={Euro}
                 title="Prix des ingrédients"
                 sub={`${pricedCount} sur ${ingredientBaseCount} renseignés · pour le coût de revient`}
@@ -129,30 +131,35 @@ export default async function SettingsPage() {
               <>
                 <Row
                   href="/fournisseurs"
+                  module="fournisseurs"
                   icon={Store}
                   title="Comparer les prix des fournisseurs"
                   sub={`${plural(supplierCount, "fournisseur")} · tableau des prix payés, article par article`}
                 />
                 <Row
                   href="/fournisseurs/liste"
+                  module="fournisseurs"
                   icon={Users}
                   title="Mes fournisseurs"
                   sub="créer, renommer, supprimer · ajouter ou corriger des produits et des prix"
                 />
                 <Row
                   href="/factures"
+                  module="factures"
                   icon={Receipt}
                   title="Factures"
                   sub={`${plural(invoiceCount, "facture")} · envoyées à Claude, avec tout l'historique des prix`}
                 />
                 <Row
                   href="/fournisseurs/commandes"
+                  module="commandes"
                   icon={ShoppingCart}
                   title="Commandes fournisseurs"
                   sub="passer une commande en quelques touches · texte pour le commercial et PDF gardés"
                 />
                 <Row
                   href="/produits-vendus"
+                  module="ventes"
                   icon={BadgeEuro}
                   title="Produits vendus"
                   sub="la marge de chaque produit coché « Produit vendu »"
@@ -162,6 +169,7 @@ export default async function SettingsPage() {
             {can("site.update") && (
               <Row
                 href="/settings/ia"
+                module="fournisseurs"
                 icon={Sparkles}
                 title="Lecture des factures"
                 sub="Par l'IA ou par Claude (MCP) · factures et mercuriales lues en lignes de prix"
@@ -173,12 +181,13 @@ export default async function SettingsPage() {
 
       {can("organize.edit") && (
         <>
-          <div className="sect-title">
+          <div className="sect-title" data-module="themes">
             <h2>PDF</h2>
           </div>
-          <div className="fl-list">
+          <div className="fl-list" data-module="themes">
             <Row
               href="/settings/themes"
+              module="themes"
               icon={Palette}
               title="Thèmes PDF"
               sub={`${plural(themes.length, "thème")} · couleurs, polices et mise en page des PDF`}
@@ -189,18 +198,27 @@ export default async function SettingsPage() {
 
       {can("import.run") && (
         <>
-          <div className="sect-title">
-            <h2>Importer</h2>
+          <div className="sect-title" data-module="imports">
+            <h2>Importer et exporter</h2>
           </div>
-          <div className="fl-list">
+          <div className="fl-list" data-module="imports">
             <Row
               href="/settings/import-json"
+              module="import-json"
               icon={FileJson}
               title="Import JSON"
               sub="Recettes depuis un fichier JSON, ou un livre converti par une IA"
             />
             <Row
+              href="/settings/export"
+              module="import-json"
+              icon={Download}
+              title="Exporter des recettes"
+              sub="Cocher les recettes voulues et les mettre dans un autre RecipeLog"
+            />
+            <Row
               href="/settings/import-recipekeeper"
+              module="import-recipekeeper"
               icon={FileArchive}
               title="Import Recipe Keeper"
               sub="Sauvegarde ZIP / HTML ou export CSV de l'application Recipe Keeper"
@@ -226,6 +244,7 @@ export default async function SettingsPage() {
             {can("recipes.edit") && (
               <Row
                 href="/settings/import-video"
+                module="import-video"
                 icon={Clapperboard}
                 title="Recettes depuis TikTok"
                 sub="Partager une vidéo TikTok, Instagram ou un lien à Claude, qui l'ajoute dans RecipeLog"
@@ -306,9 +325,9 @@ export default async function SettingsPage() {
   );
 }
 
-function Row({ href, icon: Icon, title, sub }: { href: string; icon: LucideIcon; title: string; sub: string }) {
+function Row({ href, icon: Icon, title, sub, module }: { href: string; icon: LucideIcon; title: string; sub: string; module?: ModuleCle }) {
   return (
-    <Link href={href} className="fl-row">
+    <Link href={href} className="fl-row" data-module={module}>
       <span className="ic">
         <Icon size={17} />
       </span>

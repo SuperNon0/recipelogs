@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getMcpToken } from "@/lib/mcp/token";
 import { MCP_TOOL_GROUPS } from "@/lib/mcp/tools";
+import { moduleDeLOutil, modulesCoupes } from "@/lib/modules";
 import { McpAccess, type ToolGroupInfo } from "@/components/settings/McpAccess";
 import { requirePage } from "@/lib/auth/guard";
 import { mcpPermis, mcpKeyAllowed } from "@/lib/mcp/allowed";
@@ -14,14 +15,19 @@ export default async function McpSettingsPage() {
   const token = await getMcpToken();
   // RecipeLog en ligne : Claude peut aussi se connecter avec un compte (OAuth).
   const oauth = oauthSetup() ? { connections: (await getOauthState()).connections } : null;
+  // Outils des modules coupés dans le panel admin : pas listés (Claude ne les voit pas non plus).
+  const off = await modulesCoupes();
   const groups: ToolGroupInfo[] = MCP_TOOL_GROUPS.map((g) => ({
     title: g.title,
-    tools: g.tools.map((t) => ({
+    tools: g.tools.filter((t) => {
+      const m = moduleDeLOutil(t.name);
+      return !m || !off.has(m);
+    }).map((t) => ({
       name: t.title ?? t.name,
       description: t.description,
-      kind: t.annotations?.readOnlyHint ? "read" : t.annotations?.destructiveHint ? "delete" : "write",
+      kind: (t.annotations?.readOnlyHint ? "read" : t.annotations?.destructiveHint ? "delete" : "write") as "read" | "delete" | "write",
     })),
-  }));
+  })).filter((g) => g.tools.length > 0);
 
   return (
     <div className="set-page">

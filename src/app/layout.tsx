@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { moduleDeLaPage, modulesCoupes, permissionsSansModules } from "@/lib/modules";
 import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/AppNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { ZoomReset } from "@/components/ZoomReset";
@@ -166,20 +167,25 @@ export default async function RootLayout({
     );
   }
 
+  // Plateforme : modules coupés dans le panel admin (src/lib/modules.ts). Leur page renvoie vers l'accueil.
+  const off = await modulesCoupes();
+  const moduleIci = moduleDeLaPage(path);
+  if (moduleIci && off.has(moduleIci)) redirect("/");
+
   const [siteUrl, counts] = await Promise.all([getSiteUrl(), loadNavCounts()]);
   const viewingAs = viewer.kind === "account" && viewer.realAccount ? viewer.account : null;
-  const perms = viewerPermissions(viewer);
+  const perms = permissionsSansModules(viewerPermissions(viewer), off);
   // Permissions absentes : les boutons marqués data-needs="…" sont masqués (styles/auth.css).
   const missing = ALL_PERMISSIONS.filter((p) => !perms.includes(p));
 
   return (
     <EncreHtml>
       {fonts}
-      <body data-no={missing.length ? missing.join(" ") : undefined}>
+      <body data-no={missing.length ? missing.join(" ") : undefined} data-off={off.size ? [...off].join(" ") : undefined}>
         {isDemo() && <DemoBanner />}
         <PlatformBanners bandeaux={annonces.bandeaux} maintenanceEnCours={annonces.maintenance ? annonces.maintenance.message : null} />
         {viewingAs && <ViewAsBanner email={viewingAs.email} role={viewingAs.role?.name ?? "sans rôle"} />}
-        <PermissionsProvider permissions={perms}>
+        <PermissionsProvider permissions={perms} modulesOff={[...off]}>
         <div className="app">
           <AppSidebar siteUrl={siteUrl} counts={counts} />
           <div className="main">

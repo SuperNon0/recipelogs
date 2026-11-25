@@ -4,6 +4,8 @@ import { PERMISSIONS, type Access } from "./permissions";
 import { authMode } from "./config";
 import { isMaintenanceEmail } from "./maintenance";
 import { getAnnonces } from "./passerelle";
+import { PATH_HEADER } from "./path";
+import { PERMISSIONS_DU_MODULE, moduleDeLaPage, modulesCoupes, type ModuleCle } from "@/lib/modules";
 
 /**
  * Gardes des droits. Chaque Server Action, page et route d'API commence par
@@ -34,10 +36,35 @@ function deniedMessage(access: Access, viewer?: Viewer): string {
   return `Ton rôle n'a pas la permission « ${p?.label ?? access} ».`;
 }
 
+export const MESSAGE_MODULE = "Cette partie de RecipeLog n'est pas activée sur ton site.";
+
+/** Plateforme : la permission demandée appartient-elle à un module coupé dans le panel ? */
+async function permissionCoupee(access: Access): Promise<boolean> {
+  const off = await modulesCoupes();
+  if (!off.size) return false;
+  return [...off].some((m: ModuleCle) => (PERMISSIONS_DU_MODULE[m] ?? []).some((p) => p === access));
+}
+
+/** Plateforme : l'adresse demandée est-elle celle d'un module coupé ? */
+async function pageCoupee(): Promise<boolean> {
+  const off = await modulesCoupes();
+  if (!off.size) return false;
+  let path = "";
+  try {
+    const { headers } = await import("next/headers");
+    path = (await headers()).get(PATH_HEADER) ?? "";
+  } catch {
+    return false;
+  }
+  const m = moduleDeLaPage(path);
+  return !!m && off.has(m);
+}
+
 /** Server Action : lève une erreur si le visiteur n'a pas le droit. */
 export async function requireAccess(access: Access): Promise<Viewer> {
   const viewer = await getViewer();
   if (!viewerCan(viewer, access)) throw new Error(deniedMessage(access, viewer));
+  if (await permissionCoupee(access)) throw new Error(MESSAGE_MODULE);
   if (await enMaintenance(viewer)) throw new Error(MESSAGE_MAINTENANCE);
   return viewer;
 }
@@ -46,6 +73,8 @@ export async function requireAccess(access: Access): Promise<Viewer> {
 export async function requirePage(access: Access): Promise<Viewer> {
   const viewer = await getViewer();
   if (!viewerCan(viewer, access)) redirect(`/acces?besoin=${access}`);
+  // Module coupé dans le panel admin : sa page renvoie vers l'accueil.
+  if ((await pageCoupee()) || (await permissionCoupee(access))) redirect("/");
   return viewer;
 }
 
@@ -54,6 +83,9 @@ export async function apiDenied(access: Access): Promise<Response | null> {
   const viewer = await getViewer();
   if (!viewerCan(viewer, access)) {
     return Response.json({ error: deniedMessage(access, viewer) }, { status: viewer.kind === "anonymous" ? 401 : 403, headers: { "Cache-Control": "no-store" } });
+  }
+  if ((await pageCoupee()) || (await permissionCoupee(access))) {
+    return Response.json({ error: MESSAGE_MODULE }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
   if (await enMaintenance(viewer)) {
     return Response.json({ error: MESSAGE_MAINTENANCE }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "120" } });

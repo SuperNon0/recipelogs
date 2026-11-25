@@ -49,7 +49,7 @@ export function NouvelleMercurialeButton({ fournisseur }: { fournisseur: Fournis
   const [tableur, setTableur] = useState<File | null>(null);
   return (
     <>
-      <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setOpen(true)}>
+      <button type="button" className="fl-btn fl-btn-secondary" data-module="mercuriales" onClick={() => setOpen(true)}>
         <FileUp size={15} /> Importer une mercuriale
       </button>
       {open && (
@@ -463,7 +463,7 @@ export function FacturesATraiter({
   const [supprimer, setSupprimer] = useState<PendingInvoiceItem | null>(null);
   if (!factures.length) return null;
   return (
-    <section className="nf-attente">
+    <section className="nf-attente" data-module={merc ? "mercuriales" : "factures"}>
       <div className="sect-title" style={{ marginTop: 6 }}>
       <h2 style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {merc ? "Mercuriales à traiter" : "À traiter"} ({factures.length}{limite ? ` sur ${limite}` : ""})
