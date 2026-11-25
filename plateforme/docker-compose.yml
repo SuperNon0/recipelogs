@@ -382,6 +382,8 @@ services:
     command: ["python3", "/vitrine/code/scripts/vitrine-contact.py"]
     environment:
       TZ: ${TZ:-Europe/Paris}
+      # Plus d'email pour Noë : le message est gardé, le panel le montre et prévient sur Discord.
+      VITRINE_SANS_EMAIL: "1"
     volumes:
       - ${DONNEES:-/srv/recipelog}/vitrine/code:/vitrine/code:ro
       - ${DONNEES:-/srv/recipelog}/vitrine/reglages:/etc/recipelog-vitrine:ro

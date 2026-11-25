@@ -72,7 +72,7 @@ async function api(methode, chemin, corps) {
     }
     rates = 0;
     if (t.etat === "fini") return { ...t, ok: t.ok === true, statut: t.ok ? 200 : 500 };
-    if (suivi) suivi(t.etat === "attente" ? `En attente : une autre action est en cours${t.attend ? ` (${t.attend})` : ""}. La tienne démarre juste après.` : t.etape || "");
+    if (suivi) suivi(t);
   }
 }
 
@@ -131,9 +131,9 @@ async function executer(titre, requete) {
   ouvrir(titre, `<p class="attente"><span class="rond"></span>En cours… (une création ou une mise à jour prend 1 à 3 minutes)</p><p class="sub" id="ex-etape"></p>
     <p class="texte-aide visible discret">Tu peux laisser cette fenêtre ouverte. Si tu fermes la page, l'action continue quand même : son résultat sera dans le journal, en bas du panel.</p>`);
   $("#croix").disabled = true;
-  suivi = (texte) => {
+  suivi = (t) => {
     const z = $("#ex-etape");
-    if (z) z.textContent = texte;
+    if (z) z.textContent = t.etat === "attente" ? texteAttente(t) : t.etape || "";
   };
   let r;
   try {
@@ -145,6 +145,179 @@ async function executer(titre, requete) {
   $("#croix").disabled = false;
   const texte = r.sortie || r.message || (r.ok ? "Fait." : "Échec.");
   $("#fenetre-corps").innerHTML = `<p class="etiquette ${r.ok ? "ok" : "ko"}">${r.ok ? "Réussi" : "Échec"}</p><pre class="sortie">${e(texte)}</pre>`;
+  apresFermeture = charger;
+  return r;
+}
+
+const texteAttente = (t) => `En attente : une autre action est en cours${t.attend ? ` (${t.attend})` : ""}. La tienne démarre juste après.`;
+
+// ------------------------------------------------------------ console des actions longues
+// Même console que la mise à jour de la plateforme, pour les mises à jour des clients, le
+// changement de version, la création d'un client et la mise à jour de la vitrine : les
+// grandes étapes (lues dans ce qu'affiche recipelog-instance), une barre, les alertes, et le
+// texte brut replié sous « Voir le détail ». La fenêtre peut être fermée : l'action continue.
+const CONSOLES = {
+  maj: {
+    duree: "1 à 3 minutes",
+    etapes: [
+      ["Téléchargement de la nouvelle version", /téléchargement de /i],
+      ["Sauvegarde avant la mise à jour", /sauvegarde avant la mise à jour/i],
+      ["Redémarrage avec la nouvelle version", /redémarrage avec la nouvelle version/i],
+      ["Vérification que son site répond", /vérification du démarrage/i],
+    ],
+    aide: "<b>Téléchargement</b> : le serveur récupère la dernière version de son canal (Standard ou Bêta). <b>Sauvegarde</b> : sa base, ses photos et ses factures sont copiées avant de toucher à quoi que ce soit. <b>Redémarrage</b> : son site repart avec la nouvelle version (coupé environ une minute). <b>Vérification</b> : on attend que son site réponde. S'il ne répond pas, il est remis tout seul sur sa version et sa base d'avant.",
+  },
+  creer: {
+    duree: "1 à 3 minutes",
+    etapes: [
+      ["Téléchargement de RecipeLog", /^Téléchargement de /],
+      ["Base de données", /dans PostgreSQL/],
+      ["Dossier, réglages et connexion", /^Dossier |dans Authentik/],
+      ["Démarrage de son site", /^Démarrage de /],
+    ],
+    aide: "<b>Téléchargement</b> : la version de son canal. <b>Base de données</b> : une base vide, rien qu'à lui. <b>Dossier, réglages et connexion</b> : ses fichiers et son accès à l'écran de connexion. <b>Démarrage</b> : son site s'allume ; le responsable reçoit son invitation à la fin. Si quelque chose rate en route, tout ce qui avait été créé est retiré : tu peux relancer avec le même nom.",
+  },
+  vitrine: {
+    duree: "quelques secondes",
+    etapes: [
+      ["Téléchargement de la vitrine", /Téléchargement de la vitrine/],
+      ["Mise en ligne", /Mise en ligne de la nouvelle vitrine/],
+    ],
+    aide: "<b>Téléchargement</b> : la dernière version de la branche site-vitrine sur GitHub. <b>Mise en ligne</b> : elle remplace l'ancienne ; tes réglages (bandeau, adresse de la démo) sont gardés.",
+  },
+};
+
+// Lit les lignes de l'outil : étape atteinte, dernière phrase utile, alertes, retour arrière.
+function lireLignes(lignes, def) {
+  let etape = -1;
+  let detail = "";
+  let retour = false;
+  const alertes = [];
+  for (const brute of lignes) {
+    const l = String(brute).trim().replace(/^==>\s*/, "");
+    if (!l) continue;
+    def.etapes.forEach(([, re], i) => {
+      if (re.test(l) && i > etape) etape = i;
+    });
+    if (/retour à la version précédente|retour à l'état d'avant/i.test(l)) retour = true;
+    if (/^(❌|⚠️|↩️)/.test(l)) alertes.push(l.replace(/^(❌|⚠️|↩️)\s*/, ""));
+    else if (!/^###\s/.test(l) && l.length < 200) detail = l.replace(/…$/, "").replace(/^✅\s*/, "");
+  }
+  return { etape: Math.max(0, etape), detail, retour, alertes: alertes.slice(-8) };
+}
+
+function htmlConsoleTache(def, tous) {
+  return `<div class="console-pf" id="ct">
+    <div class="pf-tete" id="pf-tete"></div>
+    <div class="pf-barre" aria-hidden="true"><span id="pf-barre"></span></div>
+    ${tous ? `<div class="pf-etapes-t"><span class="lbl-mono">Clients</span></div><ol class="pf-etapes" id="ct-clients"></ol>` : ""}
+    <div class="pf-etapes-t"><span class="lbl-mono" id="ct-etapes-t">Étapes</span><button class="aide" type="button" data-aide="aide-ct-etapes" aria-label="Aide sur les étapes">?</button></div>
+    <p class="texte-aide" id="aide-ct-etapes">${def.aide}</p>
+    <ol class="pf-etapes" id="pf-etapes"></ol>
+    <div id="pf-alertes"></div>
+    <details class="pf-detail" id="pf-detail"><summary>${ic("chevd", "s16")}<span>Voir le détail</span><small>journal technique</small></summary><pre class="pf-log" id="pf-log">Rien pour l'instant.</pre></details>
+  </div>`;
+}
+
+const pastille = (etat) => (etat === "fait" ? ic("check", "s16") : etat === "echec" ? ic("x", "s16") : etat === "encours" ? `<span class="rond"></span>` : `<span class="pf-point"></span>`);
+
+// v : { statut: attente | cours | ok | ko, t (tâche du moteur ou résultat final), lignes }
+function dessinerTache(v, def, textes) {
+  if (!$("#ct")) return;
+  const t = v.t ?? {};
+  const toutes = v.lignes ?? [];
+  // « Tout mettre à jour » : les étapes sont celles du client en cours (après son repère « ### nom »).
+  const repere = toutes.findLastIndex((l) => /^###\s/.test(l));
+  const enCours = repere >= 0 ? toutes[repere].slice(4) : null;
+  const lu = lireLignes(repere >= 0 ? toutes.slice(repere + 1) : toutes, def);
+  const tousLu = lireLignes(toutes, def);
+  const n = def.etapes.length;
+  const etape = v.statut === "ok" ? n : lu.etape;
+  const ko = v.statut === "ko";
+  const fini = v.statut === "ok" || ko;
+  const clients = t.clients ?? null;
+  const rang = clients ? clients.findIndex((c) => c.etat === "cours") : -1;
+
+  const [classe, icone, titre, texte] = {
+    attente: ["encours", "", textes.attente, texteAttente(t)],
+    cours: ["encours", "", clients && enCours ? `${textes.cours} : ${enCours}${rang >= 0 ? ` (${rang + 1} sur ${clients.length})` : ""}` : textes.cours, `Compte ${def.duree}${clients ? " par client" : ""}. Tu peux fermer cette fenêtre : l'action continue, son résultat sera dans le journal.`],
+    ok: ["ok", "check", textes.ok, tousLu.retour ? "Attention : un retour arrière a eu lieu en route, regarde les alertes." : ""],
+    ko: ["ko", "x", textes.ko, tousLu.retour ? "Il a été remis tout seul sur sa version et sa base d'avant." : "Regarde ce qui a bloqué, et le détail plus bas."],
+  }[v.statut];
+  $("#pf-tete").className = `pf-tete ${classe}`;
+  $("#pf-tete").innerHTML = `<span class="pf-icone">${icone ? ic(icone, "s22") : `<span class="rond"></span>`}</span><div><b>${e(titre)}</b>${texte ? `<p>${e(texte)}</p>` : ""}</div>`;
+
+  let pourcent;
+  if (v.statut === "ok") pourcent = 100;
+  else if (clients?.length) {
+    const faits = clients.filter((c) => c.etat !== "attente" && c.etat !== "cours").length;
+    pourcent = Math.round(((faits + (rang >= 0 ? (etape + 0.5) / n : 0)) / clients.length) * 100);
+  } else pourcent = v.statut === "attente" ? 4 : Math.round(((etape + 0.5) / n) * 100);
+  $("#pf-barre").style.width = `${Math.min(ko ? 100 : 97, pourcent)}%`;
+  $("#pf-barre").parentElement.className = `pf-barre ${classe}`;
+
+  if (clients && $("#ct-clients")) {
+    const NOMS = { attente: "pas encore commencé", cours: "en cours", fait: "mis à jour", inchange: "rien à faire (déjà à jour ou en pause)", echec: "échec : remis sur sa version d'avant" };
+    $("#ct-clients").innerHTML = clients
+      .map((c) => {
+        const etat = c.etat === "fait" || c.etat === "inchange" ? "fait" : c.etat === "echec" ? "echec" : c.etat === "cours" ? (ko ? "echec" : "encours") : "afaire";
+        const sauf = ko && c.etat === "attente" ? "pas mis à jour (arrêt après l'échec)" : NOMS[c.etat];
+        return `<li class="${etat}"><span class="pf-pastille">${pastille(etat)}</span><span class="pf-nom">${e(c.nom)}<small>${e(sauf)}</small></span></li>`;
+      })
+      .join("");
+    $("#ct-etapes-t").textContent = enCours && !fini ? `Étapes pour ${enCours}` : "Étapes du dernier client";
+  }
+
+  $("#pf-etapes").innerHTML = def.etapes
+    .map(([nom], i) => {
+      const etat = i < etape ? "fait" : i > etape ? "afaire" : ko ? "echec" : v.statut === "attente" ? "afaire" : "encours";
+      const detail = etat === "encours" || etat === "echec" ? lu.detail : "";
+      return `<li class="${etat}"><span class="pf-pastille">${pastille(etat)}</span><span class="pf-nom">${e(nom)}${detail ? `<small>${e(detail)}</small>` : ""}</span></li>`;
+    })
+    .join("");
+
+  const alertes = tousLu.alertes;
+  $("#pf-alertes").innerHTML = alertes.length
+    ? `<div class="pf-alertes ${ko ? "ko" : ""}"><b>${ic("alert", "s16")}${ko ? "Ce qui a bloqué" : "À regarder"}</b><ul>${alertes.map((a) => `<li>${e(a)}</li>`).join("")}</ul></div>`
+    : "";
+
+  const log = $("#pf-log");
+  if (toutes.length) {
+    const enBas = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    log.textContent = toutes.filter((l) => !/^###\s/.test(l)).join("\n");
+    if (enBas) log.scrollTop = log.scrollHeight;
+  }
+  if (fini) $("#fenetre-corps").scrollTop = 0;
+}
+
+// Lance une action longue et la suit dans la console. type : maj | creer | vitrine.
+let jetonConsole = 0;
+async function executerConsole(titre, type, textes, requete, tous = false) {
+  const def = CONSOLES[type];
+  const jeton = (jetonConsole += 1);
+  ouvrir(titre, htmlConsoleTache(def, tous), () => {
+    jetonConsole += 1;
+    charger();
+  });
+  let lignes = [];
+  let derniere = {};
+  dessinerTache({ statut: "attente", t: {}, lignes }, def, textes);
+  suivi = (t) => {
+    if (jeton !== jetonConsole) return;
+    derniere = t;
+    lignes = t.lignes ?? lignes;
+    dessinerTache({ statut: t.etat === "attente" ? "attente" : "cours", t, lignes }, def, textes);
+  };
+  let r;
+  try {
+    r = await requete();
+  } catch (err) {
+    r = { ok: false, sortie: String(err.message ?? err) };
+  }
+  if (jeton !== jetonConsole) return r;
+  suivi = null;
+  const finales = String(r.sortie || r.message || "").split("\n").filter((l) => l.trim());
+  dessinerTache({ statut: r.ok ? "ok" : "ko", t: { ...derniere, clients: r.clients ?? derniere.clients }, lignes: finales.length ? finales : lignes }, def, textes);
   apresFermeture = charger;
   return r;
 }
@@ -489,14 +662,30 @@ function fenetreMajCanal(canal) {
   $("#fenetre-corps").onclick = (ev) => {
     const b = ev.target.closest("[data-maj-client]");
     const c = b && parNom[b.dataset.majClient];
-    if (c) action(c, "mettre-a-jour");
+    if (c) majClient(c);
   };
   const t = $("#maj-tous");
-  if (t) t.onclick = () => executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour"));
+  if (t) t.onclick = majTous;
 }
 
 // « Version et nouveautés » : numéro installé et ce que les dernières mises à jour ont apporté
 // (une ligne par PR fusionnée), pour la plateforme et pour la vitrine.
+// Version de l'appli installée chez chaque client, rangée par canal (Standard, Bêta).
+function blocClients() {
+  if (!CLIENTS.length) return "";
+  const parCanal = {};
+  for (const c of CLIENTS) (parCanal[c.canal] ??= []).push(c);
+  return Object.entries(parCanal)
+    .map(
+      ([canal, liste]) => `<h3 class="titre-histo">Clients ${e(nomCanal(canal))}</h3>
+    <ul class="pf-liste">${liste
+      .sort((a, b) => a.nom.localeCompare(b.nom))
+      .map((c) => `<li><span><b>${e(c.nom)}</b>${majDispo(c) > 0 ? ` <span class="etiquette acc">nouvelle version</span>` : ""}</span><time>${e(c.suspendu ? "en pause" : c.version ?? "version inconnue")}</time></li>`)
+      .join("")}</ul>`,
+    )
+    .join("");
+}
+
 function fenetreVersions() {
   const bloc = (nom, numeroV, court, date, prs, vide) => `<h3 class="titre-histo">${e(nom)} ${numeroV ? `<span class="etiquette prog">${e(numeroV)}</span>` : ""}</h3>
     <p class="sub">${court ? `Installée : ${e(court)}${date ? ` le ${e(dateFr(date))}` : ""}.` : vide}</p>
@@ -505,13 +694,14 @@ function fenetreVersions() {
   const vi = MAJ?.vitrine;
   const [hAide, hTexte] = aideB(
     "histo-a",
-    "Le numéro suit la même règle que l'appli : le dernier nombre est celui de la dernière modification (PR) installée. <b>P1.0.180</b> = plateforme avec tout jusqu'à la PR 180. Dessous, les dernières modifications déjà installées, la plus récente en haut. Ce qui n'est pas encore installé est dans « Voir » sur chaque ligne de la carte « Mises à jour ».",
+    "Le numéro suit la même règle que l'appli : le dernier nombre est celui de la dernière modification (PR) installée. <b>P1.0.180</b> = plateforme avec tout jusqu'à la PR 180. Dessous, les dernières modifications déjà installées, la plus récente en haut, puis la version de l'appli chez chaque client (V2.27.204 = appli V2.27 avec tout jusqu'à la PR 204). Ce qui n'est pas encore installé est dans « Voir » sur chaque ligne de la carte « Mises à jour ».",
   );
   ouvrir(
     "Version et nouveautés",
     `<div class="aide-ligne"><span class="sub">Ce que tu as installé</span>${hAide}</div>${hTexte}` +
       bloc("Plateforme (panel, connexion, outils)", v?.numero, v?.court, v?.date, v?.historique, "Version inconnue : elle s'affichera après la prochaine mise à jour de la plateforme.") +
-      bloc("Site vitrine", vi?.numero, vi?.installe?.slice(0, 7), null, vi?.historique, "Version inconnue : mets la vitrine à jour une fois pour la voir ici."),
+      bloc("Site vitrine", vi?.numero, vi?.installe?.slice(0, 7), null, vi?.historique, "Version inconnue : mets la vitrine à jour une fois pour la voir ici.") +
+      blocClients(),
   );
 }
 
@@ -529,7 +719,7 @@ function fenetreMajVitrine() {
     `${texte}<p class="texte-aide visible">Télécharge la dernière version de la branche site-vitrine et la met en ligne en quelques secondes. Tes réglages (bandeau, adresse de la démo) sont gardés.</p>
     <div class="pied"><button class="btn principal" id="ok-maj-vitrine" type="button">Mettre à jour la vitrine</button></div>`,
   );
-  $("#ok-maj-vitrine").onclick = () => executer("Mise à jour de la vitrine", () => api("POST", "/vitrine/maj"));
+  $("#ok-maj-vitrine").onclick = majVitrine;
 }
 
 function fenetreMajPlateforme() {
@@ -1037,7 +1227,7 @@ function fenetreNouveau(pre = {}, apres = null) {
     if (!/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$/.test(corps.nom)) return ($("#n-erreur").textContent = "Nom : 2 à 32 caractères, minuscules, chiffres et tirets.");
     if (CLIENTS.some((c) => c.nom === corps.nom)) return ($("#n-erreur").textContent = "Ce client existe déjà.");
     if (corps.responsable && !/^\S+@\S+\.\S+$/.test(corps.responsable)) return ($("#n-erreur").textContent = "Adresse du responsable invalide.");
-    const r = await executer(`Création de ${corps.nom}`, () => api("POST", "/clients", corps));
+    const r = await executerConsole(`Création de ${corps.nom}`, "creer", { attente: "La création n'a pas encore démarré", cours: `Création de ${corps.nom}`, ok: `${corps.nom} est prêt`, ko: `La création de ${corps.nom} a échoué` }, () => api("POST", "/clients", corps));
     if (r.ok && apres) await apres();
   });
 }
@@ -1049,13 +1239,13 @@ $("#tout-maj").addEventListener("click", () => {
     <p class="texte-aide visible">Si la nouvelle version ne démarre pas chez un client, il est remis tout seul sur sa version et sa base d'avant, et la mise à jour s'arrête là : les clients suivants gardent leur version. Les clients en pause prendront la nouvelle version à leur réactivation.</p>
     <div class="pied"><button class="btn principal" id="ok-tout-maj" type="button">Tout mettre à jour</button></div>`,
   );
-  $("#ok-tout-maj").addEventListener("click", () => executer("Mise à jour de tous les clients", () => api("POST", "/tous/mettre-a-jour")));
+  $("#ok-tout-maj").addEventListener("click", majTous);
 });
 
 // ------------------------------------------------------------ actions d'un client
 // Elles partent de sa fiche (#client/<nom>) ou de l'accueil.
 function action(c, act, canal) {
-  if (act === "mettre-a-jour") executer(`Mise à jour de ${c.nom}`, () => api("POST", `/clients/${c.nom}/mettre-a-jour`));
+  if (act === "mettre-a-jour") fenetreMajClient(c);
   if (act === "reactiver") {
     if (c.essaiFini) fenetreReactiver(c);
     else executer(`Réactivation de ${c.nom}`, () => api("POST", `/clients/${c.nom}/reactiver`));
@@ -1075,7 +1265,38 @@ function fenetreCanal(c, canal) {
     <p class="texte-aide visible">Son site est sauvegardé, puis redémarre sur cette version (environ une minute). Si elle ne démarre pas, il revient tout seul sur sa version d'avant.</p>
     <div class="pied"><button class="btn principal" id="ok-canal" type="button">${canal === "beta-instance" ? "Passer en bêta" : "Passer en standard"}</button></div>`,
   );
-  $("#ok-canal").addEventListener("click", () => executer(`${c.nom} passe en ${nomCanal(canal).toLowerCase()}`, () => api("POST", `/clients/${c.nom}/canal`, { canal })));
+  $("#ok-canal").addEventListener("click", () =>
+    executerConsole(`${c.nom} passe en ${nomCanal(canal).toLowerCase()}`, "maj", { attente: "Le changement n'a pas encore démarré", cours: `${c.nom} passe en ${nomCanal(canal).toLowerCase()}`, ok: `${c.nom} est en ${nomCanal(canal).toLowerCase()}`, ko: `${c.nom} n'a pas pu changer de version` }, () => api("POST", `/clients/${c.nom}/canal`, { canal })),
+  );
+}
+
+// Les mises à jour suivies dans la console.
+const majClient = (c) =>
+  executerConsole(`Mise à jour de ${c.nom}`, "maj", { attente: "La mise à jour n'a pas encore démarré", cours: `Mise à jour de ${c.nom}`, ok: `${c.nom} est à jour`, ko: `La mise à jour de ${c.nom} a échoué` }, () => api("POST", `/clients/${c.nom}/mettre-a-jour`));
+const majTous = () =>
+  executerConsole("Mise à jour de tous les clients", "maj", { attente: "La mise à jour n'a pas encore démarré", cours: "Mise à jour", ok: "Tous les clients sont à jour", ko: "La mise à jour s'est arrêtée" }, () => api("POST", "/tous/mettre-a-jour"), true);
+const majVitrine = () =>
+  executerConsole("Mise à jour de la vitrine", "vitrine", { attente: "La mise à jour n'a pas encore démarré", cours: "Mise à jour de la vitrine", ok: "La vitrine est à jour", ko: "La mise à jour de la vitrine a échoué" }, () => api("POST", "/vitrine/maj"));
+
+// « Mettre à jour » sur la fiche d'un client : ce qui va changer, puis confirmation
+// (comme pour la plateforme et la vitrine).
+function fenetreMajClient(c) {
+  const k = MAJ?.canaux?.[c.canal];
+  const x = k?.clients?.find((y) => y.nom === c.nom);
+  const texte =
+    x?.enRetard > 0
+      ? listeChangements(x.changements ?? [], x.enRetard)
+      : x?.enRetard === 0
+        ? `<p class="sub">${e(c.nom)} a déjà la dernière version de son canal (${e(nomCanal(c.canal))}). Tu peux quand même relancer (pour le réparer, par exemple).</p>`
+        : `<p class="sub">Impossible de dire ce qui a changé (GitHub pas encore interrogé, ou version installée inconnue). La mise à jour prendra quand même la dernière version ${e(nomCanal(c.canal).toLowerCase())}.</p>`;
+  ouvrir(
+    `Mettre à jour ${c.nom} ?`,
+    `<p class="sub">Version installée : <b>${e(c.version ?? "inconnue")}</b> · canal ${e(nomCanal(c.canal))}</p>
+    ${texte}
+    <p class="texte-aide visible">Son site est sauvegardé, puis redémarre avec la nouvelle version (coupé environ une minute). Si elle ne démarre pas, il revient tout seul sur sa version et sa base d'avant.</p>
+    <div class="pied"><button class="btn principal" id="ok-maj-client" type="button">Mettre à jour ${e(c.nom)}</button></div>`,
+  );
+  $("#ok-maj-client").onclick = () => majClient(c);
 }
 
 const ETIQUETTES = { auto: "Nuit", manuelle: "À la main", "avant-restauration": "Avant restauration" };
@@ -1269,6 +1490,18 @@ const MODES_ANALYSE = [
   ["aucun", "Aucun (saisie à la main)"],
 ];
 
+// Modules, limites, offres et analyse des documents ne marchent chez le client qu'à partir de
+// cette version de l'appli : avant, ses réglages sont gardés mais son site les ignore.
+const VERSION_MODULES = [2, 27];
+function avantModules(c) {
+  const m = /V?(\d+)\.(\d+)/.exec(c.version ?? "");
+  if (!m) return "";
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a > VERSION_MODULES[0] || (a === VERSION_MODULES[0] && b >= VERSION_MODULES[1])) return "";
+  const v = `V${VERSION_MODULES.join(".")}`;
+  return `<div class="pf-alertes" style="margin-bottom:14px"><b>${ic("alert", "s16")}Pas encore actif chez ${e(c.nom)}</b><ul><li>Son site est en <strong>${e(c.version)}</strong> (canal ${e(nomCanal(c.canal))}). Les modules, les limites, les offres et l'analyse des documents n'y marchent qu'à partir de la <strong>${v}</strong>. Ce que tu enregistres ici est gardé et s'appliquera tout seul dès qu'il aura cette version (${c.canal === "instance" ? "quand la bêta sera passée en standard, puis mise à jour chez lui" : "mets-le à jour"}).</li></ul></div>`;
+}
+
 async function ongletModules(c, z) {
   const moi = vue();
   z.innerHTML = `<p class="attente"><span class="rond"></span>Chargement…</p>`;
@@ -1303,7 +1536,7 @@ async function ongletModules(c, z) {
     return "";
   };
   const offres = VENTE?.offres ?? [];
-  z.innerHTML = `<form id="f-modules" class="formulaire" novalidate>
+  z.innerHTML = `${avantModules(c)}<form id="f-modules" class="formulaire" novalidate>
       <div class="aide-ligne"><b>Offre</b> <button class="aide" type="button" data-aide="mo-a-offre" aria-label="Aide sur les offres">?</button>
         <select id="mo-offre"><option value="">${offre ? `Offre actuelle : ${e(offre)}` : "Choisir une offre toute prête…"}</option>${offres.map((o, i) => `<option value="${i}">${e(o.nom)}</option>`).join("")}</select>
         <button class="btn petit" type="button" id="mo-appliquer">Appliquer</button></div>
@@ -1521,9 +1754,9 @@ function afficherVitrine() {
     <h3 class="titre-demandes">Demandes reçues <span class="etiquette ${aFaire.length ? "prog" : "ok"}">${aFaire.length} à traiter</span>
       ${faites.length ? `<button class="lien" type="button" id="v-toutes">${voirTraitees ? "Cacher les traitées" : `Voir aussi les ${faites.length} traitées`}</button>` : ""}
       <button class="aide" type="button" data-aide="v-a-dem" aria-label="Aide">?</button></h3>
-    <p class="texte-aide" id="v-a-dem">Les messages du formulaire « Nous écrire » de la vitrine (ils arrivent aussi par email). « Créer le client » ouvre la création avec son adresse en responsable et 14 jours d'essai : tu vérifies, puis tu valides. La demande passe alors en « Traitée ».</p>
+    <p class="texte-aide" id="v-a-dem">Les messages du formulaire « Nous écrire » de la vitrine (tu es aussi prévenu sur Discord, plus par email). « Créer le client » ouvre la création avec son adresse en responsable et 14 jours d'essai : tu vérifies, puis tu valides. La demande passe alors en « Traitée ».</p>
     <div class="demandes">${liste || `<div class="vide">${VITRINE.demandes.length ? "Toutes les demandes sont traitées." : "Aucune demande pour l'instant."}</div>`}</div>`;
-  $("#v-maj").addEventListener("click", () => (MAJ?.vitrine ? fenetreMajVitrine() : executer("Mise à jour de la vitrine", () => api("POST", "/vitrine/maj"))));
+  $("#v-maj").addEventListener("click", () => (MAJ?.vitrine ? fenetreMajVitrine() : majVitrine()));
   $("#v-toutes")?.addEventListener("click", () => {
     voirTraitees = !voirTraitees;
     afficherVitrine();
