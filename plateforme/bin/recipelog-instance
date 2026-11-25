@@ -559,7 +559,9 @@ maj_un() {
     echo "❌ ${nom} : sauvegarde ratée, la mise à jour n'est pas faite (rien n'a changé)." >&2
     return 1
   fi
+  info "${nom} : redémarrage avec la nouvelle version…"
   lancer "${nom}" "${IMAGE}:${canal}"
+  info "${nom} : vérification du démarrage…"
   if attendre "${nom}"; then
     conf_ecrire "${nom}" IMAGE_FIXE
     conf_ecrire "${nom}" IMAGE_REFUSEE
@@ -1213,7 +1215,7 @@ vitrine_reglages() {
   contact="${VITRINE_CONTACT:-${ADMIN_EMAILS%%,*}}"
   local destinataire="${VITRINE_DESTINATAIRE:-${ADMIN_EMAILS%%,*}}"
   existe demo && demo="https://demo.${DOMAINE}"
-  printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s", connexionUrl: "/connexion" };\n' "${demo}" "${contact}" > "${r}/config.js"
+  printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s", connexionUrl: "/connexion", pagesLegales: true };\n' "${demo}" "${contact}" > "${r}/config.js"
   printf '%s' "${contact}" > "${r}/contact"
   # Formulaire « Nous écrire » : même compte d'envoi que la plateforme (Brevo).
   de="$(printf '%s' "${SMTP_EXPEDITEUR:-}" | sed -n 's/.*<\([^>]*\)>.*/\1/p')"
@@ -1248,6 +1250,7 @@ vitrine_maj() {
   sed -i -E "s#(href=\"style\.css|src=\"app\.js)(\?v=[0-9a-f]+)?\"#\1?v=${v}\"#g" "${tmp}/code/site/index.html"
   printf '%s\n' "${v}" > "${tmp}/code/.version"
   [ -z "${commit}" ] || printf '%s\n' "${commit}" > "${tmp}/code/.commit"
+  info "Mise en ligne de la nouvelle vitrine…"
   racine="${VITRINE}/code"
   find "${VITRINE}" -mindepth 1 -maxdepth 1 -name 'code.ancien' -exec rm -rf {} +
   [ -d "${racine}" ] && mv "${racine}" "${VITRINE}/code.ancien"

@@ -39,7 +39,7 @@ const sansCouleurs = (t) => t.replace(/\x1b\[[0-9;]*m/g, "");
 
 // Rend { ok, sortie, stdout } : `sortie` mélange tout (pour le journal), `stdout` ne garde
 // que la sortie standard (pour lire du JSON sans les avertissements).
-// `suivi(ligne)` reçoit la dernière ligne affichée, pour montrer où en est une action longue.
+// `suivi(ligne)` reçoit chaque ligne affichée, pour montrer où en est une action longue.
 function lancer(cmd, args, delai = 2 * 60 * 1000, suivi = null) {
   return new Promise((ok) => {
     const p = spawn(cmd, args, { env: { ...process.env, DONNEES } });
@@ -50,10 +50,8 @@ function lancer(cmd, args, delai = 2 * 60 * 1000, suivi = null) {
       sortie += d;
       if (sortie.length > 400000) sortie = sortie.slice(-200000);
       if (standard) stdout += d;
-      if (suivi) {
-        const l = sansCouleurs(String(d)).trim().split("\n").at(-1);
-        if (l) suivi(l.slice(0, 300));
-      }
+      // Chaque ligne affichée part au suivi : la console du panel en tire les étapes.
+      if (suivi) for (const l of sansCouleurs(String(d)).split("\n")) if (l.trim()) suivi(l.trim().slice(0, 300));
     };
     p.stdout.on("data", (d) => recu(d, true));
     p.stderr.on("data", (d) => recu(d, false));
@@ -123,12 +121,19 @@ const NOMS_ACTIONS = {
   canal: "changement de version",
 };
 function enTache(quoi, client, f) {
-  const t = { id: randomBytes(8).toString("hex"), quoi, client, etat: "attente", etape: "", resultat: null, fin: 0 };
+  // lignes : tout ce que l'outil a affiché (les 400 dernières), pour la console du panel.
+  // clients : avancement client par client de « Tout mettre à jour ».
+  const t = { id: randomBytes(8).toString("hex"), quoi, client, etat: "attente", etape: "", lignes: [], clients: null, resultat: null, fin: 0 };
   taches.set(t.id, t);
+  const suivi = (l) => {
+    t.etape = l;
+    t.lignes.push(l);
+    if (t.lignes.length > 400) t.lignes.splice(0, t.lignes.length - 400);
+  };
   unParUn(
     () => {
       t.etat = "cours";
-      return f((l) => (t.etape = l));
+      return f(suivi, t);
     },
     client,
     NOMS_ACTIONS[quoi] ?? quoi,
@@ -148,9 +153,9 @@ function enTache(quoi, client, f) {
 function etatTache(id) {
   const t = taches.get(id);
   if (!t) return null;
-  if (t.etat === "fini") return { etat: "fini", ...t.resultat, stdout: undefined };
+  if (t.etat === "fini") return { etat: "fini", ...t.resultat, stdout: undefined, clients: t.clients };
   const autre = t.etat === "attente" && enCours ? `${enCours.quoi}${enCours.client ? ` (${enCours.client === "*" ? "tous les clients" : enCours.client})` : ""}` : null;
-  return { etat: t.etat, etape: t.etape, attend: autre };
+  return { etat: t.etat, etape: t.etape, attend: autre, lignes: t.lignes.slice(-300), clients: t.clients };
 }
 
 async function noter(qui, action, client, r, details = {}) {
@@ -645,13 +650,18 @@ function creer(qui, c) {
 // « Tout mettre à jour » : client après client. Au premier qui rate (il est remis tout seul
 // sur sa version d'avant), on s'arrête : les suivants gardent leur version.
 function toutMettreAJour(qui) {
-  return enTache("mettre-a-jour", "*", async (suivi) => {
+  return enTache("mettre-a-jour", "*", async (suivi, t) => {
     const noms = (await clientsBruts()).map((c) => c.nom);
+    // Une ligne par client dans la console : attente, en cours, fait, déjà à jour, échec.
+    t.clients = noms.map((nom) => ({ nom, etat: "attente" }));
     let sortie = "";
     let ok = true;
     for (const [i, nom] of noms.entries()) {
-      suivi(`${nom} (${i + 1} sur ${noms.length})…`);
-      const r = await outilLong(["mettre-a-jour", nom, "--lot"], (l) => suivi(`${nom} (${i + 1} sur ${noms.length}) : ${l}`));
+      t.clients[i].etat = "cours";
+      // Repère pour la console : les étapes du client en cours se lisent après cette ligne.
+      suivi(`### ${nom}`);
+      const r = await outilLong(["mettre-a-jour", nom, "--lot"], suivi);
+      t.clients[i].etat = !r.ok ? "echec" : /déjà à jour|est en pause|garde la sienne/.test(r.sortie) ? "inchange" : "fait";
       sortie += `${r.sortie}\n`;
       if (!r.ok) {
         ok = false;
