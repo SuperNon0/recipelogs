@@ -12,6 +12,7 @@ import { tokenFromRequest, verifyCloudflareJwt } from "./cloudflare";
 import { rolePermissions, type Access, type Permission } from "./permissions";
 import { demoBlocks } from "@/lib/demo";
 import { isMaintenanceEmail } from "./maintenance";
+import { modulesCoupes } from "@/lib/modules";
 
 /**
  * Qui fait la requête.
@@ -24,8 +25,8 @@ import { isMaintenanceEmail } from "./maintenance";
 export type Viewer =
   | { kind: "open" }
   | { kind: "anonymous"; error: string }
-  | { kind: "unknown"; email: string }
-  | { kind: "account"; account: AccountWithRole; perms: Permission[]; realAccount: AccountWithRole | null };
+  | { kind: "unknown"; email: string; seulResponsable?: boolean }
+  | { kind: "account"; account: AccountWithRole; perms: Permission[]; realAccount: AccountWithRole | null; seulResponsable?: boolean };
 
 export type AccountWithRole = Account & { role: Role | null };
 
@@ -115,6 +116,18 @@ export const getViewer = cache(async (): Promise<Viewer> => {
     !(await responsableDejaPromu(who.email))
   ) {
     account = await ensureResponsableAccount(who.email);
+  }
+  // Plateforme, module « Utilisateurs » coupé dans le panel : seul le responsable (et les
+  // administrateurs) entrent ; les autres comptes sont gardés mais ne peuvent plus se connecter.
+  if (
+    authMode() === "oidc" &&
+    !isMaintenanceEmail(who.email) &&
+    !isResponsableEmail(who.email) &&
+    !(account?.status === "active" && account.role?.isAdmin) &&
+    (await modulesCoupes()).has("utilisateurs")
+  ) {
+    if (!account) return { kind: "unknown", email: who.email, seulResponsable: true };
+    return { kind: "account", account: { ...account, status: "blocked" }, perms: [], realAccount: null, seulResponsable: true };
   }
   if (!account) return { kind: "unknown", email: who.email };
 

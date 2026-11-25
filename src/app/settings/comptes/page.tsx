@@ -10,11 +10,17 @@ import { AUDIT_LABEL } from "@/lib/auth/audit";
 import { AccountsManager, type AccountInfo, type AuditInfo, type RoleInfo } from "@/components/settings/AccountsManager";
 import { cleanPermissions } from "@/lib/auth/permissions";
 import { isMaintenanceEmail } from "@/lib/auth/maintenance";
+import { roleMembre, rolesFixes } from "@/lib/auth/roleMembre";
+import { limites } from "@/lib/modules";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountsSettingsPage() {
   const viewer = await requirePage("accounts.manage");
+  // Plateforme : module « Rôles » coupé → Administrateur et Membre seulement ; nombre de rôles de l'offre.
+  const fixes = await rolesFixes();
+  if (fixes) await roleMembre();
+  const rolesMax = (await limites()).roles ?? null;
   const [settings, roles, accounts, log, categories] = await Promise.all([
     getAuthSettings(),
     prisma.role.findMany({ orderBy: [{ isAdmin: "desc" }, { name: "asc" }] }),
@@ -78,6 +84,8 @@ export default async function AccountsSettingsPage() {
         categories={categories}
         accounts={rows}
         log={entries}
+        rolesFixes={fixes}
+        rolesMax={fixes ? null : rolesMax}
       />
     </div>
   );

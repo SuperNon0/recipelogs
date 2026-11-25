@@ -245,6 +245,8 @@ body[data-no~="mcp.manage"] [data-needs~="mcp.manage"] {
 }
 
 /* Modules coupés dans le panel admin (attribut data-off du <body>, src/lib/modules.ts). */
+body[data-off~="utilisateurs"] [data-module~="utilisateurs"],
+body[data-off~="roles"] [data-module~="roles"],
 body[data-off~="cahiers"] [data-module~="cahiers"],
 body[data-off~="themes"] [data-module~="themes"],
 body[data-off~="courses"] [data-module~="courses"],

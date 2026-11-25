@@ -2,6 +2,7 @@
 
 import { requireAccess } from "@/lib/auth/guard";
 import { revalidatePath } from "next/cache";
+import { placesRecettes } from "@/lib/limites";
 import JSZip from "jszip";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +47,9 @@ export async function importRecipeKeeperCsv(
   }
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
 
@@ -59,6 +63,16 @@ export async function importRecipeKeeperCsv(
         skipped++;
         continue;
       }
+
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
 
       await prisma.recipe.create({
         data: {
@@ -93,6 +107,7 @@ export async function importRecipeKeeperCsv(
   revalidatePath("/");
   revalidatePath("/settings");
 
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }
 
@@ -183,6 +198,9 @@ export async function importRecipeKeeperHtmlOrZip(
   }
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
 
@@ -215,6 +233,16 @@ export async function importRecipeKeeperHtmlOrZip(
           categoryConnects.push({ categoryId: cat.id });
         }
       }
+
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
 
       await prisma.recipe.create({
         data: {
@@ -257,6 +285,7 @@ export async function importRecipeKeeperHtmlOrZip(
   revalidatePath("/");
   revalidatePath("/settings");
 
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }
 
@@ -347,6 +376,9 @@ export async function importRecipesFromJson(
     return { ok: false, imported: 0, skipped: 0, errors: ["Aucune recette dans le fichier."] };
 
   let imported = 0;
+  // Limite de recettes de l'offre (plateforme) : on importe ce qui rentre.
+  let places = await placesRecettes();
+  let horsOffre = 0;
   let skipped = 0;
   const errors: string[] = [];
   const aRelier: { parentId: number; name: string; liens: NonNullable<JsonRecipe["sub_recipes"]> }[] = [];
@@ -400,6 +432,16 @@ export async function importRecipesFromJson(
         : [];
       const mold = parseMold(r.mold);
       const rating = typeof r.rating === "number" && r.rating >= 1 && r.rating <= 5 ? Math.round(r.rating) : null;
+
+      if (places <= 0) {
+
+        horsOffre++;
+
+        continue;
+
+      }
+
+      places--;
 
       const created = await prisma.recipe.create({
         select: { id: true },
@@ -476,5 +518,6 @@ export async function importRecipesFromJson(
 
   revalidatePath("/");
   revalidatePath("/settings");
+  if (horsOffre) errors.push(`${horsOffre} recette${horsOffre > 1 ? "s" : ""} pas importée${horsOffre > 1 ? "s" : ""} : ton offre est pleine (nombre de recettes). Demande à RecipeLog de l'agrandir.`);
   return { ok: true, imported, skipped, errors };
 }

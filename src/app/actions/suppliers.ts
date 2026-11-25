@@ -27,6 +27,7 @@ import {
 } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, invoiceExt, removeInvoiceFile, saveInvoiceFile } from "@/lib/invoiceFiles";
 import { deballerFichier } from "@/lib/envoiFichier";
+import { verifierPlace } from "@/lib/limites";
 
 const refresh = () => revalidatePath("/", "layout");
 const fail = (e: unknown): ActionResult => ({ ok: false, error: e instanceof Error ? e.message : "Erreur inattendue." });
@@ -192,6 +193,11 @@ export async function uploadInvoiceFile(id: number, fd: FormData): Promise<Actio
   if (!ext) return { ok: false, error: "Photo (JPG, PNG, WebP) ou PDF seulement." };
   const order = await prisma.purchaseOrder.findUnique({ where: { id }, select: { filePath: true } });
   if (!order) return { ok: false, error: "Facture introuvable." };
+  try {
+    await verifierPlace(file.size);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const rel = await saveInvoiceFile(id, Buffer.from(await file.arrayBuffer()), ext);
   await prisma.purchaseOrder.update({ where: { id }, data: { filePath: rel } });
   await removeInvoiceFile(order.filePath);

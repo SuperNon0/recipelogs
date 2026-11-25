@@ -59,9 +59,10 @@ export function RecipeActions({
             </MenuButton>
             <MenuButton
               onClick={() =>
-                startTransition(() => {
+                startTransition(async () => {
                   setOpen(false);
-                  duplicateRecipe(recipeId);
+                  const res = await duplicateRecipe(recipeId);
+                  if (res && !res.ok) alert(res.error);
                 })
               }
             >

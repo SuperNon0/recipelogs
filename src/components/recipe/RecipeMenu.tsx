@@ -155,7 +155,11 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
               {
                 label: "Dupliquer",
                 icon: Copy,
-                onSelect: () => startTransition(async () => { await duplicateRecipe(r.id); }),
+                onSelect: () =>
+                  startTransition(async () => {
+                    const res = await duplicateRecipe(r.id);
+                    if (res && !res.ok) alert(res.error);
+                  }),
               },
               { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },
             ]

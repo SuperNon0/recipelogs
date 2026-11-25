@@ -3,6 +3,7 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, extname } from "node:path";
 import { prisma } from "./prisma";
 import { uploadFilePath } from "./uploads";
+import { verifierPlace } from "./limites";
 
 /** Photo ou PDF d'une facture, rangé dans le dossier d'upload sous factures/. */
 export const INVOICE_MIME: Record<string, string> = {
@@ -66,6 +67,7 @@ export async function attachInvoiceFile(orderId: number, bytes: Buffer): Promise
   if (!ext) throw new Error("PDF ou photo (JPG, PNG, WebP) seulement");
   const order = await prisma.purchaseOrder.findUnique({ where: { id: orderId }, select: { filePath: true } });
   if (!order) throw new Error("facture introuvable");
+  await verifierPlace(bytes.length);
   const rel = await saveInvoiceFile(orderId, bytes, ext);
   await prisma.purchaseOrder.update({ where: { id: orderId }, data: { filePath: rel } });
   if (order.filePath !== rel) await removeInvoiceFile(order.filePath);

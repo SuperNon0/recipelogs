@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { moduleDeLaPage, moduleDeLOutil, modulesEffectifs, permissionsSansModules } from "@/lib/modules";
+import { lireLimites, moduleDeLaPage, moduleDeLOutil, modulesEffectifs, permissionsSansModules } from "@/lib/modules";
+import { MEMBRE_PERMISSIONS } from "@/lib/auth/roleMembre";
 
 describe("modules en option", () => {
   it("couper un parent coupe ses sous-modules", () => {
@@ -43,5 +44,26 @@ describe("outils MCP des modules", () => {
     const existants = new Set(MCP_TOOLS.map((t) => t.name));
     expect(noms.length).toBeGreaterThan(40);
     expect(noms.filter((n) => !existants.has(n))).toEqual([]);
+  });
+});
+
+describe("utilisateurs, rôles et limites", () => {
+  it("couper Utilisateurs coupe Rôles et retire la gestion des comptes", () => {
+    const off = modulesEffectifs(["utilisateurs"]);
+    expect(off.has("roles")).toBe(true);
+    expect(permissionsSansModules(["accounts.manage", "recipes.edit"], off)).toEqual(["recipes.edit"]);
+    expect(moduleDeLaPage("/settings/comptes")).toBe("utilisateurs");
+  });
+
+  it("ne garde que les limites valables", () => {
+    expect(lireLimites({ recettes: 200, fichiersMo: 0, roles: -1, cahiers: 2.5, marquePdf: true, videosMois: "3", x: 1 })).toEqual({ recettes: 200, marquePdf: true });
+    expect(lireLimites(null)).toEqual({});
+  });
+
+  it("le rôle Membre a tout sauf comptes, clé Claude et mise à jour", () => {
+    expect(MEMBRE_PERMISSIONS).toContain("recipes.edit");
+    expect(MEMBRE_PERMISSIONS).not.toContain("accounts.manage");
+    expect(MEMBRE_PERMISSIONS).not.toContain("mcp.manage");
+    expect(MEMBRE_PERMISSIONS).not.toContain("site.update");
   });
 });

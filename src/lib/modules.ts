@@ -11,6 +11,8 @@
 import type { Permission } from "@/lib/auth/permissions";
 
 export const MODULE_CLES = [
+  "utilisateurs",
+  "roles",
   "cahiers",
   "themes",
   "courses",
@@ -29,6 +31,7 @@ export type ModuleCle = (typeof MODULE_CLES)[number];
 
 /** Sous-module → module parent (même arbre que le panel). */
 export const PARENT: Partial<Record<ModuleCle, ModuleCle>> = {
+  roles: "utilisateurs",
   factures: "fournisseurs",
   mercuriales: "fournisseurs",
   commandes: "fournisseurs",
@@ -54,6 +57,7 @@ export function modulesEffectifs(decoches: Iterable<string>): Set<ModuleCle> {
 
 /** Permissions retirées à tout le monde quand un module est coupé (boutons et menus marqués data-needs, can()). */
 export const PERMISSIONS_DU_MODULE: Partial<Record<ModuleCle, Permission[]>> = {
+  utilisateurs: ["accounts.manage"],
   cahiers: ["cookbooks.edit"],
   courses: ["shopping.edit"],
   production: ["production.edit"],
@@ -69,6 +73,7 @@ export function permissionsSansModules(perms: Permission[], off: Set<ModuleCle>)
 
 /** Pages (et API) de chaque module : du plus précis au plus large. */
 const ROUTES: [string, ModuleCle][] = [
+  ["/settings/comptes", "utilisateurs"],
   ["/fournisseurs/commandes", "commandes"],
   ["/api/commandes", "commandes"],
   ["/produits-vendus", "ventes"],
@@ -159,17 +164,45 @@ export function moduleDeLOutil(nom: string): ModuleCle | null {
 
 // ------------------------------------------------------------ lecture sur la passerelle
 
-let cache: { off: Set<ModuleCle>; jusqua: number } | null = null;
+/** Limites réglées dans le panel (sous la flèche de chaque module). Absente = pas de limite. */
+export type Limites = {
+  recettes?: number;
+  fichiersMo?: number;
+  roles?: number;
+  cahiers?: number;
+  themes?: number;
+  /** « Fait avec RecipeLog » en bas des PDF. */
+  marquePdf?: boolean;
+  mercurialePages?: number;
+  videosMois?: number;
+};
+
+const NOMBRES = ["recettes", "fichiersMo", "roles", "cahiers", "themes", "mercurialePages", "videosMois"] as const;
+
+export function lireLimites(v: unknown): Limites {
+  const out: Limites = {};
+  if (!v || typeof v !== "object") return out;
+  const o = v as Record<string, unknown>;
+  for (const k of NOMBRES) {
+    const n = o[k];
+    if (typeof n === "number" && Number.isInteger(n) && n > 0) out[k] = n;
+  }
+  if (o.marquePdf === true) out.marquePdf = true;
+  return out;
+}
+
+type Etat = { off: Set<ModuleCle>; limites: Limites };
+let cache: (Etat & { jusqua: number }) | null = null;
 
 /**
- * Modules coupés pour ce site. Lu sur la passerelle et gardé une minute ; si elle ne
- * répond pas, on garde la dernière réponse (ou tout allumé) : on ne coupe jamais par erreur.
+ * Modules coupés et limites de ce site. Lu sur la passerelle et gardé une minute ; si elle
+ * ne répond pas, on garde la dernière réponse (ou tout allumé) : on ne coupe jamais par erreur.
  */
-export async function modulesCoupes(): Promise<Set<ModuleCle>> {
+async function etat(): Promise<Etat> {
   const url = process.env.RECIPELOG_PASSERELLE_URL?.trim().replace(/\/+$/, "");
   const cle = process.env.RECIPELOG_PASSERELLE_CLE?.trim();
-  if (!url || !cle) return new Set();
-  if (cache && Date.now() < cache.jusqua) return cache.off;
+  if (!url || !cle) return { off: new Set(), limites: {} };
+  if (cache && Date.now() < cache.jusqua) return cache;
   try {
     const r = await fetch(`${url}/v1/modules`, {
       headers: { Authorization: `Bearer ${cle}`, Accept: "application/json" },
@@ -178,19 +211,26 @@ export async function modulesCoupes(): Promise<Set<ModuleCle>> {
     });
     // Ancienne passerelle (404) : pas de modules, tout est allumé.
     if (r.status === 404) {
-      cache = { off: new Set(), jusqua: Date.now() + 60_000 };
-      return cache.off;
+      cache = { off: new Set(), limites: {}, jusqua: Date.now() + 60_000 };
+      return cache;
     }
     if (!r.ok) throw new Error(String(r.status));
-    const j = (await r.json()) as { coupes?: unknown };
+    const j = (await r.json()) as { coupes?: unknown; limites?: unknown };
     const off = modulesEffectifs(Array.isArray(j.coupes) ? j.coupes.filter((x): x is string => typeof x === "string") : []);
-    cache = { off, jusqua: Date.now() + 60_000 };
-    return off;
+    cache = { off, limites: lireLimites(j.limites), jusqua: Date.now() + 60_000 };
+    return cache;
   } catch {
-    const off = cache?.off ?? new Set<ModuleCle>();
-    cache = { off, jusqua: Date.now() + 15_000 };
-    return off;
+    cache = { off: cache?.off ?? new Set<ModuleCle>(), limites: cache?.limites ?? {}, jusqua: Date.now() + 15_000 };
+    return cache;
   }
+}
+
+export async function modulesCoupes(): Promise<Set<ModuleCle>> {
+  return (await etat()).off;
+}
+
+export async function limites(): Promise<Limites> {
+  return (await etat()).limites;
 }
 
 export async function moduleActif(m: ModuleCle): Promise<boolean> {

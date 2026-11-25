@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildSingleRecipeHtml, type RecipeSnap } from "./template";
 import { renderHtmlToPdf } from "./renderer";
 import { decoratePdf } from "./decorate";
+import { marquePdf } from "@/lib/limites";
 import { recipePageMargins, themeHeaderText, type CookbookTheme } from "./theme";
 
 /** PDF d'une recette seule (et de ses sous-recettes) avec un thème donné. */
@@ -16,8 +17,10 @@ export async function renderRecipePdf(
   const showPageNumber = theme.showPageNumbers && snap.subRecipes.length > 0;
   const header = themeHeaderText(theme, snap.name);
   const footer = theme.footerText.trim();
-  const html = buildSingleRecipeHtml(snap, format, theme, { header: !!header, footer: showPageNumber || !!footer });
+  const marque = await marquePdf();
+  const html = buildSingleRecipeHtml(snap, format, theme, { header: !!header, footer: showPageNumber || !!footer || marque });
   const pdf = await renderHtmlToPdf(html, format, {
+    marque,
     showPageNumber,
     pageNumberAlign: theme.pageNumberAlign,
     footer,

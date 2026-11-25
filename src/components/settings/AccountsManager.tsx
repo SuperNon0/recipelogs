@@ -60,6 +60,8 @@ export function AccountsManager({
   categories,
   accounts,
   log,
+  rolesFixes = false,
+  rolesMax = null,
 }: {
   /** null : installation classique (Cloudflare). */
   platform: TeamInfo | null;
@@ -71,6 +73,10 @@ export function AccountsManager({
   categories: CategoryInfo[];
   accounts: AccountInfo[];
   log: AuditInfo[];
+  /** Plateforme, module « Rôles » coupé : seulement Administrateur et Membre. */
+  rolesFixes?: boolean;
+  /** Plateforme : nombre de rôles (hors Administrateur) permis par l'offre. */
+  rolesMax?: number | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -95,7 +101,11 @@ export function AccountsManager({
     });
   };
 
-  const defaultRole = roles.find((r) => !r.isAdmin) ?? roles[0];
+  // Rôles que l'on peut donner (sans le module « Rôles » : Administrateur et Membre).
+  const choix = rolesFixes ? roles.filter((r) => r.isAdmin || r.name === "Membre") : roles;
+  const defaultRole = choix.find((r) => !r.isAdmin) ?? choix[0];
+  const rolesCrees = roles.filter((r) => !r.isAdmin).length;
+  const plein = rolesMax != null && rolesCrees >= rolesMax;
   const requests = accounts.filter((a) => a.status === "pending");
   const members = accounts.filter((a) => a.status === "active" || a.status === "blocked");
   const refused = accounts.filter((a) => a.status === "refused");
@@ -104,7 +114,7 @@ export function AccountsManager({
   return (
     <>
       {platform ? (
-        <Team info={platform} enabled={enabled} roles={roles} defaultRoleId={defaultRole?.id} run={run} pending={pending} />
+        <Team info={platform} enabled={enabled} roles={choix} defaultRoleId={defaultRole?.id} run={run} pending={pending} />
       ) : (
         <Connection enabled={enabled} forcedOff={forcedOff} team={team} aud={aud} run={run} pending={pending} />
       )}
@@ -125,7 +135,7 @@ export function AccountsManager({
       ) : (
         <div className="fl-list">
           {requests.map((a) => (
-            <RequestRow key={a.id} account={a} roles={roles} defaultRoleId={defaultRole?.id} run={run} pending={pending} />
+            <RequestRow key={a.id} account={a} roles={choix} defaultRoleId={defaultRole?.id} run={run} pending={pending} />
           ))}
         </div>
       )}
@@ -169,7 +179,7 @@ export function AccountsManager({
                   onChange={(e) => run(() => setAccountRole(a.id, Number(e.target.value)))}
                 >
                   {a.roleId === null && <option value="">Sans rôle</option>}
-                  {roles.map((r) => (
+                  {roles.filter((r) => choix.includes(r) || r.id === a.roleId).map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
                     </option>
@@ -256,7 +266,7 @@ export function AccountsManager({
           </div>
           <div className="fl-list">
             {refused.map((a) => (
-              <RequestRow key={a.id} account={a} roles={roles} defaultRoleId={defaultRole?.id} run={run} pending={pending} refused />
+              <RequestRow key={a.id} account={a} roles={choix} defaultRoleId={defaultRole?.id} run={run} pending={pending} refused />
             ))}
           </div>
         </>
@@ -264,12 +274,29 @@ export function AccountsManager({
 
       <div className="sect-title">
         <h2>Rôles</h2>
-        <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setEditing("new")}>
-          <Plus size={14} /> Nouveau rôle
-        </button>
+        {!rolesFixes && (
+          <button
+            type="button"
+            className="fl-btn fl-btn-secondary"
+            disabled={plein}
+            title={plein ? `Ton offre comprend ${rolesMax} rôle${rolesMax! > 1 ? "s" : ""} en plus d'Administrateur` : undefined}
+            onClick={() => setEditing("new")}
+          >
+            <Plus size={14} /> Nouveau rôle
+          </button>
+        )}
       </div>
+      {rolesFixes && (
+        <p className="set-note">
+          Ton offre comprend deux rôles : Administrateur (tout) et Membre (tout sauf les comptes, la clé Claude et la mise à jour du site).
+          Pour créer tes propres rôles (Apprenti, Chef…), demande les rôles personnalisés à RecipeLog.
+        </p>
+      )}
+      {!rolesFixes && plein && (
+        <p className="set-note">Tu as atteint les {rolesMax} rôles de ton offre : supprime-en un ou demande-en plus à RecipeLog.</p>
+      )}
       <div className="fl-list">
-        {roles.map((r) => (
+        {(rolesFixes ? roles.filter((r) => choix.includes(r) || r.accounts > 0) : roles).map((r) => (
           <div key={r.id} className="fl-row acct-row">
             <span className="acct-av">{r.isAdmin ? <Shield size={16} /> : <KeyRound size={16} />}</span>
             <span className="acct-main">
@@ -288,7 +315,7 @@ export function AccountsManager({
                 )}
               </span>
             </span>
-            {!r.isAdmin && (
+            {!r.isAdmin && !rolesFixes && (
               <span className="acct-actions">
                 <button type="button" className="fl-btn fl-btn-secondary" onClick={() => setEditing(r)}>
                   <Pencil size={14} /> Modifier
@@ -308,7 +335,7 @@ export function AccountsManager({
           </div>
         ))}
       </div>
-      {roles.length <= 1 && (
+      {roles.length <= 1 && !rolesFixes && (
         <p className="set-note">Crée un rôle (Apprenti, Chef…) et coche ce qu&apos;il permet ; tu le donnes ensuite aux comptes.</p>
       )}
 

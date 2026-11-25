@@ -8,7 +8,7 @@ import {
   deletePendingInvoice,
   limitesFactures,
   listPendingInvoices,
-  PAGES_MAX_ABSOLU,
+  pagesMax,
   type LimitesFactures,
   type PendingInvoiceItem,
 } from "@/lib/pendingInvoices";
@@ -48,7 +48,7 @@ export type EtatNouvelleFacture = {
 export async function etatNouvelleFacture(): Promise<EtatNouvelleFacture> {
   await requireAccess("costs.edit");
   const [ia, limites, enAttente, modes] = await Promise.all([etatLectureIA(), limitesFactures(), prisma.pendingInvoice.count(), modesAnalyse()]);
-  return { ia, limites, enAttente, pagesMercuriale: PAGES_MAX_ABSOLU, modes, octetsMax: INVOICE_MAX_BYTES };
+  return { ia, limites, enAttente, pagesMercuriale: pagesMax("mercuriale", limites), modes, octetsMax: INVOICE_MAX_BYTES };
 }
 
 /** fd : pages (une ou plusieurs photos, ou un PDF), note ; type « mercuriale » + fournisseurId pour une liste de prix. */

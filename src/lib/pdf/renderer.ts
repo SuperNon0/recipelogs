@@ -84,6 +84,8 @@ export type RenderOptions = {
   headerAlign?: Align;
   /** Marge gauche / droite de la page (mm), pour aligner en-tête et pied sur le texte. */
   sideMarginMm?: number;
+  /** Plateforme : « Fait avec RecipeLog » en bas à droite (réglé dans le panel). */
+  marque?: boolean;
 };
 
 function escapeHtml(s: string): string {
@@ -111,7 +113,7 @@ function bands(options: RenderOptions): { show: boolean; headerHtml: string; foo
   const sideMm = options.sideMarginMm ?? 12;
   const footerText = (options.footer ?? "").trim();
   const headerText = (options.header ?? "").trim();
-  const hasFooter = footerText.length > 0 || !!options.showPageNumber;
+  const hasFooter = footerText.length > 0 || !!options.showPageNumber || !!options.marque;
   const hasHeader = headerText.length > 0;
 
   // Pied de page : le texte et le numéro vont chacun dans leur zone
@@ -119,6 +121,7 @@ function bands(options: RenderOptions): { show: boolean; headerHtml: string; foo
   const footerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
   if (footerText) footerZones[options.footerAlign ?? "left"].push(escapeHtml(footerText));
   if (options.showPageNumber) footerZones[options.pageNumberAlign ?? "center"].push(`<span class="pageNumber"></span>`);
+  if (options.marque) footerZones.right.push("Fait avec RecipeLog");
   const headerZones: Record<Align, string[]> = { left: [], center: [], right: [] };
   if (headerText) headerZones[options.headerAlign ?? "left"].push(escapeHtml(headerText));
 

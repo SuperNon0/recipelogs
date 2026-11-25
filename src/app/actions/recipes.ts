@@ -18,6 +18,7 @@ import { loadIngredientInfo, pieceWeightOf } from "@/lib/ingredientInfo";
 import { rescaleStepText } from "@/lib/stepQty";
 import { parseMold } from "@/lib/mold";
 import { copyRecipe } from "@/lib/recipeCopy";
+import { verifierRecettes } from "@/lib/limites";
 import { hasCycle } from "@/lib/subRecipes";
 import { matchPivotIngredient } from "@/lib/pivotIdentity";
 
@@ -221,6 +222,7 @@ export async function createRecipe(formData: FormData) {
   const data = soldAllowed(viewer, parseFormOrThrow(formData));
   const subs = await parsePendingSubRecipes(formData, null);
   if (data.ingredients.length === 0 && subs.length === 0) throw new Error(NO_INGREDIENT);
+  await verifierRecettes();
 
   const recipe = await prisma.$transaction(async (tx) => {
     const created = await insertRecipe(tx, data);
@@ -251,6 +253,11 @@ export async function createRecipeInline(
   }
   if (!data.ingredients.some((i) => !isSectionTitle(i.unit))) {
     return { ok: false, error: "Ajoute au moins un ingrédient." };
+  }
+  try {
+    await verifierRecettes();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
   const recipe = await prisma.$transaction((tx) => insertRecipe(tx, data));
   await ensureIngredientBases(ingredientNames(data.ingredients));
@@ -587,11 +594,16 @@ export async function toggleFavorite(id: number) {
   revalidatePath(`/recipes/${id}`);
 }
 
-export async function duplicateRecipe(id: number) {
+export async function duplicateRecipe(id: number): Promise<{ ok: false; error: string } | undefined> {
   await requireAccess("recipes.edit");
   await requireVisibleRecipe(id);
   const source = await prisma.recipe.findUnique({ where: { id }, select: { name: true } });
   if (!source) throw new Error("Recette introuvable");
+  try {
+    await verifierRecettes();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const copyId = await copyRecipe(id, source.name + " (copie)");
 
   revalidatePath("/");
