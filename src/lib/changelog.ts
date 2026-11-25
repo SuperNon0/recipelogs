@@ -28,6 +28,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     fixes: [
       "Téléphone : la page ne reste plus figée (plus de défilement) après avoir fermé une fenêtre, et la barre du bas ne reste plus coincée au milieu de l'écran après le clavier ou un zoom. Si ça arrive encore, toucher l'écran ou revenir dans l'appli remet tout en place",
       "Appli posée sur l'écran d'accueil : après une mise à jour du site, elle ne se bloque plus jusqu'à la relancer. Elle se recharge toute seule au retour (ou propose « Recharger » si tu es en train d'écrire), et « Action impossible » a un bouton « Recharger la page »",
+      "Passer une commande sur iPhone : le champ « Chercher un produit » ne disparaît plus sous la barre du haut quand on descend dans la liste. Téléphone tourné, la barre du bas laisse la place aux produits (il n'en restait qu'un visible), rien ne passe sous l'encoche, et les lignes ne restent plus blanches après une rotation ou un zoom",
     ],
   },
   {
