@@ -1325,3 +1325,52 @@ a.sold-row:hover {
   align-self: center;
   color: var(--accent);
 }
+
+/* Ce que je commande d'habitude */
+.ord-habit {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ord-habit-art {
+  flex: none;
+}
+.ord-stats {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ord-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+}
+.ord-stats > div:first-child {
+  border-top: 0;
+}
+.ord-stats dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ord-stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: right;
+}

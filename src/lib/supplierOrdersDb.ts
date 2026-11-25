@@ -5,8 +5,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { parseDay } from "./purchaseOrders";
-import { articleOf } from "./suppliers";
-import { orderText, orderUnits, packNameOf } from "./supplierOrders";
+import { articleKey, articleOf } from "./suppliers";
+import { STATS_WEEKS, buyStats, orderText, orderUnits, packNameOf, toOrderUnit, type BuyEvent, type BuyStats } from "./supplierOrders";
 
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -27,6 +27,8 @@ export type CatalogProduct = {
   priceDate: string | null;
   /** Dernière quantité commandée (même unité), pour la proposer. */
   last: { quantity: number; unit: string; date: string } | null;
+  /** Ce que je commande d'habitude (12 dernières semaines), dans l'unité units[0]. */
+  stats: BuyStats | null;
 };
 
 /**
@@ -37,7 +39,9 @@ export type CatalogProduct = {
 export async function loadOrderCatalog(supplierId: number) {
   const s = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true, name: true } });
   if (!s) return null;
-  const [products, recent, signature] = await Promise.all([
+  const today = isoDay(new Date());
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - STATS_WEEKS * 7 * 86_400_000);
+  const [products, recent, signature, invoiceLines, orderLines, firstInvoice, firstOrder] = await Promise.all([
     prisma.supplierProduct.findMany({
       where: { supplierId },
       orderBy: { name: "asc" },
@@ -50,7 +54,19 @@ export async function loadOrderCatalog(supplierId: number) {
       select: { date: true, lines: { select: { productId: true, label: true, quantity: true, unit: true } } },
     }),
     getOrderSignature(),
+    // Factures (pas les mercuriales ni les prix tapés à la main) des 12 dernières semaines.
+    prisma.purchaseOrderLine.findMany({
+      where: { quantity: { not: null }, order: { supplierId, manual: false, date: { gte: from } } },
+      select: { productId: true, quantity: true, order: { select: { date: true } } },
+    }),
+    prisma.supplierOrderLine.findMany({
+      where: { order: { supplierId, date: { gte: from } } },
+      select: { productId: true, label: true, quantity: true, unit: true, order: { select: { date: true } } },
+    }),
+    prisma.purchaseOrder.findFirst({ where: { supplierId, manual: false }, orderBy: { date: "asc" }, select: { date: true } }),
+    prisma.supplierOrder.findFirst({ where: { supplierId }, orderBy: { date: "asc" }, select: { date: true } }),
   ]);
+  const since = [firstInvoice?.date, firstOrder?.date].filter((d): d is Date => !!d).map(isoDay).sort()[0] ?? null;
   const lastByProduct = new Map<number, { quantity: number; unit: string; date: string }>();
   const lastByArticle = new Map<string, { quantity: number; unit: string; date: string }>();
   for (const o of recent) {
@@ -61,8 +77,26 @@ export async function loadOrderCatalog(supplierId: number) {
       } else if (!lastByArticle.has(l.label.toLowerCase())) lastByArticle.set(l.label.toLowerCase(), v);
     }
   }
+  // Achats de chaque produit, ramenés à son unité de commande (carton, sac…).
+  const baseOf = (p: (typeof products)[number]) => ({ name: p.name, packName: p.packName, packSize: num(p.packSize), priceUnit: p.priceUnit });
+  const prodById = new Map(products.map((p) => [p.id, p]));
+  const buys = new Map<number, BuyEvent[]>();
+  const push = (id: number, e: BuyEvent) => buys.set(id, [...(buys.get(id) ?? []), e]);
+  for (const l of invoiceLines) if (prodById.has(l.productId)) push(l.productId, { date: isoDay(l.order.date), quantity: Number(l.quantity), source: "facture" });
+  const articleBuys = new Map<string, { unit: string; events: BuyEvent[] }[]>();
+  for (const l of orderLines) {
+    const e = { date: isoDay(l.order.date), quantity: Number(l.quantity), source: "commande" as const };
+    const p = l.productId != null ? prodById.get(l.productId) : undefined;
+    if (p) {
+      const q = toOrderUnit(baseOf(p), e.quantity, l.unit);
+      if (q != null) push(p.id, { ...e, quantity: q });
+    } else if (l.productId == null) {
+      const k = articleKey(l.label);
+      articleBuys.set(k, [...(articleBuys.get(k) ?? []), { unit: l.unit, events: [e] }]);
+    }
+  }
   const catalog: CatalogProduct[] = products.map((p) => {
-    const base = { name: p.name, packName: p.packName, packSize: num(p.packSize), priceUnit: p.priceUnit };
+    const base = baseOf(p);
     return {
       id: p.id,
       name: p.name,
@@ -77,12 +111,27 @@ export async function loadOrderCatalog(supplierId: number) {
       priceUnit: p.priceUnit,
       priceDate: p.priceDate ? isoDay(p.priceDate) : null,
       last: lastByProduct.get(p.id) ?? null,
+      stats: buyStats(buys.get(p.id) ?? [], today, since),
     };
   });
+  // Un article à variantes (« Croissant ») : ses variantes et ce qui a été commandé sans choisir,
+  // quand tout se compte dans la même unité.
+  const articleStats: Record<string, { unit: string; stats: BuyStats }> = {};
+  const byArticle = new Map<string, CatalogProduct[]>();
+  for (const c of catalog) byArticle.set(articleKey(c.article), [...(byArticle.get(articleKey(c.article)) ?? []), c]);
+  for (const [k, list] of byArticle) {
+    if (list.length < 2) continue;
+    const unit = list[0].units[0];
+    if (list.some((c) => c.units[0] !== unit)) continue;
+    const loose = (articleBuys.get(k) ?? []).filter((a) => a.unit === unit).flatMap((a) => a.events);
+    const st = buyStats([...list.flatMap((c) => buys.get(c.id) ?? []), ...loose], today, since);
+    if (st) articleStats[k] = { unit, stats: st };
+  }
   return {
     supplier: s,
     products: catalog,
     lastArticles: Object.fromEntries(lastByArticle),
+    articleStats,
     signature,
   };
 }

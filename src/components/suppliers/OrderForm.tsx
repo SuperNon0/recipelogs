@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, ClipboardCopy, FileText, Plus, Search, Send, ShoppingCart, X } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ChevronRight, ClipboardCopy, FileText, Plus, Search, Send, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
 import { OTHER_FAMILY, SUPPLIER_FAMILIES, articleKey } from "@/lib/suppliers";
-import { orderText, qtyLabel, unitEstimate } from "@/lib/supplierOrders";
+import { STATS_WEEKS, orderText, perWeekLabel, qtyLabel, unitEstimate, type BuyStats } from "@/lib/supplierOrders";
 import type { CatalogProduct, OrderCatalog } from "@/lib/supplierOrdersDb";
 import { enregistrerCommande } from "@/app/actions/supplierOrders";
 import { copyText, useCanShare } from "./copyText";
@@ -29,7 +29,14 @@ type Group = {
   products: CatalogProduct[];
   /** Texte de recherche (noms, références) en minuscules sans accents. */
   hay: string;
+  /** Nombre de livraisons sur les 12 dernières semaines (0 = jamais commandé). */
+  score: number;
+  /** Quantité totale, pour départager deux articles commandés aussi souvent. */
+  volume: number;
 };
+
+/** Fiche « ce que je commande d'habitude » ouverte. */
+type StatsView = { title: string; unit: string; stats: BuyStats; price?: { value: number; unit: string; date: string | null } | null };
 
 const PAGE = 120;
 const plain = (s: string) => articleKey(s);
@@ -47,11 +54,13 @@ function buildGroups(products: CatalogProduct[]): Group[] {
     const key = plain(p.article);
     let g = map.get(key);
     if (!g) {
-      g = { key, article: p.article, family: p.family?.trim() || OTHER_FAMILY, products: [], hay: plain(p.article) };
+      g = { key, article: p.article, family: p.family?.trim() || OTHER_FAMILY, products: [], hay: plain(p.article), score: 0, volume: 0 };
       map.set(key, g);
     } else if (g.family === OTHER_FAMILY && p.family?.trim()) g.family = p.family.trim();
     g.products.push(p);
     g.hay += ` ${plain(p.name)} ${p.reference ? plain(p.reference) : ""}`;
+    g.score += p.stats?.times ?? 0;
+    g.volume += p.stats?.total ?? 0;
   }
   return [...map.values()].sort(
     (a, b) => familyRank(a.family) - familyRank(b.family) || a.family.localeCompare(b.family, "fr") || a.article.localeCompare(b.article, "fr", { sensitivity: "base" }),
@@ -69,9 +78,28 @@ function storageKey(id: number) {
   return `recipelog-commande-${id}`;
 }
 
+/** Les articles les plus commandés d'abord (nombre de livraisons, puis quantité), les autres ensuite dans l'ordre des familles. */
+function byHabit(groups: Group[]): Group[] {
+  const often = groups.filter((g) => g.score > 0).sort((a, b) => b.score - a.score || b.volume - a.volume || a.article.localeCompare(b.article, "fr"));
+  return [...often, ...groups.filter((g) => g.score === 0)];
+}
+
 export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
-  const { supplier, products, lastArticles } = catalog;
-  const groups = useMemo(() => buildGroups(products), [products]);
+  const { supplier, products, lastArticles, articleStats } = catalog;
+  const baseGroups = useMemo(() => {
+    const gs = buildGroups(products);
+    // Un article à variantes compte aussi ce qui a été commandé sans choisir la variante.
+    for (const g of gs) {
+      const a = articleStats[g.key];
+      if (a && a.stats.times > g.score) g.score = a.stats.times;
+    }
+    return gs;
+  }, [products, articleStats]);
+  const hasHabits = useMemo(() => baseGroups.some((g) => g.score > 0), [baseGroups]);
+  const [habit, setHabit] = useState(true);
+  const sortHabit = habit && hasHabits;
+  const groups = useMemo(() => (sortHabit ? byHabit(baseGroups) : baseGroups), [baseGroups, sortHabit]);
+  const [statsView, setStatsView] = useState<StatsView | null>(null);
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const byGroupKey = useMemo(() => new Map(groups.map((g) => [g.key, g])), [groups]);
   const families = useMemo(() => [...new Set(groups.map((g) => g.family))], [groups]);
@@ -133,7 +161,7 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
   }, [groups, q, family, onlyMine, picks]);
 
   // Affichage par paquets : la page reste rapide même avec une mercuriale de 1 000 produits.
-  useEffect(() => setShown(PAGE), [q, family, onlyMine]);
+  useEffect(() => setShown(PAGE), [q, family, onlyMine, sortHabit]);
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
@@ -194,6 +222,11 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
           <button type="button" className="fl-chip" aria-pressed={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
             <ShoppingCart size={13} /> Ma commande ({lines.length})
           </button>
+          {hasHabits && (
+            <button type="button" className="fl-chip" aria-pressed={sortHabit} onClick={() => setHabit((v) => !v)}>
+              <TrendingUp size={13} /> Les plus commandés
+            </button>
+          )}
           {families.length > 1 && (
             <>
               <button type="button" className="fl-chip" aria-pressed={family == null} onClick={() => setFamily(null)}>
@@ -213,8 +246,10 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
         {products.length === 0 && <div className="fl-row" style={{ color: "var(--muted)" }}>Ce fournisseur n&apos;a pas encore de produit.</div>}
         {products.length > 0 && visible.length === 0 && <div className="fl-row" style={{ color: "var(--muted)" }}>Aucun produit ne correspond.</div>}
         {visible.slice(0, shown).map((g) => {
-          const head = !q && !family && g.family !== lastFamily ? g.family : null;
-          lastFamily = g.family;
+          // Tri « Les plus commandés » : un titre pour ce que je prends souvent, puis les familles pour le reste.
+          const section = sortHabit && !q && !onlyMine && g.score > 0 ? HABIT_TITLE : g.family;
+          const head = !q && (!family || section === HABIT_TITLE) && section !== lastFamily ? section : null;
+          lastFamily = section;
           const several = g.products.length > 1;
           return (
             <div key={g.key} className="ord-group">
@@ -223,6 +258,8 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
                 <>
                   <ArticleRow
                     group={g}
+                    habit={articleStats[g.key] ?? null}
+                    onStats={setStatsView}
                     pick={picks[aKey(g)]}
                     variantsPicked={g.products.filter((p) => picks[pKey(p.id)]).length}
                     expanded={open.has(g.key) || (!!q && !plain(g.article).includes(q))}
@@ -231,10 +268,10 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
                     onToggle={toggle}
                   />
                   {(open.has(g.key) || (!!q && !plain(g.article).includes(q))) &&
-                    g.products.map((p) => <ProductRow key={p.id} product={p} pick={picks[pKey(p.id)]} variant onPick={setPick} />)}
+                    g.products.map((p) => <ProductRow key={p.id} product={p} pick={picks[pKey(p.id)]} variant onPick={setPick} onStats={setStatsView} />)}
                 </>
               ) : (
-                <ProductRow product={g.products[0]} pick={picks[pKey(g.products[0].id)]} onPick={setPick} />
+                <ProductRow product={g.products[0]} pick={picks[pKey(g.products[0].id)]} onPick={setPick} onStats={setStatsView} />
               )}
             </div>
           );
@@ -262,6 +299,8 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
           <ShoppingCart size={15} /> Voir ma commande
         </button>
       </div>
+
+      {statsView && <StatsModal view={statsView} onClose={() => setStatsView(null)} />}
 
       {review && (
         <ReviewModal
@@ -309,7 +348,30 @@ function QtyButtons({ pick, units, pickKey, onPick }: { pick?: Pick; units: stri
   );
 }
 
-const ProductRow = memo(function ProductRow({ product: p, pick, variant, onPick }: { product: CatalogProduct; pick?: Pick; variant?: boolean; onPick: (k: string, p: Pick | null) => void }) {
+const HABIT_TITLE = "Ce que je commande le plus";
+
+/** « ≈ 2 cartons / semaine » sous un produit : touche pour voir le détail. */
+function HabitChip({ view, onStats }: { view: StatsView; onStats: (v: StatsView) => void }) {
+  return (
+    <button type="button" className="ord-habit" aria-label={`Ce que je commande d'habitude : ${view.title}`} onClick={() => onStats(view)}>
+      <BarChart3 size={12} /> {perWeekLabel(view.stats.perWeek, view.unit)}
+    </button>
+  );
+}
+
+const ProductRow = memo(function ProductRow({
+  product: p,
+  pick,
+  variant,
+  onPick,
+  onStats,
+}: {
+  product: CatalogProduct;
+  pick?: Pick;
+  variant?: boolean;
+  onPick: (k: string, p: Pick | null) => void;
+  onStats: (v: StatsView) => void;
+}) {
   const unit = pick?.unit ?? p.units[0];
   const est = unitEstimate(p, unit);
   const info = [
@@ -323,6 +385,12 @@ const ProductRow = memo(function ProductRow({ product: p, pick, variant, onPick 
       <span className="ord-name">
         <b>{p.name}</b>
         <small>{info.join(" · ")}</small>
+        {p.stats && (
+          <HabitChip
+            view={{ title: p.name, unit: p.units[0], stats: p.stats, price: p.price != null ? { value: p.price, unit: p.priceUnit, date: p.priceDate } : null }}
+            onStats={onStats}
+          />
+        )}
       </span>
       <QtyButtons pick={pick} units={p.units} pickKey={pKey(p.id)} onPick={onPick} />
     </div>
@@ -331,6 +399,8 @@ const ProductRow = memo(function ProductRow({ product: p, pick, variant, onPick 
 
 const ArticleRow = memo(function ArticleRow({
   group: g,
+  habit,
+  onStats,
   pick,
   variantsPicked,
   expanded,
@@ -339,6 +409,8 @@ const ArticleRow = memo(function ArticleRow({
   onToggle,
 }: {
   group: Group;
+  habit: { unit: string; stats: BuyStats } | null;
+  onStats: (v: StatsView) => void;
   pick?: Pick;
   variantsPicked: number;
   expanded: boolean;
@@ -359,6 +431,11 @@ const ArticleRow = memo(function ArticleRow({
           </small>
         </span>
       </button>
+      {habit && (
+        <span className="ord-habit-art">
+          <HabitChip view={{ title: `${g.article} (toutes variantes)`, unit: habit.unit, stats: habit.stats }} onStats={onStats} />
+        </span>
+      )}
       <QtyButtons pick={pick} units={units} pickKey={aKey(g)} onPick={onPick} />
     </div>
   );
@@ -511,6 +588,51 @@ function ReviewModal({
             copie le texte pour le coller dans un message au commercial. « Copier sans enregistrer » copie seulement le texte.
           </Help>
         </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Ce que je commande d'habitude
+// ─────────────────────────────────────────────
+
+const frDay = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" });
+};
+
+function StatsModal({ view, onClose }: { view: StatsView; onClose: () => void }) {
+  const { stats: st, unit } = view;
+  const rows: [string, string][] = [
+    ["Par semaine", perWeekLabel(st.perWeek, unit).replace(" / semaine", "")],
+    ["Par livraison", `≈ ${qtyLabel(st.perDelivery, unit)}`],
+    ["Livraisons", `${st.times} en ${st.weeks} semaine${st.weeks > 1 ? "s" : ""}`],
+    ["Total", qtyLabel(st.total, unit)],
+    ["Dernière fois", `${qtyLabel(st.last.quantity, unit)}, le ${frDay(st.last.date)}`],
+  ];
+  if (view.price) rows.push(["Dernier prix", `${formatEuro(view.price.value)} le ${view.price.unit}${view.price.date ? ` (${frDay(view.price.date)})` : ""}`]);
+  return (
+    <ModalOverlay title={view.title} onClose={onClose}>
+      <div style={{ display: "grid", gap: 12 }}>
+        <p className="sub" style={{ margin: 0 }}>
+          Ce que tu commandes d&apos;habitude, sur les {STATS_WEEKS} dernières semaines.
+          <Help title="Ce que je commande d'habitude" example="Farine T45 : 6 sacs en 4 semaines → ≈ 1,5 sac / semaine.">
+            RecipeLog additionne ce que tu as acheté chez ce fournisseur sur les {STATS_WEEKS} dernières semaines (ou depuis ta première
+            facture si c&apos;est plus récent) et le divise par le nombre de semaines. Il compte les factures enregistrées et les commandes
+            passées ici ; une commande suivie de sa facture dans la semaine n&apos;est comptée qu&apos;une fois (la facture dit ce qui a été
+            livré). Les mercuriales et les prix tapés à la main ne comptent pas. Le tri « Les plus commandés » met en haut les produits
+            livrés le plus souvent.
+          </Help>
+        </p>
+        <dl className="ord-stats">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd className="num">{v}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </ModalOverlay>
   );

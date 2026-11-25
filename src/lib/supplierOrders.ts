@@ -139,3 +139,93 @@ export function suggestGroups(products: { id: number; name: string; article?: st
     })
     .sort((a, b) => a.article.localeCompare(b.article, "fr"));
 }
+
+// ─────────────────────────────────────────────
+// Ce que je commande d'habitude
+// ─────────────────────────────────────────────
+
+/** Nombre de semaines regardées pour la moyenne commandée. */
+export const STATS_WEEKS = 12;
+
+/** Un achat d'un produit : une ligne de facture, ou une commande passée dans RecipeLog. */
+export type BuyEvent = { date: string; quantity: number; source: "facture" | "commande" };
+
+/** Ce que je commande d'habitude d'un produit, dans son unité de commande (carton, sac, kg…). */
+export type BuyStats = {
+  /** Quantité moyenne par semaine sur la période. */
+  perWeek: number;
+  /** Quantité moyenne par livraison. */
+  perDelivery: number;
+  /** Nombre de livraisons (jours différents) sur la période. */
+  times: number;
+  /** Total sur la période. */
+  total: number;
+  /** Semaines prises en compte (moins de 12 quand l'historique est plus court). */
+  weeks: number;
+  last: { date: string; quantity: number };
+};
+
+const dayMs = 86_400_000;
+const dayNum = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / dayMs);
+
+/**
+ * Quantité ramenée à l'unité de commande du produit (son conditionnement) :
+ * « 25 kg » d'un sac de 25 kg = 1 sac. Null si l'unité ne se convertit pas.
+ */
+export function toOrderUnit(
+  p: { name: string; packName?: string | null; packSize?: number | null; priceUnit: string },
+  quantity: number,
+  unit: string,
+): number | null {
+  const first = packNameOf(p);
+  if (unit === first) return quantity;
+  if (unit === p.priceUnit && p.packSize != null && p.packSize > 0) return quantity / p.packSize;
+  return null;
+}
+
+/**
+ * Garde une seule trace par achat : une commande passée dans RecipeLog n'est
+ * pas comptée quand une facture du même produit arrive dans les 7 jours qui
+ * suivent (c'est la même livraison, et la facture dit ce qui a vraiment été livré).
+ */
+export function dedupeBuys(events: BuyEvent[]): BuyEvent[] {
+  const invoices = events.filter((e) => e.source === "facture").map((e) => dayNum(e.date));
+  return events.filter((e) => {
+    if (e.source === "facture") return true;
+    const d = dayNum(e.date);
+    return !invoices.some((i) => i >= d && i <= d + 7);
+  });
+}
+
+/**
+ * Moyenne commandée sur les {@link STATS_WEEKS} dernières semaines. `since`
+ * est le premier achat connu chez ce fournisseur : si l'historique commence il
+ * y a 3 semaines, la moyenne se fait sur 3 semaines et non 12.
+ */
+export function buyStats(events: BuyEvent[], today: string, since: string | null): BuyStats | null {
+  const end = dayNum(today);
+  const start = end - STATS_WEEKS * 7 + 1;
+  const kept = dedupeBuys(events).filter((e) => e.quantity > 0 && dayNum(e.date) >= start && dayNum(e.date) <= end);
+  if (!kept.length) return null;
+  const first = Math.max(start, Math.min(since ? dayNum(since) : end, ...kept.map((e) => dayNum(e.date))));
+  const weeks = Math.min(STATS_WEEKS, Math.max(1, Math.ceil((end - first + 1) / 7)));
+  const byDay = new Map<string, number>();
+  for (const e of kept) byDay.set(e.date, (byDay.get(e.date) ?? 0) + e.quantity);
+  const total = [...byDay.values()].reduce((s, q) => s + q, 0);
+  const lastDay = [...byDay.keys()].sort().at(-1)!;
+  const round = (v: number) => Math.round(v * 100) / 100;
+  return {
+    perWeek: round(total / weeks),
+    perDelivery: round(total / byDay.size),
+    times: byDay.size,
+    total: round(total),
+    weeks,
+    last: { date: lastDay, quantity: round(byDay.get(lastDay)!) },
+  };
+}
+
+/** « ≈ 2 cartons / semaine », « ≈ 0,5 sac / semaine ». */
+export function perWeekLabel(perWeek: number, unit: string): string {
+  const q = perWeek >= 10 ? Math.round(perWeek) : perWeek >= 1 ? Math.round(perWeek * 2) / 2 : Math.round(perWeek * 10) / 10;
+  return `≈ ${qtyLabel(q || 0.1, unit)} / semaine`;
+}

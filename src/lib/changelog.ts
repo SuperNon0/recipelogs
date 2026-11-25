@@ -11,6 +11,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.28",
+    date: "2026-11-25",
+    title: "Ce que je commande d'habitude",
+    summary:
+      "Quand tu passes une commande, chaque produit montre ce que tu en commandes en moyenne par semaine chez ce fournisseur, d'après tes factures et tes commandes. Les produits que tu prends le plus sont en haut de la liste.",
+    features: [
+      "Passer une commande : sous chaque produit déjà acheté, « ≈ 2 cartons / semaine », la moyenne des 12 dernières semaines (ou depuis ta première facture chez ce fournisseur si c'est plus récent)",
+      "Touche cette moyenne pour voir le détail : par semaine, par livraison, nombre de livraisons, total, dernière fois et dernier prix",
+      "Nouveau tri « Les plus commandés », mis par défaut : ce que tu commandes le plus souvent passe en haut, sous « Ce que je commande le plus », et le reste suit par famille. Touche-le pour revenir au rangement par famille",
+      "Le calcul compte les factures enregistrées et les commandes passées dans RecipeLog. Une commande suivie de sa facture dans la semaine ne compte qu'une fois ; les mercuriales et les prix tapés à la main ne comptent pas",
+    ],
+  },
+  {
     version: "V2.27",
     date: "2026-11-25",
     title: "Exporter des recettes et offres à la carte",
