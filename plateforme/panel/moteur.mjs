@@ -10,6 +10,7 @@ import { alerter, canauxAlerte, disponibilites, etatCourant, machine, pannesParJ
 import { courrielRegle, envoyerCourriel } from "./courriel.mjs";
 import { RefusNotif, marquer as marquerNotifs, regler as reglerNotifs, resume as resumeNotifs, vider as viderNotifs } from "./notifications.mjs";
 import { RefusIA, reglerCle, reglerFactures, reglerQuota, resume as resumeIA } from "./ia.mjs";
+import { RefusModules, oublier as oublierModules, regler as reglerModules, resume as resumeModules } from "./modules.mjs";
 import { RefusVente, lire as lireVente, manques as manquesVente, regler as reglerVente } from "./vente.mjs";
 import { demarrer as demarrerPlateforme, etat as etatPlateforme, oublierNouveautes } from "./plateforme.mjs";
 import { regler as reglerNouveautes, resume as resumeNouveautes, verifier as verifierNouveautes } from "./nouveautes.mjs";
@@ -615,6 +616,8 @@ async function action(qui, nom, act, corps) {
   }
   return enTache(act, nom, async (suivi) => {
     const r = await outilLong(args, suivi);
+    // Client supprimé : un client recréé plus tard sous le même nom repart avec tous ses modules.
+    if (act === "supprimer" && r.ok) await oublierModules(DONNEES, nom).catch(() => {});
     await noter(qui, act, nom, r, details);
     return r;
   });
@@ -775,6 +778,21 @@ createServer(async (req, res) => {
       }
     }
     // Lecture des factures par IA (lot 7) : quotas par client et lectures du mois.
+    // Modules en option de chaque client (modules.mjs).
+    if (req.method === "GET" && url.pathname === "/modules") return repondre(res, 200, await resumeModules(DONNEES));
+    if (req.method === "POST" && url.pathname === "/modules") {
+      const corps = await lireCorps(req);
+      let apres;
+      try {
+        apres = await reglerModules(DONNEES, corps);
+      } catch (e) {
+        if (e instanceof RefusModules) throw new Refus(400, e.message);
+        throw e;
+      }
+      const lim = Object.entries(apres.limites).map(([k, v]) => `${k}=${v}`).join(", ");
+      await noter(qui, "modules", corps.client, { ok: true, sortie: "" }, { coupes: Object.keys(apres.coupes).join(", ") || "aucun", limites: lim || "aucune", ...(corps.offre ? { offre: corps.offre } : {}) });
+      return repondre(res, 200, await resumeModules(DONNEES));
+    }
     if (req.method === "GET" && url.pathname === "/ia") return repondre(res, 200, await resumeIA(DONNEES));
     if (req.method === "POST" && url.pathname === "/ia/quota") {
       const corps = await lireCorps(req);

@@ -720,7 +720,7 @@ const ONGLETS = [
   ["equipe", "Équipe"],
   ["sauvegardes", "Sauvegardes"],
   ["journaux", "Journaux"],
-  ["reglages", "Réglages"],
+  ["modules", "Modules"],
   ["demo", "Démo"],
 ];
 
@@ -755,7 +755,7 @@ function ficheClient(nom, onglet, auto) {
   if (onglet === "equipe") ongletEquipe(c, zc);
   if (onglet === "sauvegardes") ongletSauvegardes(c, zc);
   if (onglet === "journaux") ongletJournaux(c, zc);
-  if (onglet === "reglages") ongletReglages(c, zc);
+  if (onglet === "modules") ongletModules(c, zc);
   if (onglet === "demo") ongletDemo(c, zc);
 }
 $("#fiche").addEventListener("click", (ev) => {
@@ -778,7 +778,7 @@ function ongletResume(c, z) {
     ["Sauvegarde", s ? e(dateSauv(s.id).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "aucune", sv === "test" ? "test de restauration raté" : c.sauvegarde?.test ? `testée le ${dateFr(c.sauvegarde.test.date)}` : "pas encore testée"],
     ["Offre", c.essaiFin ? (joursRestants(c.essaiFin) >= 0 ? `Essai : ${joursRestants(c.essaiFin)} j` : "Essai fini") : "Client", c.essaiFin ? `jusqu'au ${dateFr(c.essaiFin)}` : `depuis le ${dateFr(c.creeLe)}`],
     ["Lectures IA", lim === null ? "—" : lim === 0 ? "coupées" : `${u} / ${lim}`, "ce mois-ci"],
-    ["Accès MCP", c.mcp ? "permis" : "coupé", c.mcp ? (c.mcpCle === false ? "connexion par compte seulement" : "compte ou clé secrète") : "réglable dans Réglages"],
+    ["Accès MCP", c.mcp ? "permis" : "coupé", c.mcp ? (c.mcpCle === false ? "connexion par compte seulement" : "compte ou clé secrète") : "réglable dans Modules"],
     ["Disponibilité", SANTE ? pct(SANTE.disponibilite?.[`client:${c.nom}`] ?? 100) : "—", "sur 30 jours"],
     ["Comptes actifs", SANTE?.clients?.[c.nom]?.usage ? e(SANTE.clients[c.nom].usage.comptes) : "—", SANTE?.clients?.[c.nom]?.usage ? `dernière visite ${depuisFr(SANTE.clients[c.nom].usage.derniereActivite)}` : ""],
   ];
@@ -792,6 +792,7 @@ function ongletResume(c, z) {
     ${aFaire.length ? `<h2>À regarder</h2><div class="afaire">${aFaire.map(([x, i]) => ligneAFaire(x, i)).join("")}</div>` : ""}
     ${tickets.length ? `<h2>Demandes de support</h2><div class="demandes">${tickets.map((t) => `<article class="demande"><div><span class="etiquette ${(STATUTS[t.statut] ?? [, "acc"])[1]}">${e((STATUTS[t.statut] ?? [t.statut])[0])}</span> ${e(t.email)}<small>${e(heureFr(t.maj))}</small><p>${e(t.messages.at(-1).texte.slice(0, 200))}</p></div><div class="actions"><button class="btn petit principal" type="button" data-ticket-ouvrir="${e(t.id)}">Ouvrir</button></div></article>`).join("")}</div>` : ""}
     <h2>Dernières actions</h2><div class="boite"><div class="evts">${evts(journal)}</div></div>
+    <h2>Essai</h2>${blocEssai(c)}
     <h2>Version de l'appli ${cnAide}</h2>${cnTexte}
     <div class="ligne-zs"><div><b>${e(nomCanal(c.canal))}</b><small>${c.canal === "beta-instance" ? "Reçoit la bêta : les nouveautés pas encore données aux autres clients." : c.canal === "instance" ? "La version de tous les clients." : "Ancienne version : passe-le en standard ou en bêta."}</small></div>
       <div class="actions">${c.canal !== "beta-instance" ? `<button class="btn" type="button" data-fiche-act="canal" data-canal="beta-instance">Passer en bêta</button>` : ""}${c.canal !== "instance" ? `<button class="btn" type="button" data-fiche-act="canal" data-canal="instance">${c.canal === "beta-instance" ? "Repasser en standard" : "Passer en standard"}</button>` : ""}</div></div>
@@ -802,6 +803,7 @@ function ongletResume(c, z) {
         <button class="btn danger" type="button" data-fiche-act="supprimer">${ic("trash", "s16")}Supprimer…</button></div>
     </section>`;
   z.querySelectorAll("[data-ticket-ouvrir]").forEach((b) => b.addEventListener("click", () => fenetreTicket(c.nom, b.dataset.ticketOuvrir)));
+  brancherEssai(c);
 }
 
 // ------------------------------------------------------------ navigation (adresse après #)
@@ -937,6 +939,7 @@ const NOMS_ACTIONS = {
   "maintenance-annulee": "a annulé la maintenance :",
   "ia-quota": "a changé les lectures par IA de",
   "ia-factures": "a changé les factures en photo de",
+  modules: "a changé les modules de",
   "ia-cle": "a changé l'IA de la",
   "ia-cle-retiree": "a retiré la clé d'IA de la",
   vente: "a changé les tarifs et textes légaux de la",
@@ -1169,48 +1172,238 @@ function fenetreSuppression(c) {
   });
 }
 
-function ongletReglages(c, z) {
-  vue();
+// ------------------------------------------------------------ modules en option (modules.mjs)
+// Une ligne par module, les sous-modules en retrait sous leur parent. La flèche ▸ d'une ligne
+// ouvre ses réglages juste en dessous (limites, comptes, lectures IA…). Décocher un parent grise
+// ses sous-modules (coupés aussi) sans toucher à leurs cases. Le même arbre sert dans l'onglet
+// Modules d'un client et dans chaque offre de « Tarifs » (offres toutes prêtes).
+let MODS = null; // { modules, limites } : la liste vient du moteur
+async function chargerMods() {
+  if (MODS) return MODS;
+  const r = await api("GET", "/modules");
+  if (r.modules) MODS = r;
+  return r;
+}
+// Lignes toujours là (pas de case) mais avec des réglages.
+const TOUJOURS = [
+  { cle: "recettes", nom: "Recettes", aide: "Toujours là, avec les dossiers, catégories, ingrédients, favoris et historique." },
+  { cle: "fichiers", nom: "Fichiers et photos", aide: "Toujours là : les factures, mercuriales et photos envoyées sur son site." },
+];
+
+/**
+ * HTML de l'arbre. etat = { coupes: Set, limites: {} } ; extra(cle) = réglages en plus sous la
+ * flèche d'une ligne (comptes, IA…) ; mcp = ligne « Accès Claude (MCP) » (onglet d'un client).
+ */
+function arbreModules(px, etat, extra = () => "", mcp = null) {
+  const lims = (ligne) =>
+    MODS.limites
+      .filter((l) => l.ligne === ligne)
+      .map((l) =>
+        l.type === "case"
+          ? `<div class="champ"><label class="case"><input type="checkbox" data-limite="${e(l.cle)}" ${etat.limites[l.cle] ? "checked" : ""}> ${e(l.nom)} ${aide(`${px}-l-${l.cle}`, e(l.aide))}</div>`
+          : `<div class="champ"><label>${e(l.nom)} ${aide(`${px}-l-${l.cle}`, e(l.aide))}<div class="suffixe"><input type="number" min="0" max="${l.max}" data-limite="${e(l.cle)}" value="${etat.limites[l.cle] ?? ""}" placeholder="${l.cle === "mercurialePages" ? "20" : "sans limite"}"><span>${e(l.unite)}</span></div></div>`,
+      )
+      .join("");
+  const ligne = (m, { toujours = false, sous = false } = {}) => {
+    const reglages = lims(m.cle) + extra(m.cle);
+    const fleche = reglages ? `<button class="fleche" type="button" data-fleche="${px}-r-${e(m.cle)}" aria-expanded="false" aria-label="Réglages de ${e(m.nom)}">▸</button>` : `<span class="fleche sans"></span>`;
+    const tete = toujours
+      ? `<label class="case"><span class="etiquette ok petite">toujours là</span> <b>${e(m.nom)}</b> ${aide(`${px}-a-${m.cle}`, e(m.aide))}`
+      : `<label class="case"><input type="checkbox" data-module="${e(m.cle)}" ${etat.coupes.has(m.cle) ? "" : "checked"}> ${sous ? e(m.nom) : `<b>${e(m.nom)}</b>`} ${aide(`${px}-a-${m.cle}`, e(m.aide))}`;
+    return `<div class="module${sous ? " sous" : ""}" data-parent="${e(m.parent ?? "")}"><div class="module-tete">${fleche}<div class="champ">${tete}</div></div>
+      ${reglages ? `<div class="module-reglages" id="${px}-r-${e(m.cle)}" hidden>${reglages}</div>` : ""}</div>`;
+  };
+  return `<div class="arbre-modules" data-px="${px}">
+    ${TOUJOURS.map((m) => ligne(m, { toujours: true })).join("")}
+    ${MODS.modules.map((m) => ligne(m, { sous: Boolean(m.parent) })).join("")}
+    ${mcp ? ligne({ cle: "mcp", nom: "Accès Claude (MCP)", aide: "Permet au client de brancher Claude sur son RecipeLog (connecteur RecipeLog dans claude.ai). Changer cette case redémarre son site (environ une minute)." }).replace('data-module="mcp"', `id="${px}-mcp"`).replace(etat.coupes.has("mcp") ? "" : "checked", mcp.actif ? "checked" : "") : ""}
+  </div>`;
+}
+
+/** Branche la flèche et le grisé des sous-modules. */
+function brancherArbre(racine) {
+  const griser = () => {
+    for (const d of racine.querySelectorAll(".module.sous")) {
+      const p = racine.querySelector(`[data-module="${d.dataset.parent}"]`);
+      d.classList.toggle("eteint", Boolean(p && !p.checked));
+    }
+  };
+  griser();
+  racine.addEventListener("change", griser);
+  racine.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-fleche]");
+    if (!b) return;
+    const r = document.getElementById(b.dataset.fleche);
+    if (!r) return;
+    r.hidden = !r.hidden;
+    b.setAttribute("aria-expanded", String(!r.hidden));
+    b.textContent = r.hidden ? "▸" : "▾";
+  });
+  return griser;
+}
+
+/** Ce que l'arbre dit : modules décochés et limites (nombre vide = 0 = pas de limite). */
+function lireArbre(racine) {
+  const coupes = [...racine.querySelectorAll("[data-module]")].filter((i) => !i.checked).map((i) => i.dataset.module);
+  const limites = {};
+  for (const i of racine.querySelectorAll("[data-limite]")) limites[i.dataset.limite] = i.type === "checkbox" ? i.checked : Number(i.value || 0);
+  return { coupes, limites };
+}
+
+/** Remplit l'arbre avec une offre (modules, limites). */
+function remplirArbre(racine, o) {
+  const coupes = new Set(o.coupes ?? []);
+  for (const i of racine.querySelectorAll("[data-module]")) i.checked = !coupes.has(i.dataset.module);
+  for (const i of racine.querySelectorAll("[data-limite]")) {
+    const v = o.limites?.[i.dataset.limite];
+    if (i.type === "checkbox") i.checked = v === true;
+    else i.value = v ? String(v) : "";
+  }
+}
+
+const MODES_ANALYSE = [
+  ["", "Comme le réglage par défaut"],
+  ["les-deux", "IA et Claude (MCP), au choix"],
+  ["ia", "IA seulement"],
+  ["mcp", "Claude (MCP) seulement"],
+  ["aucun", "Aucun (saisie à la main)"],
+];
+
+async function ongletModules(c, z) {
+  const moi = vue();
+  z.innerHTML = `<p class="attente"><span class="rond"></span>Chargement…</p>`;
+  const [r, m] = await Promise.all([api("GET", "/modules"), chargerMods()]);
+  if (moi !== jetonVue) return;
+  if (!r.modules || !m.modules) {
+    z.innerHTML = `<p class="erreur">${e(r.message ?? m.message ?? "Modules indisponibles.")}</p>`;
+    return;
+  }
+  const coupes = new Set(Object.keys(r.clients?.[c.nom] ?? {}));
+  const limites = r.valeurs?.[c.nom] ?? {};
+  const offre = r.offres?.[c.nom] ?? null;
+  // Réglages d'ailleurs, montrés sous la flèche de leur module.
   const max = c.places?.max ?? 0;
-  const jours = c.essaiFin ? Math.max(joursRestants(c.essaiFin), 0) : 0;
-  z.innerHTML = `<form id="f-reglages" class="formulaire" novalidate>
-      ${c.connexion === "authentik" ? `<div class="champ"><label for="r-max">Nombre de comptes ${aide("r-a-max", "Combien de personnes de son équipe peuvent se connecter. 0 = pas de limite. Baisser sous le nombre actuel ne retire personne : il ne pourra juste plus inviter.")}
-        <input id="r-max" type="number" min="0" max="10000" value="${max}"></div>` : ""}
-      <div class="champ"><label for="r-essai">Essai : jours restants ${aide("r-a-essai", "Change la fin de l'essai à partir d'aujourd'hui. 0 = ce n'est plus un essai (client normal, plus de pause automatique). Un client mis en pause par la fin d'essai se rouvre avec « Réactiver ».")}
-        <div class="suffixe"><input id="r-essai" type="number" min="0" max="3650" value="${jours}"><span>${c.essaiFin ? `jusqu'au ${e(dateFr(c.essaiFin))}` : "pas d'essai"}</span></div></div>
-      <div class="champ"><label class="case"><input id="r-mcp" type="checkbox" ${c.mcp ? "checked" : ""}> Accès MCP (Claude) ${aide("r-a-mcp", "Permet au client de brancher Claude sur son RecipeLog. Changer cette case redémarre son site (environ une minute).")}</div>
-      <div class="champ"><label class="case"><input id="r-mcp-cle" type="checkbox" ${c.mcpCle !== false ? "checked" : ""}> Clé secrète MCP ${aide("r-a-mcp-cle", "Ancienne façon de brancher Claude : une clé à copier dans claude.ai (utile pour Claude Code). Décoché : la section Clé secrète disparaît chez le client et une ancienne clé ne marche plus ; Claude se branche seulement avec un compte du client (« Se connecter » dans claude.ai). Changer cette case redémarre son site (environ une minute).")}</div>
-      <p class="erreur" id="r-erreur"></p>
+  const iaLim = typeof IA?.clients?.[c.nom] === "number" ? IA.clients[c.nom] : null;
+  const fac = IA?.factures?.clients?.[c.nom] ?? {};
+  const ana = IA?.analyse?.clients?.[c.nom] ?? "";
+  const defIA = IA ? { lectures: IA.defaut ?? 30, attente: IA.factures?.defaut?.attente ?? 30, pages: IA.factures?.defaut?.pages ?? 10, analyse: IA.analyse?.defaut ?? "les-deux" } : null;
+  const extra = (cle) => {
+    if (cle === "utilisateurs" && c.connexion === "authentik")
+      return `<div class="champ"><label for="mo-max">Nombre de comptes ${aide("mo-a-max", "Combien de personnes de son équipe peuvent se connecter (le responsable compte). 0 = pas de limite. Baisser sous le nombre actuel ne retire personne : il ne pourra juste plus inviter.")}<input id="mo-max" type="number" min="0" max="10000" value="${max}"></div>`;
+    if (cle === "factures" && defIA)
+      return `<div class="champ"><label for="mo-ana">Analyse des documents ${aide("mo-a-ana", "Comment le client fait lire ses factures et mercuriales : par l'IA de la plateforme, par Claude (connecteur RecipeLog), au choix, ou pas du tout (saisie à la main). « IA seulement » et « Aucun » coupent aussi son accès Claude (MCP).")}
+          <select id="mo-ana">${MODES_ANALYSE.map(([k, t]) => `<option value="${k}" ${k === ana ? "selected" : ""}>${e(t)}${k === "" ? ` (${e(MODES_ANALYSE.find(([x]) => x === defIA.analyse)?.[1] ?? defIA.analyse)})` : ""}</option>`).join("")}</select></div>
+        <div class="deux">
+          <div class="champ"><label for="mo-lec">Lectures IA par mois ${aide("mo-a-lec", `Factures et mercuriales lues par l'IA de la plateforme chaque mois. Vide = le défaut (${defIA.lectures}). 0 = pas de lecture par IA.`)}<input id="mo-lec" type="number" min="0" max="100000" value="${iaLim ?? ""}" placeholder="${defIA.lectures}"></div>
+          <div class="champ"><label for="mo-att">Factures en attente ${aide("mo-a-att", `Factures prises en photo qui peuvent attendre d'être lues en même temps. Vide = le défaut (${defIA.attente}). 0 = « Nouvelle facture » coupée.`)}<input id="mo-att" type="number" min="0" max="10000" value="${fac.attente ?? ""}" placeholder="${defIA.attente}"></div>
+          <div class="champ"><label for="mo-pag">Pages par facture ${aide("mo-a-pag", `Photos par facture. Vide = le défaut (${defIA.pages}). 20 au plus.`)}<input id="mo-pag" type="number" min="1" max="20" value="${fac.pages ?? ""}" placeholder="${defIA.pages}"></div>
+        </div>`;
+    if (cle === "mcp")
+      return `<div class="champ"><label class="case"><input id="mo-mcp-cle" type="checkbox" ${c.mcpCle !== false ? "checked" : ""}> Clé secrète MCP ${aide("mo-a-mcp-cle", "Ancienne façon de brancher Claude : une clé à copier dans claude.ai (utile pour Claude Code). Décoché : la section Clé secrète disparaît chez le client et une ancienne clé ne marche plus ; Claude se branche seulement avec un compte du client. Changer cette case redémarre son site (environ une minute).")}</div>`;
+    return "";
+  };
+  const offres = VENTE?.offres ?? [];
+  z.innerHTML = `<form id="f-modules" class="formulaire" novalidate>
+      <div class="aide-ligne"><b>Offre</b> <button class="aide" type="button" data-aide="mo-a-offre" aria-label="Aide sur les offres">?</button>
+        <select id="mo-offre"><option value="">${offre ? `Offre actuelle : ${e(offre)}` : "Choisir une offre toute prête…"}</option>${offres.map((o, i) => `<option value="${i}">${e(o.nom)}</option>`).join("")}</select>
+        <button class="btn petit" type="button" id="mo-appliquer">Appliquer</button></div>
+      <p class="texte-aide" id="mo-a-offre">Remplit d'un coup les cases et les réglages ci-dessous avec ce que comprend l'offre (réglée une fois dans <a href="#vente">Tarifs</a> : nombre de comptes, lectures IA, accès Claude, modules et limites). Tu peux ensuite retoucher à la main ; rien ne change chez le client avant « Enregistrer ».</p>
+      <div class="aide-ligne"><b>Modules de ${e(c.nom)}</b> <button class="aide" type="button" data-aide="mo-a-tout" aria-label="Aide sur les modules">?</button>
+        <span class="droite"><button class="btn petit" type="button" data-m-tout="1">Tout activer</button> <button class="btn petit" type="button" data-m-tout="0">Tout couper</button></span></div>
+      <p class="texte-aide" id="mo-a-tout">Un module coupé disparaît des menus de son RecipeLog, ses pages renvoient vers l'accueil et ses outils Claude (MCP) ne sont plus proposés. <b>Ses données ne sont jamais effacées</b> : en le recochant, tout revient. Couper un module en gras coupe aussi ses sous-modules (en gris) ; ils gardent leur case et reviennent comme avant. La flèche ▸ ouvre les réglages d'une ligne (limites, comptes, lectures IA…) : une limite vide ou à 0 = pas de limite. Modules et limites changent sur son site en une minute environ, sans le redémarrer.</p>
+      ${arbreModules("mo", { coupes, limites }, extra, { actif: c.mcp })}
+      <p class="erreur" id="m-erreur"></p>
       <div class="pied"><button class="btn principal" type="submit">Enregistrer</button></div>
     </form>`;
-  $("#f-reglages").addEventListener("submit", async (ev) => {
+  const f = $("#f-modules");
+  const racine = f.querySelector(".arbre-modules");
+  const griser = brancherArbre(racine);
+  let offreChoisie;
+  f.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-m-tout]");
+    if (!b) return;
+    const oui = b.dataset.mTout === "1";
+    for (const i of f.querySelectorAll("[data-module], #mo-mcp")) i.checked = oui;
+    griser();
+  });
+  $("#mo-appliquer").addEventListener("click", () => {
+    const o = offres[Number($("#mo-offre").value)];
+    if (!o || $("#mo-offre").value === "") return ($("#m-erreur").textContent = "Choisis d'abord une offre.");
+    remplirArbre(racine, o.modules ?? {});
+    if ($("#mo-max")) $("#mo-max").value = String(o.utilisateurs ?? 0);
+    if ($("#mo-lec")) $("#mo-lec").value = String(o.lectures ?? 0);
+    $("#mo-mcp").checked = Boolean(o.mcp);
+    offreChoisie = o.nom;
+    griser();
+    $("#m-erreur").textContent = `Offre « ${o.nom} » appliquée ci-dessous : vérifie puis Enregistrer.`;
+  });
+  f.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const etapes = [];
-    const nMax = $("#r-max") ? Number($("#r-max").value || 0) : max;
-    const nJours = Number($("#r-essai").value || 0);
-    const nMcp = $("#r-mcp").checked;
-    const nMcpCle = $("#r-mcp-cle").checked;
-    if ($("#r-max") && nMax !== max) etapes.push(["Places", () => api("POST", `/clients/${c.nom}/quota`, { max: nMax })]);
-    // Essai déjà fini (0 jour restant) : mettre 0 le retire pour de bon, c'est bien un changement.
-    if (nJours !== jours || (c.essaiFin && nJours === 0)) etapes.push(["Essai", () => api("POST", `/clients/${c.nom}/essai`, { jours: nJours })]);
-    const mcpCle = c.mcpCle !== false;
-    if (nMcp !== c.mcp || nMcpCle !== mcpCle) {
-      const corps = {};
-      if (nMcp !== c.mcp) corps.mcp = nMcp;
-      if (nMcpCle !== mcpCle) corps.mcpCle = nMcpCle;
-      etapes.push(["MCP", () => api("POST", `/clients/${c.nom}/options`, corps)]);
+    const lu = lireArbre(racine);
+    const modules = {};
+    for (const cle of MODS.modules.map((x) => x.cle)) {
+      const avant = !coupes.has(cle);
+      const apres = !lu.coupes.includes(cle);
+      if (avant !== apres) modules[cle] = apres;
     }
-    if (!etapes.length) return ($("#r-erreur").textContent = "Rien n'a changé.");
-    await executer(`Réglages de ${c.nom}`, async () => {
+    const lim = {};
+    for (const [k, v] of Object.entries(lu.limites)) {
+      const avant = limites[k] ?? (typeof v === "boolean" ? false : 0);
+      if (v !== avant) lim[k] = v === 0 || v === false ? null : v;
+    }
+    const etapes = [];
+    if (Object.keys(modules).length || Object.keys(lim).length || offreChoisie) {
+      etapes.push(["Modules et limites", () => api("POST", "/modules", { client: c.nom, modules, limites: lim, ...(offreChoisie ? { offre: offreChoisie } : {}) }).then((x) => ({ ...x, ok: Boolean(x.modules) }))]);
+    }
+    if ($("#mo-max")) {
+      const n = Number($("#mo-max").value || 0);
+      if (n !== max) etapes.push(["Comptes", () => api("POST", `/clients/${c.nom}/quota`, { max: n })]);
+    }
+    if ($("#mo-lec")) {
+      const v = $("#mo-lec").value === "" ? null : Number($("#mo-lec").value);
+      if (v !== iaLim) etapes.push(["Lectures IA", () => api("POST", "/ia/quota", { client: c.nom, limite: v })]);
+      const att = $("#mo-att").value === "" ? null : Number($("#mo-att").value);
+      const pag = $("#mo-pag").value === "" ? null : Number($("#mo-pag").value);
+      const an = $("#mo-ana").value || null;
+      if (att !== (fac.attente ?? null) || pag !== (fac.pages ?? null) || (an ?? "") !== ana) etapes.push(["Factures", () => api("POST", "/ia/factures", { client: c.nom, attente: att, pages: pag, analyse: an })]);
+    }
+    const nMcp = $("#mo-mcp").checked;
+    const nCle = $("#mo-mcp-cle").checked;
+    const opt = {};
+    if (nMcp !== c.mcp) opt.mcp = nMcp;
+    if (nCle !== (c.mcpCle !== false)) opt.mcpCle = nCle;
+    if (Object.keys(opt).length) etapes.push(["Accès Claude (MCP)", () => api("POST", `/clients/${c.nom}/options`, opt)]);
+    if (!etapes.length) return ($("#m-erreur").textContent = "Rien n'a changé.");
+    await executer(`Modules de ${c.nom}`, async () => {
       const sorties = [];
       let ok = true;
-      for (const [nom, f] of etapes) {
-        const r = await f();
-        ok = ok && r.ok;
-        sorties.push(`${nom} : ${r.sortie || r.message || (r.ok ? "fait" : "échec")}`);
+      for (const [nom, fn] of etapes) {
+        const x = await fn();
+        ok = ok && x.ok;
+        sorties.push(`${nom} : ${x.ok ? x.sortie || "enregistré" : x.sortie || x.message || "échec"}`);
       }
       return { ok, sortie: sorties.join("\n") };
     });
+  });
+}
+
+// Essai (dans le Résumé) : jours restants, 0 = client normal.
+function blocEssai(c) {
+  const jours = c.essaiFin ? Math.max(joursRestants(c.essaiFin), 0) : 0;
+  return `<form id="f-essai" class="ligne-zs" novalidate><div><b>Essai</b> ${aide("r-a-essai", "Change la fin de l'essai à partir d'aujourd'hui. 0 = ce n'est plus un essai (client normal, plus de pause automatique). Un client mis en pause par la fin d'essai se rouvre avec « Réactiver ».")}
+      <small>${c.essaiFin ? `jusqu'au ${e(dateFr(c.essaiFin))}` : "pas d'essai : client normal"}</small></div>
+      <div class="actions"><div class="suffixe"><input id="r-essai" type="number" min="0" max="3650" value="${jours}" aria-label="Jours d'essai restants"><span>jours</span></div>
+      <button class="btn" type="submit">Changer</button></div></form>`;
+}
+function brancherEssai(c) {
+  const f = $("#f-essai");
+  if (!f) return;
+  const jours = c.essaiFin ? Math.max(joursRestants(c.essaiFin), 0) : 0;
+  f.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const n = Number($("#r-essai").value || 0);
+    if (n === jours && !(c.essaiFin && n === 0)) return;
+    executer(`Essai de ${c.nom}`, () => api("POST", `/clients/${c.nom}/essai`, { jours: n }));
   });
 }
 
@@ -2058,7 +2251,10 @@ function afficherVente() {
     ${v.manques.length ? `<p class="sub">Il manque encore : ${e(v.manques.join(", "))}.</p>` : `<p class="sub">Toutes les informations obligatoires sont remplies.</p>`}
     <ul class="liste-offres">${offres || "<li>Aucune offre.</li>"}</ul>
     <p class="liens-vente">${liens}</p></div>`;
-  $("#vente-modifier").addEventListener("click", fenetreVente);
+  $("#vente-modifier").addEventListener("click", async () => {
+    await chargerMods().catch(() => null);
+    fenetreVente();
+  });
 }
 
 const CHAMPS_VENTE = [
@@ -2080,11 +2276,14 @@ function ligneOffre(o, i) {
     <div class="deux">
       <div class="champ"><label>Nom</label><input type="text" data-k="nom" maxlength="40" value="${e(o.nom)}"></div>
       <div class="champ"><label>Prix par mois ${aide(`vo-p${i}`, "En euros. Vide = « Sur devis ».")}<div class="suffixe"><input type="number" data-k="prix" min="0" step="0.01" value="${o.prix ?? ""}" placeholder="sur devis"><span>€</span></div></div>
-      <div class="champ"><label>Utilisateurs ${aide(`vo-u${i}`, "Nombre de comptes compris. 0 = selon le besoin.")}<input type="number" data-k="utilisateurs" min="0" value="${o.utilisateurs ?? 0}"></div>
-      <div class="champ"><label>Lectures IA par mois ${aide(`vo-l${i}`, "Lectures de factures par IA comprises avec ta clé. 0 = pas de lecture par IA. Ce chiffre est affiché ; le vrai quota se règle dans « Lecture des factures par IA ».")}<input type="number" data-k="lectures" min="0" value="${o.lectures ?? 0}"></div>
+      <div class="champ"><label>Utilisateurs ${aide(`vo-u${i}`, "Nombre de comptes compris. 0 = selon le besoin. Mis au client quand tu appliques l'offre (onglet Modules).")}<input type="number" data-k="utilisateurs" min="0" value="${o.utilisateurs ?? 0}"></div>
+      <div class="champ"><label>Lectures IA par mois ${aide(`vo-l${i}`, "Lectures de factures par IA comprises avec ta clé. 0 = pas de lecture par IA. Affiché sur la page Tarifs, et mis au client quand tu appliques l'offre (onglet Modules).")}<input type="number" data-k="lectures" min="0" value="${o.lectures ?? 0}"></div>
     </div>
     <div class="champ"><label>Description</label><input type="text" data-k="texte" maxlength="200" value="${e(o.texte ?? "")}"></div>
     <div class="champ"><label class="case"><input type="checkbox" data-k="mcp" ${o.mcp ? "checked" : ""}> Accès MCP (Claude) compris</label></div>
+    ${MODS ? `<details class="offre-modules"><summary>Modules et limites compris</summary>
+      <p class="sub">Ce que « Appliquer » (onglet Modules d'un client) coche et règle d'un coup. Une limite vide = pas de limite.</p>
+      ${arbreModules(`vo${i}`, { coupes: new Set(o.modules?.coupes ?? []), limites: o.modules?.limites ?? {} })}</details>` : ""}
     <button class="btn petit" type="button" data-retirer="${i}">Retirer cette offre</button></fieldset>`;
 }
 
@@ -2118,10 +2317,19 @@ function fenetreVente() {
   const lireOffres = () =>
     [...document.querySelectorAll("[data-offre]")].map((f) => {
       const val = (k) => f.querySelector(`[data-k="${k}"]`);
-      return { nom: val("nom").value.trim(), prix: val("prix").value === "" ? null : Number(val("prix").value), utilisateurs: Number(val("utilisateurs").value || 0), lectures: Number(val("lectures").value || 0), texte: val("texte").value.trim(), mcp: val("mcp").checked };
+      const arbre = f.querySelector(".arbre-modules");
+      const mods = arbre ? lireArbre(arbre) : null;
+      if (mods) mods.limites = Object.fromEntries(Object.entries(mods.limites).filter(([, v]) => v));
+      return { nom: val("nom").value.trim(), prix: val("prix").value === "" ? null : Number(val("prix").value), utilisateurs: Number(val("utilisateurs").value || 0), lectures: Number(val("lectures").value || 0), texte: val("texte").value.trim(), mcp: val("mcp").checked, modules: mods ?? f._modules };
     });
   const dessiner = () => {
     $("#ve-offres").innerHTML = offres.map(ligneOffre).join("");
+    // Sans la liste des modules (moteur injoignable), on garde ceux déjà réglés tels quels.
+    document.querySelectorAll("[data-offre]").forEach((f, i) => {
+      f._modules = offres[i]?.modules;
+      const a = f.querySelector(".arbre-modules");
+      if (a) brancherArbre(a);
+    });
     $("#ve-ajouter").disabled = offres.length >= 6;
   };
   dessiner();

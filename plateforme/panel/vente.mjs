@@ -8,6 +8,7 @@
 // Le moteur sert GET /vente et POST /vente ; le panel affiche les pages.
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
+import { MODULES, nettoyerOffre } from "./modules.mjs";
 
 export class RefusVente extends Error {}
 
@@ -38,6 +39,16 @@ export const PAR_DEFAUT = {
   enVigueur: "",
   majLe: null,
 };
+
+/** Ce que comprend une offre, en une phrase (modules coupés retirés, limite de recettes). */
+function compris(o) {
+  const coupes = new Set(o.modules?.coupes ?? []);
+  const actif = (m) => !coupes.has(m.cle) && !(m.parent && coupes.has(m.parent));
+  const noms = MODULES.filter((m) => !["utilisateurs", "roles", "imports", "import-recipekeeper", "import-json", "import-video", "themes"].includes(m.cle) && actif(m)).map((m) => m.nom.toLowerCase());
+  const n = o.modules?.limites?.recettes;
+  const recettes = n ? `Jusqu'à ${n.toLocaleString("fr-FR")} recettes` : "Recettes sans limite";
+  return noms.length ? `${recettes}, ${noms.slice(0, -1).join(", ")}${noms.length > 1 ? " et " : ""}${noms.at(-1)}` : recettes;
+}
 
 const fichier = (donnees) => `${donnees}/vente/vente.json`;
 
@@ -87,6 +98,8 @@ export function nettoyer(c) {
       lectures: entier(o.lectures, 0, 100000, `${nom}, lectures IA`) ?? 0,
       mcp: Boolean(o.mcp),
       texte: texte(o.texte, 200, `${nom}, description`),
+      // Modules et limites appliqués d'un coup à un client (onglet Modules → « Appliquer une offre »).
+      modules: nettoyerOffre(o.modules),
     };
   });
   if (!["franchise", "assujetti"].includes(c.tva)) throw new RefusVente("TVA : franchise ou assujetti.");
@@ -163,7 +176,7 @@ export function page(nom, v, { domaine, cssUrl }) {
       ${o.texte ? `<p>${echapper(o.texte)}</p>` : ""}
       <ul>
         <li>${o.utilisateurs ? `Jusqu'à ${o.utilisateurs} utilisateur${o.utilisateurs > 1 ? "s" : ""}` : "Utilisateurs selon le besoin"}</li>
-        <li>Recettes, coûts de revient, marges, fournisseurs et factures</li>
+        <li>${echapper(compris(o))}</li>
         <li>${o.lectures ? `${o.lectures} lectures de factures par IA par mois` : o.prix == null ? "Lectures de factures par IA selon le besoin" : "Saisie des factures à la main"}</li>
         ${o.mcp ? "<li>Accès pour Claude (MCP)</li>" : ""}
         <li>Sauvegarde chaque nuit, mises à jour et support compris</li>

@@ -6,6 +6,7 @@ import { ErreurPasserelle, clientParCle, equipe, inviter, retirer, renvoyer } fr
 import { annoncesPour } from "./annonces.mjs";
 import { ajouterMessage, creerDemande, listerDemandes, marquerLu } from "./support.mjs";
 import { noterEtat, quota, relayer, relayerAutre } from "./ia.mjs";
+import { modulesPour } from "./modules.mjs";
 
 const PORT = Number(process.env.PORT || 8000);
 
@@ -41,12 +42,15 @@ async function traiter(req, res) {
 
   if (chemin === "/v1/equipe" && req.method === "GET") return repondre(res, 200, await equipe(nom));
   if (chemin === "/v1/equipe" && req.method === "POST") {
+    // Module « Utilisateurs » coupé dans le panel : le responsable ne peut inviter personne.
+    if ((await modulesPour(nom)).coupes.includes("utilisateurs")) return repondre(res, 403, { error: "module", message: "Les utilisateurs ne sont pas compris dans ton offre RecipeLog." });
     const { email, nom: nomAffiche } = await lireJson(req);
     return repondre(res, 201, await inviter(nom, email, nomAffiche));
   }
   // Maintenance et bandeaux (lot 6) : lus par l'appli toutes les 30 secondes.
   if (chemin === "/v1/annonces" && req.method === "GET") return repondre(res, 200, await annoncesPour(nom));
   // Lecture des factures par IA (lot 7) : quota du mois, et relais vers Claude avec la clé de la plateforme.
+  if (chemin === "/v1/modules" && req.method === "GET") return repondre(res, 200, await modulesPour(nom));
   if (chemin === "/v1/ia/quota" && req.method === "GET") return repondre(res, 200, await quota(nom));
   if (chemin === "/v1/ia/anthropic/v1/messages" && req.method === "POST") return relayer(nom, req, res, url.search);
   if (chemin === "/v1/ia/openai/v1/responses" && req.method === "POST") return relayerAutre(nom, req, res, "openai");
