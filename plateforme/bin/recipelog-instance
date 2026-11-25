@@ -1215,7 +1215,7 @@ vitrine_reglages() {
   contact="${VITRINE_CONTACT:-${ADMIN_EMAILS%%,*}}"
   local destinataire="${VITRINE_DESTINATAIRE:-${ADMIN_EMAILS%%,*}}"
   existe demo && demo="https://demo.${DOMAINE}"
-  printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s", connexionUrl: "/connexion" };\n' "${demo}" "${contact}" > "${r}/config.js"
+  printf '// Écrit par recipelog-instance vitrine (gardé aux mises à jour).\nwindow.VITRINE = { demoUrl: "%s", contactEmail: "%s", connexionUrl: "/connexion", pagesLegales: true };\n' "${demo}" "${contact}" > "${r}/config.js"
   printf '%s' "${contact}" > "${r}/contact"
   # Formulaire « Nous écrire » : même compte d'envoi que la plateforme (Brevo).
   de="$(printf '%s' "${SMTP_EXPEDITEUR:-}" | sed -n 's/.*<\([^>]*\)>.*/\1/p')"
