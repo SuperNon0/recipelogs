@@ -21,12 +21,30 @@ describe("vente : réglages", () => {
       tva: "franchise",
       essai: "14",
       annuel: 2,
-      offres: [{ nom: "Solo", prix: "19.5", utilisateurs: 1, lectures: 10, mcp: 1, texte: "" }],
+      offres: [
+        {
+          nom: "Solo",
+          prix: "19.5",
+          utilisateurs: 1,
+          lectures: 10,
+          mcp: 1,
+          texte: "",
+          modules: { coupes: ["roles", "inconnu", "roles"], limites: { recettes: 200, cahiers: -1, marquePdf: true } },
+        },
+      ],
       enVigueur: "2026-12-01",
       publie: true,
     });
     expect(v.identite.nom).toBe("Noé Martin");
-    expect(v.offres[0]).toEqual({ nom: "Solo", prix: 19.5, utilisateurs: 1, lectures: 10, mcp: true, texte: "" });
+    expect(v.offres[0]).toEqual({
+      nom: "Solo",
+      prix: 19.5,
+      utilisateurs: 1,
+      lectures: 10,
+      mcp: true,
+      texte: "",
+      modules: { coupes: ["roles"], limites: { recettes: 200, marquePdf: true } },
+    });
     expect(v.manques).toEqual([]);
     expect(JSON.parse(readFileSync(join(d, "vente", "vente.json"), "utf8")).essai).toBe(14);
     expect(() => vente.nettoyer({ ...v, identite: { email: "pas-un-mail" } })).toThrow(/e-mail/);
