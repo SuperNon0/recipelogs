@@ -31,6 +31,7 @@ import { deleteRecipe, deleteRecipes, duplicateRecipe, toggleFavorite } from "@/
 import { assignRecipesToFolder } from "@/app/actions/settings";
 import { formatG } from "@/lib/format";
 import { useCan, useModule } from "@/components/auth/Permissions";
+import { demander, prevenir } from "@/components/ui/demander";
 
 export type FolderOption = { id: number; name: string; color: string };
 
@@ -100,14 +101,14 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
       },
     ];
 
-    const remove = () => {
+    const remove = async () => {
       const nv = opts.variants ? opts.variants.members.length - 1 : (r.variantCount ?? 0);
       const isRoot = opts.variants ? opts.variants.rootId === r.id : true;
       const variantNote = nv > 0 && isRoot ? "\n\nSes variantes restent reliées : la plus ancienne devient la version principale." : "";
-      if (!confirm(`Supprimer définitivement « ${r.name} » ?${variantNote}\n\nCette action est irréversible.`)) return;
+      if (!await demander(`Supprimer définitivement « ${r.name} » ?${variantNote}\n\nCette action est irréversible.`)) return;
       startTransition(async () => {
         const res = opts.onPage ? await deleteRecipe(r.id) : await deleteRecipes([r.id]);
-        if (res && !res.ok) return alert(res.error);
+        if (res && !res.ok) return prevenir(res.error);
         if (!opts.onPage) router.refresh();
       });
     };
@@ -158,7 +159,7 @@ export function useRecipeMenu(r: RecipeMenuTarget, opts: { onPage?: boolean; var
                 onSelect: () =>
                   startTransition(async () => {
                     const res = await duplicateRecipe(r.id);
-                    if (res && !res.ok) alert(res.error);
+                    if (res && !res.ok) prevenir(res.error);
                   }),
               },
               { label: variantsLabel, icon: GitBranch, submenu: variantsMenu },

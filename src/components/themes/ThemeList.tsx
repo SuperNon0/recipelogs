@@ -27,6 +27,7 @@ import {
   setDefaultPdfTheme,
 } from "@/app/actions/pdfThemes";
 import { FONT_LABELS, RECIPE_LAYOUT_LABELS, PAPER_LABELS, type CookbookTheme } from "@/lib/pdf/theme";
+import { demander } from "@/components/ui/demander";
 
 export type ThemeCard = {
   id: number;
@@ -92,8 +93,8 @@ export function ThemeList({ themes, recipes }: { themes: ThemeCard[]; recipes: R
         ? [{
             label: "Revenir à l'original",
             icon: RotateCcw,
-            onSelect: () => {
-              if (confirm(`Remettre « ${t.name} » dans son état d'origine ? Tes modifications de ce thème seront perdues.`)) {
+            onSelect: async () => {
+              if (await demander(`Remettre « ${t.name} » dans son état d'origine ? Tes modifications de ce thème seront perdues.`)) {
                 run(() => resetPdfTheme(t.id));
               }
             },
@@ -107,8 +108,8 @@ export function ThemeList({ themes, recipes }: { themes: ThemeCard[]; recipes: R
         icon: Trash2,
         danger: true,
         disabled: themes.length <= 1,
-        onSelect: () => {
-          if (confirm(`Supprimer le thème « ${t.name} » ?`)) run(() => deletePdfTheme(t.id));
+        onSelect: async () => {
+          if (await demander(`Supprimer le thème « ${t.name} » ?`)) run(() => deletePdfTheme(t.id));
         },
       },
     ],

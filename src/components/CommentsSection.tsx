@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { addComment, deleteComment } from "@/app/actions/recipes";
 import { Help } from "./ui/Help";
+import { demander } from "@/components/ui/demander";
 
 type CommentItem = {
   id: number;
@@ -69,8 +70,8 @@ export function CommentsSection({
                 className="fl-btn fl-btn-ghost fl-btn-icon"
                 style={{ width: 30, height: 30 }}
                 aria-label="Supprimer la note"
-                onClick={() => {
-                  if (confirm("Supprimer cette note ?")) startTransition(() => deleteComment(c.id, recipeId));
+                onClick={async () => {
+                  if (await demander("Supprimer cette note ?")) startTransition(() => deleteComment(c.id, recipeId));
                 }}
               >
                 <Trash2 size={15} />

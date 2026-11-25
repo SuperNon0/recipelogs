@@ -23,6 +23,7 @@ import type { ActionResult } from "@/lib/actionResult";
 import { PERMISSIONS, permissionGroups, STATUS_LABEL } from "@/lib/auth/permissions";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
+import { demander } from "@/components/ui/demander";
 
 export type RoleInfo = {
   id: number;
@@ -85,8 +86,8 @@ export function AccountsManager({
   const [editing, setEditing] = useState<RoleInfo | "new" | null>(null);
 
   /** Lance une action, affiche son erreur éventuelle et recharge la page. */
-  const run = (fn: () => Promise<ActionResult & { notice?: string }>, confirmText?: string) => {
-    if (confirmText && !confirm(confirmText)) return;
+  const run = async (fn: () => Promise<ActionResult & { notice?: string }>, confirmText?: string) => {
+    if (confirmText && !await demander(confirmText)) return;
     setError(null);
     setNotice(null);
     start(async () => {

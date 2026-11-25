@@ -3,10 +3,11 @@
 import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { deleteCookbook } from "@/app/actions/cookbooks";
+import { demander } from "@/components/ui/demander";
 
 /** Demande confirmation puis supprime le cahier (les recettes sont conservées). */
-export function confirmDeleteCookbook(cookbookName: string): boolean {
-  return confirm(
+export async function confirmDeleteCookbook(cookbookName: string): Promise<boolean> {
+  return await demander(
     `Supprimer définitivement le cahier « ${cookbookName} » ? Les recettes elles-mêmes ne sont pas supprimées.`,
   );
 }
@@ -24,8 +25,8 @@ export function DeleteCookbookButton({
     <button
       type="button"
       disabled={pending}
-      onClick={() => {
-        if (confirmDeleteCookbook(cookbookName)) startTransition(() => deleteCookbook(cookbookId));
+      onClick={async () => {
+        if (await confirmDeleteCookbook(cookbookName)) startTransition(() => deleteCookbook(cookbookId));
       }}
       className="fl-btn fl-btn-danger"
     >

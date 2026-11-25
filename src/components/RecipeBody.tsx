@@ -37,6 +37,7 @@ import { Help } from "./ui/Help";
 import { useCan, useModule } from "./auth/Permissions";
 import { ContextArea, MoreButton, type MenuSpec } from "./ui/Menu";
 import { AddSubRecipeDialog, SUB_MODE_HELP } from "./AddSubRecipeModal";
+import { demander } from "@/components/ui/demander";
 
 // ─────────────────────────────────────────────
 // Types
@@ -578,8 +579,8 @@ function SubRows({
         label: "Retirer de la recette",
         icon: XCircle,
         danger: true,
-        onSelect: () => {
-          if (confirm(`Retirer la sous-recette « ${sr.label} » ? La recette d'origine n'est pas supprimée.`)) {
+        onSelect: async () => {
+          if (await demander(`Retirer la sous-recette « ${sr.label} » ? La recette d'origine n'est pas supprimée.`)) {
             startTransition(() => removeSubRecipe(sr.id, parentId));
           }
         },
@@ -1056,7 +1057,7 @@ function MultiplierCard({
     setCoefInput(String(next).replace(".", ","));
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!dirty) return;
     const k = globalCoef.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
     // Vers un seul moule : il devient le moule d'origine. Sinon le moule enregistré ne correspond plus.
@@ -1067,7 +1068,7 @@ function MultiplierCard({
         ? "\n\nLe moule d'origine est effacé : les nouvelles quantités ne correspondent plus à ce moule."
         : "";
     const msg = `Enregistrer les quantités ×${k} comme nouvelle base de la recette ?${hasSubRecipes ? "\n\nLes sous-recettes liées ne sont pas modifiées." : ""}${moldNote}`;
-    if (!confirm(msg)) return;
+    if (!await demander(msg)) return;
     setSaveError(null);
     // La masse visée couvre aussi les sous-recettes, qui ne sont pas modifiées :
     // l'ajustement au gramme près ne vaut que pour une recette sans sous-recette.

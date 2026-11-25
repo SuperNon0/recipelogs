@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { clearRecipeHistory } from "@/app/actions/history";
+import { demander } from "@/components/ui/demander";
 
 /** Vide l'historique des recettes ouvertes, après confirmation. */
 export function ClearHistoryButton() {
@@ -12,8 +13,8 @@ export function ClearHistoryButton() {
       type="button"
       className="fl-btn fl-btn-ghost"
       disabled={pending}
-      onClick={() => {
-        if (confirm("Vider l'historique ? Les recettes ne sont pas touchées.")) start(() => clearRecipeHistory());
+      onClick={async () => {
+        if (await demander("Vider l'historique ? Les recettes ne sont pas touchées.")) start(() => clearRecipeHistory());
       }}
     >
       <Trash2 size={16} /> Vider

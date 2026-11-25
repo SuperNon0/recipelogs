@@ -11,6 +11,7 @@ import { formatEuro } from "@/lib/cost";
 import type { loadPurchaseOrder } from "@/lib/purchaseOrders";
 import { Help } from "@/components/ui/Help";
 import { InvoiceFormModal, PriceFormModal, type EditablePrice } from "./ManageForms";
+import { demander } from "@/components/ui/demander";
 
 type Order = NonNullable<Awaited<ReturnType<typeof loadPurchaseOrder>>>;
 
@@ -55,8 +56,8 @@ export function InvoiceDetail({ order }: { order: Order }) {
             type="button"
             className="fl-btn fl-btn-danger"
             disabled={pending}
-            onClick={() => {
-              if (!confirm("Supprimer cette facture ?\n\nSes prix sortent de l'historique ; les produits qui ne sont sur aucune autre facture sont retirés.")) return;
+            onClick={async () => {
+              if (!await demander("Supprimer cette facture ?\n\nSes prix sortent de l'historique ; les produits qui ne sont sur aucune autre facture sont retirés.")) return;
               start(async () => {
                 const r = await deleteInvoice(order.id);
                 if (!r.ok) return setError(r.error);
@@ -154,7 +155,7 @@ export function InvoiceDetail({ order }: { order: Order }) {
                   type="button"
                   className="fl-btn fl-btn-ghost"
                   disabled={pending}
-                  onClick={() => confirm("Retirer le fichier joint ?") && start(async () => { await removeInvoiceAttachment(order.id); router.refresh(); })}
+                  onClick={async () => (await demander("Retirer le fichier joint ?")) && start(async () => { await removeInvoiceAttachment(order.id); router.refresh(); })}
                 >
                   <X size={15} /> Retirer
                 </button>

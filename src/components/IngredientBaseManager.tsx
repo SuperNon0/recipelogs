@@ -35,6 +35,7 @@ import {
 import { ContextArea, MoreButton, useActionMenu, type MenuSpec } from "@/components/ui/Menu";
 import { Help } from "@/components/ui/Help";
 import { MergeIngredientModal, RenameIngredientModal } from "@/components/settings/IngredientModals";
+import { demander } from "@/components/ui/demander";
 
 type IngredientCategory = "base" | "fruit" | "preparation" | null;
 
@@ -109,8 +110,8 @@ export function IngredientBaseManager({
 
   // ─── Actions sur un ingrédient ─────────────────────────────────────────────
 
-  function handleDelete(id: number, name: string) {
-    if (!confirm(`Supprimer « ${name} » de la base ?\n\nLes recettes qui utilisent cet ingrédient ne sont pas modifiées.`)) return;
+  async function handleDelete(id: number, name: string) {
+    if (!await demander(`Supprimer « ${name} » de la base ?\n\nLes recettes qui utilisent cet ingrédient ne sont pas modifiées.`)) return;
     setError(null);
     startTransition(async () => {
       const r = await deleteIngredientBase(id);
@@ -173,10 +174,10 @@ export function IngredientBaseManager({
     });
   }
 
-  function handleBulkDelete() {
+  async function handleBulkDelete() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (!confirm(`Supprimer ${ids.length} ingrédient${ids.length > 1 ? "s" : ""} de la base ?\n\nLes recettes qui les utilisent ne sont pas modifiées. Cette action est irréversible.`)) return;
+    if (!await demander(`Supprimer ${ids.length} ingrédient${ids.length > 1 ? "s" : ""} de la base ?\n\nLes recettes qui les utilisent ne sont pas modifiées. Cette action est irréversible.`)) return;
     setError(null);
     startTransition(async () => {
       const r = await deleteIngredientBasesBulk(ids);
@@ -197,7 +198,7 @@ export function IngredientBaseManager({
       ids.length === 1 && m.sourceIds.length === 1
         ? `Fusionner ${m.label} dans « ${target.name} » ?\n\nToutes les recettes qui utilisent ${m.label} seront mises à jour avec « ${target.name} ». Cette action est irréversible.`
         : `Fusionner ${ids.length} ingrédient${ids.length > 1 ? "s" : ""} dans « ${target.name} » ?\n\nToutes les recettes concernées seront mises à jour avec « ${target.name} ». Cette action est irréversible.`;
-    if (!confirm(msg)) return null;
+    if (!await demander(msg)) return null;
     const r = ids.length === 1 && m.sourceIds.length === 1
       ? await mergeIngredientBases(ids[0], target.id)
       : await mergeIngredientBasesBulk(ids, target.id);

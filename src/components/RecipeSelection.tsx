@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { ListChecks, Trash2, X } from "lucide-react";
 import { deleteRecipes } from "@/app/actions/recipes";
+import { demander } from "@/components/ui/demander";
 
 /**
  * Sélection multiple de recettes + suppression en lot.
@@ -85,10 +86,10 @@ export function RecipeSelectionProvider({
 
   const isSelected = useCallback((id: number) => selected.has(id), [selected]);
 
-  function handleDelete() {
+  async function handleDelete() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    const ok = confirm(
+    const ok = await demander(
       `Supprimer ${ids.length} recette${ids.length > 1 ? "s" : ""} ?\n\nCette action est irréversible.`,
     );
     if (!ok) return;

@@ -40,6 +40,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Mercuriales : jusqu'à 20 pages par défaut, et jusqu'à 50 si ton offre le prévoit",
       "Certaines offres ajoutent un petit « Fait avec RecipeLog » en bas à droite des PDF (recette, cahier, fiche de production)",
     ],
+    fixes: [
+      "Les aides « ? » ne se ferment plus en touchant à côté ou en faisant défiler la page : seulement avec leur croix (ou en retouchant le « ? »), comme toutes les fenêtres. Ouvrir une autre aide ferme la précédente",
+      "Les fenêtres ne se ferment plus avec la touche Échap : seulement avec leur croix, pour ne jamais perdre ce qu'on est en train de remplir",
+      "Supprimer une recette, un cahier, une liste, un thème, une note, retirer une sous-recette… : la confirmation est maintenant une vraie fenêtre RecipeLog, plus la petite boîte grise du navigateur",
+      "RecipeLog en ligne, partie Prix fournisseurs non comprise dans l'offre : Claude ne voit plus le coût ni la marge des recettes, comme sur la fiche recette",
+      "Lecture des factures et mercuriales avec ChatGPT : la réponse arrive maintenant au fil de l'eau, comme avec Gemini, pour qu'une longue mercuriale ne soit plus coupée au bout de 5 minutes",
+    ],
   },
   {
     version: "V2.26",

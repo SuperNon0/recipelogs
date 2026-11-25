@@ -8,6 +8,7 @@ import { ContextArea, MoreButton, type MenuEntry, type MenuSpec } from "@/compon
 import { EmptyState } from "@/components/EmptyState";
 import type { ActionResult } from "@/lib/actionResult";
 import { DATA_COLORS, NameColorModal } from "./NameColorModal";
+import { demander } from "@/components/ui/demander";
 
 export type ColoredItem = { id: number; name: string; color: string; count: number };
 
@@ -71,8 +72,8 @@ export function ColoredItemList({
     });
   }
 
-  function handleDelete(item: ColoredItem) {
-    if (!confirm(confirmDelete(item))) return;
+  async function handleDelete(item: ColoredItem) {
+    if (!await demander(confirmDelete(item))) return;
     setError(null);
     startTransition(async () => {
       const r = await remove(item.id);
