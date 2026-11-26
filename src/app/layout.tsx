@@ -5,6 +5,7 @@ import { AppSidebar, AppTabBar, AppTopBar, type NavCounts } from "@/components/A
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { ZoomReset } from "@/components/ZoomReset";
 import { AppGuard } from "@/components/AppGuard";
+import { DemarrageRapide } from "@/components/DemarrageRapide";
 import { getSiteUrl } from "@/app/actions/settings";
 import { prisma } from "@/lib/prisma";
 import { APPLE_TOUCH_ICON } from "@/lib/apple-touch-icon";
@@ -200,6 +201,7 @@ export default async function RootLayout({
         </PermissionsProvider>
         <ZoomReset />
         <AppGuard />
+        <DemarrageRapide actif={process.env.RECIPELOG_DEMARRAGE_RAPIDE_OFF !== "1"} />
         {authMode() === "oidc" && viewer.kind === "account" && <SessionKeeper />}
         {encreJs}
       </body>
