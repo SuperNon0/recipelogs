@@ -11,6 +11,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.30",
+    date: "2026-11-26",
+    title: "Copier-coller des recettes entre deux RecipeLog",
+    summary:
+      "Pour emporter des recettes dans un autre RecipeLog, tu peux maintenant les copier puis les coller de l'autre côté, sans passer par un fichier. C'est le plus simple sur téléphone ; le téléchargement d'un fichier reste possible.",
+    features: [
+      "Réglages → Exporter des recettes : nouveau bouton « Copier » à côté de « Télécharger », qui met les recettes cochées (et leurs sous-recettes) dans le presse-papiers",
+      "Réglages → Import JSON : nouvelle case « Coller ici ». Colle les recettes copiées, la liste des recettes trouvées s'affiche, puis touche « Importer ». Choisir un fichier .json marche toujours",
+    ],
+  },
+  {
     version: "V2.29",
     date: "2026-11-26",
     title: "Rappels de commande et numéros des fournisseurs",
