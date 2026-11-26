@@ -150,6 +150,7 @@ const OUTILS: Record<string, ModuleCle> = {
   enregistrer_mercuriale: "mercuriales",
   passer_commande: "commandes",
   lister_commandes: "commandes",
+  a_commander_aujourd_hui: "commandes",
   voir_commande: "commandes",
   supprimer_commande: "commandes",
   produits_vendus: "ventes",

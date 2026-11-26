@@ -3037,3 +3037,12 @@ button.fl-row:hover {
     font-size: 16px !important;
   }
 }
+
+/* Fiche fournisseur : numéros à appeler (un bouton par numéro, appel direct). */
+.sup-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  width: 100%;
+}

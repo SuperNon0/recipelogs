@@ -11,6 +11,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.29",
+    date: "2026-11-26",
+    title: "Rappels de commande et numéros des fournisseurs",
+    summary:
+      "Règle les jours où tu commandes chez chaque fournisseur : ces jours-là, l'accueil te rappelle « À commander aujourd'hui », avec un bouton pour commander. Chaque fournisseur peut aussi avoir un ou plusieurs numéros de téléphone : touche-en un pour appeler.",
+    features: [
+      "Fiche d'un fournisseur → Modifier : « Jours de commande » et « Jours de livraison », à cocher de lundi à dimanche",
+      "Accueil et page Commandes : « À commander aujourd'hui » liste les fournisseurs dont c'est le jour, avec quand ils livrent (« livré demain ») et un bouton « Commander ». Une fois la commande passée dans RecipeLog, le fournisseur est coché « Commandé aujourd'hui »",
+      "Fiche d'un fournisseur → Modifier : « Numéros à appeler », un ou plusieurs (commercial, standard, livreur…). Sur la fiche, touche un numéro pour appeler directement depuis ton téléphone",
+      "Mes fournisseurs : les jours de commande s'affichent sous chaque fournisseur",
+      "Claude (connecteur RecipeLog) : modifier_fournisseur et creer_fournisseur règlent les jours de commande, de livraison et les numéros ; voir_fournisseur les montre ; nouvel outil a_commander_aujourd_hui",
+    ],
+  },
+  {
     version: "V2.28",
     date: "2026-11-25",
     title: "Ce que je commande d'habitude",

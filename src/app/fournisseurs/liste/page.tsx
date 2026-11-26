@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { requirePage } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import { SupplierList } from "@/components/suppliers/SupplierList";
+import { parseJours } from "@/lib/orderDays";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function SupplierListPage() {
       id: true,
       name: true,
       note: true,
+      orderDays: true,
       _count: { select: { products: true, orders: { where: { manual: false } } } },
       orders: { where: { manual: false }, orderBy: { date: "desc" }, take: 1, select: { date: true } },
     },
@@ -29,6 +31,7 @@ export default async function SupplierListPage() {
           id: s.id,
           name: s.name,
           note: s.note,
+          orderDays: parseJours(s.orderDays),
           products: s._count.products,
           invoices: s._count.orders,
           lastInvoice: s.orders[0]?.date.toISOString().slice(0, 10) ?? null,

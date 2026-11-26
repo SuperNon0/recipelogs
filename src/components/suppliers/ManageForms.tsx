@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 import { PRICE_UNITS, formatEuro, type PriceUnit } from "@/lib/cost";
 import { SUPPLIER_FAMILIES } from "@/lib/suppliers";
 import { PACK_NAMES, packNameOf } from "@/lib/supplierOrders";
+import { JOURS } from "@/lib/orderDays";
+import { MAX_CONTACTS, type Contact } from "@/lib/supplierContacts";
 import {
   addPrice,
   addProduct,
@@ -147,30 +149,75 @@ export function ConfirmModal({
 // Fournisseur
 // ─────────────────────────────────────────────
 
-/** Créer (sans `supplier`) ou modifier un fournisseur : nom et remarque. */
+/** Groupe de champs (boutons, plusieurs lignes) avec son « ? » : un div, pas un label (un label enverrait le clic au premier bouton). */
+function FieldGroup({ label, help, children }: { label: string; help: { title: string; text: React.ReactNode; example?: React.ReactNode }; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
+      <span className="fl-label" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        <Help title={help.title} example={help.example}>
+          {help.text}
+        </Help>
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** Sept boutons Lun … Dim à cocher. */
+function DayPicker({ value, onChange, label }: { value: number[]; onChange: (v: number[]) => void; label: string }) {
+  return (
+    <div role="group" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {JOURS.map((j) => {
+        const on = value.includes(j.n);
+        return (
+          <button
+            key={j.n}
+            type="button"
+            className="fl-chip"
+            aria-pressed={on}
+            aria-label={j.nom}
+            onClick={() => onChange(on ? value.filter((x) => x !== j.n) : [...value, j.n].sort((a, b) => a - b))}
+          >
+            {j.court}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+type SupplierEdit = { id: number; name: string; note: string | null; orderDays?: number[]; deliveryDays?: number[]; contacts?: Contact[] };
+
+/** Créer (sans `supplier`) ou modifier un fournisseur : nom, numéros à appeler, jours de commande et de livraison, remarque. */
 export function SupplierFormModal({
   supplier,
   onClose,
   onSaved,
 }: {
-  supplier?: { id: number; name: string; note: string | null };
+  supplier?: SupplierEdit;
   onClose: () => void;
   onSaved?: (id: number) => void;
 }) {
   const [name, setName] = useState(supplier?.name ?? "");
   const [note, setNote] = useState(supplier?.note ?? "");
+  const [orderDays, setOrderDays] = useState<number[]>(supplier?.orderDays ?? []);
+  const [deliveryDays, setDeliveryDays] = useState<number[]>(supplier?.deliveryDays ?? []);
+  const [contacts, setContacts] = useState<Contact[]>(supplier?.contacts?.length ? supplier.contacts : [{ nom: "", tel: "" }]);
+  const setContact = (i: number, c: Partial<Contact>) => setContacts((l) => l.map((x, k) => (k === i ? { ...x, ...c } : x)));
   return (
     <FormModal
       title={supplier ? "Modifier le fournisseur" : "Nouveau fournisseur"}
       submitLabel={supplier ? "Enregistrer" : "Créer le fournisseur"}
       onClose={onClose}
       onSubmit={async () => {
+        const data = { name, note, orderDays, deliveryDays, contacts: contacts.filter((c) => c.tel.trim()) };
         if (supplier) {
-          const r = await editSupplier(supplier.id, { name, note });
+          const r = await editSupplier(supplier.id, data);
           if (r.ok) onSaved?.(supplier.id);
           return r;
         }
-        const r = await addSupplier({ name, note });
+        const r = await addSupplier(data);
         if (!r.ok) return r;
         onSaved?.(r.id);
         return { ok: true };
@@ -186,12 +233,78 @@ export function SupplierFormModal({
       >
         <input className="fl-input" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!supplier} required maxLength={120} />
       </Field>
+      <FieldGroup
+        label="Numéros à appeler"
+        help={{
+          title: "Numéros à appeler",
+          text: "Un ou plusieurs numéros de téléphone, avec qui répond (commercial, standard, livreur…). Sur la fiche du fournisseur, touche un numéro pour appeler directement depuis ton téléphone.",
+          example: "Commercial : 06 12 34 56 78 · Standard : 04 66 51 60 06",
+        }}
+      >
+        <div style={{ display: "grid", gap: 6 }}>
+          {contacts.map((c, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 6 }}>
+              <input
+                className="fl-input"
+                value={c.nom}
+                placeholder="Qui (commercial…)"
+                aria-label="Qui répond à ce numéro"
+                maxLength={80}
+                onChange={(e) => setContact(i, { nom: e.target.value })}
+              />
+              <input
+                className="fl-input"
+                type="tel"
+                inputMode="tel"
+                value={c.tel}
+                placeholder="06 12 34 56 78"
+                aria-label="Numéro de téléphone"
+                maxLength={40}
+                onChange={(e) => setContact(i, { tel: e.target.value })}
+              />
+              <button
+                type="button"
+                className="fl-btn fl-btn-ghost fl-btn-icon"
+                aria-label="Retirer ce numéro"
+                onClick={() => setContacts((l) => (l.length > 1 ? l.filter((_, k) => k !== i) : [{ nom: "", tel: "" }]))}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+          {contacts.length < MAX_CONTACTS && (
+            <button type="button" className="fl-btn fl-btn-ghost" style={{ justifySelf: "start" }} onClick={() => setContacts((l) => [...l, { nom: "", tel: "" }])}>
+              <Plus size={15} /> Ajouter un numéro
+            </button>
+          )}
+        </div>
+      </FieldGroup>
+      <FieldGroup
+        label="Jours de commande"
+        help={{
+          title: "Jours de commande",
+          text: "Les jours où tu passes commande chez ce fournisseur. Ces jours-là, il apparaît dans « À commander aujourd'hui » sur l'accueil et sur la page Commandes, avec un bouton pour commander. Laisse tout décoché pour ne pas avoir de rappel.",
+          example: "Lun, Mer, Ven pour un fournisseur qui livre le lendemain.",
+        }}
+      >
+        <DayPicker value={orderDays} onChange={setOrderDays} label="Jours de commande" />
+      </FieldGroup>
+      <FieldGroup
+        label="Jours de livraison"
+        help={{
+          title: "Jours de livraison",
+          text: "Les jours où ce fournisseur livre. Le rappel dit alors quand arrive la commande (« livré demain », « livré samedi »).",
+          example: "Mar, Jeu, Sam",
+        }}
+      >
+        <DayPicker value={deliveryDays} onChange={setDeliveryDays} label="Jours de livraison" />
+      </FieldGroup>
       <Field
         label="Remarque"
         help={{
           title: "Remarque",
-          text: "Ce que tu veux retenir sur ce fournisseur : téléphone du commercial, jour de livraison, minimum de commande…",
-          example: "Livre le mardi et le vendredi, commande avant 14 h.",
+          text: "Ce que tu veux retenir sur ce fournisseur : minimum de commande, heure limite, code client…",
+          example: "Commande avant 14 h, franco 150 €.",
         }}
       >
         <textarea className="fl-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} />
