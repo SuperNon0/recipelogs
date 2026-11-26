@@ -167,7 +167,7 @@ function FieldGroup({ label, help, children }: { label: string; help: { title: s
 /** Sept boutons Lun … Dim à cocher. */
 function DayPicker({ value, onChange, label }: { value: number[]; onChange: (v: number[]) => void; label: string }) {
   return (
-    <div role="group" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+    <div role="group" aria-label={label} style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 4 }}>
       {JOURS.map((j) => {
         const on = value.includes(j.n);
         return (
@@ -175,6 +175,7 @@ function DayPicker({ value, onChange, label }: { value: number[]; onChange: (v: 
             key={j.n}
             type="button"
             className="fl-chip"
+            style={{ justifyContent: "center", padding: 0 }}
             aria-pressed={on}
             aria-label={j.nom}
             onClick={() => onChange(on ? value.filter((x) => x !== j.n) : [...value, j.n].sort((a, b) => a - b))}

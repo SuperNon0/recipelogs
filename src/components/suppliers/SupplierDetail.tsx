@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Combine, History, Layers, Package, Pencil, Phone, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Combine, History, Layers, Package, Pencil, Phone, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
@@ -97,7 +97,6 @@ export function SupplierDetail({
         )}
         {(supplier.orderDays.length > 0 || supplier.deliveryDays.length > 0) && (
           <p className="sub">
-            <CalendarDays size={14} style={{ verticalAlign: "-2px" }} />{" "}
             {[
               supplier.orderDays.length ? `Commande ${joursEnTexte(supplier.orderDays)}` : null,
               supplier.deliveryDays.length ? `livre ${joursEnTexte(supplier.deliveryDays)}` : null,
