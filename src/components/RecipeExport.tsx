@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, CircleAlert, CircleCheck, Download, Search } from "lucide-react";
+import { Check, CircleAlert, CircleCheck, Copy, Download, Search } from "lucide-react";
 import { exportRecipesJson } from "@/app/actions/export";
 import { foldText } from "@/lib/textSearch";
 import { Help } from "@/components/ui/Help";
+import { copyText } from "@/components/suppliers/copyText";
 
 type Item = { id: number; name: string; folder: { name: string; color: string } | null; categories: string[]; sous: number };
 
@@ -18,6 +19,8 @@ export function RecipeExport({ recettes }: { recettes: Item[] }) {
   const [sousRecettes, setSousRecettes] = useState(true);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  // Texte prêt quand la copie automatique a été refusée (vieux iPhone) : un second appui copie.
+  const [aCopier, setACopier] = useState<{ texte: string; nombre: number } | null>(null);
 
   // Recherche dans le nom, le dossier et les catégories, sans tenir compte des accents.
   const shown = useMemo(() => {
@@ -49,9 +52,15 @@ export function RecipeExport({ recettes }: { recettes: Item[] }) {
     });
   const withSubs = recettes.some((r) => selected.has(r.id) && r.sous > 0);
 
+  const resume = (nombre: number, ou: string) => {
+    const extra = nombre - selected.size;
+    return `${nombre} recette${nombre > 1 ? "s" : ""} ${ou}${extra > 0 ? ` (dont ${extra} sous-recette${extra > 1 ? "s" : ""} ajoutée${extra > 1 ? "s" : ""})` : ""}.`;
+  };
+
   const download = async () => {
     setPending(true);
     setResult(null);
+    setACopier(null);
     try {
       const r = await exportRecipesJson([...selected], sousRecettes);
       if (!r.ok) {
@@ -67,16 +76,66 @@ export function RecipeExport({ recettes }: { recettes: Item[] }) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      const extra = r.nombre - selected.size;
-      setResult({
-        ok: true,
-        text: `${r.nombre} recette${r.nombre > 1 ? "s" : ""} dans le fichier${extra > 0 ? ` (dont ${extra} sous-recette${extra > 1 ? "s" : ""} ajoutée${extra > 1 ? "s" : ""})` : ""}. Dans l'autre RecipeLog : Réglages → Import JSON.`,
-      });
+      setResult({ ok: true, text: `${resume(r.nombre, "dans le fichier")} Dans l'autre RecipeLog : Réglages → Import JSON.` });
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : "L'export a échoué." });
     } finally {
       setPending(false);
     }
+  };
+
+  const copierOk = (nombre: number) =>
+    setResult({
+      ok: true,
+      text: `${resume(nombre, "copiée" + (nombre > 1 ? "s" : ""))} Dans l'autre RecipeLog : Réglages → Import JSON → « Coller ici » → Importer.`,
+    });
+
+  // Copie dans le presse-papiers, à coller dans l'autre RecipeLog (plus simple sur téléphone).
+  const copy = async () => {
+    setPending(true);
+    setResult(null);
+    setACopier(null);
+    let nombre = 0;
+    const prepare = exportRecipesJson([...selected], sousRecettes).then((r) => {
+      if (!r.ok) throw new Error(r.error);
+      nombre = r.nombre;
+      return r.fichier;
+    });
+    try {
+      // Safari (iPhone) refuse de copier après une attente : on lui demande la copie
+      // tout de suite, avec un texte qui arrive ensuite.
+      let copie = false;
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write && window.isSecureContext) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "text/plain": prepare.then((t) => new Blob([t], { type: "text/plain" })) }),
+          ]);
+          copie = true;
+        } catch {
+          /* repli ci-dessous */
+        }
+      }
+      const texte = await prepare;
+      if (!copie) copie = await copyText(texte);
+      if (copie) copierOk(nombre);
+      else {
+        setACopier({ texte, nombre });
+        setResult({ ok: true, text: `${resume(nombre, "prête" + (nombre > 1 ? "s" : ""))} Touche « Copier maintenant ».` });
+      }
+    } catch (e) {
+      setResult({ ok: false, text: e instanceof Error ? e.message : "La copie a échoué." });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  // Second appui quand le navigateur a refusé la copie automatique.
+  const copierMaintenant = async () => {
+    if (!aCopier) return;
+    if (await copyText(aCopier.texte)) {
+      copierOk(aCopier.nombre);
+      setACopier(null);
+    } else setResult({ ok: false, text: "Le navigateur refuse la copie. Utilise « Télécharger » à la place." });
   };
 
   const n = selected.size;
@@ -185,7 +244,26 @@ export function RecipeExport({ recettes }: { recettes: Item[] }) {
         </div>
       )}
 
-      <div className="set-foot">
+      <div className="set-foot" style={{ alignItems: "center" }}>
+        <Help
+          title="Copier ou télécharger"
+          example="Sur ton téléphone : coche « Tarte au citron », touche « Copier », ouvre l'autre RecipeLog → Réglages → Import JSON, touche la case « Coller ici », colle, puis « Importer »."
+        >
+          Deux façons d&apos;emporter les recettes, au choix. « Copier » les met dans le presse-papiers :
+          dans l&apos;autre RecipeLog, ouvre Réglages → Import JSON et colle-les dans la case « Coller
+          ici ». C&apos;est le plus simple sur téléphone. « Télécharger » crée un fichier à choisir
+          là-bas avec « Choisir un fichier .json », pratique pour garder une copie ou l&apos;envoyer.
+        </Help>
+        {aCopier && (
+          <button type="button" className="fl-btn fl-btn-primary" onClick={copierMaintenant}>
+            <Copy size={15} />
+            Copier maintenant
+          </button>
+        )}
+        <button type="button" className="fl-btn fl-btn-secondary" onClick={copy} disabled={pending || n === 0}>
+          <Copy size={15} />
+          {n === 0 ? "Copier" : `Copier ${n} recette${n > 1 ? "s" : ""}`}
+        </button>
         <button type="button" className="fl-btn fl-btn-primary" onClick={download} disabled={pending || n === 0}>
           <Download size={15} />
           {pending ? "Préparation…" : n === 0 ? "Coche des recettes" : `Télécharger ${n} recette${n > 1 ? "s" : ""}`}

@@ -33,7 +33,7 @@ export default async function ImportJsonPage() {
       <div className="page-head">
         <h1>Import JSON</h1>
         <p className="sub">
-          Charge un fichier JSON exporté depuis RecipeLog ou converti depuis un autre format. Les
+          Charge un fichier JSON, ou colle les recettes copiées depuis un autre RecipeLog. Les
           recettes déjà présentes (même nom) sont ignorées.
         </p>
       </div>
@@ -41,7 +41,7 @@ export default async function ImportJsonPage() {
       <section className="fl-card" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 className="set-card-h">
           <FileJson size={17} />
-          Importer un fichier
+          Importer un fichier ou des recettes copiées
         </h2>
         <JsonRecipeImport />
       </section>

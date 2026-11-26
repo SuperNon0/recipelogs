@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CircleAlert, CircleCheck, Download, Upload } from "lucide-react";
+import { CircleAlert, CircleCheck, ClipboardPaste, Download, Upload } from "lucide-react";
+import { Help } from "@/components/ui/Help";
 import { importRecipesFromJson } from "@/app/actions/import";
 import type { ImportResult } from "@/app/actions/import";
 
@@ -14,6 +15,58 @@ export function JsonRecipeImport() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // Texte collé (copié depuis « Exporter des recettes » d'un autre RecipeLog), au lieu d'un fichier.
+  const [pasted, setPasted] = useState("");
+  const [source, setSource] = useState<"file" | "text" | null>(null);
+
+  // Lit le contenu (fichier ou texte collé) et prépare l'aperçu.
+  const analyse = (text: string): boolean => {
+    try {
+      const parsed = JSON.parse(text);
+      // Fichier de « Exporter des recettes » (un autre RecipeLog) : { recipelog_export: 1, recettes: [...] }.
+      const list: JsonRecipe[] = Array.isArray(parsed?.recettes) ? parsed.recettes : Array.isArray(parsed) ? parsed : [parsed];
+      if (list.length === 0 || !list[0]?.name) {
+        setParseError("Format non reconnu : vérifie que c'est bien une liste de recettes.");
+        setPreview(null);
+        return false;
+      }
+      setParseError(null);
+      setPreview(list);
+      return true;
+    } catch {
+      setParseError("Texte JSON invalide : recopie tout, du premier au dernier caractère.");
+      setPreview(null);
+      return false;
+    }
+  };
+
+  const handlePaste = (text: string) => {
+    setPasted(text);
+    setResult(null);
+    if (!text.trim()) {
+      setParseError(null);
+      if (source === "text") {
+        setPreview(null);
+        setSource(null);
+      }
+      return;
+    }
+    // Un texte collé remplace un fichier choisi avant.
+    setFileName(null);
+    if (inputRef.current) inputRef.current.value = "";
+    setSource("text");
+    analyse(text);
+  };
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) handlePaste(text);
+      else setParseError("Le presse-papiers est vide : copie d'abord les recettes dans l'autre RecipeLog.");
+    } catch {
+      setParseError("Le navigateur ne laisse pas lire le presse-papiers : appuie longuement dans la case puis « Coller ».");
+    }
+  };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -21,37 +74,33 @@ export function JsonRecipeImport() {
     if (!file) return;
     setResult(null);
     setParseError(null);
+    setPasted("");
+    setSource("file");
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target?.result as string);
-        // Fichier de « Exporter des recettes » (un autre RecipeLog) : { recipelog_export: 1, recettes: [...] }.
-        const list: JsonRecipe[] = Array.isArray(parsed?.recettes) ? parsed.recettes : Array.isArray(parsed) ? parsed : [parsed];
-        if (list.length === 0 || !list[0]?.name) {
-          setParseError("Format non reconnu : vérifie que le fichier est bien un tableau de recettes.");
-          setPreview(null);
-          return;
-        }
-        setPreview(list);
-      } catch {
-        setParseError("Fichier JSON invalide.");
-        setPreview(null);
-      }
+      if (!analyse(ev.target?.result as string)) setParseError("Fichier JSON invalide ou format non reconnu.");
     };
     reader.readAsText(file);
   };
 
   const handleImport = async () => {
-    if (!inputRef.current?.files?.[0] || !preview) return;
+    if (!preview) return;
+    const file =
+      source === "text"
+        ? new File([pasted], "recettes-collees.json", { type: "application/json" })
+        : inputRef.current?.files?.[0];
+    if (!file) return;
     setLoading(true);
     setResult(null);
     const formData = new FormData();
-    formData.append("file", inputRef.current.files[0]);
+    formData.append("file", file);
     try {
       const res = await importRecipesFromJson(formData);
       setResult(res);
       setPreview(null);
       setFileName(null);
+      setPasted("");
+      setSource(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
       setResult({ ok: false, imported: 0, skipped: 0, errors: [e instanceof Error ? e.message : "Erreur inconnue"] });
@@ -76,6 +125,39 @@ export function JsonRecipeImport() {
           <small>Un tableau de recettes : name, ingredients, steps, notes, source</small>
         </span>
       </label>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span className="fl-label" style={{ margin: 0 }}>
+            Ou colle les recettes copiées
+          </span>
+          <Help
+            title="Coller des recettes"
+            example="Dans l'autre RecipeLog : Réglages → Exporter des recettes → coche « Tarte au citron » → « Copier ». Ici : touche « Coller ici » (ou appuie longuement dans la case → Coller), puis « Importer »."
+          >
+            Plus simple sur téléphone qu&apos;un fichier : dans l&apos;autre RecipeLog, « Exporter des
+            recettes » → « Copier » met les recettes dans le presse-papiers. Colle-les ici : la liste des
+            recettes trouvées s&apos;affiche, puis touche « Importer ». Tu peux aussi coller un texte JSON
+            préparé par une IA.
+          </Help>
+          <button type="button" className="fl-btn fl-btn-secondary" style={{ marginLeft: "auto" }} onClick={pasteFromClipboard}>
+            <ClipboardPaste size={15} />
+            Coller ici
+          </button>
+        </div>
+        <textarea
+          className="fl-input"
+          value={pasted}
+          onChange={(e) => handlePaste(e.target.value)}
+          placeholder="Appuie longuement ici puis « Coller »…"
+          rows={4}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          aria-label="Recettes copiées à coller"
+          style={{ fontFamily: "var(--font-mono)", fontSize: 16, resize: "vertical", minHeight: 96 }}
+        />
+      </div>
 
       {parseError && (
         <div className="set-alert">
