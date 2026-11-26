@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SHARE_ENABLED } from "@/lib/features";
 import { PATH_HEADER, SEARCH_HEADER } from "@/lib/auth/path";
+import { BUILD_ID } from "@/lib/appGuard";
 
 
 /**
@@ -52,7 +53,11 @@ export function middleware(req: NextRequest) {
   const headers = new Headers(req.headers);
   headers.set(PATH_HEADER, path);
   headers.set(SEARCH_HEADER, req.nextUrl.search);
-  return NextResponse.next({ request: { headers } });
+  const res = NextResponse.next({ request: { headers } });
+  // Démarrage rapide (public/sw.js) : la copie de l'accueil gardée sur le
+  // téléphone sait de quelle version du site elle vient.
+  if (BUILD_ID) res.headers.set("x-recipelog-build", BUILD_ID);
+  return res;
 }
 
 const OAUTH_WELL_KNOWN: [string, string][] = [

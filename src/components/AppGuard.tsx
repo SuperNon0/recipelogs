@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { debloquerSiRienDOuvert } from "@/components/ui/overlay";
+import { EVENEMENT_NOUVELLE_VERSION } from "@/components/DemarrageRapide";
 import { BUILD_ID, doitRecharger, estErreurDeVersion, rechargerUneFois } from "@/lib/appGuard";
 
 /**
@@ -91,7 +92,12 @@ export function AppGuard() {
       if (estErreurDeVersion(e.reason)) rechargerUneFois();
     };
 
+    // 3 ter. Démarrage rapide : la copie affichée vient d'une ancienne version
+    // et une saisie est en cours (DemarrageRapide) : on propose de recharger.
+    const versionDeLaCopie = () => setNouvelle(true);
+
     document.addEventListener("visibilitychange", auRetour);
+    window.addEventListener(EVENEMENT_NOUVELLE_VERSION, versionDeLaCopie);
     window.addEventListener("pageshow", pageAffichee);
     window.addEventListener("error", surErreur);
     window.addEventListener("unhandledrejection", surRejet);
@@ -103,6 +109,7 @@ export function AppGuard() {
     }, 15 * 60 * 1000);
     return () => {
       document.removeEventListener("visibilitychange", auRetour);
+      window.removeEventListener(EVENEMENT_NOUVELLE_VERSION, versionDeLaCopie);
       window.removeEventListener("pageshow", pageAffichee);
       window.removeEventListener("error", surErreur);
       window.removeEventListener("unhandledrejection", surRejet);
