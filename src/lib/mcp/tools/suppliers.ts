@@ -29,6 +29,7 @@ import { attachInvoiceFile, createUploadLink, removeInvoiceFile } from "@/lib/in
 import { currentOrigin } from "@/lib/auth/service";
 import { deletePendingInvoice, finishPendingInvoice, getPendingInvoice, listPendingInvoices, readPendingPage } from "@/lib/pendingInvoices";
 import { DELETE, READ, WRITE, id, js, parseArgs, text, type McpTool } from "./helpers";
+import { JOURS, jourDepuisTexte } from "@/lib/orderDays";
 import type { McpToolResult } from "../protocol";
 import { texteDuPdf } from "@/lib/pdfTexte";
 
@@ -83,6 +84,35 @@ const toLine = (l: z.infer<typeof lineSchema>) => ({
   lineTotal: l.montant_ligne,
   ingredient: l.ingredient,
   packName: l.conditionnement,
+});
+
+// Jours de commande / de livraison et numéros à appeler (creer_fournisseur, modifier_fournisseur).
+const JOURS_JS = (description: string) => ({ type: "array", items: { type: "string" }, description });
+const CONTACTS_JS = {
+  type: "array",
+  description: "Numéros à appeler (remplacent tous les anciens ; liste vide pour les effacer)",
+  items: { type: "object", properties: { nom: js.str("Qui répond (Commercial, Standard…)"), tel: js.str("Numéro de téléphone") }, required: ["tel"] },
+};
+const joursZ = z
+  .array(z.union([z.string(), z.number()]))
+  .max(7)
+  .transform((l, ctx) => {
+    const out: number[] = [];
+    for (const j of l) {
+      const n = typeof j === "number" ? j : jourDepuisTexte(j);
+      if (!n || n < 1 || n > 7) {
+        ctx.addIssue({ code: "custom", message: `jour inconnu : ${j} (lundi … dimanche)` });
+        return z.NEVER;
+      }
+      out.push(n);
+    }
+    return out;
+  });
+const contactsZ = z.array(z.object({ nom: z.string().max(80).optional(), tel: z.string().max(40) })).max(10);
+const joursSortie = (s: { orderDays: number[]; deliveryDays: number[]; contacts: { nom: string; tel: string }[] }) => ({
+  ...(s.orderDays.length ? { jours_commande: s.orderDays.map((n) => JOURS[n - 1].nom) } : {}),
+  ...(s.deliveryDays.length ? { jours_livraison: s.deliveryDays.map((n) => JOURS[n - 1].nom) } : {}),
+  ...(s.contacts.length ? { contacts: s.contacts } : {}),
 });
 
 export const SUPPLIER_TOOLS: McpTool[] = [
@@ -509,6 +539,8 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       return text({
         id: s.id,
         nom: s.name,
+        ...(s.note ? { note: s.note } : {}),
+        ...joursSortie(s),
         produits_trouves: matching.length,
         ...(matching.length > PER ? { page: a.page, pages: Math.ceil(matching.length / PER) } : {}),
         produits: pageItems.map((p) => ({
@@ -741,13 +773,28 @@ export const SUPPLIER_TOOLS: McpTool[] = [
       "Crée un fournisseur vide (sans facture). Inutile avant enregistrer_facture, qui crée le fournisseur tout seul. Ensuite : ajouter_produit_fournisseur pour lui ajouter des produits et leurs prix.",
     inputSchema: {
       type: "object",
-      properties: { nom: js.str("Nom du fournisseur"), note: js.str("Remarque libre (jour de livraison, contact…)") },
+      properties: {
+        nom: js.str("Nom du fournisseur"),
+        note: js.str("Remarque libre (minimum de commande, heure limite…)"),
+        jours_commande: JOURS_JS("Jours où l'on commande (« lundi », « mercredi »…) : rappel « À commander aujourd'hui » dans l'appli"),
+        jours_livraison: JOURS_JS("Jours où il livre (« mardi », « jeudi »…)"),
+        contacts: CONTACTS_JS,
+      },
       required: ["nom"],
     },
     annotations: WRITE,
     run: async (args) => {
-      const a = parseArgs(z.object({ nom: z.string().trim().min(1).max(120), note: z.string().max(2000).optional() }), args);
-      const s = await createSupplier({ name: a.nom, note: a.note });
+      const a = parseArgs(
+        z.object({
+          nom: z.string().trim().min(1).max(120),
+          note: z.string().max(2000).optional(),
+          jours_commande: joursZ.optional(),
+          jours_livraison: joursZ.optional(),
+          contacts: contactsZ.optional(),
+        }),
+        args,
+      );
+      const s = await createSupplier({ name: a.nom, note: a.note, orderDays: a.jours_commande, deliveryDays: a.jours_livraison, contacts: a.contacts });
       refresh();
       return text({ fournisseur_id: s.id, nom: s.name });
     },
@@ -757,26 +804,44 @@ export const SUPPLIER_TOOLS: McpTool[] = [
     name: "modifier_fournisseur",
     title: "Renommer ou modifier un fournisseur",
     description:
-      "Renomme un fournisseur et / ou change sa remarque. Ses produits, ses prix et ses factures restent. Refusé si un autre fournisseur porte déjà ce nom (pour réunir deux fournisseurs, demande à l'utilisateur).",
+      "Renomme un fournisseur, change sa remarque, ses jours de commande et de livraison (rappel « À commander aujourd'hui » dans l'appli) ou ses numéros à appeler. Seuls les champs donnés changent. Ses produits, ses prix et ses factures restent. Refusé si un autre fournisseur porte déjà ce nom (pour réunir deux fournisseurs, demande à l'utilisateur).",
     inputSchema: {
       type: "object",
       properties: {
         id: js.int("Id du fournisseur (voir comparer_prix_fournisseurs)"),
         nom: js.str("Nouveau nom"),
         note: js.str("Nouvelle remarque (texte vide pour l'effacer)"),
+        jours_commande: JOURS_JS("Jours où l'on commande, ex. [\"lundi\", \"mercredi\", \"vendredi\"] (liste vide = aucun rappel)"),
+        jours_livraison: JOURS_JS("Jours où il livre, ex. [\"mardi\", \"jeudi\", \"samedi\"] (liste vide pour les effacer)"),
+        contacts: CONTACTS_JS,
       },
       required: ["id"],
     },
     annotations: WRITE,
     run: async (args) => {
       const a = parseArgs(
-        z.object({ id, nom: z.string().trim().min(1).max(120).optional(), note: z.string().max(2000).optional() }),
+        z.object({
+          id,
+          nom: z.string().trim().min(1).max(120).optional(),
+          note: z.string().max(2000).optional(),
+          jours_commande: joursZ.optional(),
+          jours_livraison: joursZ.optional(),
+          contacts: contactsZ.optional(),
+        }),
         args,
       );
-      if (a.nom === undefined && a.note === undefined) throw new Error("rien à changer : donne nom ou note");
-      const s = await updateSupplier(a.id, { name: a.nom, note: a.note });
+      if ([a.nom, a.note, a.jours_commande, a.jours_livraison, a.contacts].every((v) => v === undefined)) {
+        throw new Error("rien à changer : donne nom, note, jours_commande, jours_livraison ou contacts");
+      }
+      const s = await updateSupplier(a.id, {
+        name: a.nom,
+        note: a.note,
+        orderDays: a.jours_commande,
+        deliveryDays: a.jours_livraison,
+        contacts: a.contacts,
+      });
       refresh();
-      return text({ fournisseur_id: s.id, nom: s.name, note: s.note });
+      return text({ fournisseur_id: s.id, nom: s.name, note: s.note, ...joursSortie(s) });
     },
   },
 

@@ -18,7 +18,16 @@ const frDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("f
 const s = (n: number) => (n > 1 ? "s" : "");
 
 /** Page Commandes : choisir un fournisseur pour commander, et l'historique des commandes. */
-export function OrderHistory({ orders, suppliers }: { orders: SupplierOrderListItem[]; suppliers: { id: number; name: string; products: number }[] }) {
+export function OrderHistory({
+  orders,
+  suppliers,
+  rappel,
+}: {
+  orders: SupplierOrderListItem[];
+  suppliers: { id: number; name: string; products: number }[];
+  /** Bloc « À commander aujourd'hui », affiché sous le titre. */
+  rappel?: React.ReactNode;
+}) {
   const can = useCan();
   return (
     <>
@@ -33,6 +42,7 @@ export function OrderHistory({ orders, suppliers }: { orders: SupplierOrderListI
           </Help>
         </p>
       </div>
+      {rappel}
       {can("costs.edit") && (
         <>
           <div className="sect-title">

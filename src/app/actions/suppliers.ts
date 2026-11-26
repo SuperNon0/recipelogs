@@ -24,6 +24,7 @@ import {
   searchableProducts,
   type ProductChoice,
   type SearchableProduct,
+  type JoursInput,
 } from "@/lib/purchaseOrders";
 import { INVOICE_MAX_BYTES, invoiceExt, removeInvoiceFile, saveInvoiceFile } from "@/lib/invoiceFiles";
 import { deballerFichier } from "@/lib/envoiFichier";
@@ -96,7 +97,7 @@ async function edit(fn: () => Promise<unknown>): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function addSupplier(data: { name: string; note?: string | null }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+export async function addSupplier(data: { name: string; note?: string | null } & JoursInput): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   await requireAccess("costs.edit");
   try {
     const s = await createSupplier(data);
@@ -107,7 +108,7 @@ export async function addSupplier(data: { name: string; note?: string | null }):
   }
 }
 
-export async function editSupplier(id: number, data: { name?: string; note?: string | null }): Promise<ActionResult> {
+export async function editSupplier(id: number, data: { name?: string; note?: string | null } & JoursInput): Promise<ActionResult> {
   await requireAccess("costs.edit");
   return edit(() => updateSupplier(id, data));
 }

@@ -21,6 +21,10 @@ import {
 } from "@/lib/recipes";
 import { listPdfThemes } from "@/lib/pdfThemes";
 import { requirePage } from "@/lib/auth/guard";
+import { viewerCan } from "@/lib/auth/viewer";
+import { moduleActif } from "@/lib/modules";
+import { rappelsCommandes } from "@/lib/orderReminders";
+import { OrderReminder } from "@/components/suppliers/OrderReminder";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +33,7 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePage("read");
+  const viewer = await requirePage("read");
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : undefined;
   const tag = typeof sp.tag === "string" ? sp.tag : undefined;
@@ -45,7 +49,9 @@ export default async function HomePage({
   const hasFilters = !!(q || tag || categoryId);
 
   const showRecent = folderFilter === undefined && !hasFilters;
-  const [tags, categories, folders, recipes, themes, hiddenVariants, recent] = await Promise.all([
+  // Rappel « À commander aujourd'hui » : sur l'accueil seulement, pour qui voit les prix fournisseurs.
+  const voitRappels = showRecent && viewerCan(viewer, "costs.view") && (await moduleActif("commandes"));
+  const [tags, categories, folders, recipes, themes, hiddenVariants, recent, rappels] = await Promise.all([
     listAllTags(),
     listAllCategories(),
     listAllFolders(),
@@ -53,6 +59,7 @@ export default async function HomePage({
     listPdfThemes(),
     hasFilters || withVariants ? 0 : countHiddenVariants(folderFilter),
     showRecent ? listRecipes({ recentlyViewed: 5 }) : [],
+    voitRappels ? rappelsCommandes() : null,
   ]);
 
   const currentFolder =
@@ -106,6 +113,8 @@ export default async function HomePage({
         </div>
 
         <RecipeFilters allTags={tags} allCategories={categories} />
+
+        {rappels && <OrderReminder jour={rappels.jour} rappels={rappels.rappels} peutCommander={viewerCan(viewer, "costs.edit")} />}
 
         {!inFolder && !hasFilters && folders.length > 0 && (
           <>

@@ -12,6 +12,8 @@ import { isPriceUnit, type PriceUnit } from "./cost";
 import { articleKey, articleOf, packLabel, packagingWarning, priceStats, unitPriceOf, type ComparisonProduct } from "./suppliers";
 
 import { purchaseLineAmounts } from "./purchaseLineSnapshot";
+import { parseJours, serialiseJours } from "./orderDays";
+import { contactsDepuisJson, nettoieContacts } from "./supplierContacts";
 
 type Tx = Prisma.TransactionClient;
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
@@ -592,17 +594,34 @@ async function supplierNameFree(tx: Tx, name: string, exceptId?: number) {
 }
 
 /** Nouveau fournisseur, tapé à la main. */
-export async function createSupplier(input: { name: string; note?: string | null }): Promise<{ id: number; name: string }> {
+export async function createSupplier(input: { name: string; note?: string | null } & JoursInput): Promise<{ id: number; name: string }> {
   const name = cleanText(input.name, 120);
   if (!name) throw new Error("Le nom du fournisseur est vide.");
   return prisma.$transaction(async (tx) => {
     await supplierNameFree(tx, name);
-    return tx.supplier.create({ data: { name, note: cleanText(input.note, 2000) }, select: { id: true, name: true } });
+    return tx.supplier.create({
+      data: {
+        name,
+        note: cleanText(input.note, 2000),
+        orderDays: serialiseJours(input.orderDays),
+        deliveryDays: serialiseJours(input.deliveryDays),
+        contacts: nettoieContacts(input.contacts),
+      },
+      select: { id: true, name: true },
+    });
   });
 }
 
 /** Renomme un fournisseur et / ou change sa remarque (ses produits et factures restent). */
-export async function updateSupplier(id: number, input: { name?: string; note?: string | null }) {
+/** Jours de commande / de livraison (1 = lundi … 7 = dimanche) ; liste vide = aucun. */
+export type JoursInput = {
+  orderDays?: number[] | null;
+  deliveryDays?: number[] | null;
+  /** Numéros à appeler ; donnés = remplacent tous les anciens. */
+  contacts?: { nom?: string | null; tel?: string | null }[] | null;
+};
+
+export async function updateSupplier(id: number, input: { name?: string; note?: string | null } & JoursInput) {
   return prisma.$transaction(async (tx) => {
     const s = await tx.supplier.findUnique({ where: { id }, select: { id: true } });
     if (!s) throw new Error("Fournisseur introuvable.");
@@ -614,7 +633,11 @@ export async function updateSupplier(id: number, input: { name?: string; note?: 
       data.name = name;
     }
     if (input.note !== undefined) data.note = cleanText(input.note, 2000);
-    return tx.supplier.update({ where: { id }, data, select: { id: true, name: true, note: true } });
+    if (input.orderDays !== undefined) data.orderDays = serialiseJours(input.orderDays);
+    if (input.deliveryDays !== undefined) data.deliveryDays = serialiseJours(input.deliveryDays);
+    if (input.contacts !== undefined) data.contacts = nettoieContacts(input.contacts);
+    const r = await tx.supplier.update({ where: { id }, data, select: { id: true, name: true, note: true, orderDays: true, deliveryDays: true, contacts: true } });
+    return { ...r, orderDays: parseJours(r.orderDays), deliveryDays: parseJours(r.deliveryDays), contacts: contactsDepuisJson(r.contacts) };
   });
 }
 
@@ -1047,6 +1070,9 @@ export async function loadSupplier(id: number) {
       id: true,
       name: true,
       note: true,
+      orderDays: true,
+      deliveryDays: true,
+      contacts: true,
       products: { select: productSelect, orderBy: { name: "asc" } },
       orders: {
         where: { manual: false },
@@ -1060,6 +1086,9 @@ export async function loadSupplier(id: number) {
     id: s.id,
     name: s.name,
     note: s.note,
+    orderDays: parseJours(s.orderDays),
+    deliveryDays: parseJours(s.deliveryDays),
+    contacts: contactsDepuisJson(s.contacts),
     products: s.products.map(toComparisonProduct),
     orders: s.orders.map((o) => ({
       id: o.id,

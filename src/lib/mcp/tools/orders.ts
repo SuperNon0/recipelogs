@@ -1,4 +1,6 @@
 import { revalidatePath } from "next/cache";
+import { rappelsCommandes } from "@/lib/orderReminders";
+import { JOURS } from "@/lib/orderDays";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { currentOrigin } from "@/lib/auth/service";
@@ -120,6 +122,23 @@ export const ORDER_TOOLS: McpTool[] = [
       const { id: orderId } = await createSupplierOrder({ supplierId: sid, signature: a.signature, deliveryDate: a.livraison, note: a.remarque, lines });
       revalidatePath("/fournisseurs", "layout");
       return text(orderView((await loadSupplierOrder(orderId))!));
+    },
+  },
+  {
+    name: "a_commander_aujourd_hui",
+    title: "Fournisseurs à qui commander aujourd'hui",
+    description:
+      "Les fournisseurs dont c'est le jour de commande aujourd'hui (heure française), d'après les jours réglés sur leur fiche (modifier_fournisseur, jours_commande), avec le prochain jour de livraison et s'ils ont déjà une commande enregistrée aujourd'hui.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: READ,
+    run: async () => {
+      const r = await rappelsCommandes();
+      return text({
+        date: r.date,
+        jour: JOURS[r.jour - 1].nom,
+        a_commander: r.rappels.map((x) => ({ fournisseur_id: x.id, fournisseur: x.name, livraison: x.livraison, deja_commande: x.commandee })),
+        ...(r.rappels.length ? {} : { message: "Aucun fournisseur à commander aujourd'hui (ou jours de commande pas encore réglés)." }),
+      });
     },
   },
   {

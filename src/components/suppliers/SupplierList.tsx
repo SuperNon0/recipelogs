@@ -7,8 +7,9 @@ import { ChevronRight, Plus, ShoppingCart, Store } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { SupplierFormModal } from "./ManageForms";
+import { joursEnTexte } from "@/lib/orderDays";
 
-type Row = { id: number; name: string; note: string | null; products: number; invoices: number; lastInvoice: string | null };
+type Row = { id: number; name: string; note: string | null; orderDays: number[]; products: number; invoices: number; lastInvoice: string | null };
 
 /** Liste de tous les fournisseurs, avec « Nouveau fournisseur ». */
 export function SupplierList({ suppliers }: { suppliers: Row[] }) {
@@ -62,6 +63,7 @@ export function SupplierList({ suppliers }: { suppliers: Row[] }) {
                   `${r.products} produit${s(r.products)}`,
                   `${r.invoices} facture${s(r.invoices)}`,
                   r.lastInvoice ? `dernière le ${new Date(r.lastInvoice).toLocaleDateString("fr-FR")}` : null,
+                  r.orderDays.length ? `commande ${joursEnTexte(r.orderDays)}` : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}

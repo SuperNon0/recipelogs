@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Combine, History, Layers, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Combine, History, Layers, Package, Pencil, Phone, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
 import { useCan } from "@/components/auth/Permissions";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
@@ -20,6 +20,8 @@ import { GroupProductsModal } from "./GroupProducts";
 import { MergeDuplicatesModal, type ProduitAFusionner } from "./MergeDuplicates";
 import { doublonsProduits } from "@/lib/ia/rapprochement";
 import { articleKey } from "@/lib/suppliers";
+import { joursEnTexte } from "@/lib/orderDays";
+import { telLien } from "@/lib/supplierContacts";
 
 const PAGE = 150;
 
@@ -83,6 +85,26 @@ export function SupplierDetail({
           {supplier.orders.length > 1 ? "s" : ""}
           {total > 0 ? ` · ${formatEuro(total)} au total` : ""}
         </p>
+        {supplier.contacts.length > 0 && (
+          <p className="sup-contacts">
+            {supplier.contacts.map((c, i) => (
+              <a key={i} href={`tel:${telLien(c.tel)}`} className="fl-btn fl-btn-secondary">
+                <Phone size={15} /> {c.nom ? `${c.nom} · ` : ""}
+                {c.tel}
+              </a>
+            ))}
+          </p>
+        )}
+        {(supplier.orderDays.length > 0 || supplier.deliveryDays.length > 0) && (
+          <p className="sub">
+            {[
+              supplier.orderDays.length ? `Commande ${joursEnTexte(supplier.orderDays)}` : null,
+              supplier.deliveryDays.length ? `livre ${joursEnTexte(supplier.deliveryDays)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
         {supplier.note && <p className="sub" style={{ whiteSpace: "pre-line" }}>{supplier.note}</p>}
       </div>
       {editable && <FacturesATraiter factures={aTraiter} fournisseurs={[]} limite={0} fournisseur={{ id: supplier.id, name: supplier.name }} modes={modes} />}
@@ -198,7 +220,17 @@ export function SupplierDetail({
 
       {open && <ProductHistoryModal products={open.products} supplier={supplier.name} bases={bases} onClose={() => setOpenKey(null)} />}
       {modal === "edit" && (
-        <SupplierFormModal supplier={{ id: supplier.id, name: supplier.name, note: supplier.note }} onClose={() => setModal(null)} />
+        <SupplierFormModal
+          supplier={{
+            id: supplier.id,
+            name: supplier.name,
+            note: supplier.note,
+            orderDays: supplier.orderDays,
+            deliveryDays: supplier.deliveryDays,
+            contacts: supplier.contacts,
+          }}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal === "delete" && (
         <DeleteSupplierModal id={supplier.id} onClose={() => setModal(null)} onDeleted={() => router.push("/fournisseurs/liste")} />
