@@ -13,11 +13,16 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "V2.30",
     date: "2026-11-26",
-    title: "Copier-coller des recettes entre deux RecipeLog",
+    title: "Démarrage rapide de l'appli et copier-coller des recettes",
     summary:
-      "Pour emporter des recettes dans un autre RecipeLog, tu peux maintenant les copier puis les coller de l'autre côté, sans passer par un fichier. C'est le plus simple sur téléphone ; le téléchargement d'un fichier reste possible.",
+      "L'appli posée sur l'écran d'accueil du téléphone garde maintenant son interface sur l'appareil : quand l'iPhone l'a fermée, elle s'ouvre tout de suite sur l'accueil au lieu de tout retélécharger, puis se met à jour toute seule avec tes dernières données. Et pour emporter des recettes dans un autre RecipeLog, tu peux maintenant les copier puis les coller de l'autre côté, sans passer par un fichier.",
     features: [
-      "Réglages → Exporter des recettes : nouveau bouton « Copier » à côté de « Télécharger », qui met les recettes cochées (et leurs sous-recettes) dans le presse-papiers",
+      "Au lancement, l'accueil s'affiche aussitôt tel que tu l'as laissé, puis ses chiffres et ses listes se rafraîchissent d'eux-mêmes une seconde après",
+      "Le code de l'appli, les polices et les icônes restent sur le téléphone : plus besoin de les retélécharger à chaque ouverture",
+      "Après une mise à jour du site, la nouvelle version est téléchargée en arrière-plan, puis l'appli recharge une fois comme avant (ou propose « Recharger » si tu étais en train d'écrire)",
+      "Rien ne change pour la connexion : si ta session est finie, l'appli repasse par la page de connexion. Se déconnecter efface la copie gardée sur le téléphone",
+      "Seuls l'interface et l'accueil sont gardés : les autres pages et les recettes viennent toujours du site, il faut donc être connecté à Internet",
+      "Réglages → Exporter des recettes : nouveau bouton « Copier » à côté de « Télécharger », qui met les recettes cochées (et leurs sous-recettes) dans le presse-papiers. C'est le plus simple sur téléphone",
       "Réglages → Import JSON : nouvelle case « Coller ici ». Colle les recettes copiées, la liste des recettes trouvées s'affiche, puis touche « Importer ». Choisir un fichier .json marche toujours",
     ],
   },
