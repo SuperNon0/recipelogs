@@ -5,8 +5,8 @@ import { currentOrigin } from "@/lib/auth/service";
 import { groupProducts, mergeProducts } from "@/lib/purchaseOrders";
 import { doublonsProduits } from "@/lib/ia/rapprochement";
 import { articleKey, articleOf } from "@/lib/suppliers";
-import { orderUnits, qtyLabel } from "@/lib/supplierOrders";
-import { createSupplierOrder, deleteSupplierOrder, listSupplierOrders, loadSupplierOrder } from "@/lib/supplierOrdersDb";
+import { offerKey, orderUnits, priceVerdict, qtyLabel } from "@/lib/supplierOrders";
+import { createSupplierOrder, deleteSupplierOrder, listSupplierOrders, loadOrderCatalog, loadSupplierOrder } from "@/lib/supplierOrdersDb";
 import { loadSoldProducts } from "@/lib/soldProducts";
 import { DELETE, READ, WRITE, id, js, parseArgs, text, type McpTool } from "./helpers";
 
@@ -49,7 +49,8 @@ export const ORDER_TOOLS: McpTool[] = [
     description:
       "Prépare et enregistre une commande chez un fournisseur (comme le bouton « Passer une commande ») : rend le texte à envoyer au commercial et l'adresse du PDF, gardés dans l'historique des commandes. " +
       "Chaque ligne : produit_id (voir voir_fournisseur), ou produit = nom exact, ou article = nom commun (« Croissant ») quand la variante est au choix du commercial ; quantite ; unite = le conditionnement du produit (carton, sac, kg…, voir voir_fournisseur → conditionnement), par défaut celui du produit. " +
-      "Montre le texte à l'utilisateur avant de dire que c'est envoyé : RecipeLog n'envoie rien lui-même.",
+      "Montre le texte à l'utilisateur avant de dire que c'est envoyé : RecipeLog n'envoie rien lui-même. " +
+      "La réponse liste aussi moins_cher_ailleurs : les produits commandés qu'un autre fournisseur vend moins cher (même article, même unité de prix, dernier prix connu). Dis-le à l'utilisateur.",
     inputSchema: {
       type: "object",
       properties: {
@@ -119,7 +120,24 @@ export const ORDER_TOOLS: McpTool[] = [
       });
       const { id: orderId } = await createSupplierOrder({ supplierId: sid, signature: a.signature, deliveryDate: a.livraison, note: a.remarque, lines });
       revalidatePath("/fournisseurs", "layout");
-      return text(orderView((await loadSupplierOrder(orderId))!));
+      // Le même article moins cher chez un autre fournisseur ?
+      const catalog = await loadOrderCatalog(sid);
+      const moinsCher: { produit: string; ici: string; ailleurs: string; fournisseur: string; economie: string }[] = [];
+      for (const l of lines) {
+        if (l.productId == null) continue;
+        const p = catalog?.products.find((c) => c.id === l.productId);
+        if (!p) continue;
+        const v = priceVerdict(p.price, catalog!.offers[offerKey(p.article, p.priceUnit)]);
+        if (v?.kind !== "cheaper") continue;
+        moinsCher.push({
+          produit: p.name,
+          ici: `${p.price} €/${p.priceUnit}`,
+          ailleurs: `${v.offer.price} €/${v.offer.unit} (${v.offer.productName}, prix du ${v.offer.date ?? "?"})`,
+          fournisseur: v.offer.supplier,
+          economie: `-${v.pct} %`,
+        });
+      }
+      return text({ ...orderView((await loadSupplierOrder(orderId))!), moins_cher_ailleurs: moinsCher });
     },
   },
   {
