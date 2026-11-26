@@ -229,3 +229,45 @@ export function perWeekLabel(perWeek: number, unit: string): string {
   const q = perWeek >= 10 ? Math.round(perWeek) : perWeek >= 1 ? Math.round(perWeek * 2) / 2 : Math.round(perWeek * 10) / 10;
   return `≈ ${qtyLabel(q || 0.1, unit)} / semaine`;
 }
+
+// ─────────────────────────────────────────────
+// Le même article chez les autres fournisseurs
+// ─────────────────────────────────────────────
+
+/** Clé de comparaison entre fournisseurs : même article, même unité de prix (kg, L, pièce). */
+export const offerKey = (article: string, priceUnit: string) => `${articleKey(article)}|${priceUnit}`;
+
+/** Le même article chez un autre fournisseur : son dernier prix et ce que j'y commande d'habitude. */
+export type Offer = {
+  supplierId: number;
+  supplier: string;
+  productId: number;
+  productName: string;
+  /** Dernier prix connu, en € HT par unité de prix. */
+  price: number;
+  unit: string;
+  date: string | null;
+  /** Ce que j'y commande d'habitude (12 dernières semaines), dans l'unité statsUnit. */
+  stats: BuyStats | null;
+  statsUnit: string;
+};
+
+export type PriceVerdict =
+  /** Un autre fournisseur est moins cher (pct = économie en %). */
+  | { kind: "cheaper"; offer: Offer; pct: number }
+  /** Ici c'est le moins cher (ou le même prix) parmi `suppliers` fournisseurs. */
+  | { kind: "best"; suppliers: number }
+  /** Pas de prix ici, mais un prix connu ailleurs. */
+  | { kind: "elsewhere"; offer: Offer };
+
+/**
+ * Compare le prix d'ici aux autres fournisseurs (offres triées du moins cher
+ * au plus cher). Moins de 0,5 % d'écart compte comme le même prix.
+ */
+export function priceVerdict(price: number | null, offers: Offer[] | undefined): PriceVerdict | null {
+  if (!offers?.length) return null;
+  const best = offers.reduce((a, b) => (b.price < a.price ? b : a));
+  if (price == null || !(price > 0)) return { kind: "elsewhere", offer: best };
+  if (best.price < price * 0.995) return { kind: "cheaper", offer: best, pct: Math.max(1, Math.round(((price - best.price) / price) * 100)) };
+  return { kind: "best", suppliers: new Set(offers.map((o) => o.supplierId)).size + 1 };
+}

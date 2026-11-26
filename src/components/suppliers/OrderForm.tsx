@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Check, ChevronDown, ChevronRight, ClipboardCopy, FileText, Plus, Search, Send, ShoppingCart, TrendingUp, X } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ChevronRight, ClipboardCopy, FileText, Plus, Scale, Search, Send, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Help } from "@/components/ui/Help";
 import { formatEuro } from "@/lib/cost";
 import { OTHER_FAMILY, SUPPLIER_FAMILIES, articleKey } from "@/lib/suppliers";
-import { STATS_WEEKS, orderText, perWeekLabel, qtyLabel, unitEstimate, type BuyStats } from "@/lib/supplierOrders";
+import { STATS_WEEKS, offerKey, orderText, perWeekLabel, priceVerdict, qtyLabel, unitEstimate, type BuyStats, type Offer, type PriceVerdict } from "@/lib/supplierOrders";
 import type { CatalogProduct, OrderCatalog } from "@/lib/supplierOrdersDb";
 import { enregistrerCommande } from "@/app/actions/supplierOrders";
 import { copyText, useCanShare } from "./copyText";
@@ -37,6 +37,21 @@ type Group = {
 
 /** Fiche « ce que je commande d'habitude » ouverte. */
 type StatsView = { title: string; unit: string; stats: BuyStats; price?: { value: number; unit: string; date: string | null } | null };
+
+/** Fenêtre « Comparer » ouverte : le même article ici et chez les autres fournisseurs. */
+type CompareView = { article: string; here: CatalogProduct[]; offers: Offer[] };
+
+/** « le kg », « le L », « la pièce ». */
+const perUnit = (u: string) => (u === "pièce" ? "la pièce" : `le ${u}`);
+/** « (−13 %) » sans retour à la ligne avant le %. */
+const pctLabel = (pct: number) => `(−${pct}\u00a0%)`;
+
+/** La variante qui sert à comparer un article : celle dont le prix est le plus récent. */
+function repOf(products: CatalogProduct[]): CatalogProduct {
+  const priced = products.filter((p) => p.price != null);
+  if (!priced.length) return products[0];
+  return priced.slice().sort((a, b) => (b.priceDate ?? "").localeCompare(a.priceDate ?? "") || (a.price ?? 0) - (b.price ?? 0))[0];
+}
 
 const PAGE = 120;
 const plain = (s: string) => articleKey(s);
@@ -84,8 +99,8 @@ function byHabit(groups: Group[]): Group[] {
   return [...often, ...groups.filter((g) => g.score === 0)];
 }
 
-export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
-  const { supplier, products, lastArticles, articleStats } = catalog;
+export function OrderForm({ catalog, initialQuery = "" }: { catalog: OrderCatalog; initialQuery?: string }) {
+  const { supplier, products, lastArticles, articleStats, offers } = catalog;
   const baseGroups = useMemo(() => {
     const gs = buildGroups(products);
     // Un article à variantes compte aussi ce qui a été commandé sans choisir la variante.
@@ -100,13 +115,27 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
   const sortHabit = habit && hasHabits;
   const groups = useMemo(() => (sortHabit ? byHabit(baseGroups) : baseGroups), [baseGroups, sortHabit]);
   const [statsView, setStatsView] = useState<StatsView | null>(null);
+  const [compareView, setCompareView] = useState<CompareView | null>(null);
+  const offersOf = useCallback((p: CatalogProduct) => offers[offerKey(p.article, p.priceUnit)], [offers]);
+  const verdictOf = useCallback((p: CatalogProduct) => priceVerdict(p.price, offersOf(p)), [offersOf]);
+  /** Verdict d'un article (sa variante au prix le plus récent), pour la ligne et le filtre. */
+  const groupVerdicts = useMemo(() => new Map(groups.map((g) => [g.key, verdictOf(repOf(g.products))])), [groups, verdictOf]);
+  const cheaperCount = useMemo(() => [...groupVerdicts.values()].filter((v) => v?.kind === "cheaper").length, [groupVerdicts]);
+  const openCompare = useCallback(
+    (here: CatalogProduct[], article: string) => {
+      const rep = repOf(here);
+      setCompareView({ article, here: here.filter((p) => p.priceUnit === rep.priceUnit), offers: offersOf(rep) ?? [] });
+    },
+    [offersOf],
+  );
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const byGroupKey = useMemo(() => new Map(groups.map((g) => [g.key, g])), [groups]);
   const families = useMemo(() => [...new Set(groups.map((g) => g.family))], [groups]);
 
   const [picks, setPicks] = useState<Picks>({});
   const [loaded, setLoaded] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
+  const [cheapOnly, setCheapOnly] = useState(false);
   const [family, setFamily] = useState<string | null>(null);
   const [onlyMine, setOnlyMine] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -156,12 +185,13 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
     return groups.filter((g) => {
       if (family && g.family !== family) return false;
       if (onlyMine && !picks[aKey(g)] && !g.products.some((p) => picks[pKey(p.id)])) return false;
+      if (cheapOnly && groupVerdicts.get(g.key)?.kind !== "cheaper") return false;
       return words.every((w) => g.hay.includes(w));
     });
-  }, [groups, q, family, onlyMine, picks]);
+  }, [groups, q, family, onlyMine, cheapOnly, groupVerdicts, picks]);
 
   // Affichage par paquets : la page reste rapide même avec une mercuriale de 1 000 produits.
-  useEffect(() => setShown(PAGE), [q, family, onlyMine, sortHabit]);
+  useEffect(() => setShown(PAGE), [q, family, onlyMine, cheapOnly, sortHabit]);
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
@@ -188,6 +218,15 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
     return out.sort((a, b) => a.label.localeCompare(b.label, "fr"));
   }, [picks, byId, byGroupKey]);
   const total = lines.reduce((s, l) => s + (l.estimate ?? 0), 0);
+  // Dans « Ma commande » : les lignes moins chères chez un autre fournisseur.
+  const cheaperLines = useMemo(() => {
+    const out: Record<string, Extract<PriceVerdict, { kind: "cheaper" }>> = {};
+    for (const l of lines) {
+      const v = l.productId != null ? (byId.get(l.productId) ? verdictOf(byId.get(l.productId)!) : null) : groupVerdicts.get(l.key.slice(2)) ?? null;
+      if (v?.kind === "cheaper") out[l.key] = v;
+    }
+    return out;
+  }, [lines, byId, verdictOf, groupVerdicts]);
 
   let lastFamily = "";
   return (
@@ -227,6 +266,19 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
               <TrendingUp size={13} /> Les plus commandés
             </button>
           )}
+          {cheaperCount > 0 && (
+            <span className="ord-chip-help">
+              <button type="button" className="fl-chip" aria-pressed={cheapOnly} onClick={() => setCheapOnly((v) => !v)}>
+                <Scale size={13} /> Moins cher ailleurs ({cheaperCount})
+              </button>
+              <Help title="Moins cher ailleurs" example="Farine T45 : 0,92 € le kg ici, 0,80 € chez Soframa → « Moins cher chez Soframa (−13 %) ».">
+                Montre seulement les produits qu&apos;un autre de tes fournisseurs vend moins cher, d&apos;après le dernier prix connu chez
+                chacun (factures, mercuriales, prix tapés à la main). Deux produits sont comparés quand ils ont le même article
+                (« Farine T45 », « Crème 35 % ») et la même unité de prix (kg, L ou pièce). Touche l&apos;étiquette sous un produit pour voir
+                tous les prix et ce que tu commandes chez chacun.
+              </Help>
+            </span>
+          )}
           {families.length > 1 && (
             <>
               <button type="button" className="fl-chip" aria-pressed={family == null} onClick={() => setFamily(null)}>
@@ -264,14 +316,25 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
                     variantsPicked={g.products.filter((p) => picks[pKey(p.id)]).length}
                     expanded={open.has(g.key) || (!!q && !plain(g.article).includes(q))}
                     last={lastArticles[g.article.toLowerCase()] ?? null}
+                    verdict={groupVerdicts.get(g.key) ?? null}
+                    onCompare={openCompare}
                     onPick={setPick}
                     onToggle={toggle}
                   />
                   {(open.has(g.key) || (!!q && !plain(g.article).includes(q))) &&
-                    g.products.map((p) => <ProductRow key={p.id} product={p} pick={picks[pKey(p.id)]} variant onPick={setPick} onStats={setStatsView} />)}
+                    g.products.map((p) => (
+                      <ProductRow key={p.id} product={p} pick={picks[pKey(p.id)]} variant verdict={verdictOf(p)} onCompare={openCompare} onPick={setPick} onStats={setStatsView} />
+                    ))}
                 </>
               ) : (
-                <ProductRow product={g.products[0]} pick={picks[pKey(g.products[0].id)]} onPick={setPick} onStats={setStatsView} />
+                <ProductRow
+                  product={g.products[0]}
+                  pick={picks[pKey(g.products[0].id)]}
+                  verdict={groupVerdicts.get(g.key) ?? null}
+                  onCompare={openCompare}
+                  onPick={setPick}
+                  onStats={setStatsView}
+                />
               )}
             </div>
           );
@@ -301,11 +364,13 @@ export function OrderForm({ catalog }: { catalog: OrderCatalog }) {
       </div>
 
       {statsView && <StatsModal view={statsView} onClose={() => setStatsView(null)} />}
+      {compareView && <CompareModal view={compareView} supplier={supplier} onClose={() => setCompareView(null)} />}
 
       {review && (
         <ReviewModal
           supplier={supplier}
           lines={lines}
+          cheaper={cheaperLines}
           total={total}
           defaultSignature={catalog.signature}
           onRemove={(k) => setPick(k, null)}
@@ -363,12 +428,16 @@ const ProductRow = memo(function ProductRow({
   product: p,
   pick,
   variant,
+  verdict,
+  onCompare,
   onPick,
   onStats,
 }: {
   product: CatalogProduct;
   pick?: Pick;
   variant?: boolean;
+  verdict: PriceVerdict | null;
+  onCompare: (here: CatalogProduct[], article: string) => void;
   onPick: (k: string, p: Pick | null) => void;
   onStats: (v: StatsView) => void;
 }) {
@@ -385,11 +454,16 @@ const ProductRow = memo(function ProductRow({
       <span className="ord-name">
         <b>{p.name}</b>
         <small>{info.join(" · ")}</small>
-        {p.stats && (
-          <HabitChip
-            view={{ title: p.name, unit: p.units[0], stats: p.stats, price: p.price != null ? { value: p.price, unit: p.priceUnit, date: p.priceDate } : null }}
-            onStats={onStats}
-          />
+        {(p.stats || verdict) && (
+          <span className="ord-tags">
+            {p.stats && (
+              <HabitChip
+                view={{ title: p.name, unit: p.units[0], stats: p.stats, price: p.price != null ? { value: p.price, unit: p.priceUnit, date: p.priceDate } : null }}
+                onStats={onStats}
+              />
+            )}
+            {verdict && <PriceChip verdict={verdict} onClick={() => onCompare([p], p.article)} />}
+          </span>
         )}
       </span>
       <QtyButtons pick={pick} units={p.units} pickKey={pKey(p.id)} onPick={onPick} />
@@ -405,6 +479,8 @@ const ArticleRow = memo(function ArticleRow({
   variantsPicked,
   expanded,
   last,
+  verdict,
+  onCompare,
   onPick,
   onToggle,
 }: {
@@ -415,6 +491,8 @@ const ArticleRow = memo(function ArticleRow({
   variantsPicked: number;
   expanded: boolean;
   last: { quantity: number; unit: string } | null;
+  verdict: PriceVerdict | null;
+  onCompare: (here: CatalogProduct[], article: string) => void;
   onPick: (k: string, p: Pick | null) => void;
   onToggle: (k: string) => void;
 }) {
@@ -431,9 +509,10 @@ const ArticleRow = memo(function ArticleRow({
           </small>
         </span>
       </button>
-      {habit && (
-        <span className="ord-habit-art">
-          <HabitChip view={{ title: `${g.article} (toutes variantes)`, unit: habit.unit, stats: habit.stats }} onStats={onStats} />
+      {(habit || verdict) && (
+        <span className="ord-habit-art ord-tags">
+          {habit && <HabitChip view={{ title: `${g.article} (toutes variantes)`, unit: habit.unit, stats: habit.stats }} onStats={onStats} />}
+          {verdict && <PriceChip verdict={verdict} onClick={() => onCompare(g.products, g.article)} />}
         </span>
       )}
       <QtyButtons pick={pick} units={units} pickKey={aKey(g)} onPick={onPick} />
@@ -450,6 +529,7 @@ type Line = { key: string; label: string; reference: string | null; productId: n
 function ReviewModal({
   supplier,
   lines,
+  cheaper,
   total,
   defaultSignature,
   onRemove,
@@ -458,6 +538,7 @@ function ReviewModal({
 }: {
   supplier: { id: number; name: string };
   lines: Line[];
+  cheaper: Record<string, Extract<PriceVerdict, { kind: "cheaper" }>>;
   total: number;
   defaultSignature: string | null;
   onRemove: (key: string) => void;
@@ -524,6 +605,20 @@ function ReviewModal({
   return (
     <ModalOverlay title={`Ma commande · ${supplier.name}`} onClose={onClose}>
       <div style={{ display: "grid", gap: 12 }}>
+        {Object.keys(cheaper).length > 0 && (
+          <p className="ord-cheaper-note">
+            <Scale size={15} />
+            <span>
+              {Object.keys(cheaper).length === 1
+                ? "1 produit de ta commande est moins cher chez un autre fournisseur."
+                : `${Object.keys(cheaper).length} produits de ta commande sont moins chers chez un autre fournisseur.`}
+            </span>
+            <Help title="Moins cher ailleurs">
+              D&apos;après le dernier prix connu chez chaque fournisseur, pour le même article et la même unité de prix (kg, L ou pièce).
+              Retire la ligne ici et commande-la chez l&apos;autre fournisseur si tu veux payer moins cher. Rien n&apos;est changé tout seul.
+            </Help>
+          </p>
+        )}
         <div className="ord-review">
           {lines.map((l) => (
             <div key={l.key} className="ord-review-row">
@@ -531,6 +626,11 @@ function ReviewModal({
               <span>
                 {l.label}
                 {l.productId == null && <small> (variante au choix du commercial)</small>}
+                {cheaper[l.key] && (
+                  <small className="ord-review-cheaper">
+                    Moins cher chez {cheaper[l.key].offer.supplier} : {formatEuro(cheaper[l.key].offer.price)} {perUnit(cheaper[l.key].offer.unit)} {pctLabel(cheaper[l.key].pct)}
+                  </small>
+                )}
               </span>
               <span className="num ord-review-price">{l.estimate != null ? formatEuro(l.estimate) : ""}</span>
               <button type="button" className="fl-btn fl-btn-ghost fl-btn-icon" aria-label={`Retirer ${l.label}`} onClick={() => onRemove(l.key)}>
@@ -633,6 +733,96 @@ function StatsModal({ view, onClose }: { view: StatsView; onClose: () => void })
             </div>
           ))}
         </dl>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Le même article chez les autres fournisseurs
+// ─────────────────────────────────────────────
+
+/** Étiquette sous un produit : « Moins cher chez Soframa » ou « Le moins cher ». */
+function PriceChip({ verdict: v, onClick }: { verdict: PriceVerdict; onClick: () => void }) {
+  const label =
+    v.kind === "cheaper"
+      ? `Moins cher chez ${v.offer.supplier} : ${formatEuro(v.offer.price)} ${perUnit(v.offer.unit)} ${pctLabel(v.pct)}`
+      : v.kind === "best"
+        ? `Le moins cher de tes ${v.suppliers} fournisseurs`
+        : `Prix chez ${v.offer.supplier} : ${formatEuro(v.offer.price)} ${perUnit(v.offer.unit)}`;
+  return (
+    <button type="button" className="ord-price-tag" data-kind={v.kind} onClick={onClick} aria-label={`${label}. Comparer les prix`}>
+      {v.kind === "best" ? <Check size={12} /> : <Scale size={12} />} {label}
+    </button>
+  );
+}
+
+function CompareModal({ view, supplier, onClose }: { view: CompareView; supplier: { id: number; name: string }; onClose: () => void }) {
+  type Row = { key: string; supplierId: number; supplier: string; here: boolean; product: string; price: number | null; unit: string; date: string | null; stats: BuyStats | null; statsUnit: string };
+  const rows: Row[] = [
+    ...view.here.map((p) => ({
+      key: `h${p.id}`,
+      supplierId: supplier.id,
+      supplier: supplier.name,
+      here: true,
+      product: p.name,
+      price: p.price,
+      unit: p.priceUnit,
+      date: p.priceDate,
+      stats: p.stats,
+      statsUnit: p.units[0],
+    })),
+    ...view.offers.map((o) => ({
+      key: `o${o.productId}`,
+      supplierId: o.supplierId,
+      supplier: o.supplier,
+      here: false,
+      product: o.productName,
+      price: o.price,
+      unit: o.unit,
+      date: o.date,
+      stats: o.stats,
+      statsUnit: o.statsUnit,
+    })),
+  ].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || Number(b.here) - Number(a.here));
+  const best = rows[0]?.price ?? null;
+  return (
+    <ModalOverlay title={`${view.article} : comparer les prix`} onClose={onClose}>
+      <div style={{ display: "grid", gap: 12 }}>
+        <p className="sub" style={{ margin: 0 }}>
+          Le dernier prix connu chez chacun de tes fournisseurs, du moins cher au plus cher.
+          <Help title="Comparer les prix" example="Crème 35 % : 4,10 € le L chez Soframa, 4,60 € le L ici → commande-la chez Soframa.">
+            RecipeLog compare les produits rangés sous le même article (« Crème 35 % », « Farine T45 ») avec la même unité de prix (kg, L
+            ou pièce), d&apos;après le dernier prix de chaque fournisseur : facture, mercuriale ou prix tapé à la main. Regarde la date : un
+            vieux prix a pu changer. « Tu y prends » est ce que tu commandes en moyenne chez ce fournisseur sur les {STATS_WEEKS} dernières
+            semaines. Si un produit n&apos;apparaît pas, donne-lui le même article dans la fiche du fournisseur.
+          </Help>
+        </p>
+        <div className="ord-cmp">
+          {rows.map((r) => (
+            <div key={r.key} className="ord-cmp-row" data-best={(r.price != null && best != null && r.price <= best * 1.005) || undefined}>
+              <span className="ord-cmp-who">
+                <b>
+                  {r.supplier}
+                  {r.here && <span className="ord-cmp-here">ici</span>}
+                </b>
+                <small>{r.product}</small>
+                <small>
+                  {r.stats ? `Tu y prends ${perWeekLabel(r.stats.perWeek, r.statsUnit)}` : `Pas commandé ces ${STATS_WEEKS} semaines`}
+                </small>
+              </span>
+              <span className="ord-cmp-price">
+                <b className="num">{r.price != null ? `${formatEuro(r.price)} ${perUnit(r.unit)}` : "pas de prix"}</b>
+                {r.date && <small>prix du {frDay(r.date)}</small>}
+                {!r.here && (
+                  <Link className="ord-cmp-go" href={`/fournisseurs/${r.supplierId}/commande?q=${encodeURIComponent(view.article)}`}>
+                    Commander chez lui
+                  </Link>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </ModalOverlay>
   );

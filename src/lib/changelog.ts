@@ -11,6 +11,21 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.29",
+    date: "2026-11-26",
+    title: "Moins cher chez un autre fournisseur",
+    summary:
+      "Quand tu passes une commande, chaque produit te dit si un autre de tes fournisseurs le vend moins cher, et combien tu commandes chez chacun. Tu vois tout de suite où commander au meilleur prix.",
+    features: [
+      "Passer une commande : sous chaque produit que tu as aussi chez un autre fournisseur, « Moins cher chez Soframa : 0,80 € le kg (−13 %) » en orange, ou « Le moins cher de tes 3 fournisseurs » en vert",
+      "Touche cette étiquette : tous les prix du même article chez tes fournisseurs, du moins cher au plus cher, avec la date de chaque prix, ce que tu y commandes par semaine et un lien « Commander chez lui » qui ouvre directement le produit chez l'autre fournisseur",
+      "Nouveau bouton « Moins cher ailleurs » : il ne montre que les produits que tu paierais moins cher chez un autre fournisseur",
+      "Ma commande : avant d'enregistrer, RecipeLog prévient quand des produits sont moins chers ailleurs et dit chez qui",
+      "La comparaison se fait sur les produits rangés sous le même article (« Farine T45 », « Crème 35 % ») avec la même unité de prix (kg, L ou pièce), d'après le dernier prix connu chez chacun",
+      "Claude : quand il passe une commande pour toi, il te dit aussi les produits moins chers chez un autre fournisseur",
+    ],
+  },
+  {
     version: "V2.28",
     date: "2026-11-25",
     title: "Ce que je commande d'habitude",

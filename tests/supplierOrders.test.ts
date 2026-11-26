@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderText, orderUnits, packNameOf, qtyLabel, suggestGroups, unitEstimate } from "@/lib/supplierOrders";
+import { offerKey, orderText, orderUnits, packNameOf, priceVerdict, qtyLabel, suggestGroups, unitEstimate } from "@/lib/supplierOrders";
 
 describe("conditionnement commandé", () => {
   it("prend le conditionnement réglé", () => {
@@ -78,5 +78,43 @@ describe("regroupements proposés", () => {
     expect(suggestGroups([{ id: 1, name: "Chocolat noir 64 %" }, { id: 2, name: "Chocolat lait 35 %" }])).toEqual([]);
     expect(suggestGroups([{ id: 1, name: "Farine T45" }, { id: 2, name: "Farine T55" }])).toEqual([]);
     expect(suggestGroups([{ id: 1, name: "Sucre semoule" }, { id: 2, name: "Sucre glace" }])).toHaveLength(1);
+  });
+});
+
+describe("priceVerdict", () => {
+  const offer = (supplierId: number, price: number) => ({
+    supplierId,
+    supplier: `F${supplierId}`,
+    productId: supplierId * 10,
+    productName: "Farine T45",
+    price,
+    unit: "kg",
+    date: "2026-11-20",
+    stats: null,
+    statsUnit: "sac",
+  });
+
+  it("rien à comparer sans autre fournisseur", () => {
+    expect(priceVerdict(1, [])).toBeNull();
+    expect(priceVerdict(1, undefined)).toBeNull();
+  });
+
+  it("dit où c'est moins cher, avec l'économie en %", () => {
+    const v = priceVerdict(0.92, [offer(3, 0.95), offer(2, 0.8)]);
+    expect(v).toMatchObject({ kind: "cheaper", pct: 13, offer: { supplierId: 2 } });
+  });
+
+  it("ici le moins cher, ou presque le même prix", () => {
+    expect(priceVerdict(0.8, [offer(2, 0.92), offer(3, 0.95)])).toEqual({ kind: "best", suppliers: 3 });
+    expect(priceVerdict(1, [offer(2, 0.998)])).toEqual({ kind: "best", suppliers: 2 });
+  });
+
+  it("pas de prix ici : le prix connu ailleurs", () => {
+    expect(priceVerdict(null, [offer(2, 0.9), offer(3, 0.8)])).toMatchObject({ kind: "elsewhere", offer: { supplierId: 3 } });
+  });
+
+  it("offerKey ignore casse et accents", () => {
+    expect(offerKey("Crème 35 %", "L")).toBe(offerKey("creme  35 %", "L"));
+    expect(offerKey("Crème 35 %", "L")).not.toBe(offerKey("Crème 35 %", "kg"));
   });
 });

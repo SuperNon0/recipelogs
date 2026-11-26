@@ -6,7 +6,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { parseDay } from "./purchaseOrders";
 import { articleKey, articleOf } from "./suppliers";
-import { STATS_WEEKS, buyStats, orderText, orderUnits, packNameOf, toOrderUnit, type BuyEvent, type BuyStats } from "./supplierOrders";
+import { STATS_WEEKS, buyStats, offerKey, orderText, orderUnits, packNameOf, toOrderUnit, type BuyEvent, type BuyStats, type Offer } from "./supplierOrders";
 
 const num = (v: Prisma.Decimal | number | null | undefined) => (v == null ? null : Number(v));
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -127,13 +127,101 @@ export async function loadOrderCatalog(supplierId: number) {
     const st = buyStats([...list.flatMap((c) => buys.get(c.id) ?? []), ...loose], today, since);
     if (st) articleStats[k] = { unit, stats: st };
   }
+  const offers = await loadOtherOffers(supplierId, catalog, today, from);
   return {
     supplier: s,
     products: catalog,
+    offers,
     lastArticles: Object.fromEntries(lastByArticle),
     articleStats,
     signature,
   };
+}
+
+/**
+ * Les mêmes articles (même nom d'article, même unité de prix) chez les autres
+ * fournisseurs : pour chacun, le dernier prix de la variante achetée le plus
+ * récemment (comme le tableau « Comparer les prix ») et ce que j'y commande
+ * d'habitude. Clé offerKey → offres du moins cher au plus cher.
+ */
+async function loadOtherOffers(
+  supplierId: number,
+  catalog: { article: string; priceUnit: string }[],
+  today: string,
+  from: Date,
+): Promise<Record<string, Offer[]>> {
+  const keys = new Set(catalog.map((c) => offerKey(c.article, c.priceUnit)));
+  if (!keys.size) return {};
+  const others = await prisma.supplierProduct.findMany({
+    where: { supplierId: { not: supplierId }, price: { not: null } },
+    select: { id: true, supplierId: true, name: true, article: true, packSize: true, packName: true, price: true, priceUnit: true, priceDate: true, supplier: { select: { name: true } } },
+  });
+  type P = (typeof others)[number];
+  // Un article chez un fournisseur = toutes ses variantes.
+  const bySlot = new Map<string, { key: string; list: P[] }>();
+  for (const p of others) {
+    const key = offerKey(articleOf(p), p.priceUnit);
+    if (!keys.has(key)) continue;
+    const slot = `${key}#${p.supplierId}`;
+    const cur = bySlot.get(slot);
+    if (cur) cur.list.push(p);
+    else bySlot.set(slot, { key, list: [p] });
+  }
+  if (!bySlot.size) return {};
+  const ids = [...bySlot.values()].flatMap((x) => x.list.map((p) => p.id));
+  const sids = [...new Set([...bySlot.values()].map((x) => x.list[0].supplierId))];
+  const [invoiceLines, orderLines, firstInvoices, firstOrders] = await Promise.all([
+    prisma.purchaseOrderLine.findMany({
+      where: { productId: { in: ids }, quantity: { not: null }, order: { manual: false, date: { gte: from } } },
+      select: { productId: true, quantity: true, order: { select: { date: true } } },
+    }),
+    prisma.supplierOrderLine.findMany({
+      where: { productId: { in: ids }, order: { date: { gte: from } } },
+      select: { productId: true, quantity: true, unit: true, order: { select: { date: true } } },
+    }),
+    prisma.purchaseOrder.groupBy({ by: ["supplierId"], where: { supplierId: { in: sids }, manual: false }, _min: { date: true } }),
+    prisma.supplierOrder.groupBy({ by: ["supplierId"], where: { supplierId: { in: sids } }, _min: { date: true } }),
+  ]);
+  const since = new Map<number, string>();
+  for (const r of [...firstInvoices, ...firstOrders]) {
+    if (!r._min.date) continue;
+    const d = isoDay(r._min.date);
+    const cur = since.get(r.supplierId);
+    if (!cur || d < cur) since.set(r.supplierId, d);
+  }
+  const baseOf = (p: P) => ({ name: p.name, packName: p.packName, packSize: num(p.packSize), priceUnit: p.priceUnit });
+  const prodById = new Map(others.map((p) => [p.id, p]));
+  const buys = new Map<number, BuyEvent[]>();
+  const push = (id: number, e: BuyEvent) => buys.set(id, [...(buys.get(id) ?? []), e]);
+  for (const l of invoiceLines) push(l.productId, { date: isoDay(l.order.date), quantity: Number(l.quantity), source: "facture" });
+  for (const l of orderLines) {
+    const p = l.productId != null ? prodById.get(l.productId) : undefined;
+    if (!p) continue;
+    const q = toOrderUnit(baseOf(p), Number(l.quantity), l.unit);
+    if (q != null) push(p.id, { date: isoDay(l.order.date), quantity: q, source: "commande" });
+  }
+  const out: Record<string, Offer[]> = {};
+  for (const { key, list } of bySlot.values()) {
+    // La variante achetée le plus récemment ; à date égale, la moins chère.
+    const latest = list
+      .slice()
+      .sort((a, b) => (b.priceDate?.getTime() ?? 0) - (a.priceDate?.getTime() ?? 0) || Number(a.price) - Number(b.price))[0];
+    const statsUnit = orderUnits(baseOf(latest))[0];
+    const events = list.filter((p) => orderUnits(baseOf(p))[0] === statsUnit).flatMap((p) => buys.get(p.id) ?? []);
+    (out[key] ??= []).push({
+      supplierId: latest.supplierId,
+      supplier: latest.supplier.name,
+      productId: latest.id,
+      productName: latest.name,
+      price: Number(latest.price),
+      unit: latest.priceUnit,
+      date: latest.priceDate ? isoDay(latest.priceDate) : null,
+      stats: buyStats(events, today, since.get(latest.supplierId) ?? null),
+      statsUnit,
+    });
+  }
+  for (const list of Object.values(out)) list.sort((a, b) => a.price - b.price || a.supplier.localeCompare(b.supplier, "fr"));
+  return out;
 }
 
 const SIGNATURE_KEY = "orderSignature";
